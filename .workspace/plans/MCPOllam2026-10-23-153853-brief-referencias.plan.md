@@ -643,3 +643,24 @@ O brief é aditivo e fica numa pasta própria. Para reverter, basta apagar `refe
   | --- | --- |
   | B0 a B6 | concluídas |
   | B7 | **concluída**, exceto o commit (aguarda ordem do owner) |
+
+### 2026-10-23 19:28 — decisões finais do owner + commit
+- **Decisões (via AskUserQuestion, 19:21):**
+  - P-5 = só o projeto;
+  - P-6 = `--max-prompt-chars` ≈ 128.000 caracteres (~48k tokens);
+  - **PB6-1 = `PROTO-009` vira MUST**;
+  - P-9 = `openWorldHint:false`.
+- **Aplicado:** `60` (1.2.0) e `61` (1.2.0) agora com **105 MUST, 52 SHOULD, 14 COULD**; MUST por fase: Fase 1 = 44, Fase 3 = 38.
+  - Conferido: 105 linhas MUST no `60` e no `61`; listas por fase com contagem declarada igual à contada; LF nos dois.
+  - Também atualizados: `CFG-010` (default ≈ 128.000 caracteres; `65536` na lista de literais proibidos) e `TOOL-005` (`openWorldHint:false`).
+- **Não deu certo, e a solução:**
+  1. **1ª tentativa:** a função auxiliar se chamava `R`, que no PowerShell é alias de `Invoke-History` e tem precedência sobre a função. **Nenhuma substituição foi feita**; os dois arquivos foram regravados só com o `FileVersion` trocado para 1.2.0, com o conteúdo intacto (contagens continuaram 104/53/14) e em LF. Refeito com a função `Rep1`, que exige exatamente 1 ocorrência por troca.
+  2. **1º `git commit`:** a here-string passada a `-F -` virou pathspec no PowerShell 5.1, e o commit falhou com o índice intacto. Refeito com a mensagem num arquivo UTF-8 (`-F <arquivo>`).
+- **Pré-commit (lido):**
+  - varredura de segredos sobre **os 52 arquivos** a commitar (e não só o brief): `known_hits=0`, 0 `Bearer` com valor;
+  - 2 ocorrências de `BEGIN .*PRIVATE KEY`, que são o **texto da regex** (plano, linha 220, e `scan-segredos-brief.ps1:154`), não uma chave;
+  - índice: 52 arquivos, 0 fora do conjunto aprovado, 0 de `referencias/` fora do brief, 0 `.mcp.json`/`.exe`/`.env`/`settings.local.json`.
+- **Commit `0fba414`** ("docs: brief das referências e planos do mcpollama (fase de concepção)"): 52 arquivos, stage por caminho, sem push (não há remoto). Fora do commit, por decisão: `.claude/`, `.cursor/`, `.vscode/`.
+- **Aviso registrado:** o `core.autocrlf` do Git global converte LF → CRLF no checkout. O índice guarda LF. Recomenda-se um `.gitattributes` (`* text=auto eol=lf`), já registrado no brief (lição de CRLF do truenas-mcp). **Não criado:** decisão do owner, a tratar no scaffold da Fase 1.
+- **Este registro** foi feito depois do commit, então fica pendente para o próximo.
+- **Ondas:** B0 a B7 **concluídas**. Brief encerrado.

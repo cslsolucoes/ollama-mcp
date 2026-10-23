@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| **FileVersion** | 1.2.0 |
+| **FileVersion** | 1.2.1 |
 | **Data** | 2026-10-23 |
 | **Origem** | onda B5 do plano `.workspace/plans/MCPOllam2026-10-23-153853-brief-referencias.plan.md` |
 
@@ -307,7 +307,7 @@ Fila única de GPU, carga a frio e o defeito de prompt grande medidos em `VAL`.
 | `MCPO-REQ-PERF-001` | **Carga a frio não é falha.** A primeira chamada depois de o modelo sair da VRAM leva ~32 a 36 s (31.963 e 36.449 ms medidos) e não é falha: o timeout default é maior, a mensagem de timeout cita a carga a frio e `load_duration` aparece na linha de uso. | MUST | VAL §5 e §8.3; PBR (changelog 18:12 e 18:29) | Mock com atraso de carga; smoke real lendo `load_duration`. |
 | `MCPO-REQ-PERF-002` | **Fila de GPU no servidor MCP.** Um semáforo (N=1, configurável) antes do cliente HTTP serializa as chamadas ao Ollama. `ping` e `tools/list` não entram na fila. A espera na fila é medida e reportada. | MUST | CLM (Servidor Ollama: fila única); TNS-README (item 4: fila própria para a GPU); LIC-TNS-003 | Teste com duas chamadas simultâneas: a segunda espera e o tempo de fila aparece. |
 | `MCPO-REQ-PERF-003` | **Timeout de fila separado.** O timeout de espera na fila é separado do timeout de execução; ao exceder, a mensagem diz "na fila". | SHOULD | TNS-10 (task em `working` com "na fila"); (inferência) | Teste. |
-| `MCPO-REQ-PERF-004` | **Teto de prompt provisório.** `--max-prompt-chars` tem default PROVISÓRIO e conservador, abaixo de 42.540 caracteres (valor a fixar; só 44 tokens foram provados). Prompt acima do teto vira chunking ou erro e nunca é enviado. | MUST | VAL §7 e §8.1 (falha reproduzida 2×; derruba o serviço); PBR (PB4-1, PB4-2) | Teste: prompt acima do teto não chega ao mock. |
+| `MCPO-REQ-PERF-004` | **Teto de prompt.** `--max-prompt-chars` tem default **128.000 caracteres (~48k tokens)** (decisão do owner, P-6, 2026-10-23 19:21; a redação original, "abaixo de 42.540 caracteres", valia enquanto o defeito do servidor estava aberto e foi superada pela mitigação, VAL §9). Prompt acima do teto vira chunking ou erro e nunca é enviado. | MUST | VAL §7 e §8.1 (falha reproduzida 2×; derruba o serviço); PBR (PB4-1, PB4-2) | Teste: prompt acima do teto não chega ao mock. |
 | `MCPO-REQ-PERF-005` | **Sem prompt grande ao vivo.** Nenhum teste ao vivo envia prompt acima de 42.540 caracteres, nem para medir o limite, sem ordem explícita do owner. O limiar só se mede depois da correção do servidor (PB4-1). | MUST | VAL §7 ("cada falha derruba o serviço que outros clientes usam") | Procedimento; revisão dos testes `live`. |
 | `MCPO-REQ-PERF-006` | **Sem literal de contexto.** O código não fixa `32768`, `131072` nem `65536` como limite de contexto. O `num_ctx` real é informação do servidor (lido de `/api/show` ou `/api/ps` quando útil) e o orçamento vem de configuração. | MUST | VAL §3 e §8.1 (divergência 32k × 131072) | `grep` de literais = 0 como limite. |
 | `MCPO-REQ-PERF-007` | **Disjuntor para prompt grande.** Depois de uma conexão derrubada com prompt grande, um disjuntor bloqueia novos prompts acima daquele tamanho por X minutos. | COULD | VAL §7 (inferência: o serviço reinicia) | Teste se existir. |
@@ -350,6 +350,7 @@ Cada linha é um defeito encontrado (medido ou lido) numa referência e o requis
 
 ## Changelog
 
+- **1.2.1 (2026-10-23):** Fase 1 da implementação: `PERF-004` alinhado à decisão P-6 (default de 128.000 caracteres). O conflito com o `CFG-010` foi apontado pelo agente da Fase 1.
 - **1.2.0 (2026-10-23):** B7, com as decisões do owner das 19:21: `PROTO-009` passa de SHOULD a **MUST** (PB6-1), e o total fica **105 MUST, 52 SHOULD, 14 COULD**; `TOOL-005` com `openWorldHint:false` declarado (P-9); `CFG-010` com default de `--max-prompt-chars` ≈ 128.000 caracteres, ~48k tokens (P-6), e o literal `65536` incluído na lista proibida.
 - **1.1.0 (2026-10-23):** B6 (revisão adversarial, ver `70-Revisao.md`). Só fontes corrigidas; enunciados, prioridades e contagens (171; 104/53/14) inalterados. `PROTO-009`: "(inferência)" trocada pela citação da especificação MCP 2025-11-25 (tool desconhecida = erro de protocolo, exemplo `-32602`). `TOOL-005`: defaults de `ToolAnnotations` da especificação (`openWorldHint` default `true`). `CFG-003`: linha `454-456` → `454-460`. `CFG-005`: o `load_ms` 31.963 vem do changelog do plano (PBR 18:29), não do `VAL §5`. `SEC-001`: removida a "contradição" do `OMG-30:33`, já corrigida no B5. `SEC-016`: registrado que o `.mcp.json` do MCPVMWare já foi posto no `.gitignore`.
 - **1.0.0 (2026-10-23):** B5. 171 requisitos em 12 áreas (104 MUST, 53 SHOULD, 14 COULD), 24 anti-padrões medidos como requisitos negativos. Gerado a partir de um único conjunto de dados que também alimenta a `61-Matriz_Cobertura.md`, para as duas não divergirem.

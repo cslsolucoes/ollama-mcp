@@ -16,7 +16,11 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-23: **concepção**. Todo o código-fonte fica em `src/` (criada, ainda vazia); o layout abaixo é o alvo.
+Estado em 2026-10-23: **Fase 1 concluída**. O esqueleto do protocolo está em `src/`
+(`mcp/types.go`, `mcpollama-mcp/`): `initialize`, `ping`, `tools/list` (ainda vazio) e
+`tools/call`, com os erros JSON-RPC. Ainda não há cliente Ollama (Fase 2) nem tools (Fase 3).
+O layout abaixo é o alvo; requisitos por fase em
+`referencias/Brief_Referencias/61-Matriz_Cobertura.md` §3.
 
 ---
 
@@ -85,9 +89,15 @@ src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao
 ```
 
 - **Configuração:** flags com fallback para variável de ambiente, como em `TruenasMcp`/`mcpvmware-mcp`:
-  `--ollama-url`/`OLLAMA_HOST`, `--api-key`/`OLLAMA_API_KEY`, `--tls-ca`/`OLLAMA_TLS_CA`,
-  `--insecure`/`OLLAMA_INSECURE`, `--model`/`OLLAMA_MODEL` (default `qwen3-ia`), `--debug`,
-  `--version`, `--tools-verbosity full|compact` (o tamanho do `tools/list` também custa tokens).
+  `--ollama-url`/`OLLAMA_HOST`, `--api-key`/`OLLAMA_API_KEY` (preferir a env; sem `--api-key-file`),
+  `--tls-ca`/`OLLAMA_TLS_CA`, `--insecure`/`OLLAMA_INSECURE`, `--model`/`OLLAMA_MODEL`
+  (default `qwen3-ia`), `--embed-model`/`OLLAMA_EMBED_MODEL` (default `nomic-embed-text`),
+  `--timeout`/`OLLAMA_TIMEOUT` (default 120 s, provisório até a medição da Fase 5),
+  `--max-prompt-chars`/`MCPOLLAMA_MAX_PROMPT_CHARS` (default 128000),
+  `--max-file-bytes`/`MCPOLLAMA_MAX_FILE_BYTES`, `--max-line-bytes`/`MCPOLLAMA_MAX_LINE_BYTES`,
+  `--tools-verbosity`/`MCPOLLAMA_TOOLS_VERBOSITY` (`full|compact`; o tamanho do `tools/list`
+  também custa tokens), `--debug`/`MCPOLLAMA_DEBUG`, `--version`. A fonte da verdade é
+  `src/mcpollama-mcp/config.go`.
 - **stdout é exclusivo do JSON-RPC.** Log e debug vão para stderr. O servidor não grava em
   disco a não ser que uma flag peça.
 - **Sem tools administrativas.** O nginx devolve 403 em `/api/pull|push|create|delete|copy|blobs`.

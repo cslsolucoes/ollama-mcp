@@ -91,17 +91,23 @@ src/
   tools/                  uma tool por arquivo + *_test.go ao lado
 ```
 
-**Configuração (proposta).** Cada flag tem fallback para uma variável de ambiente:
+**Configuração (implementada na Fase 1; fonte da verdade: `src/mcpollama-mcp/config.go`).** Cada flag tem fallback para uma variável de ambiente:
 
 | Flag | Env | Default |
 | --- | --- | --- |
-| `--ollama-url` | `OLLAMA_HOST` | `http://127.0.0.1:11434` |
-| `--api-key` | `OLLAMA_API_KEY` | — (Bearer do nginx) |
+| `--ollama-url` | `OLLAMA_HOST` | — (sem default; o erro vem por chamada, a partir da Fase 2) |
+| `--api-key` | `OLLAMA_API_KEY` | — (Bearer do nginx; prefira a env: `args` aparecem na lista de processos) |
 | `--tls-ca` | `OLLAMA_TLS_CA` | — (PEM da Cloudflare Origin CA) |
-| `--insecure` | `OLLAMA_INSECURE` | `false` |
+| `--insecure` | `OLLAMA_INSECURE` | `false` (gera WARNING a cada start) |
 | `--model` | `OLLAMA_MODEL` | `qwen3-ia` |
-| `--tools-verbosity` | — | `full` (`compact` reduz o custo do `tools/list`) |
-| `--debug` / `--version` | `MCPOLLAMA_DEBUG` | — |
+| `--embed-model` | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
+| `--timeout` | `OLLAMA_TIMEOUT` | `120s` (provisório até a medição da Fase 5) |
+| `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` (~48k tokens) |
+| `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |
+| `--max-line-bytes` | `MCPOLLAMA_MAX_LINE_BYTES` | `8388608` (linha de stdin; sem o teto de 64 KB do `bufio.Scanner`) |
+| `--tools-verbosity` | `MCPOLLAMA_TOOLS_VERBOSITY` | `full` (`compact` reduz o custo do `tools/list`) |
+| `--debug` | `MCPOLLAMA_DEBUG` | `false` (só metadados; nunca argumentos nem o token) |
+| `--version` | — | imprime a versão (injetada por `-ldflags "-X main.Version=..."`) |
 
 **Tools (proposta).**
 - **Base**, como no `ollama-mcp-go`: `list_models`, `generate`, `chat`, `embed`.

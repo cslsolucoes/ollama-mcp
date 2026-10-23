@@ -277,7 +277,7 @@ Leitura: as referências resolvem bem o **protocolo base** e a **higiene de buil
 | `MCPO-REQ-PERF-001` | Carga a frio não é falha | MUST | 2, 3 | nenhuma | GAP |  |
 | `MCPO-REQ-PERF-002` | Fila de GPU no servidor MCP | MUST | 3 | nenhuma | GAP | PB5-4 |
 | `MCPO-REQ-PERF-003` | Timeout de fila separado | SHOULD | 3 | nenhuma | GAP | PB5-4 |
-| `MCPO-REQ-PERF-004` | Teto de prompt provisório | MUST | 1, 2, 4 | nenhuma | GAP | PB5-1 |
+| `MCPO-REQ-PERF-004` | Teto de prompt (default 128.000 caracteres, P-6) | MUST | 1, 2, 4 | nenhuma | GAP | PB5-1; P-6 decidida (19:21) |
 | `MCPO-REQ-PERF-005` | Sem prompt grande ao vivo | MUST | 2, 3, 4 | nenhuma | GAP | PB5-1 |
 | `MCPO-REQ-PERF-006` | Sem literal de contexto | MUST | 1, 2, 4 | W1 (`CONTEXT_SIZE`, parcial) | GAP | PB5-1 |
 | `MCPO-REQ-PERF-007` | Disjuntor para prompt grande | COULD | 3, 4 | nenhuma | GAP | PB5-10 |

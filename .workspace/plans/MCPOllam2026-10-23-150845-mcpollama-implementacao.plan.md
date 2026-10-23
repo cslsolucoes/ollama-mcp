@@ -279,3 +279,64 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
 3. **PB6-1 (brief) = `MCPO-REQ-PROTO-009` vira MUST:** tool desconhecida → `-32602`. O brief foi recontado para **105 MUST, 52 SHOULD, 14 COULD**; a Fase 1 fica com 44 MUST e a Fase 3 com 38. Conferido nos dois documentos (`60` e `61`).
 4. **P-9 = `openWorldHint:false`** declarado.
 - **Ainda abertas:** P-3 (Fase 5), P-4 (após a Fase 6), P-7 (após a medição da Fase 5), P-8, P-10 (Fase 4) e o versionamento do pack `.cursor/`.
+- **1º commit:** `0fba414` (52 arquivos: `CLAUDE.md`, `README.md`, `.gitignore`, `.claudeignore`, `.cursorignore`, `.workspace/` e o brief), com stage por caminho, sem push.
+- **Para a Fase 1:** criar o `.gitattributes` (`* text=auto eol=lf`). O `core.autocrlf` global converte para CRLF no checkout (lição de CRLF do truenas-mcp).
+
+### 2026-10-23 19:30 — Fase 1 iniciada (ordem do owner: "prossiga por ordem de dependência")
+- **Ponto de partida (lido):** `go1.26.5 windows/amd64`; `src/` existe e está vazio (sem `go.mod`); sem `.gitattributes`; `core.autocrlf=true`.
+- **Execução:** implementação delegada a um agente Sonnet. O loop principal verifica: build limpo, `go vet`, `go test -count=1`, smoke via pipe lido e conferência dos 44 MUST da Fase 1 (`61` §3).
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 | concluída (commit `0fba414`) |
+  | 1 | **em execução** |
+  | 2 a 6 | pendentes |
+
+### 2026-10-23 19:45 — Fase 1 concluída (agente Sonnet + verificação do loop principal)
+- **Feito (agente):**
+  - `src/go.mod`: módulo `github.com/cslsoftwares/mcpollama`, Go 1.26, **sem `require`**;
+  - `src/mcp/types.go` (103 linhas), com os tipos JSON-RPC e MCP escritos à mão;
+  - `src/mcpollama-mcp/`: `main.go` (48), `config.go` (226), `logger.go` (61), `server.go` (365), `config_test.go` (199) e `server_test.go` (547). Linhas medidas pelo loop principal; os números relatados pelo agente estavam desatualizados;
+  - `.gitattributes` (`* text=auto eol=lf`, `*.go`/`go.mod`/`go.sum` em LF, `*.ps1` em CRLF, `*.exe binary`);
+  - binário `mcpollama-mcp.exe` na raiz (ignorado por `.gitignore:2:*.exe`).
+- **Achado do agente no smoke:** o pipe do PowerShell 5.1 antepõe um BOM UTF-8 à 1ª linha, e o servidor respondia `-32700`. Agora um BOM no início da linha é descartado (`TestLeadingBOMTolerated`).
+- **Verificação do loop principal (2ª via, lida):**
+  1. **Gate limpo:** `go clean -cache -testcache`; `go build ./...` = 0; `go vet ./...` = 0; `go test -count=1 -v ./...` com **43 PASS, 0 FAIL** (`ok .../mcpollama-mcp 0.065s`; `mcp` sem testes, só tipos); `gofmt -l .` vazio. O agente mediu **94,3%** de cobertura em `mcpollama-mcp`.
+  2. **Falso alarme descartado:** o `gopls` acusou `parseConfig`, `validate`, `secrets`, `safeURL`, `newRedactor` e `debugf` como não usados. A busca de chamadores mostra uso real em `main.go:27,32,35,44` e `server.go:48,105,120,121,201,315`. Era diagnóstico desatualizado do editor.
+  3. **Smoke do binário** (`-ldflags -X main.Version=0.1.0-smoke`), com stdin por arquivo (sem BOM), `--ollama-url https://exemplo.invalid`, `--debug` e token-**sentinela** falso em `OLLAMA_API_KEY`:
+     - `exit=0`; **7 linhas de stdout, todas JSON válido**; a notificação não teve resposta;
+     - `initialize` com `2025-06-18` → `protocolVersion` `2025-06-18`, `serverInfo.version` `0.1.0-smoke`;
+     - `ping` → `{}`; `tools/list` → `{"tools":[]}`;
+     - método inexistente → `-32601`; JSON inválido → `-32700` com `id` nulo; `tools/call` de `x` → **`-32602`** "Unknown tool: x";
+     - **linha de ~100 KB → respondida `{}`**, sem o teto de 64 KB dos moldes;
+     - sentinela: **0** ocorrências em stdout e em stderr; 0 CR no stdout;
+     - `--version` → `mcpollama-mcp version 0.1.0-smoke`.
+  4. **Fim de linha:** `git ls-files --eol` mostra todo o índice em LF (46 `w/lf` e 6 `w/crlf` na cópia de trabalho, sem diff). O `.gitattributes` não exige renormalização.
+- **MUST da Fase 1 (44):** 41 atendidos, com teste ou comando listado pelo agente. A conferência por amostra no smoke cobriu PROTO-001/002/003/005/006/007/008/009, SEC-003, OBS-002, TEST-007/015 e BUILD-003. Exceções:
+  - **BUILD-001 (parcial, esperado):** `ollama/`, `tools/` e `cmd/dumptools` são das Fases 2 e 3;
+  - **BUILD-002 (agora atendido):** o `.exe` é ignorado (`git check-ignore`);
+  - **BUILD-003 (atendido):** `var Version`, com `-X main.Version`, que é o nome do requisito (o prompt dizia `version`);
+  - **BUILD-011 (atendido pelo loop principal):** este registro;
+  - **PERF-004 × CFG-010 (conflito resolvido):** o PERF-004 pedia um teto abaixo de 42.540, redação de antes da mitigação do servidor. Foi **alinhado à decisão P-6** (128.000): `60` 1.2.1 e linha no `61`. O código já usava 128000.
+  - **CFG-003 (parcial, esperado):** o `model` por chamada vem com as tools, na Fase 3.
+- **Não deu certo / limitações:**
+  1. **`-race` não roda nesta máquina:** `CGO_ENABLED=0` e não há `gcc` no PATH (verificado). Fica a pendência **P1-1**: rodar `-race` num ambiente com cgo (ex.: Linux/CI), obrigatório antes da Fase 3, que traz o loop concorrente (PB5-9).
+  2. **Comportamentos decididos pelo agente sem requisito explícito** (ficam como estão; podem ser revistos):
+     - `id:null` respondido com `id:null`;
+     - JSON válido que não é objeto → `-32600`;
+     - faltar `jsonrpc` ou `method` → `-32600`;
+     - notificação desconhecida nunca recebe resposta;
+     - `compact` corta para a 1ª frase;
+     - `--ollama-url` vazio não impede o arranque;
+     - `--timeout` com default de 120 s.
+  3. `--trace-file` e `--audit-log-path` existem, mas só emitem um WARNING de "fase futura" e não gravam nada (SEC-014 e CFG-011 mantidos).
+- **Docs atualizados:** `CLAUDE.md` (estado "Fase 1 concluída"; flags e env reais, apontando para o `config.go` como fonte da verdade); `README.md` (tabela de configuração implementada, com 13 linhas e defaults reais).
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 | concluída (`0fba414`) |
+  | 1 | **concluída** (commit abaixo) |
+  | 2 | próxima: cliente Ollama |
+  | 3 a 6 | pendentes |
