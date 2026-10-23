@@ -1,0 +1,3 @@
+# Allowlist de falsos positivos triados da varredura de segredos do brief (SHA-256 do valor; nunca o valor).
+# Formato: <sha256>  # origem | motivo | data
+1790b601484a9cbb67466fe38b67fc7f74c5563a8b315e8725c848de77ee890b  # MCPVMWare/.mcp.json $._mcpServersDesativados.mcpVmwareTest.args[0] | 7 chars, aparece 107x no codigo/doc publico do MCPVMWare (nao e credencial) | 2026-10-23

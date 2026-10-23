@@ -1,0 +1,17 @@
+# Binarios compilados (Go) — gerados de src/ para a raiz, nunca versionar
+*.exe
+/mcpollama-mcp
+
+# Config de MCP servers project-level — pode conter o Bearer token do Ollama
+.mcp.json
+
+# Referencias externas e de outros projetos — contem credenciais reais
+# (ex.: referencias/MCPVMWare/.mcp.json). Somente leitura, nunca versionar.
+# Excecao: o brief (sintese propria, 0 segredos) e versionado.
+# Tem de ser `referencias/*` (nao `referencias/`) para a excecao funcionar.
+referencias/*
+!referencias/Brief_Referencias/
+
+# Estado local de sessao / tooling
+.remember/
+.claude/settings.local.json

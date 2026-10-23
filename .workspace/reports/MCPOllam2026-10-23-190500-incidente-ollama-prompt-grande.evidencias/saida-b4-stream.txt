@@ -1,0 +1,8 @@
+﻿18:10:47 config {"base_env":"https://ia.cslsolucoes.com.br:8443","inet":"https://ia.cslsolucoes.com.br","lan":"https://ia.cslsolucoes.com.br:8443","openai_model_env":"qwen3.8:27b-64k","token_carregado":true}
+18:10:48 dns {"err":"","host":"ia.cslsolucoes.com.br","ips":["10.100.2.2"]}
+18:10:48 pools {"ca_origem_apenas_ok":true,"so_mais_ca_ok":true,"system_pool_err":""}
+18:10:48 ps {"err":"","label":"inicio","models":[{"name":"nomic-embed-text:latest","size_vram":851873625,"context_length":2048}],"qwen3_ia_carregado":false,"status":200}
+18:11:24 generate {"done_reason":"stop","err":"","error_field":"","eval_count":2,"eval_ms":36,"gen_tok_s":54.7600142376037,"label":"curto-recarga","load_ms":36449,"prompt_chars":37,"prompt_eval_count":35,"prompt_eval_ms":188,"prompt_tok_s":185.72565667285753,"response":"ok","status":200,"total_ms":36675,"wall_ms":36684}
+18:11:24 ps {"err":"","label":"apos-recarga","models":[{"name":"qwen3-ia:latest","size_vram":25562028438,"context_length":131072}],"qwen3_ia_carregado":true,"status":200}
+18:12:09 stream {"err":"Post \"https://ia.cslsolucoes.com.br:8443/api/generate\": read tcp 10.100.2.30:24760-\u003e10.100.2.2:8443: wsarecv: Foi forçado o cancelamento de uma conexão existente pelo host remoto.","fase":"headers","ms":45019}
+18:12:22 ps {"err":"","label":"apos-falha","models":[],"qwen3_ia_carregado":false,"status":200}
