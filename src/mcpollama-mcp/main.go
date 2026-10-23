@@ -10,6 +10,8 @@ import (
 	"io"
 	"log"
 	"os"
+
+	"github.com/cslsoftwares/mcpollama/redact"
 )
 
 // Version is overridden at build time:
@@ -32,7 +34,7 @@ func realMain(args []string, getenv func(string) string, stdin io.Reader, stdout
 		err = cfg.validate()
 	}
 	if err != nil {
-		fmt.Fprintln(stderr, "mcpollama-mcp: "+newRedactor(cfg.secrets()...)(err.Error()))
+		fmt.Fprintln(stderr, "mcpollama-mcp: "+redact.New(cfg.secrets()...)(err.Error()))
 		return 2
 	}
 	if cfg.ShowVersion {
@@ -41,7 +43,7 @@ func realMain(args []string, getenv func(string) string, stdin io.Reader, stdout
 	}
 	cfg.Version = Version
 	if err := Run(context.Background(), stdin, stdout, stderr, cfg, nil); err != nil {
-		fmt.Fprintln(stderr, "mcpollama-mcp: "+newRedactor(cfg.secrets()...)(err.Error()))
+		fmt.Fprintln(stderr, "mcpollama-mcp: "+redact.New(cfg.secrets()...)(err.Error()))
 		return 1
 	}
 	return 0

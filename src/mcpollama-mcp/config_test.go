@@ -197,3 +197,13 @@ func TestNoLiteralContextLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestOllamaOptionsFromConfig(t *testing.T) {
+	c := Config{OllamaURL: "https://h.invalid:8443", APIKey: "k", TLSCA: "ca.pem", Insecure: true, Model: "m", EmbedModel: "e",
+		Timeout: 7 * time.Second, MaxPromptChars: 99, MaxLineBytes: 1234}
+	o := c.ollamaOptions()
+	if o.BaseURL != c.OllamaURL || o.APIKey != "k" || o.TLSCA != "ca.pem" || !o.Insecure || o.Model != "m" || o.EmbedModel != "e" ||
+		o.Timeout != 7*time.Second || o.MaxPromptChars != 99 || o.MaxLineBytes != 1234 {
+		t.Fatalf("%+v", o)
+	}
+}

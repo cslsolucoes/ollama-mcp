@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/mcp"
+	"github.com/cslsoftwares/mcpollama/redact"
 )
 
 func testConfig() Config {
@@ -425,13 +426,13 @@ func TestLogsDefaultToMetadataOnly(t *testing.T) {
 
 func TestLogLineCap(t *testing.T) {
 	var b bytes.Buffer
-	l := &logger{w: &b, redact: newRedactor("SECRET")}
+	l := &logger{w: &b, redact: redact.New("SECRET")}
 	l.logf("%s SECRET %s", strings.Repeat("a", 3000), strings.Repeat("é", 3000))
 	out := b.String()
 	if len(out) > maxLogLine {
 		t.Fatalf("log line is %d bytes, cap %d", len(out), maxLogLine)
 	}
-	if strings.Contains(out, "SECRET") || !strings.Contains(out, redacted) {
+	if strings.Contains(out, "SECRET") || !strings.Contains(out, redact.Mask) {
 		t.Fatal("redaction must happen before the cap")
 	}
 	if strings.Count(out, "\n") != 1 {
@@ -445,7 +446,7 @@ func TestLogLineCap(t *testing.T) {
 }
 
 func TestRedactorIgnoresEmptySecret(t *testing.T) {
-	if got := newRedactor("")("abc"); got != "abc" {
+	if got := redact.New("")("abc"); got != "abc" {
 		t.Fatalf("got %q", got)
 	}
 }

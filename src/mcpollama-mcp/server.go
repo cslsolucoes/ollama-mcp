@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/mcp"
+	"github.com/cslsoftwares/mcpollama/redact"
 )
 
 const serverName = "mcpollama"
@@ -45,11 +46,11 @@ type server struct {
 // Run serves JSON-RPC over in/out until EOF (nil error) or a read failure.
 // Everything that is not a JSON-RPC message goes to errw.
 func Run(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config, tools []ToolEntry) error {
-	redact := newRedactor(cfg.secrets()...)
+	red := redact.New(cfg.secrets()...)
 	s := &server{
 		cfg:    cfg,
-		log:    &logger{w: errw, redact: redact, debug: cfg.Debug},
-		redact: redact,
+		log:    &logger{w: errw, redact: red, debug: cfg.Debug},
+		redact: red,
 		tools:  make(map[string]ToolEntry, len(tools)),
 		out:    out,
 	}

@@ -16,9 +16,12 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-23: **Fase 1 concluída**. O esqueleto do protocolo está em `src/`
+Estado em 2026-10-23: **Fases 1 e 2 concluídas**. O esqueleto do protocolo está em `src/`
 (`mcp/types.go`, `mcpollama-mcp/`): `initialize`, `ping`, `tools/list` (ainda vazio) e
-`tools/call`, com os erros JSON-RPC. Ainda não há cliente Ollama (Fase 2) nem tools (Fase 3).
+`tools/call`, com os erros JSON-RPC. O cliente Ollama está em `src/ollama/` (stream interno,
+TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao vivo
+ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama`, uma chamada
+de cada vez). Ainda não há tools (Fase 3).
 O layout abaixo é o alvo; requisitos por fase em
 `referencias/Brief_Referencias/61-Matriz_Cobertura.md` §3.
 

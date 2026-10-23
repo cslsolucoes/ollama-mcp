@@ -340,3 +340,54 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   | 1 | **concluída** (commit abaixo) |
   | 2 | próxima: cliente Ollama |
   | 3 a 6 | pendentes |
+
+### 2026-10-23 19:47 — Fase 1 commitada; Fase 2 iniciada
+- **Commit da Fase 1:** `67d05bb` ("feat: Fase 1 - esqueleto do protocolo MCP (stdio, JSON-RPC 2.0)"), 15 arquivos, stage por caminho. Pré-commit: varredura de `src/` com `known_hits=0` (16 genéricos = nomes de flag e sentinelas de teste); índice sem `.exe`/`.env`/`.mcp.json`.
+- **Fase 2 (cliente Ollama) iniciada:** implementação delegada a um agente Sonnet, só com mocks `httptest` e sem chamar o servidor. O gate de 2ª via contra o servidor real (uma chamada de cada vez) fica com o loop principal. MUST da Fase 2: 29 (`61` §3).
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 e 1 | concluídas (`0fba414`, `67d05bb`) |
+  | 2 | **em execução** |
+  | 3 a 6 | pendentes |
+
+### 2026-10-23 20:05 — Fase 2 concluída (agente Sonnet + verificação e 2ª via ao vivo do loop principal)
+- **Feito (agente):**
+  - `src/ollama/`: `client.go` (196), `api.go` (361), `errors.go` (206), `types.go` (138);
+  - testes `client_test.go` (341), `stream_test.go` (234), `security_test.go` (255), `tls_test.go` (159) e `live_test.go` (108, build tag `live`);
+  - `src/redact/` (`redact.New`/`Mask` + teste): o `newRedactor` da Fase 1 foi **movido** para cá e é reusado pelo cliente (SSOT, sem duplicar). A Fase 1 foi ajustada para usá-lo (`logger.go`, `main.go`, `server.go`, `config.go` com `Config.ollamaOptions()`).
+  - **Decisão PB5-8: stream interno (`stream:true`) com agregação** e `Options.DisableStream` para não-stream, ambos testados. Motivos:
+    - a queda do servidor acontece antes dos cabeçalhos, então nenhum modo resolve;
+    - o stream evita a conexão ociosa atrás do nginx (teoria: o `proxy_read_timeout` não foi medido);
+    - o texto parcial é preservado em erro.
+  - TLS: `SystemCertPool()` + PEM; `--insecure` sem WARNING duplicado; Bearer só no header, recusado em `http://` não-loopback (SEC-009, SHOULD); redirect 3xx vira erro.
+  - Erros: 401/403 (HTML reduzido)/404/400/5xx; **conexão derrubada → `ErrConnectionDropped`**, com mensagem sobre reinício, carga a frio de ~36 s e `--max-prompt-chars`; sem retry.
+  - Corpo de erro com `LimitReader` de 4 KiB; teto de prompt (128000 runas) aplicado **antes** do envio, com o mock recebendo 0 requisições.
+  - Bugs achados pelo agente e corrigidos com teste:
+    - `Scanner` com buffer inicial de 64 KiB ignorava um `MaxLineBytes` menor;
+    - a ordem da redação (URL antes do token) deixava um resíduo.
+- **Verificação do loop principal (lida):**
+  1. **Gate limpo:** `go clean -cache -testcache`; build, `vet` e `vet -tags live` = 0; `go test -count=1 -cover -v ./...` com **115 PASS (93 de topo), 0 FAIL**. Cobertura: `mcpollama-mcp` 94,2%, `ollama` 92,1%, `redact` 100%. `gofmt` vazio; `go.mod` sem `require`; 0 literais 32768/65536/131072 fora de teste; 0 endpoints admin fora de teste.
+  2. **Falso alarme do `gopls` descartado:** `maxErrBodyBytes`, `userAgent` e `debugf` acusados de não usados, mas em uso em `api.go:275,284,287,290,317,347`.
+  3. **2ª via ao vivo** (20:03, `https://ia.cslsolucoes.com.br:8443`, `--tls-ca` da CA de origem, token do `csl-ollama.env` só em memória, **uma chamada de cada vez**):
+     - `TestLive1Tags`: PASS, **5 modelos**, os mesmos da sonda independente da B4 (`qwen3-ia`, `qwen3-coder:30b-a3b-q4_K_M`, `nomic-embed-text`, `qwen3.8:27b-64k`, `qwen3.8:27b-q4_K_M`);
+     - `TestLive2PS`: PASS; residente era o **`qwen3.8:27b-64k`** (`size_vram` 11.762.516.619, ctx 65536), o modelo do nível `local`, e não o `qwen3-ia`;
+     - `TestLive3Unauthorized`: PASS, 401 → "token ausente ou inválido (OLLAMA_API_KEY) [HTTP 401 GET /api/tags]: unauthorized";
+     - `TestLive4GenerateShort`: PASS, `response="ok"`, `done_reason=stop`, `prompt_eval=17`, `eval=2`, **`load_ms=21953`** (carga a frio do `qwen3-ia`), `total_ms=22117`;
+     - token na saída: **0**.
+- **MUST da Fase 2 (29):** todos atendidos, segundo a tabela do agente, com teste por item. O BUILD-011 foi feito pelo loop principal (este registro). O TEST-006 está coberto entre a Fase 1 (stdout/`--debug`) e a Fase 2 (erros e logs do cliente); a parte com tool real vem na Fase 3.
+- **Achado operacional (novo):** o `ia-local` (`qwen3.8:27b-64k`) e o mcpollama (`qwen3-ia`) **disputam a VRAM**, e cada troca custa ~22–36 s de carga. Isso é insumo direto da **P-4** (trocar o nível `local` pela tool MCP elimina a disputa) e do timeout da Fase 5.
+- **Observações:**
+  - o `live_test.go` aceita `OLLAMA_API_KEY_FILE` (caminho de arquivo) **só como conveniência de teste**. O binário continua sem `--api-key-file` (P-1 = não);
+  - as mensagens de erro ao usuário estão em pt-BR (textos do OLL-004); código e comentários em inglês;
+  - `OLL-008` (timeout de inatividade) e `PERF-007` (disjuntor) são COULD e não foram feitos;
+  - `-race` continua pendente (P1-1, sem cgo nesta máquina).
+- **Docs:** `CLAUDE.md` com o estado "Fases 1 e 2 concluídas" e o uso da build tag `live`.
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 e 1 | concluídas (`0fba414`, `67d05bb`) |
+  | 2 | **concluída** (commit abaixo) |
+  | 3 | próxima: tools base (exige a P1-1 `-race` antes do loop concorrente) |
+  | 4 a 6 | pendentes |

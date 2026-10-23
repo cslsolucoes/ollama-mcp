@@ -12,26 +12,6 @@ import (
 // redaction.
 const maxLogLine = 4000
 
-const redacted = "[REDACTED]"
-
-// newRedactor returns the single function that swaps the exact value of every
-// secret for [REDACTED]. Empty secrets are ignored (replacing "" would
-// mangle the whole text).
-func newRedactor(secrets ...string) func(string) string {
-	var live []string
-	for _, s := range secrets {
-		if s != "" {
-			live = append(live, s)
-		}
-	}
-	return func(text string) string {
-		for _, s := range live {
-			text = strings.ReplaceAll(text, s, redacted)
-		}
-		return text
-	}
-}
-
 // logger writes one redacted, capped, single-line record per call (stderr).
 type logger struct {
 	mu     sync.Mutex

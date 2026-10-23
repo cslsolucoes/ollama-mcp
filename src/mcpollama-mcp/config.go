@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/cslsoftwares/mcpollama/ollama"
 )
 
 // Defaults. The prompt ceiling is a character budget decided by the owner
@@ -223,4 +225,20 @@ func (c Config) safeURL() string {
 		return ""
 	}
 	return u.Scheme + "://" + u.Host
+}
+
+// ollamaOptions maps the resolved configuration to the Ollama client options.
+// Building the client is lazy: nothing calls this at start or on initialize.
+func (c Config) ollamaOptions() ollama.Options {
+	return ollama.Options{
+		BaseURL:        c.OllamaURL,
+		APIKey:         c.APIKey,
+		TLSCA:          c.TLSCA,
+		Insecure:       c.Insecure,
+		Model:          c.Model,
+		EmbedModel:     c.EmbedModel,
+		Timeout:        c.Timeout,
+		MaxPromptChars: c.MaxPromptChars,
+		MaxLineBytes:   c.MaxLineBytes,
+	}
 }
