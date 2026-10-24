@@ -650,3 +650,16 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   | --- | --- |
   | 0 a 5 | concluídas (5 no Claude Code) |
   | 6 | **concluída** (commit abaixo) |
+- **Commit:** `6bc3b48`.
+
+### 2026-10-24 17:40 — decisões finais do owner (P-7, P-4)
+- **P-7 = manter o `--timeout` em 120 s** (default do código, sem mudança). Fica documentado que gerações acima de ~8 mil tokens com o modelo frio podem estourar o limite e recebem o erro claro de timeout.
+- **P-4 = manter o `mcpOllama` só neste projeto** (`.mcp.json` da raiz). Sem escopo de usuário e sem troca do nível `local` do `CLAUDE.md` global (`ia-local.ps1`/`qwen3.8:27b-64k` continua). Consequência registrada: a disputa de VRAM entre `qwen3-ia` e `qwen3.8:27b-64k` continua (cargas a frio de ~22–36 s ao alternar).
+- **Docs:** "provisório" removido do `--timeout` no `CLAUDE.md` e no `README.md`.
+- **Pendências restantes, todas do owner e nenhuma bloqueante:**
+  - P-8 (`rank_files` e tools assíncronas);
+  - P5-2 (Cursor/VS Code, opcional);
+  - P5-3/P5-4 (rotação da chave do TrueNAS e da senha `sa`);
+  - reparo da GPU 3 (voltar a 4 GPUs e 131072);
+  - versionar o pack `.cursor/`.
+- **Plano:** todas as fases (0–6) concluídas.

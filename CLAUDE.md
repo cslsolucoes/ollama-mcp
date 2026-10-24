@@ -109,7 +109,7 @@ src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao
   `--ollama-url`/`OLLAMA_HOST`, `--api-key`/`OLLAMA_API_KEY` (preferir a env; sem `--api-key-file`),
   `--tls-ca`/`OLLAMA_TLS_CA`, `--insecure`/`OLLAMA_INSECURE`, `--model`/`OLLAMA_MODEL`
   (default `qwen3-ia`), `--embed-model`/`OLLAMA_EMBED_MODEL` (default `nomic-embed-text`),
-  `--timeout`/`OLLAMA_TIMEOUT` (default 120 s, provisório até a medição da Fase 5),
+  `--timeout`/`OLLAMA_TIMEOUT` (default 120 s, decisão P-7; o Claude Code aceita tools de ~87 s ou mais),
   `--max-prompt-chars`/`MCPOLLAMA_MAX_PROMPT_CHARS` (default 128000),
   `--max-file-bytes`/`MCPOLLAMA_MAX_FILE_BYTES`, `--max-line-bytes`/`MCPOLLAMA_MAX_LINE_BYTES`,
   `--tools-verbosity`/`MCPOLLAMA_TOOLS_VERBOSITY` (`full|compact`; o tamanho do `tools/list`

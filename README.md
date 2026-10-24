@@ -101,7 +101,7 @@ src/
 | `--insecure` | `OLLAMA_INSECURE` | `false` (gera WARNING a cada start) |
 | `--model` | `OLLAMA_MODEL` | `qwen3-ia` |
 | `--embed-model` | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
-| `--timeout` | `OLLAMA_TIMEOUT` | `120s` (provisório até a medição da Fase 5) |
+| `--timeout` | `OLLAMA_TIMEOUT` | `120s` (decisão P-7; gerações longas com modelo frio podem estourar e recebem erro claro) |
 | `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` (~48k tokens) |
 | `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |
 | `--max-line-bytes` | `MCPOLLAMA_MAX_LINE_BYTES` | `8388608` (linha de stdin; sem o teto de 64 KB do `bufio.Scanner`) |
