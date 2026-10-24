@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -149,7 +151,7 @@ func noop(context.Context, json.RawMessage) (string, error) { return "ok", nil }
 func TestToolsListSortedDeterministic(t *testing.T) {
 	var tools []ToolEntry
 	for _, n := range []string{"zeta", "alpha", "mid", "beta"} {
-		tools = append(tools, ToolEntry{Def: mcp.Tool{Name: n, InputSchema: map[string]any{"type": "object"}}, Handler: noop})
+		tools = append(tools, ToolEntry{Def: mcp.Tool{Name: n, InputSchema: map[string]any{"type": "object"}}, Handler: mcp.TextHandler(noop)})
 	}
 	first := ""
 	for i := 0; i < 5; i++ {
@@ -176,7 +178,7 @@ func TestToolsListSortedDeterministic(t *testing.T) {
 func TestToolsVerbosityCompact(t *testing.T) {
 	tool := ToolEntry{Def: mcp.Tool{Name: "t", Description: "First sentence. Second sentence with detail.",
 		InputSchema: map[string]any{"type": "object", "properties": map[string]any{
-			"p": map[string]any{"type": "string", "description": "long text"}}}}, Handler: noop}
+			"p": map[string]any{"type": "string", "description": "long text"}}}}, Handler: mcp.TextHandler(noop)}
 	cfg := testConfig()
 	cfg.ToolsVerbosity = "compact"
 	lines, _ := run(t, cfg, []ToolEntry{tool}, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`+"\n")
@@ -317,7 +319,7 @@ func TestToolsCallBadParams(t *testing.T) {
 		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"t","arguments":"str"}}`,
 		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"t","arguments":[1]}}`,
 	} {
-		r := one(t, testConfig(), []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: noop}}, in)
+		r := one(t, testConfig(), []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: mcp.TextHandler(noop)}}, in)
 		if r.Error == nil || r.Error.Code != -32602 {
 			t.Errorf("%s -> %+v", in, r)
 		}
@@ -325,25 +327,29 @@ func TestToolsCallBadParams(t *testing.T) {
 }
 
 func TestToolsCallArgumentsDefaultToEmptyObject(t *testing.T) {
+	var mu sync.Mutex
 	var got []string
 	h := func(_ context.Context, a json.RawMessage) (string, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		got = append(got, string(a))
 		return "ok", nil
 	}
-	tools := []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: h}}
+	tools := []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: mcp.TextHandler(h)}}
 	in := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"t"}}` + "\n" +
 		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"t","arguments":null}}` + "\n" +
 		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"t","arguments":{"a":1}}}` + "\n"
 	run(t, testConfig(), tools, in)
-	if strings.Join(got, "|") != `{}|{}|{"a":1}` {
+	sort.Strings(got) // one goroutine per call: arrival order is not defined
+	if strings.Join(got, "|") != `{"a":1}|{}|{}` {
 		t.Fatalf("args = %v", got)
 	}
 }
 
 func TestToolsCallSuccessAndIsError(t *testing.T) {
 	tools := []ToolEntry{
-		{Def: mcp.Tool{Name: "good"}, Handler: func(context.Context, json.RawMessage) (string, error) { return "hello", nil }},
-		{Def: mcp.Tool{Name: "bad"}, Handler: func(context.Context, json.RawMessage) (string, error) { return "", errors.New("ollama 503") }},
+		{Def: mcp.Tool{Name: "good"}, Handler: mcp.TextHandler(func(context.Context, json.RawMessage) (string, error) { return "hello", nil })},
+		{Def: mcp.Tool{Name: "bad"}, Handler: mcp.TextHandler(func(context.Context, json.RawMessage) (string, error) { return "", errors.New("ollama 503") })},
 	}
 	r := one(t, testConfig(), tools, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"good"}}`)
 	if r.Error != nil || string(r.Result) != `{"content":[{"type":"text","text":"hello"}]}` {
@@ -356,19 +362,24 @@ func TestToolsCallSuccessAndIsError(t *testing.T) {
 }
 
 func TestToolPanicRecovered(t *testing.T) {
-	tools := []ToolEntry{{Def: mcp.Tool{Name: "boom"}, Handler: func(context.Context, json.RawMessage) (string, error) {
+	tools := []ToolEntry{{Def: mcp.Tool{Name: "boom"}, Handler: mcp.TextHandler(func(context.Context, json.RawMessage) (string, error) {
 		panic("kaboom")
-	}}}
+	})}}
 	in := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"boom"}}` + "\n" +
 		`{"jsonrpc":"2.0","id":2,"method":"ping"}` + "\n"
 	lines, errw := run(t, testConfig(), tools, in)
 	if len(lines) != 2 {
 		t.Fatalf("got %q", lines)
 	}
-	if !strings.Contains(lines[0], `"isError":true`) {
-		t.Fatalf("panic must become isError: %s", lines[0])
+	// tools/call runs on its own goroutine: match by id, not by position.
+	byID := map[string]string{}
+	for _, l := range lines {
+		byID[string(decode(t, l).ID)] = l
 	}
-	if decode(t, lines[1]).Error != nil {
+	if !strings.Contains(byID["1"], `"isError":true`) {
+		t.Fatalf("panic must become isError: %s", byID["1"])
+	}
+	if decode(t, byID["2"]).Error != nil {
 		t.Fatal("server must keep serving after a panic")
 	}
 	if !strings.Contains(errw, "panic recovered") {
@@ -377,7 +388,7 @@ func TestToolPanicRecovered(t *testing.T) {
 }
 
 func TestStdoutIsOnlyJSONRPC(t *testing.T) {
-	tools := []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: noop}}
+	tools := []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: mcp.TextHandler(noop)}}
 	cfg := testConfig()
 	cfg.Debug = true
 	cfg.Insecure = true
@@ -409,7 +420,7 @@ func TestStdoutIsOnlyJSONRPC(t *testing.T) {
 }
 
 func TestLogsDefaultToMetadataOnly(t *testing.T) {
-	tools := []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: noop}}
+	tools := []ToolEntry{{Def: mcp.Tool{Name: "t"}, Handler: mcp.TextHandler(noop)}}
 	in := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"t","arguments":{"prompt":"TOPSECRETPROMPT"}}}` + "\n"
 	for _, debug := range []bool{false, true} {
 		cfg := testConfig()
@@ -454,12 +465,12 @@ func TestRedactorIgnoresEmptySecret(t *testing.T) {
 func TestTokenNeverInAnyOutput(t *testing.T) {
 	const token = "tok-S3CR3T-value-123"
 	tools := []ToolEntry{
-		{Def: mcp.Tool{Name: "err"}, Handler: func(context.Context, json.RawMessage) (string, error) {
+		{Def: mcp.Tool{Name: "err"}, Handler: mcp.TextHandler(func(context.Context, json.RawMessage) (string, error) {
 			return "", fmt.Errorf("upstream said Authorization: Bearer %s rejected", token)
-		}},
-		{Def: mcp.Tool{Name: "boom"}, Handler: func(context.Context, json.RawMessage) (string, error) {
+		})},
+		{Def: mcp.Tool{Name: "boom"}, Handler: mcp.TextHandler(func(context.Context, json.RawMessage) (string, error) {
 			panic("leaking " + token)
-		}},
+		})},
 	}
 	cfg := testConfig()
 	cfg.Debug = true
@@ -509,7 +520,7 @@ func TestInsecureWarnings(t *testing.T) {
 }
 
 func TestDuplicateToolRejected(t *testing.T) {
-	tl := ToolEntry{Def: mcp.Tool{Name: "a"}, Handler: noop}
+	tl := ToolEntry{Def: mcp.Tool{Name: "a"}, Handler: mcp.TextHandler(noop)}
 	err := Run(context.Background(), strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, testConfig(), []ToolEntry{tl, tl})
 	if err == nil {
 		t.Fatal("duplicate tool names must fail")

@@ -16,12 +16,13 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-23: **Fases 1 e 2 concluídas**. O esqueleto do protocolo está em `src/`
+Estado em 2026-10-23: **Fases 1, 2 e 3 concluídas** (tools base `list_models`, `generate`,
+`chat` e `embed` em `src/tools/`; catálogo em `TOOLS.md`, gerado por `src/cmd/dumptools`). O esqueleto do protocolo está em `src/`
 (`mcp/types.go`, `mcpollama-mcp/`): `initialize`, `ping`, `tools/list` (ainda vazio) e
 `tools/call`, com os erros JSON-RPC. O cliente Ollama está em `src/ollama/` (stream interno,
 TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao vivo
 ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama`, uma chamada
-de cada vez). Ainda não há tools (Fase 3).
+de cada vez). Próxima: Fase 4 (tools de arquivo com `--allow-root`).
 O layout abaixo é o alvo; requisitos por fase em
 `referencias/Brief_Referencias/61-Matriz_Cobertura.md` §3.
 
@@ -61,6 +62,8 @@ go vet ./...
 go test ./...                                           # suíte completa
 go test ./tools -run TestNomeDoTeste -v                 # um teste
 go test -count=1 ./...                                  # sem cache de teste (validação "limpa")
+# detector de corrida: precisa de cgo; usa o gcc já presente em deps\ (só na sessão)
+$env:PATH="E:\MCPOllam\deps\gcc-mingw-w64\bin;$env:PATH"; $env:CC="gcc"; $env:CGO_ENABLED='1'; go test -race -count=1 ./...; Remove-Item Env:CC,Env:CGO_ENABLED
 ```
 
 Smoke test do protocolo (stdio), sem cliente MCP, a partir da raiz:

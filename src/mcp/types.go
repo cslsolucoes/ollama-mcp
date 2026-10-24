@@ -3,7 +3,10 @@
 // purpose: the core has no external dependency and no MCP SDK.
 package mcp
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 // JSON-RPC 2.0 error codes.
 const (
@@ -73,9 +76,22 @@ type ToolsCapability struct {
 }
 
 type Tool struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	InputSchema map[string]any `json:"inputSchema"`
+	Name        string           `json:"name"`
+	Title       string           `json:"title,omitempty"`
+	Description string           `json:"description"`
+	InputSchema map[string]any   `json:"inputSchema"`
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+}
+
+// ToolAnnotations are the behaviour hints of a tool. The booleans carry no
+// omitempty on purpose: the spec defaults (destructiveHint and openWorldHint
+// true) make an omitted false mean something else, so every hint is explicit.
+type ToolAnnotations struct {
+	Title           string `json:"title,omitempty"`
+	ReadOnlyHint    bool   `json:"readOnlyHint"`
+	DestructiveHint bool   `json:"destructiveHint"`
+	IdempotentHint  bool   `json:"idempotentHint"`
+	OpenWorldHint   bool   `json:"openWorldHint"`
 }
 
 type ToolsListResult struct {
@@ -90,6 +106,9 @@ type ToolCallParams struct {
 type ToolCallResult struct {
 	Content []ContentBlock `json:"content"`
 	IsError bool           `json:"isError,omitempty"`
+	// Meta is the protocol _meta object; usage counters travel here as well as
+	// in the text line.
+	Meta map[string]any `json:"_meta,omitempty"`
 }
 
 type ContentBlock struct {
@@ -100,4 +119,27 @@ type ContentBlock struct {
 // TextResult builds a single-text-block tool result.
 func TextResult(text string, isError bool) ToolCallResult {
 	return ToolCallResult{Content: []ContentBlock{{Type: "text", Text: text}}, IsError: isError}
+}
+
+// ToolHandler runs one tool. A returned error becomes a result with
+// isError:true; a result may also carry IsError itself (for example a partial
+// answer plus the failure). Protocol errors are reserved for the dispatcher.
+type ToolHandler func(ctx context.Context, args json.RawMessage) (ToolCallResult, error)
+
+// ToolEntry pairs a tool definition with its handler: the single registry
+// shape shared by the server and the tools package.
+type ToolEntry struct {
+	Def     Tool
+	Handler ToolHandler
+}
+
+// TextHandler adapts a handler that only produces text.
+func TextHandler(f func(ctx context.Context, args json.RawMessage) (string, error)) ToolHandler {
+	return func(ctx context.Context, args json.RawMessage) (ToolCallResult, error) {
+		s, err := f(ctx, args)
+		if err != nil {
+			return ToolCallResult{}, err
+		}
+		return TextResult(s, false), nil
+	}
 }

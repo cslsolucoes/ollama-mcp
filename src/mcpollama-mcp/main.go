@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/cslsoftwares/mcpollama/redact"
 )
@@ -42,9 +43,25 @@ func realMain(args []string, getenv func(string) string, stdin io.Reader, stdout
 		return 0
 	}
 	cfg.Version = Version
-	if err := Run(context.Background(), stdin, stdout, stderr, cfg, nil); err != nil {
+	// Both the server log and the Ollama client log reach stderr from several
+	// goroutines; one locked writer keeps the lines whole.
+	errw := &syncWriter{w: stderr}
+	lg := &logger{w: errw, redact: redact.New(cfg.secrets()...), debug: cfg.Debug}
+	if err := Run(context.Background(), stdin, stdout, errw, cfg, buildTools(cfg, lg)); err != nil {
 		fmt.Fprintln(stderr, "mcpollama-mcp: "+redact.New(cfg.secrets()...)(err.Error()))
 		return 1
 	}
 	return 0
+}
+
+// syncWriter serialises writes to one underlying writer.
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (s *syncWriter) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Write(p)
 }

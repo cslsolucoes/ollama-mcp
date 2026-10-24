@@ -391,3 +391,65 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   | 2 | **concluída** (commit abaixo) |
   | 3 | próxima: tools base (exige a P1-1 `-race` antes do loop concorrente) |
   | 4 a 6 | pendentes |
+
+### 2026-10-23 20:40 — Fase 2 commitada; P1-1 (`-race`) resolvida; Fase 3 iniciada
+- **Commit da Fase 2:** `b1c809d` (19 arquivos; varredura de `src/` com `known_hits=0`, índice sem `.exe`/`.env`/`.mcp.json`).
+- **P1-1 (`-race`):**
+  - perguntado ao owner via AskUserQuestion (opções: instalar gcc via winget, seguir sem `-race`, ou outra máquina). O owner apontou `E:\MCPOllam\deps`, `sdk` e `ZLibSource`;
+  - `deps/gcc-mingw-w64/bin/gcc.exe` é o **GCC 16.1.0**, já presente. Usado **só por sessão** (`CC`, `PATH` e `CGO_ENABLED=1`), sem instalar nada.
+  - **Resultado:** `go test -race -count=1 ./...` deu exit 0 (`mcpollama-mcp` 1,290 s, `ollama` 1,901 s, `redact` 1,076 s), com **0 `DATA RACE`** nas Fases 1 e 2. **P1-1 resolvida.**
+- **Observação:** `deps/` (18.203 arquivos, 1.426,5 MB; `gcc-mingw-w64`, `gcc-linux-musl`, `win32`, `win64`), `sdk/` (2.593 arquivos, 44,3 MB, fontes de compressão) e `ZLibSource/` (798 arquivos, 19,3 MB) estão **não rastreadas e fora do `.gitignore`**. O stage por caminho as mantém fora dos commits. ~~**Pendência P2-1 (owner):** incluí-las no `.gitignore`?~~ **Decidida (20:43, owner: "sim, coloque"):** `/deps/`, `/sdk/` e `/ZLibSource/` acrescentados ao `.gitignore` (linhas 21–23). Verificado com `git check-ignore -v`: as três pastas casam e somem do `git status`. A mudança entra no commit da Fase 3.
+- **Fase 3 (tools base) iniciada:** agente Sonnet; 38 MUST (`61` §3); gate com `-race` usando o gcc de `deps/`.
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 2 | concluídas (`0fba414`, `67d05bb`, `b1c809d`) |
+  | 3 | **em execução** |
+  | 4 a 6 | pendentes |
+
+### 2026-10-23 21:05 — Fase 3 concluída (agente Sonnet + verificação e 2ª via ao vivo do loop principal)
+- **Feito (agente):**
+  - `src/tools/`: `registry.go`, `args.go` (helpers de argumento num arquivo só), `schema.go`, `queue.go` (fila de GPU N=1), `usage.go` (linha `[uso]` + `_meta`), `generate.go`, `chat.go`, `embed.go`, `list_models.go` e `catalog.go`, mais 8 arquivos de teste (incluindo `live_test.go` com a tag `live`);
+  - `src/cmd/dumptools/` (`-o`, `-check`) e o **`TOOLS.md`** na raiz (190 linhas, 4935 bytes);
+  - `src/mcpollama-mcp/backend.go` (cliente lazy + fila), `concurrency_test.go` e `tools_wiring_test.go`;
+  - `mcp/types.go` ganhou `Tool.Title`, `Tool.Annotations`, `ToolCallResult.Meta` (`_meta`), e os tipos `ToolHandler`/`ToolEntry` foram movidos para o pacote `mcp`, porque `tools` não pode importar `main`.
+  - **Loop concorrente:** goroutine por `tools/call`, `notifications/cancelled` suprime a resposta, um `id` repetido em curso recebe `-32600`, e no EOF o servidor espera as chamadas em curso.
+  - O `list_models` **não** passa pela fila, de propósito (não carrega modelo).
+  - Teto de saída de 32.000 caracteres, com aviso (TOK-007 parcial).
+  - O agente quebrou de propósito 3 pontos (supressão por cancelamento, fila, sincronia do `TOOLS.md`) e os testes pegaram os 3.
+- **Verificação do loop principal (lida):**
+  1. **Falso alarme do `gopls`:** ~30 "erros de compilação" (`mcp.ToolEntry` indefinido etc.) eram estado antigo do editor. O `types.go` define tudo, e o build limpo passou.
+  2. **Gate limpo:** `go clean -cache -testcache`; build, `vet` e `vet -tags live` = 0; `go test -count=1 -cover -v ./...` com **186 PASS, 0 FAIL**. Cobertura: `dumptools` 73,0%, `mcpollama-mcp` 94,2%, `ollama` 92,1%, `redact` 100%, `tools` 94,7%. `gofmt` vazio.
+  3. **`-race`** (gcc de `deps/`): exit 0, **0 DATA RACE** nos 5 pacotes.
+  4. **`go run ./cmd/dumptools -check`:** "TOOLS.md is in sync".
+  5. **Smoke offline** (binário `0.3.0-smoke`, `--ollama-url https://exemplo.invalid`, sentinela em `OLLAMA_API_KEY`):
+     - `tools/list` **full = 4000 bytes, compact = 2540 bytes** (−36,5%);
+     - 4 tools: `chat`, `embed`, `generate` e `list_models`, todas com `openWorldHint=false`;
+     - `prompt:5` → `isError` "`prompt` must be a string (recebido: number)";
+     - host inexistente → `isError` "não foi possível falar com …: no such host";
+     - sentinela: 0 em stdout e 0 em stderr nos dois modos.
+  6. **2ª via ao vivo** (21:00, `:8443`, uma chamada de cada vez, token só em memória):
+     - `TestLive1ListModels`: PASS;
+     - `TestLive2Generate`: PASS, `[uso] modelo=qwen3-ia prompt_eval_count=17 eval_count=2 total_ms=22156 load_ms=21990 queue_ms=0 fim=stop`. O `qwen3-ia` estava **fora da VRAM** de novo, provavelmente desalojado pelo `ia-local`;
+     - `TestLive3Chat`: PASS, `total_ms=65 load_ms=0` (quente);
+     - `TestLive4Embed`: PASS, `modelo=nomic-embed-text prompt_eval_count=15 total_ms=6805 load_ms=4760`;
+     - token na saída: **0**.
+- **MUST da Fase 3 (38):** todos atendidos, segundo a tabela do agente, com teste por item.
+  - **TEST-016** (2ª via ao vivo) e **INTEG-012** (em série): feitos pelo loop principal acima.
+  - **BUILD-011:** este registro.
+  - **TEST-008:** a parte com `--allow-root` fica para a Fase 4.
+- **SHOULD extras:** TOOL-004, TOOL-005 (`openWorldHint:false`), TOOL-009, TOOL-012, TOK-005 e TOK-006 (orçamento de 4400 bytes para o `tools/list`). O TOK-003 saiu só no `_meta`.
+- **Desvios registrados:**
+  - respostas podem sair fora de ordem (casadas por `id`);
+  - fila com N=1 fixo, sem `--gpu-slots`, e sem timeout de fila separado (PERF-003, SHOULD);
+  - `input` do `embed` com `oneOf` (compatibilidade com os clientes a verificar na Fase 5);
+  - mensagem de tipo errado mistura inglês e pt-BR ("`prompt` must be a string (recebido: number)"), como no texto do requisito.
+- **Docs:** `README.md` (seção Tools com o `TOOLS.md`, a linha `[uso]` e as anotações); `CLAUDE.md` (estado "Fases 1, 2 e 3 concluídas"); `.gitignore` (P2-1) entra neste commit.
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 2 | concluídas |
+  | 3 | **concluída** (commit abaixo) |
+  | 4 | próxima: tools de arquivo (`--allow-root`, P-10 em aberto) |
+  | 5 e 6 | pendentes |

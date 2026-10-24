@@ -15,3 +15,9 @@ referencias/*
 # Estado local de sessao / tooling
 .remember/
 .claude/settings.local.json
+
+# Toolchains e fontes de terceiros locais (gcc mingw-w64/musl p/ -race e cross-compile;
+# fontes de compressao de outros projetos) — grandes, nunca versionar
+/deps/
+/sdk/
+/ZLibSource/

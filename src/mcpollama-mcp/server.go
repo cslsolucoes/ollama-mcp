@@ -22,15 +22,12 @@ const serverName = "mcpollama"
 
 var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
 
-// ToolHandler runs one tool. A returned error becomes a result with
-// isError:true; protocol errors are reserved for the dispatcher.
-type ToolHandler func(ctx context.Context, args json.RawMessage) (string, error)
-
-// ToolEntry pairs a tool definition with its handler.
-type ToolEntry struct {
-	Def     mcp.Tool
-	Handler ToolHandler
-}
+// ToolHandler and ToolEntry are the registry shapes. They live in package mcp
+// so the tools package can build them without importing package main.
+type (
+	ToolHandler = mcp.ToolHandler
+	ToolEntry   = mcp.ToolEntry
+)
 
 type server struct {
 	cfg    Config
@@ -41,6 +38,21 @@ type server struct {
 
 	mu  sync.Mutex // serialises writes to out
 	out io.Writer
+
+	// Concurrency (PB5-9): one goroutine per tools/call. inflight maps the raw
+	// JSON-RPC id of each running call to its cancel switch; wg lets Run wait
+	// for the calls still running when stdin ends.
+	wg       sync.WaitGroup
+	imu      sync.Mutex
+	inflight map[string]*inflightCall
+}
+
+// inflightCall is a running tools/call. cancelled records that the client
+// asked for the cancellation (notifications/cancelled): the MCP rule is that
+// no response is sent for a cancelled request.
+type inflightCall struct {
+	cancel    context.CancelFunc
+	cancelled bool
 }
 
 // Run serves JSON-RPC over in/out until EOF (nil error) or a read failure.
@@ -53,6 +65,8 @@ func Run(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config, too
 		redact: red,
 		tools:  make(map[string]ToolEntry, len(tools)),
 		out:    out,
+
+		inflight: map[string]*inflightCall{},
 	}
 	for _, t := range tools {
 		if _, dup := s.tools[t.Def.Name]; dup {
@@ -78,13 +92,17 @@ func Run(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config, too
 	r := bufio.NewReaderSize(in, 64*1024)
 	for {
 		if err := ctx.Err(); err != nil {
+			s.wg.Wait() // the calls see the same canceled context and return
 			return err
 		}
 		line, tooLong, err := readLine(r, cfg.MaxLineBytes)
 		if errors.Is(err, io.EOF) {
+			s.wg.Wait() // answer the calls still running before returning
 			return nil
 		}
 		if err != nil {
+			s.cancelAll()
+			s.wg.Wait()
 			return fmt.Errorf("read stdin: %w", err)
 		}
 		start := time.Now()
@@ -102,10 +120,48 @@ func Run(ctx context.Context, in io.Reader, out, errw io.Writer, cfg Config, too
 		if resp != nil {
 			s.write(*resp)
 		}
+		if info.deferred { // the call goroutine logs its own record when it ends
+			s.log.debugf("method=%s req_bytes=%d dispatched", info.method, len(line))
+			continue
+		}
 		s.log.logf("method=%s%s status=%s dur=%s", info.method, info.toolAttr(), info.status, time.Since(start))
 		s.log.debugf("method=%s req_bytes=%d resp=%t", info.method, len(line), resp != nil)
 	}
 }
+
+// cancelAll cancels every running call (stdin failed: nobody can read the
+// answers any more).
+func (s *server) cancelAll() {
+	s.imu.Lock()
+	defer s.imu.Unlock()
+	for _, c := range s.inflight {
+		c.cancel()
+	}
+}
+
+// cancelRequest handles notifications/cancelled: it cancels the context of the
+// call with that requestId. Unknown or finished ids are ignored.
+func (s *server) cancelRequest(params json.RawMessage) string {
+	var p struct {
+		RequestID json.RawMessage `json:"requestId"`
+	}
+	if json.Unmarshal(params, &p) != nil || len(p.RequestID) == 0 {
+		return "ignored"
+	}
+	s.imu.Lock()
+	defer s.imu.Unlock()
+	c, ok := s.inflight[idKey(p.RequestID)]
+	if !ok {
+		return "unknown_request"
+	}
+	c.cancelled = true
+	c.cancel()
+	return "cancel_requested"
+}
+
+// idKey is the map key of a JSON-RPC id: the raw bytes without whitespace, so
+// the number 1 and the string "1" stay different requests.
+func idKey(id json.RawMessage) string { return string(bytes.TrimSpace(id)) }
 
 func (s *server) logStartup() {
 	s.log.logf("%s %s ready (stdio)", serverName, s.cfg.Version)
@@ -171,9 +227,10 @@ func (s *server) write(resp mcp.Response) {
 }
 
 type callInfo struct {
-	method string
-	tool   string
-	status string
+	method   string
+	tool     string
+	status   string
+	deferred bool // a tools/call goroutine owns the response and the log record
 }
 
 func (c callInfo) toolAttr() string {
@@ -221,6 +278,9 @@ func (s *server) handleLine(ctx context.Context, line []byte) (resp *mcp.Respons
 
 	if notification {
 		info.status = "notification"
+		if req.Method == "notifications/cancelled" {
+			info.status = "notification:" + s.cancelRequest(req.Params)
+		}
 		return nil, info
 	}
 	if req.JSONRPC != "2.0" || req.Method == "" {
@@ -239,6 +299,9 @@ func (s *server) handleLine(ctx context.Context, line []byte) (resp *mcp.Respons
 		out = resultResponse(id, mcp.ToolsListResult{Tools: s.list})
 	case "tools/call":
 		out = s.toolsCall(ctx, id, req.Params, &info)
+		if info.deferred {
+			return nil, info
+		}
 	default:
 		out = errorResponse(id, mcp.CodeMethodNotFound, "method not found: "+req.Method)
 	}
@@ -301,14 +364,73 @@ func (s *server) toolsCall(ctx context.Context, id json.RawMessage, params json.
 	} else if args[0] != '{' {
 		return errorResponse(id, mcp.CodeInvalidParams, "invalid tools/call params: arguments must be an object")
 	}
-	res := s.callTool(ctx, entry, args)
-	if res.IsError {
-		info.status = "tool_error"
+	return s.dispatchCall(ctx, id, entry, args, info)
+}
+
+// dispatchCall registers the call as in flight and runs it on its own
+// goroutine, so ping, tools/list and notifications/cancelled are served while a
+// generation runs (PB5-9). The goroutine writes the response and the log
+// record; the returned value is only used for an immediate protocol error.
+func (s *server) dispatchCall(ctx context.Context, id json.RawMessage, entry ToolEntry, args json.RawMessage, info *callInfo) mcp.Response {
+	key := idKey(id)
+	cctx, cancel := context.WithCancel(ctx)
+	call := &inflightCall{cancel: cancel}
+	s.imu.Lock()
+	if _, dup := s.inflight[key]; dup {
+		s.imu.Unlock()
+		cancel()
+		return errorResponse(id, mcp.CodeInvalidRequest, "invalid request: a request with this id is still running")
 	}
-	return resultResponse(id, res)
+	s.inflight[key] = call
+	s.imu.Unlock()
+
+	info.deferred = true
+	tool, method, start := info.tool, info.method, time.Now()
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer cancel()
+		res := s.callTool(cctx, entry, args)
+
+		s.imu.Lock()
+		delete(s.inflight, key)
+		cancelled := call.cancelled
+		s.imu.Unlock()
+
+		status := "ok"
+		switch {
+		case cancelled:
+			status = "cancelled" // MCP: no response for a cancelled request
+		case res.IsError:
+			status = "tool_error"
+		}
+		if !cancelled {
+			s.write(resultResponse(id, res))
+		}
+		s.log.logf("method=%s tool=%s status=%s dur=%s%s", method, tool, status, time.Since(start), usageAttr(res))
+	}()
+	return mcp.Response{}
+}
+
+// usageAttr renders the Ollama counters carried in the result _meta as log
+// attributes (counters only, never content: OBS-001).
+func usageAttr(res mcp.ToolCallResult) string {
+	u, ok := res.Meta["mcpollama/usage"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	for _, k := range []string{"prompt_eval_count", "eval_count", "total_ms", "load_ms", "queue_ms"} {
+		if v, ok := u[k]; ok {
+			fmt.Fprintf(&b, " %s=%v", k, v)
+		}
+	}
+	return b.String()
 }
 
 // callTool runs a handler, turning errors and panics into isError results.
+// Every text that leaves is redacted once more (defence in depth: the client
+// already scrubs its own errors).
 func (s *server) callTool(ctx context.Context, e ToolEntry, args json.RawMessage) (res mcp.ToolCallResult) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -317,11 +439,14 @@ func (s *server) callTool(ctx context.Context, e ToolEntry, args json.RawMessage
 			res = mcp.TextResult(s.redact(fmt.Sprintf("tool %s failed with an internal error", e.Def.Name)), true)
 		}
 	}()
-	text, err := e.Handler(ctx, args)
+	res, err := e.Handler(ctx, args)
 	if err != nil {
 		return mcp.TextResult(s.redact(err.Error()), true)
 	}
-	return mcp.TextResult(text, false)
+	for i := range res.Content {
+		res.Content[i].Text = s.redact(res.Content[i].Text)
+	}
+	return res
 }
 
 // compactTool shortens a definition for --tools-verbosity compact: first
@@ -347,12 +472,24 @@ func stripDescriptions(m map[string]any) map[string]any {
 				continue
 			}
 		}
-		if sub, ok := v.(map[string]any); ok {
-			v = stripDescriptions(sub)
-		}
-		out[k] = v
+		out[k] = stripValue(v)
 	}
 	return out
+}
+
+// stripValue recurses into nested objects and into arrays such as oneOf.
+func stripValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		return stripDescriptions(t)
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = stripValue(e)
+		}
+		return out
+	}
+	return v
 }
 
 // unmarshalRequest decodes one request object. json.Unmarshal accepts the

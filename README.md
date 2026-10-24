@@ -109,10 +109,10 @@ src/
 | `--debug` | `MCPOLLAMA_DEBUG` | `false` (só metadados; nunca argumentos nem o token) |
 | `--version` | — | imprime a versão (injetada por `-ldflags "-X main.Version=..."`) |
 
-**Tools (proposta).**
-- **Base**, como no `ollama-mcp-go`: `list_models`, `generate`, `chat`, `embed`.
-- **Orientadas a economia:** `summarize_file`, `extract`, `translate`, com leitura local de arquivos.
-- **Contadores de uso:** o retorno inclui `prompt_eval_count` e `eval_count`, para medir a economia.
+**Tools.** O catálogo gerado do código fica em [`TOOLS.md`](TOOLS.md) (`go run ./cmd/dumptools`; um teste falha se divergir).
+- **Base (Fase 3, implementadas):** `list_models`, `generate`, `chat` e `embed` (com `nomic-embed-text`; resumo por padrão e `include_vectors` opcional). Todas `readOnlyHint:true` e `openWorldHint:false`. A fila de GPU atende uma chamada por vez.
+- **Orientadas a economia (Fase 4, a fazer):** `summarize_file`, `extract`, `translate`, com leitura local de arquivos.
+- **Contadores de uso:** todo resultado termina com uma linha `[uso] modelo=… prompt_eval_count=… eval_count=… total_ms=… load_ms=… queue_ms=…`, também presente em `_meta`.
 - **Sem tools administrativas.** O nginx devolve **403** em `/api/pull|push|create|delete|copy|blobs`.
 
 ## 4. Servidor Ollama (alvo)
