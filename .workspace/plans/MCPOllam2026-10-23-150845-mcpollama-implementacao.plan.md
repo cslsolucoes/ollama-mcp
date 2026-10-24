@@ -549,3 +549,41 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
     - `%USERPROFILE%` → exit 0, com **WARNING** "is a volume root, your home directory or a system directory: ALL content ... can be read and sent to the remote Ollama server";
     - raiz normal → exit 0, sem aviso.
 - **Observação:** o WARNING está em inglês, como os outros avisos de partida; os erros de partida estão em pt-BR.
+- **Commit do fix:** `9ef7935`.
+
+### 2026-10-23 22:45 — Fase 5 iniciada: decisões do owner e registro nos clientes
+- **Decisões (via AskUserQuestion):**
+  1. **Token literal** nas configs dos clientes (fora do git);
+  2. **Claude Code no escopo de projeto** (`.mcp.json` na raiz); o escopo de usuário fica para depois da Fase 6, junto com a P-4;
+  3. **P-3 = `.cursor/mcp.json` do projeto**;
+  4. `--allow-root E:\MCPOllam` durante a validação.
+- **Feito:**
+  - **`.gitignore`:** acrescentados `/.cursor/mcp.json` e `/.vscode/mcp.json` (só `.mcp.json` era coberto). `git check-ignore -v` confirmou os 3 **antes** de escrever o token.
+  - Os espelhos `.claude/` e `.vscode/` linkam só subpastas específicas do `.cursor/` (`agents`, `commands`, `plans`, `rules`, `skills`, `Templates`, `README.md`, `VERSION.md`), então o `.cursor/mcp.json` **não** é espelhado.
+  - Binário `mcpollama-mcp.exe` com `--version` = `0.4.0-9ef7935`.
+  - Configs escritas com o token lido do `csl-ollama.env` sem exibi-lo:
+    - `.mcp.json` e `.cursor/mcp.json` (`mcpServers`);
+    - `.vscode/mcp.json` (`servers`, `type: stdio`);
+    - os três com `command` = o binário da raiz, `args` = `--ollama-url https://ia.cslsolucoes.com.br:8443 --tls-ca <CA de origem> --allow-root E:\MCPOllam`, e `env.OLLAMA_API_KEY`.
+  - Conferido: JSON válido, token presente, `command` existe, e nenhum dos 3 aparece no `git status`.
+- **Claude Code (`claude mcp list`, lido):** `mcpOllamaCSL` → **"⏸ Pending approval (run `claude` to approve)"**. Servidor de escopo de projeto exige aprovação numa sessão interativa; o token do Ollama não apareceu na saída (0).
+- **INCIDENTE de processo (meu):** o `claude mcp list` imprime os `args` de **todos** os servidores do usuário. O `mcpTrueNas`, registrado fora deste projeto, tem uma **API key do TrueNAS em texto puro nos `args`**, e ela apareceu na saída e entrou no contexto da sessão. O filtro que eu aplicava cobria só o token do Ollama. **Ação recomendada ao owner:** rotacionar a chave do TrueNAS e movê-la de `args` para `env`. **Lição:** comandos que listam configs de terceiros (`claude mcp list`/`get`) precisam de filtro genérico de segredo, ou não devem ser rodados com a saída exposta. O valor **não** foi registrado em nenhum arquivo.
+- **Pendências da Fase 5 (owner):**
+  - **P5-1:** aprovar o `mcpOllamaCSL` no Claude Code;
+  - **P5-2:** validar no Cursor e no VS Code (GUI), com uma chamada real cada e medindo o timeout de tool (PB5-3);
+  - **P5-3:** rotacionar a chave do TrueNAS.
+
+### 2026-10-23 22:16 — Fase 5: Claude Code validado (headless), Cursor e VS Code pendentes
+- **Aprovação (decisão do owner: "Eu habilito via settings"):**
+  - `enabledMcpjsonServers: ["mcpOllamaCSL"]` acrescentado ao `.claude/settings.local.json` (fora do git), preservando as 109 regras existentes;
+  - **não bastou:** o `claude mcp list` continua "Pending approval". A causa, dada pelo próprio CLI, é que o workspace **não está marcado como confiável** (`projects["E:/MCPOllam"].hasTrustDialogAccepted` no `~/.claude.json`). Isso só se resolve abrindo o `claude` interativo aqui uma vez e aceitando o diálogo de confiança. **Não** editei o `~/.claude.json` (config global do usuário).
+- **Validação real no Claude Code (headless, `claude -p --mcp-config .mcp.json --strict-mcp-config`, Haiku, só a tool liberada):**
+  1. `list_models`: exit 0, 16,9 s, **5 modelos** recebidos pelo cliente; token na saída 0. A tool não tem linha `[uso]` (não chama modelo); o cliente reportou isso corretamente.
+  2. `generate` ("Responda apenas: ok"): exit 0, 17,2 s, resposta "ok" e **a linha `[uso] modelo=qwen3-ia prompt_eval_count=14 eval_count=2 total_ms=120 load_ms=0 queue_ms=0 fim=stop` chegou ao modelo do cliente** e foi copiada literalmente. **PB5-5 validado para o Claude Code:** os contadores no texto chegam ao modelo. Token na saída: 0.
+- **Segredos de terceiros vistos nesta etapa (não registrados por valor):**
+  - **P5-3:** API key do TrueNAS nos `args` do `mcpTrueNas`, exposta pelo `claude mcp list`;
+  - **P5-4 (novo):** o `.claude/settings.local.json` deste projeto, herdado do template e de outro projeto, tem **senha `sa` do SQL Server em texto puro** em regras `permissions.allow` (`sqlcmd -P ...`). O arquivo está fora do git, mas o valor entrou no contexto ao ler o arquivo para editá-lo, como manda a skill (ler antes de editar). Recomendação: rotacionar a senha e limpar essas regras.
+- **Pendências da Fase 5 (atualizadas):**
+  - **P5-1:** abrir o `claude` interativo em `E:\MCPOllam` e aceitar a confiança do workspace;
+  - **P5-2:** Cursor (`.cursor/mcp.json` já escrito) e VS Code (`.vscode/mcp.json` já escrito): reiniciar ou recarregar, fazer 1 chamada real (`list_models` e `generate`) e anotar se a linha `[uso]` chega ao modelo e o tempo/timeout de uma geração longa (PB5-3);
+  - **P5-3 e P5-4:** rotacionar a chave do TrueNAS e a senha `sa`.

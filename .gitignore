@@ -2,8 +2,11 @@
 *.exe
 /mcpollama-mcp
 
-# Config de MCP servers project-level — pode conter o Bearer token do Ollama
+# Config de MCP servers project-level — contem o Bearer token do Ollama em texto
+# (decisao do owner, Fase 5: token literal nas configs dos clientes, fora do git)
 .mcp.json
+/.cursor/mcp.json
+/.vscode/mcp.json
 
 # Referencias externas e de outros projetos — contem credenciais reais
 # (ex.: referencias/MCPVMWare/.mcp.json). Somente leitura, nunca versionar.
