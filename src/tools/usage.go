@@ -20,6 +20,7 @@ type usage struct {
 	load       time.Duration
 	queue      time.Duration
 	doneReason string
+	parts      int // file parts of a map-reduce request; 0 for the other tools
 }
 
 // line is the fixed last line of every result that called the model.
@@ -30,6 +31,9 @@ func (u usage) line() string {
 		fmt.Fprintf(&b, " eval_count=%d", u.eval)
 	}
 	fmt.Fprintf(&b, " total_ms=%d load_ms=%d queue_ms=%d", u.total.Milliseconds(), u.load.Milliseconds(), u.queue.Milliseconds())
+	if u.parts > 0 {
+		fmt.Fprintf(&b, " partes=%d", u.parts)
+	}
 	if u.doneReason != "" {
 		fmt.Fprintf(&b, " fim=%s", u.doneReason)
 	}
@@ -49,6 +53,9 @@ func (u usage) meta() map[string]any {
 	}
 	if u.doneReason != "" {
 		m["done_reason"] = u.doneReason
+	}
+	if u.parts > 0 {
+		m["parts"] = u.parts
 	}
 	return map[string]any{"mcpollama/usage": m}
 }

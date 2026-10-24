@@ -43,7 +43,7 @@ func TestEnvFallback(t *testing.T) {
 		"MCPOLLAMA_TRACE": "t.log", "MCPOLLAMA_AUDIT_LOG": "a.log",
 	})
 	want := Config{OllamaURL: "https://h.invalid:8443", APIKey: "k", TLSCA: "ca.pem", Insecure: true, Model: "m",
-		EmbedModel: "e", Timeout: 90 * time.Second, MaxPromptChars: 1000, MaxLineBytes: 2048, MaxFileBytes: 4096,
+		EmbedModel: "e", Timeout: 90 * time.Second, MaxPromptChars: 1000, MaxLineBytes: 2048, MaxFileBytes: 4096, MaxChunks: 40,
 		Debug: true, ToolsVerbosity: "compact", TraceFile: "t.log", AuditLogPath: "a.log"}
 	if c != want {
 		t.Fatalf("got  %+v\nwant %+v", c, want)

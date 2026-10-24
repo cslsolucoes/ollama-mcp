@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,6 +39,7 @@ func newMock(t *testing.T, h http.HandlerFunc) *mock {
 	m.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m.hits.Add(1)
 		b, _ := io.ReadAll(r.Body)
+		r.Body = io.NopCloser(bytes.NewReader(b)) // handlers may read the body again
 		var body map[string]any
 		_ = json.Unmarshal(b, &body)
 		m.mu.Lock()

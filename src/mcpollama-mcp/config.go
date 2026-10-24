@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/ollama"
 )
 
@@ -24,6 +25,7 @@ const (
 	defaultMaxPromptChars = 128000
 	defaultMaxLineBytes   = 8 << 20
 	defaultMaxFileBytes   = 4 << 20
+	defaultMaxChunks      = 40 // model calls per file request (FILE-011)
 	defaultVerbosity      = "full"
 )
 
@@ -39,6 +41,8 @@ type Config struct {
 	MaxPromptChars int
 	MaxLineBytes   int
 	MaxFileBytes   int
+	MaxChunks      int
+	AllowRoot      string // comma-separated directories; empty disables the file tools
 	Debug          bool
 	ToolsVerbosity string
 	TraceFile      string
@@ -74,6 +78,9 @@ Every flag falls back to its environment variable; the flag wins.
   --timeout DURATION      per-call deadline, default 2m0s          (OLLAMA_TIMEOUT)
   --max-prompt-chars N    prompt ceiling in characters, default 128000 (MCPOLLAMA_MAX_PROMPT_CHARS)
   --max-file-bytes N      file ceiling in bytes, default 4194304   (MCPOLLAMA_MAX_FILE_BYTES)
+  --allow-root DIR[,DIR]  directories the file tools may read; without it
+                          summarize_file, extract and translate do not exist (MCPOLLAMA_ALLOW_ROOT)
+  --max-chunks N          model calls per file request, default 40 (MCPOLLAMA_MAX_CHUNKS)
   --max-line-bytes N      stdin line ceiling, default 8388608      (MCPOLLAMA_MAX_LINE_BYTES)
   --tools-verbosity MODE  full|compact tools/list size             (MCPOLLAMA_TOOLS_VERBOSITY)
   --trace-file FILE       opt-in trace file (later phase)          (MCPOLLAMA_TRACE)
@@ -100,6 +107,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fTimeout  = fs.Duration("timeout", 0, "")
 		fPrompt   = fs.Int("max-prompt-chars", 0, "")
 		fFile     = fs.Int("max-file-bytes", 0, "")
+		fChunks   = fs.Int("max-chunks", 0, "")
+		fRoot     = fs.String("allow-root", "", "")
 		fLine     = fs.Int("max-line-bytes", 0, "")
 		fVerb     = fs.String("tools-verbosity", "", "")
 		fTrace    = fs.String("trace-file", "", "")
@@ -155,6 +164,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		EmbedModel:     str("embed-model", "OLLAMA_EMBED_MODEL", defaultEmbedModel, fEmbed),
 		MaxPromptChars: integer("max-prompt-chars", "MCPOLLAMA_MAX_PROMPT_CHARS", defaultMaxPromptChars, fPrompt),
 		MaxFileBytes:   integer("max-file-bytes", "MCPOLLAMA_MAX_FILE_BYTES", defaultMaxFileBytes, fFile),
+		MaxChunks:      integer("max-chunks", "MCPOLLAMA_MAX_CHUNKS", defaultMaxChunks, fChunks),
+		AllowRoot:      str("allow-root", "MCPOLLAMA_ALLOW_ROOT", "", fRoot),
 		MaxLineBytes:   integer("max-line-bytes", "MCPOLLAMA_MAX_LINE_BYTES", defaultMaxLineBytes, fLine),
 		ToolsVerbosity: str("tools-verbosity", "MCPOLLAMA_TOOLS_VERBOSITY", defaultVerbosity, fVerb),
 		TraceFile:      str("trace-file", "MCPOLLAMA_TRACE", "", fTrace),
@@ -184,8 +195,11 @@ func (c Config) validate() error {
 	if c.Timeout <= 0 {
 		return errors.New("--timeout must be positive")
 	}
-	if c.MaxPromptChars <= 0 || c.MaxFileBytes <= 0 || c.MaxLineBytes <= 0 {
-		return errors.New("--max-prompt-chars, --max-file-bytes and --max-line-bytes must be positive")
+	if c.MaxPromptChars <= 0 || c.MaxFileBytes <= 0 || c.MaxLineBytes <= 0 || c.MaxChunks <= 0 {
+		return errors.New("--max-prompt-chars, --max-file-bytes, --max-line-bytes and --max-chunks must be positive")
+	}
+	if _, err := c.guard(); err != nil {
+		return err
 	}
 	if c.OllamaURL != "" {
 		u, err := url.Parse(c.OllamaURL)
@@ -203,6 +217,17 @@ func (c Config) validate() error {
 		}
 	}
 	return nil
+}
+
+// guard builds the file gate from --allow-root. It returns nil (no file tools)
+// when no root is configured, and an error when a root is unusable: a typo in
+// a root must stop the start, not silently leave the tools off.
+func (c Config) guard() (*files.Guard, error) {
+	roots := files.SplitRoots(c.AllowRoot)
+	if len(roots) == 0 {
+		return nil, nil
+	}
+	return files.NewGuard(roots, int64(c.MaxFileBytes))
 }
 
 // secrets returns every value that must never reach a log or an error:

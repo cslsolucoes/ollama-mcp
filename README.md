@@ -105,13 +105,21 @@ src/
 | `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` (~48k tokens) |
 | `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |
 | `--max-line-bytes` | `MCPOLLAMA_MAX_LINE_BYTES` | `8388608` (linha de stdin; sem o teto de 64 KB do `bufio.Scanner`) |
+| `--allow-root` | `MCPOLLAMA_ALLOW_ROOT` | — (sem ele, as tools de arquivo não existem) |
+| `--max-chunks` | `MCPOLLAMA_MAX_CHUNKS` | `40` (teto de chamadas do map-reduce por arquivo) |
 | `--tools-verbosity` | `MCPOLLAMA_TOOLS_VERBOSITY` | `full` (`compact` reduz o custo do `tools/list`) |
 | `--debug` | `MCPOLLAMA_DEBUG` | `false` (só metadados; nunca argumentos nem o token) |
 | `--version` | — | imprime a versão (injetada por `-ldflags "-X main.Version=..."`) |
 
 **Tools.** O catálogo gerado do código fica em [`TOOLS.md`](TOOLS.md) (`go run ./cmd/dumptools`; um teste falha se divergir).
 - **Base (Fase 3, implementadas):** `list_models`, `generate`, `chat` e `embed` (com `nomic-embed-text`; resumo por padrão e `include_vectors` opcional). Todas `readOnlyHint:true` e `openWorldHint:false`. A fila de GPU atende uma chamada por vez.
-- **Orientadas a economia (Fase 4, a fazer):** `summarize_file`, `extract`, `translate`, com leitura local de arquivos.
+- **Orientadas a economia (Fase 4, implementadas):** `summarize_file`, `extract` e `translate` leem o arquivo **no servidor**, a partir de um `path`, e devolvem só o resultado. Elas só existem com `--allow-root`, e a leitura recusa:
+  - caminho fora da raiz, inclusive via symlink, junction ou **hardlink**;
+  - nomes da denylist fixa (`.env*`, chaves, certificados, `.mcp.json`, `*credential*`, `*secret*`, `.git/`...);
+  - caminhos especiais do Windows (UNC, `\\?\`, ADS, dispositivos);
+  - binário, arquivo grande demais e diretório.
+
+  Arquivo acima do teto vira map-reduce automático (`--max-chunks`). Nada é gravado em disco.
 - **Contadores de uso:** todo resultado termina com uma linha `[uso] modelo=… prompt_eval_count=… eval_count=… total_ms=… load_ms=… queue_ms=…`, também presente em `_meta`.
 - **Sem tools administrativas.** O nginx devolve **403** em `/api/pull|push|create|delete|copy|blobs`.
 

@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/mcp"
 	"github.com/cslsoftwares/mcpollama/ollama"
 )
@@ -50,6 +51,16 @@ type Deps struct {
 	// the real defaults.
 	Model      string
 	EmbedModel string
+	// Files is the read gate of the economy tools. nil (no --allow-root) means
+	// summarize_file, extract and translate are not registered at all
+	// (FILE-001): they are absent from tools/list and tools/call answers
+	// "unknown tool" (-32602).
+	Files *files.Guard
+	// MaxPromptChars is the prompt ceiling the map-reduce splits against; it
+	// must equal the ollama client ceiling. 0 means the config default.
+	MaxPromptChars int
+	// MaxChunks caps the model calls of one file request (FILE-011); 0 means 40.
+	MaxChunks int
 }
 
 func (d Deps) backend() (Backend, error) {
@@ -69,15 +80,26 @@ func readOnlyClosed(title string, idempotent bool) *mcp.ToolAnnotations {
 	}
 }
 
-// New returns the registry of the base tools (phase 3).
+// New returns the registry: the base tools (phase 3) and, only when d.Files is
+// set, the file tools (phase 4).
 func New(d Deps) []mcp.ToolEntry {
-	return []mcp.ToolEntry{
+	out := []mcp.ToolEntry{
 		d.listModelsTool(),
 		d.generateTool(),
 		d.chatTool(),
 		d.embedTool(),
 	}
+	if d.Files != nil {
+		out = append(out, d.summarizeFileTool(), d.extractTool(), d.translateTool())
+	}
+	return out
 }
+
+// CatalogDeps is the Deps of the offline catalog dump: no backend and a Guard
+// with no roots, so every tool is registered and none can read anything. The
+// catalog documents the file tools although a running server has them only
+// with --allow-root.
+func CatalogDeps() Deps { return Deps{Files: &files.Guard{}} }
 
 // Defs returns just the definitions of a registry, in registry order.
 func Defs(entries []mcp.ToolEntry) []mcp.Tool {

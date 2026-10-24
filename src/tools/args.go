@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // args is the decoded arguments object of one tools/call. This file is the
@@ -159,4 +160,24 @@ func (a args) optList(key string) ([]any, bool, error) {
 		return nil, false, typeErr(key, "an array", v)
 	}
 	return l, true, nil
+}
+
+// limitedString reads a string argument (required or optional) and enforces a
+// rune ceiling, so a prompt fragment taken from the arguments cannot be
+// arbitrarily large.
+func (a args) limitedString(key string, max int, required bool) (string, error) {
+	var s string
+	var err error
+	if required {
+		s, err = a.reqString(key)
+	} else {
+		s, err = a.optString(key)
+	}
+	if err != nil {
+		return "", err
+	}
+	if n := utf8.RuneCountInString(s); n > max {
+		return "", fmt.Errorf("`%s` é longo demais (%d caracteres; máximo %d)", key, n, max)
+	}
+	return s, nil
 }

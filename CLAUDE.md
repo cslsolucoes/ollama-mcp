@@ -16,13 +16,17 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-23: **Fases 1, 2 e 3 concluídas** (tools base `list_models`, `generate`,
-`chat` e `embed` em `src/tools/`; catálogo em `TOOLS.md`, gerado por `src/cmd/dumptools`). O esqueleto do protocolo está em `src/`
+Estado em 2026-10-23: **Fases 1 a 4 concluídas** (tools base `list_models`, `generate`,
+`chat` e `embed`; tools de arquivo `summarize_file`, `extract` e `translate`, que só existem
+com `--allow-root` e passam pelo guard de `src/files/`; catálogo em `TOOLS.md`, gerado por
+`src/cmd/dumptools`). Qualquer mudança em `src/files/` exige rodar de novo os testes de
+ataque da revisão adversarial
+(`.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.*`). O esqueleto do protocolo está em `src/`
 (`mcp/types.go`, `mcpollama-mcp/`): `initialize`, `ping`, `tools/list` (ainda vazio) e
 `tools/call`, com os erros JSON-RPC. O cliente Ollama está em `src/ollama/` (stream interno,
 TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao vivo
 ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama`, uma chamada
-de cada vez). Próxima: Fase 4 (tools de arquivo com `--allow-root`).
+de cada vez). Próxima: Fase 5 (integração com Claude Code, Cursor e VS Code).
 O layout abaixo é o alvo; requisitos por fase em
 `referencias/Brief_Referencias/61-Matriz_Cobertura.md` §3.
 

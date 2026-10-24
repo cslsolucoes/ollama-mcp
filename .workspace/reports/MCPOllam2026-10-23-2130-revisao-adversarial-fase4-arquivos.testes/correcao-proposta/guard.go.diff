@@ -1,0 +1,16 @@
+diff --git a/advrev/src/files/guard.go b/advrev-fix/src/files/guard.go
+index 32a868d..fbf9aa5 100644
+--- a/advrev/src/files/guard.go
++++ b/advrev-fix/src/files/guard.go
+@@ -181,6 +181,11 @@ func (g *Guard) Read(requested string) (*File, error) {
+ 	if err != nil || !post.Mode().IsRegular() || !os.SameFile(pre, post) {
+ 		return nil, errNotAllowed()
+ 	}
++	// A hard link is a second name for the same file: the denylist and the
++	// containment saw only this name (SEC-C-01 of the adversarial review).
++	if n, err := linkCount(f); err != nil || n != 1 {
++		return nil, errNotAllowed()
++	}
+ 	data, err := io.ReadAll(io.LimitReader(f, g.maxBytes+1))
+ 	if err != nil {
+ 		return nil, refuse(ReasonBadRequest, "não foi possível ler o arquivo")

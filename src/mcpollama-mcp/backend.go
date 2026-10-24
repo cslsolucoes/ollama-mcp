@@ -40,10 +40,16 @@ func buildTools(cfg Config, lg *logger) []ToolEntry {
 		opts.Logf = lg.debugf
 	}
 	lb := &lazyBackend{opts: opts}
+	// validate() already refused an unusable root, so an error here cannot happen
+	// in the binary; if it did, the file tools stay unregistered (fail closed).
+	guard, _ := cfg.guard()
 	return tools.New(tools.Deps{
-		Backend:    lb.get,
-		Queue:      tools.NewQueue(1),
-		Model:      cfg.Model,
-		EmbedModel: cfg.EmbedModel,
+		Backend:        lb.get,
+		Queue:          tools.NewQueue(1),
+		Model:          cfg.Model,
+		EmbedModel:     cfg.EmbedModel,
+		Files:          guard,
+		MaxPromptChars: cfg.MaxPromptChars,
+		MaxChunks:      cfg.MaxChunks,
 	})
 }

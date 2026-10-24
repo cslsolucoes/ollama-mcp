@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/mcp"
 	"github.com/cslsoftwares/mcpollama/redact"
 )
@@ -173,6 +174,9 @@ func (s *server) logStartup() {
 	}
 	if s.cfg.TraceFile != "" || s.cfg.AuditLogPath != "" {
 		s.log.logf("WARNING: --trace-file and --audit-log-path take effect in a later phase; nothing is written")
+	}
+	if roots := files.SplitRoots(s.cfg.AllowRoot); len(roots) > 0 {
+		s.log.logf("file tools enabled: %d allowed root(s), max_file_bytes=%d, max_chunks=%d; the text of files under the roots is sent to the Ollama server", len(roots), s.cfg.MaxFileBytes, s.cfg.MaxChunks)
 	}
 	s.log.debugf("config url=%s model=%s embed_model=%s timeout=%s api_key_set=%t max_prompt_chars=%d max_line_bytes=%d verbosity=%s",
 		s.cfg.safeURL(), s.cfg.Model, s.cfg.EmbedModel, s.cfg.Timeout, s.cfg.APIKey != "",
@@ -420,7 +424,7 @@ func usageAttr(res mcp.ToolCallResult) string {
 		return ""
 	}
 	var b strings.Builder
-	for _, k := range []string{"prompt_eval_count", "eval_count", "total_ms", "load_ms", "queue_ms"} {
+	for _, k := range []string{"prompt_eval_count", "eval_count", "total_ms", "load_ms", "queue_ms", "parts"} {
 		if v, ok := u[k]; ok {
 			fmt.Fprintf(&b, " %s=%v", k, v)
 		}

@@ -333,9 +333,9 @@ func buildToolsFor(t *testing.T, cfg Config) []ToolEntry {
 	return buildTools(cfg, &logger{w: &sink, redact: func(s string) string { return s }})
 }
 
-func realToolsList(t *testing.T, verbosity string) ([]mcp.Tool, int) {
+func realToolsList(t *testing.T, verbosity string, extra ...string) ([]mcp.Tool, int) {
 	t.Helper()
-	args := []string{"--ollama-url", "https://exemplo.invalid", "--tools-verbosity", verbosity}
+	args := append([]string{"--ollama-url", "https://exemplo.invalid", "--tools-verbosity", verbosity}, extra...)
 	lines, _, code := runMain(t, args, nil, rpc(1, "tools/list", ""))
 	if code != 0 || len(lines) != 1 {
 		t.Fatalf("exit %d, %d lines", code, len(lines))
@@ -402,7 +402,8 @@ func TestRealToolsListIsDeterministic(t *testing.T) {
 // BUILD-006 / TEST-010 against the REAL tools/list: render the catalog from
 // what the server actually serves and compare with TOOLS.md.
 func TestToolsMdMatchesTheRealToolsList(t *testing.T) {
-	list, _ := realToolsList(t, "full")
+	// the catalog documents every tool, so the real list is taken with --allow-root
+	list, _ := realToolsList(t, "full", "--allow-root", t.TempDir())
 	raw, err := os.ReadFile(filepath.Join("..", "..", "TOOLS.md"))
 	if err != nil {
 		t.Fatalf("TOOLS.md: %v (run: go run ./cmd/dumptools)", err)

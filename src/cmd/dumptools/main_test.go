@@ -20,7 +20,7 @@ func TestWriteThenCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != tools.RenderCatalog(tools.Defs(tools.New(tools.Deps{}))) || !strings.Contains(string(got), "## `generate`") {
+	if string(got) != tools.RenderCatalog(tools.Defs(tools.New(tools.CatalogDeps()))) || !strings.Contains(string(got), "## `generate`") || !strings.Contains(string(got), "## `summarize_file`") {
 		t.Fatal("the file is not the rendered registry")
 	}
 	out.Reset()

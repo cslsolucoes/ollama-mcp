@@ -207,7 +207,10 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
 7. **P-7:** default de `--timeout` e adoção (ou não) do modo assíncrono (`task_id`). Depende da medição da Fase 5.
 8. **P-8:** conjunto final de tools: incluir `rank_files` (COULD) e tools assíncronas?
 9. ~~**P-9:** valor de `openWorldHint` nas tools. A spec usa `true` como default, então é preciso declarar (`MCPO-REQ-TOOL-005`).~~ **Decidida (2026-10-23 19:21): `openWorldHint:false`, declarado explicitamente** em todas as tools.
-10. **P-10:** denylist de arquivos (`.env`, `*.pem`, `*.key`...), política de override e regras de caminho do Windows.
+10. ~~**P-10:** denylist de arquivos (`.env`, `*.pem`, `*.key`...), política de override e regras de caminho do Windows.~~ **Decidida (2026-10-23 21:08):**
+    - **denylist fixa, sem override:** `.env*`, `*.pem`, `*.key`, `*.pfx`/`*.p12`, `id_rsa*`/`id_ed25519*`, `.mcp.json`, `*credential*`/`*secret*`, `settings.local.json` e tudo dentro de `.git/`;
+    - **recusar todos os caminhos especiais do Windows:** UNC, `\\?\`, `\\.\`, ADS e nomes de dispositivo. Junction ou symlink só se o destino resolvido (`EvalSymlinks`) ficar dentro do `--allow-root`;
+    - **arquivo acima do teto: map-reduce automático**, com partes ≤ teto em fronteira de linha e a linha `[uso]` somando tudo e informando o nº de partes.
 
 ## Changelog
 
@@ -452,4 +455,74 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   | 0 a 2 | concluídas |
   | 3 | **concluída** (commit abaixo) |
   | 4 | próxima: tools de arquivo (`--allow-root`, P-10 em aberto) |
+  | 5 e 6 | pendentes |
+
+### 2026-10-23 21:08 — Fase 3 commitada; decisões da Fase 4; Fase 4 iniciada
+- **Commit da Fase 3:** `dedc305` (32 arquivos, incluindo o `.gitignore` da P2-1; varredura de `src/` com `known_hits=0`).
+- **Decisões do owner (via AskUserQuestion):** P-10 com denylist fixa sem override, recusa de todos os caminhos especiais do Windows e map-reduce automático (detalhe na lista de pendências, item 10).
+- **Fase 4 iniciada:** implementação em Sonnet; depois, **revisão adversarial de segurança em Opus**, porque a leitura de arquivo local é a maior superfície de ataque do projeto; e o gate do loop principal (limpo, `-race`, smoke e 2ª via ao vivo **dentro do teto**). MUST da Fase 4: 23 (`61` §3).
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 3 | concluídas (`0fba414`, `67d05bb`, `b1c809d`, `dedc305`) |
+  | 4 | **em execução** |
+  | 5 e 6 | pendentes |
+
+### 2026-10-23 22:05 — Fase 4: implementação, revisão adversarial, correção do escape crítico e verificação
+- **Feito (agente Sonnet):**
+  - `src/files/` (`policy.go`, `guard.go`, `guard_test.go`): contenção em 10 camadas: sintaxe Windows, forma, `Clean` + denylist no nome pedido, `EvalSymlinks`, `filepath.Rel`, denylist no nome resolvido, intermediários sem reparse point, abertura via `os.Root`, `Stat` antes e depois com `SameFile` e limite de bytes, e 2º `EvalSymlinks`;
+  - `src/tools/filetools.go` e `chunk.go`: `summarize_file`, `extract` e `translate`, com map-reduce, `--max-chunks` (default 40), linha `[arquivo]` + `partes=N` no `[uso]`, conteúdo delimitado por nonce e `temperature` 0,2;
+  - `--allow-root`/`MCPOLLAMA_ALLOW_ROOT`; `TOOLS.md` com as 7 tools.
+  - **Desvios do agente:**
+    - junction sempre recusada, inclusive para dentro (o Go 1.26 não a segue);
+    - denylist +3 padrões (`*.env`, `id_ecdsa*`, `id_dsa*`), também aplicada a diretórios;
+    - `translate` concatena as partes, sem redução;
+    - tetos de tamanho para `instruction`, `format` e `focus`.
+- **Revisão adversarial (Opus):**
+  - a 1ª execução caiu por **529 (API sobrecarregada)**, sem produzir nada; foi retomada;
+  - relatório `.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.report.md`, com os testes de ataque em `...testes\`: **232 vetores** (219 bloqueados, **4 escaparam, todos por hardlink**, 7 achados de política, 2 informativos, 3 não testáveis);
+  - TOCTOU com ~8.200 leituras e 0 vazamentos; map-reduce com 1.350 combinações e nada acima do teto;
+  - veredito: **NÃO SEGURO** no estado entregue, **SEGURO COM RESSALVAS** após a correção do hardlink;
+  - o revisor relatou e corrigiu um erro de processo próprio (encoding no PowerShell 5.1).
+- **SEC-C-01 (crítico), hardlink: confirmado por 2ª via pelo loop principal.** Binário real, `--allow-root` temporário, URL inexistente como oráculo: `notas.txt` (hardlink → `.env`) e `externo-link.txt` (hardlink → arquivo **fora da raiz**) foram **lidos** e chegaram a tentar o envio; o `.env` direto foi recusado.
+  - **Correção aplicada pelo loop principal:** `guard.go` recusa arquivo com `linkCount != 1`, de forma opaca e fail-closed, mais `nlink_windows.go` (`GetFileInformationByHandle`) e `nlink_other.go` (`Stat_t.Nlink`);
+  - regressão `TestHardlinksAreRefused`, que também prova que o original volta a ser legível com 1 link;
+  - **controle negativo** numa cópia com a correção desligada: o teste **falha** (`hl-env.txt: hard link was read (24 bytes)`), ou seja, pega o defeito;
+  - **2ª via após a correção:** os 2 hardlinks são recusados ("arquivo não encontrado ou fora das raízes permitidas"), o `normal.txt` continua legível e há 0 sentinelas na saída.
+- **SEC-M-01 (conteúdo ecoado em erro) e SEC-m-01 (nonce reaproveitado na redução):** corrigidos por um agente Sonnet.
+  - `sanitizeUpstream` descarta o corpo do upstream nos erros das tools de arquivo, mantendo `Kind`/`Status` e `errors.Is`;
+  - a redução usa um nonce novo por rodada, conferido contra os parciais;
+  - testes `TestFileToolErrorDoesNotEchoUpstreamBody` (4 subcasos), `TestSanitizeUpstreamKeepsLocalErrors` e `TestReduceUsesFreshNonce`. O agente desfez as correções e os testes falharam.
+- **Teste 8.3:** movido para `guard_windows_test.go`, e o `guard_test.go` voltou a compilar para Linux (`GOOS=linux go vet` = 0). **Rodado no C:** (8dot3 habilitado): PASS, com `ENVPRO~1.LOC` negado pelo nome resolvido. O SKIP no D: é só de ambiente.
+- **Verificação final do loop principal (lida):**
+  - `go clean -cache -testcache`; build, `vet`, `vet -tags live` e `GOOS=linux vet` = 0;
+  - `go test -count=1 -cover -v ./...` com **245 PASS, 0 FAIL, 1 SKIP** (8.3 no D:). Cobertura: `files` 90,7%, `tools` 92,7%, `mcpollama-mcp` 94,3%, `ollama` 92,1%, `redact` 100%, `dumptools` 73,0%;
+  - **`-race` com 0 DATA RACE**; `gofmt` vazio; `dumptools -check` em sincronia.
+- **2ª via ao vivo** (22:00, uma chamada de cada vez, arquivo `ata.txt` de 289 bytes):
+  - `TestLive5SummarizeFile`: PASS, `prompt_eval_count=362 eval_count=66 total_ms=25707 load_ms=24738` (carga a frio, o `qwen3-ia` de novo fora da VRAM);
+  - `TestLive6Extract`: PASS, `total_ms=230`;
+  - `TestLive7Translate`: PASS, `total_ms=948`;
+  - `partes=1` nos 3; token na saída: 0.
+- **Ressalvas abertas da revisão (decisões do owner):**
+  - SEC-M-02: `--allow-root C:\` é aceito e lê `C:\Windows\win.ini`;
+  - SEC-M-03: lacunas da denylist (`.npmrc`, `.pypirc`, `.netrc`, `*.ppk`, `.kube\config`, `.docker\config.json`, `.ssh\`, `.aws\`, `.claude.json` etc.);
+  - SEC-m-02: vírgula no nome de pasta parte o `--allow-root`;
+  - raiz relativa aceita;
+  - raízes aninhadas, com a denylist dependendo da ordem;
+  - raiz via junction aceita, mas inútil;
+  - hardlink entre volumes não testável (NTFS não permite).
+
+### 2026-10-23 22:10 — decisões do owner sobre as ressalvas + commit da Fase 4
+- **Decisões (via AskUserQuestion):**
+  1. **SEC-M-02 = aceitar com aviso:** raiz de unidade, `%USERPROFILE%` ou diretório do sistema sobem, mas com WARNING explícito em stderr a cada início.
+  2. **SEC-M-03 = manter a denylist como está** (P-10 + os 3 padrões do agente). As lacunas listadas pelo revisor ficam **aceitas pelo owner** e documentadas.
+  3. **`--allow-root`:** separador `;` (aceita vírgula em nome de pasta), raiz **só absoluta** (relativa recusada na partida) e **raízes aninhadas recusadas**.
+  4. **Commit agora; as ressalvas 1 e 3 num commit `fix` próprio**, com o mesmo gate.
+- **Docs:** `CLAUDE.md` (estado "Fases 1 a 4 concluídas"; regra de rodar de novo os testes de ataque ao mexer em `src/files/`) e `README.md` (tools de arquivo e flags `--allow-root`/`--max-chunks`).
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 3 | concluídas |
+  | 4 | **concluída** (commit abaixo), com o `fix` de ressalvas em seguida |
   | 5 e 6 | pendentes |

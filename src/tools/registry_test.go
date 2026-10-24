@@ -8,12 +8,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/mcp"
 )
 
 // toolsListBudget is the byte budget of the full tools/list payload (TOK-006).
 // Measured at 4 tools: see TestToolsListBudget for the figure it protects.
-const toolsListBudget = 4400
+const (
+	toolsListBudget     = 4400 // the four base tools, no --allow-root
+	toolsListBudgetFull = 7600 // with the three file tools (--allow-root)
+)
 
 // TEST-008 / TOOL-001 / SEC-012: the exact set, not a "contains".
 func TestExactToolSet(t *testing.T) {
@@ -31,7 +35,7 @@ func TestExactToolSet(t *testing.T) {
 // TOOL-003: the Cursor prefixes the server id to the tool name; the sum is capped.
 func TestQualifiedNameLimit(t *testing.T) {
 	longest := 0
-	for _, e := range New(Deps{}) {
+	for _, e := range New(CatalogDeps()) {
 		if n := len(ServerID) + len(e.Def.Name); n > longest {
 			longest = n
 		}
@@ -47,7 +51,7 @@ func TestQualifiedNameLimit(t *testing.T) {
 
 // TOOL-005 (P-9): title and explicit closed-world annotations.
 func TestAnnotationsAreExplicit(t *testing.T) {
-	for _, e := range New(Deps{}) {
+	for _, e := range New(CatalogDeps()) {
 		d := e.Def
 		if d.Title == "" || d.Annotations == nil {
 			t.Fatalf("%s: title/annotations missing", d.Name)
@@ -63,8 +67,9 @@ func TestAnnotationsAreExplicit(t *testing.T) {
 			}
 		}
 	}
-	idem := map[string]bool{"list_models": true, "embed": true, "generate": false, "chat": false}
-	for _, e := range New(Deps{}) {
+	idem := map[string]bool{"list_models": true, "embed": true, "generate": false, "chat": false,
+		"summarize_file": false, "extract": false, "translate": false}
+	for _, e := range New(CatalogDeps()) {
 		if e.Def.Annotations.IdempotentHint != idem[e.Def.Name] {
 			t.Errorf("%s: idempotentHint = %t", e.Def.Name, e.Def.Annotations.IdempotentHint)
 		}
@@ -105,7 +110,7 @@ func TestSchemaConformance(t *testing.T) {
 			t.Errorf("%s: neither type nor oneOf", path)
 		}
 	}
-	for _, e := range New(Deps{}) {
+	for _, e := range New(CatalogDeps()) {
 		if e.Def.InputSchema["type"] != "object" {
 			t.Fatalf("%s: root must be an object", e.Def.Name)
 		}
@@ -116,7 +121,7 @@ func TestSchemaConformance(t *testing.T) {
 // TOK-001 / TOOL-009: nothing in the base tools asks for file text; the
 // descriptions are short and static.
 func TestDescriptionsShortAndStatic(t *testing.T) {
-	for _, e := range New(Deps{Model: "dynamic-model-name"}) {
+	for _, e := range New(Deps{Model: "dynamic-model-name", Files: &files.Guard{}}) {
 		d := e.Def.Description
 		if len(d) > 480 {
 			t.Errorf("%s: description has %d bytes", e.Def.Name, len(d))
@@ -143,9 +148,21 @@ func TestToolsListBudget(t *testing.T) {
 	}
 }
 
+// TOK-006 with the file tools registered.
+func TestToolsListBudgetWithFileTools(t *testing.T) {
+	b, err := json.Marshal(mcp.ToolsListResult{Tools: Defs(New(CatalogDeps()))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("full tools/list payload with file tools: %d bytes (budget %d)", len(b), toolsListBudgetFull)
+	if len(b) > toolsListBudgetFull {
+		t.Fatalf("tools/list = %d bytes > budget %d", len(b), toolsListBudgetFull)
+	}
+}
+
 // BUILD-006 / TEST-010: the catalog file is exactly what the registry renders.
 func TestCatalogInSync(t *testing.T) {
-	want := RenderCatalog(Defs(New(Deps{})))
+	want := RenderCatalog(Defs(New(CatalogDeps())))
 	raw, err := os.ReadFile(filepath.Join("..", "..", "TOOLS.md"))
 	if err != nil {
 		t.Fatalf("TOOLS.md missing (run: go run ./cmd/dumptools): %v", err)
@@ -157,7 +174,7 @@ func TestCatalogInSync(t *testing.T) {
 }
 
 func TestCatalogIsDeterministicAndSorted(t *testing.T) {
-	defs := Defs(New(Deps{}))
+	defs := Defs(New(CatalogDeps()))
 	rev := append([]mcp.Tool(nil), defs...)
 	for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
 		rev[i], rev[j] = rev[j], rev[i]
@@ -170,7 +187,7 @@ func TestCatalogIsDeterministicAndSorted(t *testing.T) {
 	}
 	c := RenderCatalog(defs)
 	last := -1
-	for _, n := range []string{"## `chat`", "## `embed`", "## `generate`", "## `list_models`"} {
+	for _, n := range []string{"## `chat`", "## `embed`", "## `extract`", "## `generate`", "## `list_models`", "## `summarize_file`", "## `translate`"} {
 		i := strings.Index(c, n)
 		if i <= last {
 			t.Fatalf("%s out of order", n)

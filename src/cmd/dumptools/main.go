@@ -39,7 +39,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		path = filepath.Join(root, "TOOLS.md")
 	}
-	want := tools.RenderCatalog(tools.Defs(tools.New(tools.Deps{})))
+	want := tools.RenderCatalog(tools.Defs(tools.New(tools.CatalogDeps())))
 	if *check {
 		have, err := os.ReadFile(path)
 		if err != nil || strings.ReplaceAll(string(have), "\r\n", "\n") != want {
