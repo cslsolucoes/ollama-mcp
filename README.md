@@ -64,7 +64,7 @@ Exemplo (Claude Code / Cursor), no mesmo molde do `mcpvmware-mcp` e do `TruenasM
 ```json
 {
   "mcpServers": {
-    "mcpOllamaCSL": {
+    "mcpOllama": {
       "command": "E:\\MCPOllam\\mcpollama-mcp.exe",
       "args": ["--ollama-url", "https://ia.cslsolucoes.com.br:8443",
                "--tls-ca", "C:\\Users\\<user>\\.openclaude\\certs\\cloudflare-origin-ca.pem"],

@@ -587,3 +587,32 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P5-1:** abrir o `claude` interativo em `E:\MCPOllam` e aceitar a confiança do workspace;
   - **P5-2:** Cursor (`.cursor/mcp.json` já escrito) e VS Code (`.vscode/mcp.json` já escrito): reiniciar ou recarregar, fazer 1 chamada real (`list_models` e `generate`) e anotar se a linha `[uso]` chega ao modelo e o tempo/timeout de uma geração longa (PB5-3);
   - **P5-3 e P5-4:** rotacionar a chave do TrueNAS e a senha `sa`.
+- **Commit:** `8e99a9b` (`.gitignore` + plano).
+- **Decisão do owner (22:17):** **esperar os testes de GUI** (P5-1/P5-2) antes da Fase 6. A Fase 6 fica bloqueada até o retorno do owner.
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 4 | concluídas (`0fba414`, `67d05bb`, `b1c809d`, `dedc305`, `e6dfb5b` + `9ef7935`) |
+  | 5 | **em progresso:** Claude Code validado (headless); confiança do workspace, Cursor e VS Code com o owner |
+  | 6 | **bloqueada**, aguardando o fim da Fase 5 (decisão do owner) |
+
+### 2026-10-24 17:30 — foco no Claude Code; renomeação do servidor; Fase 5 validada na sessão real
+- **Decisões do owner:**
+  1. "o foco principal é no claude" → **Cursor e VS Code deixam de bloquear o projeto**: a validação neles vira opcional (P5-2 rebaixada) e a Fase 6 fica desbloqueada;
+  2. **renomear o servidor `mcpOllamaCSL` → `mcpOllama`.**
+- **Renomeação feita** nos 4 arquivos ignorados pelo git (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` e `enabledMcpjsonServers` do `.claude/settings.local.json`), por script, sem exibir o token. Conferido: 1 troca em cada, JSON válido, novo nome presente, 0 restos do nome antigo, os 4 continuam ignorados.
+  - Também no exemplo do `README.md`.
+  - `src/` e `TOOLS.md` não usam o nome do servidor (busca case-sensitive: 0).
+  - As menções antigas neste plano ficam como histórico.
+  - Nesta sessão as tools ainda aparecem como `mcp__mcpOllamaCSL__*`; o nome novo vale a partir do próximo início do Claude Code.
+- **P5-1 resolvida:** na sessão retomada (2026-10-24), o Claude Code carregou o servidor de projeto, e as 7 tools aparecem como tools da sessão. Validação **interativa e real**, feita pelo próprio loop principal:
+  - `list_models`: 5 instalados; em VRAM só o `qwen3.8:27b-64k` (nível `local`), ctx 65536;
+  - `summarize_file` de `validacao-empirica.md` (12.548 bytes, 12.313 caracteres, `max_words` 120): resumo correto em pt-BR. **O texto do arquivo não entrou no contexto do Claude, só o resumo.** `[uso] modelo=qwen3-ia prompt_eval_count=4970 eval_count=197 total_ms=25764 load_ms=22023 queue_ms=0 partes=1`. Carga a frio de 22 s, porque o `ia-local` tinha o outro modelo residente.
+- **`CLAUDE.md`:** seção "Estado" corrigida (removidos "`tools/list` (ainda vazio)" e "Próxima: Fase 5"; acrescentados o foco no Claude Code, o nome `mcpOllama` e a próxima etapa, Fase 6).
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 4 | concluídas |
+  | 5 | **concluída para o Claude Code** (foco do owner). Pendências opcionais: P5-2 Cursor/VS Code. Pendências do owner: P5-3/P5-4 (rotação de segredos) |
+  | 6 | **desbloqueada**, próxima |

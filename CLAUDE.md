@@ -21,12 +21,15 @@ Estado em 2026-10-23: **Fases 1 a 4 concluídas** (tools base `list_models`, `ge
 com `--allow-root` e passam pelo guard de `src/files/`; catálogo em `TOOLS.md`, gerado por
 `src/cmd/dumptools`). Qualquer mudança em `src/files/` exige rodar de novo os testes de
 ataque da revisão adversarial
-(`.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.*`). O esqueleto do protocolo está em `src/`
-(`mcp/types.go`, `mcpollama-mcp/`): `initialize`, `ping`, `tools/list` (ainda vazio) e
-`tools/call`, com os erros JSON-RPC. O cliente Ollama está em `src/ollama/` (stream interno,
-TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao vivo
-ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama`, uma chamada
-de cada vez). Próxima: Fase 5 (integração com Claude Code, Cursor e VS Code).
+(`.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.*`). O protocolo
+está em `src/` (`mcp/types.go`, `mcpollama-mcp/`); o cliente Ollama em `src/ollama/` (stream
+interno, TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao
+vivo ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama` ou `./tools`,
+uma chamada de cada vez).
+**Fase 5:** o foco é o **Claude Code** (decisão do owner, 2026-10-24). O servidor se chama
+**`mcpOllama`** no `.mcp.json` da raiz (escopo de projeto, fora do git; token literal) e já
+foi validado nele; Cursor (`.cursor/mcp.json`) e VS Code (`.vscode/mcp.json`) estão
+configurados, mas a validação neles é opcional. Próxima: Fase 6 (medição da economia).
 O layout abaixo é o alvo; requisitos por fase em
 `referencias/Brief_Referencias/61-Matriz_Cobertura.md` §3.
 
