@@ -29,7 +29,11 @@ uma chamada de cada vez).
 **Fase 5:** o foco é o **Claude Code** (decisão do owner, 2026-10-24). O servidor se chama
 **`mcpOllama`** no `.mcp.json` da raiz (escopo de projeto, fora do git; token literal) e já
 foi validado nele; Cursor (`.cursor/mcp.json`) e VS Code (`.vscode/mcp.json`) estão
-configurados, mas a validação neles é opcional. Próxima: Fase 6 (medição da economia).
+configurados, mas a validação neles é opcional.
+**Fase 6 (medição):** resumir um arquivo de ~72 mil caracteres com `summarize_file` custou
+**−66% de custo Anthropic** e deixou **~22 mil tokens fora do contexto** do Claude, com ~15 s a
+mais de espera (`.workspace/reports/MCPOllam2026-10-24-173500-economia-tokens.report.md`).
+O Claude Code aceitou uma tool de ~87 s sem corte; o limite efetivo é o `--timeout` do servidor.
 O layout abaixo é o alvo; requisitos por fase em
 `referencias/Brief_Referencias/61-Matriz_Cobertura.md` §3.
 

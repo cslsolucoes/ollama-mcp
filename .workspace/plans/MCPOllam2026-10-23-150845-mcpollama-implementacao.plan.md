@@ -616,3 +616,37 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   | 0 a 4 | concluídas |
   | 5 | **concluída para o Claude Code** (foco do owner). Pendências opcionais: P5-2 Cursor/VS Code. Pendências do owner: P5-3/P5-4 (rotação de segredos) |
   | 6 | **desbloqueada**, próxima |
+- **Commit:** `3b904ca`.
+
+### 2026-10-24 17:36 — Fase 6 concluída: medição da economia (Claude Code headless)
+- **Relatório:** `.workspace/reports/MCPOllam2026-10-24-173500-economia-tokens.report.md`. Evidência bruta (`A.json`, `A2.json`, `B.json`, `T3.json`) em `...economia-tokens.evidencias/`, varrida antes da cópia (`known_hits=0`).
+- **Método:** mesmo pedido (resumir `60-Requisitos_mcpollama.md`, 72.114 caracteres), com `claude -p --model haiku --output-format json`:
+  - A: `Read`, cache frio;
+  - B: `summarize_file` via `--mcp-config .mcp.json --strict-mcp-config`;
+  - A2: `Read` repetido com o cache quente, para tirar o efeito da ordem.
+- **Medido (lido do JSON):**
+
+  | Rodada | Custo (US$) | Turnos | Turno final: criação de cache | Parede |
+  | --- | ---: | ---: | ---: | ---: |
+  | A | 0,03944 | 3 | 16.060 | 31,2 s |
+  | A2 | 0,03702 | 2 | 23.244 | 23,7 s |
+  | B | 0,01243 | 3 | 1.069 | 39,3 s |
+
+  - **Custo −66,4%** (B × A2), −68,5% (B × A);
+  - **~22,2 mil tokens do arquivo fora do contexto** do Claude;
+  - lado Ollama em B: `prompt_eval_count=27474 eval_count=443 total_ms=18776 load_ms=1`.
+- **Qualidade:** os dois resumos acertam 171 / 105 / 52 / 14. O B listou as 12 áreas, com uma imprecisão ("128.000 caracteres falha"); o A repetiu uma frase superada do documento. Qualidade equivalente para orientação.
+- **PB5-3 / P-7 (timeout):** o `generate` com `num_predict` 7000 levou **86,7 s no servidor e completou sem corte no Claude Code** (parede 107,3 s, `fim=length`). O cliente aceita pelo menos ~87 s; **o limite efetivo hoje é o `--timeout` de 120 s do mcpollama**. O máximo do Claude Code não foi medido.
+- **Não deu certo, e a solução:** o 1º teste de timeout não valeu. No PowerShell 5.1, as aspas duplas internas do argumento foram quebradas na passagem para o `claude.exe`, e o modelo recebeu só "Escreva" (3,9 s). Refeito com aspas simples dentro do prompt. O 2º teste parou sozinho em 1.933 tokens (21 s), então foi forçada uma saída longa determinística (contagem por extenso), o 3º teste.
+- **Limitações registradas no relatório:** n=1 por variante; contexto base dominando os totais; um tipo de tarefa só; Haiku como cliente; servidor quente em B.
+- **Pendências do owner:**
+  - **P-7:** default do `--timeout` (120 s hoje; uma geração no teto de 32.768 tokens leva ~6 min);
+  - **P-4:** escopo de usuário e troca do nível `local`;
+  - P-8;
+  - P5-2 (opcional), P5-3 e P5-4.
+- **Fases:**
+
+  | Fase | Estado |
+  | --- | --- |
+  | 0 a 5 | concluídas (5 no Claude Code) |
+  | 6 | **concluída** (commit abaixo) |
