@@ -177,6 +177,11 @@ func (s *server) logStartup() {
 	}
 	if roots := files.SplitRoots(s.cfg.AllowRoot); len(roots) > 0 {
 		s.log.logf("file tools enabled: %d allowed root(s), max_file_bytes=%d, max_chunks=%d; the text of files under the roots is sent to the Ollama server", len(roots), s.cfg.MaxFileBytes, s.cfg.MaxChunks)
+		if g, err := s.cfg.guard(); err == nil {
+			for _, r := range g.BroadRoots(broadDirs()) {
+				s.log.logf("WARNING: --allow-root %q is a volume root, your home directory or a system directory: ALL content of that tree (except the fixed denylist) can be read and sent to the remote Ollama server", r)
+			}
+		}
 	}
 	s.log.debugf("config url=%s model=%s embed_model=%s timeout=%s api_key_set=%t max_prompt_chars=%d max_line_bytes=%d verbosity=%s",
 		s.cfg.safeURL(), s.cfg.Model, s.cfg.EmbedModel, s.cfg.Timeout, s.cfg.APIKey != "",

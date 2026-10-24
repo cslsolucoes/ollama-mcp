@@ -42,7 +42,7 @@ type Config struct {
 	MaxLineBytes   int
 	MaxFileBytes   int
 	MaxChunks      int
-	AllowRoot      string // comma-separated directories; empty disables the file tools
+	AllowRoot      string // directories separated by ; (os.PathListSeparator); empty disables the file tools
 	Debug          bool
 	ToolsVerbosity string
 	TraceFile      string
@@ -78,7 +78,8 @@ Every flag falls back to its environment variable; the flag wins.
   --timeout DURATION      per-call deadline, default 2m0s          (OLLAMA_TIMEOUT)
   --max-prompt-chars N    prompt ceiling in characters, default 128000 (MCPOLLAMA_MAX_PROMPT_CHARS)
   --max-file-bytes N      file ceiling in bytes, default 4194304   (MCPOLLAMA_MAX_FILE_BYTES)
-  --allow-root DIR[,DIR]  directories the file tools may read; without it
+  --allow-root DIR[;DIR]  absolute directories the file tools may read, separated by ;
+                          (: on Linux), not nested; without it
                           summarize_file, extract and translate do not exist (MCPOLLAMA_ALLOW_ROOT)
   --max-chunks N          model calls per file request, default 40 (MCPOLLAMA_MAX_CHUNKS)
   --max-line-bytes N      stdin line ceiling, default 8388608      (MCPOLLAMA_MAX_LINE_BYTES)
@@ -218,6 +219,10 @@ func (c Config) validate() error {
 	}
 	return nil
 }
+
+// broadDirs supplies the home and system directories that make a root "broad";
+// a variable so tests inject them instead of depending on the machine.
+var broadDirs = files.DefaultBroadDirs
 
 // guard builds the file gate from --allow-root. It returns nil (no file tools)
 // when no root is configured, and an error when a root is unusable: a typo in

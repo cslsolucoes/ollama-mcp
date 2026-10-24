@@ -526,3 +526,26 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   | 0 a 3 | concluídas |
   | 4 | **concluída** (commit abaixo), com o `fix` de ressalvas em seguida |
   | 5 e 6 | pendentes |
+
+### 2026-10-23 22:30 — Fase 4 commitada (`e6dfb5b`) + `fix` das ressalvas do `--allow-root`
+- **Commit da Fase 4:** `e6dfb5b` (41 arquivos, incluindo o relatório e os testes de ataque em `.workspace/reports`; varredura de `src/` e `reports/` com `known_hits=0`).
+- **Fix (agente Sonnet), decisões do owner de 22:10:**
+  - separador `os.PathListSeparator` (`;` no Windows): vírgula passa a ser válida em nome de pasta;
+  - raiz relativa → erro na partida;
+  - raízes aninhadas (nos dois sentidos, ou repetidas) → erro na partida;
+  - **raiz via junction → erro na partida**, com mensagem clara: o agente escolheu recusar em vez de suportar, porque o `EvalSymlinks` do Go não atravessa junction;
+  - **raiz ampla** (volume, `%USERPROFILE%`, `%SystemRoot%`, `%ProgramFiles%`, `%ProgramFiles(x86)%`, `%ProgramW6432%`, `%ProgramData%`) → **sobe com `WARNING:` em stderr** a cada início;
+  - denylist **inalterada**.
+  - Testes novos: 6 em `files/guard_test.go` e 2 em `files_wiring_test.go`.
+  - **Testes de ataque da revisão rodados de novo** numa cópia: compilaram sem ajuste, 209 PASS, **ESCAPOU=0**, BLOQUEADO=223. Restam 2 ACHADO, ambos aceitos pelo owner: `deny/gaps` (denylist mantida) e `cfg/drive-root` (agora com aviso).
+- **Verificação do loop principal (lida):**
+  - `go clean -cache -testcache`; build, `vet` e `GOOS=linux vet` = 0;
+  - `go test -count=1 -v ./...` com **253 PASS, 0 FAIL, 1 SKIP** (8.3 no D:);
+  - `-race` com 0 DATA RACE; `gofmt` vazio; `dumptools -check` em sincronia;
+  - **binário real, 5 cenários de partida:**
+    - `Cliente, Inc` → exit 0, sem aviso;
+    - `.\rel` → **exit 2** "a raiz deve ser um caminho absoluto";
+    - raiz aninhada (`a;a\b`) → **exit 2**;
+    - `%USERPROFILE%` → exit 0, com **WARNING** "is a volume root, your home directory or a system directory: ALL content ... can be read and sent to the remote Ollama server";
+    - raiz normal → exit 0, sem aviso.
+- **Observação:** o WARNING está em inglês, como os outros avisos de partida; os erros de partida estão em pt-BR.

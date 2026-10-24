@@ -45,30 +45,113 @@ func NewGuard(roots []string, maxBytes int64) (*Guard, error) {
 		if rf := checkSyntax(r, runtime.GOOS == "windows"); rf != nil {
 			return nil, fmt.Errorf("--allow-root %q: %s", r, rf.Error())
 		}
-		abs, err := filepath.Abs(r)
-		if err != nil {
-			return nil, fmt.Errorf("--allow-root %q: caminho inválido", r)
+		// Only absolute roots: a relative one would be resolved against the
+		// working directory of whoever launched the server, which a client
+		// does not control (SEC-m-03).
+		if !filepath.IsAbs(r) {
+			return nil, fmt.Errorf("--allow-root %q: a raiz deve ser um caminho absoluto (raízes relativas são recusadas)", r)
 		}
-		abs = filepath.Clean(abs)
+		abs := filepath.Clean(r)
 		res, err := filepath.EvalSymlinks(abs)
 		if err != nil {
 			return nil, fmt.Errorf("--allow-root %q: o diretório não existe ou não pode ser resolvido", r)
+		}
+		res = filepath.Clean(res)
+		// Go's EvalSymlinks leaves a junction (mount point) unresolved, and no
+		// read through such a root can work: refuse at the start instead of
+		// accepting a root that silently fails every call (SEC-m-06).
+		if lst, err := os.Lstat(res); err != nil || lst.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+			return nil, fmt.Errorf("--allow-root %q: a raiz é uma junction ou ponto de reanálise, não suportada; use o caminho real do diretório", r)
 		}
 		st, err := os.Stat(res)
 		if err != nil || !st.IsDir() {
 			return nil, fmt.Errorf("--allow-root %q: não é um diretório", r)
 		}
+		// Nested (or repeated) roots are refused: with several roots the
+		// denylist and the containment would depend on their order (SEC-m-04).
+		for i, o := range g.roots {
+			if _, in := within(o, res); in {
+				return nil, fmt.Errorf("--allow-root %q: está dentro de outra raiz (%q); raízes aninhadas ou repetidas são recusadas", r, g.rawRoots[i])
+			}
+			if _, in := within(res, o); in {
+				return nil, fmt.Errorf("--allow-root %q: contém outra raiz (%q); raízes aninhadas ou repetidas são recusadas", r, g.rawRoots[i])
+			}
+		}
 		g.rawRoots = append(g.rawRoots, abs)
-		g.roots = append(g.roots, filepath.Clean(res))
+		g.roots = append(g.roots, res)
 	}
 	return g, nil
 }
 
+// BroadDirs are the directories a root must not silently be: the user's home
+// and the system directories. Injected so tests never depend on the machine.
+type BroadDirs struct {
+	Home   string
+	System []string
+}
+
+// DefaultBroadDirs reads the real home (os.UserHomeDir) and, on Windows, the
+// system directories from the environment.
+func DefaultBroadDirs() BroadDirs {
+	var b BroadDirs
+	b.Home, _ = os.UserHomeDir()
+	for _, k := range []string{"SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"} {
+		if v := os.Getenv(k); v != "" {
+			b.System = append(b.System, v)
+		}
+	}
+	return b
+}
+
+// BroadRoots returns the configured roots that are a volume root, the home
+// directory or a system directory (owner decision: accepted, but the caller
+// must warn on every start). Both sides are resolved and compared whole, case-
+// insensitively on Windows.
+func (g *Guard) BroadRoots(b BroadDirs) []string {
+	if g == nil {
+		return nil
+	}
+	canon := func(p string) string {
+		if p == "" {
+			return ""
+		}
+		p = filepath.Clean(p)
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			p = filepath.Clean(r)
+		}
+		return p
+	}
+	same := func(a, c string) bool {
+		if runtime.GOOS == "windows" {
+			return strings.EqualFold(a, c)
+		}
+		return a == c
+	}
+	var out []string
+	for _, r := range g.roots {
+		broad := filepath.Dir(r) == r // C:\ or /
+		if h := canon(b.Home); h != "" && same(r, h) {
+			broad = true
+		}
+		for _, s := range b.System {
+			if c := canon(s); c != "" && same(r, c) {
+				broad = true
+			}
+		}
+		if broad {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // SplitRoots splits the value of --allow-root / MCPOLLAMA_ALLOW_ROOT. The
-// separator is the comma of the flag's contract; blanks are dropped.
+// separator is os.PathListSeparator (';' on Windows, ':' elsewhere), like the
+// PATH variable, so a comma is a valid character of a directory name
+// (SEC-m-02). Blanks are dropped.
 func SplitRoots(s string) []string {
 	var out []string
-	for _, p := range strings.Split(s, ",") {
+	for _, p := range strings.Split(s, string(os.PathListSeparator)) {
 		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, p)
 		}

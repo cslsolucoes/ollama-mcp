@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/mcp"
 )
 
@@ -85,7 +86,7 @@ func TestBadAllowRootStopsTheStart(t *testing.T) {
 		"missing": filepath.Join(root, "nao-existe"),
 		"file":    filepath.Join(root, "nota.txt"),
 		"unc":     `\\host\share`,
-		"one bad": root + "," + filepath.Join(root, "nao-existe"),
+		"one bad": root + ";" + filepath.Join(root, "nao-existe"),
 	} {
 		lines, errw, code := runMain(t, []string{"--allow-root", v}, nil, rpc(1, "tools/list", ""))
 		if code != 2 || len(lines) != 0 || !strings.Contains(errw, "--allow-root") {
@@ -193,12 +194,70 @@ func TestAllowRootConfig(t *testing.T) {
 	if c.AllowRoot != "" || c.MaxChunks != 40 {
 		t.Fatalf("defaults: %+v", c)
 	}
-	c = parse(t, nil, map[string]string{"MCPOLLAMA_ALLOW_ROOT": "/a,/b", "MCPOLLAMA_MAX_CHUNKS": "7"})
-	if c.AllowRoot != "/a,/b" || c.MaxChunks != 7 {
+	c = parse(t, nil, map[string]string{"MCPOLLAMA_ALLOW_ROOT": "/a;/b", "MCPOLLAMA_MAX_CHUNKS": "7"})
+	if c.AllowRoot != "/a;/b" || c.MaxChunks != 7 {
 		t.Fatalf("env: %+v", c)
 	}
 	c = parse(t, []string{"--allow-root", "/flag", "--max-chunks", "9"}, map[string]string{"MCPOLLAMA_ALLOW_ROOT": "/env"})
 	if c.AllowRoot != "/flag" || c.MaxChunks != 9 {
 		t.Fatalf("flag: %+v", c)
+	}
+}
+
+// Owner decision 2/3/5: relative, nested and junction roots stop the start
+// (exit 2, a pt-BR message that names the flag and leaks nothing else).
+func TestBadRootShapesStopTheStart(t *testing.T) {
+	root := rootWithFiles(t)
+	sub := filepath.Join(root, "sub")
+	os.MkdirAll(sub, 0o755)
+	for name, v := range map[string]string{
+		"relative": "root",
+		"dot":      ".",
+		"nested":   root + ";" + sub,
+		"nested2":  sub + ";" + root,
+	} {
+		lines, errw, code := runMain(t, []string{"--allow-root", v}, nil, rpc(1, "tools/list", ""))
+		if code != 2 || len(lines) != 0 || !strings.Contains(errw, "--allow-root") {
+			t.Fatalf("%s: exit %d, %d stdout lines, stderr %q", name, code, len(lines), errw)
+		}
+		if strings.Contains(errw, fileSentinel) {
+			t.Fatalf("%s: stderr leaks content: %q", name, errw)
+		}
+	}
+	// a comma is just a character: this is ONE root (which does not exist)
+	_, errw, code := runMain(t, []string{"--allow-root", root + ",x"}, nil)
+	if code != 2 || !strings.Contains(errw, ",x") {
+		t.Fatalf("comma must stay inside the name: exit %d %q", code, errw)
+	}
+}
+
+// Owner decision 4: a broad root starts, with an explicit WARNING on stderr at
+// every start; a normal root gets none. Home and system dirs are injected.
+func TestBroadRootWarning(t *testing.T) {
+	root := rootWithFiles(t)
+	home := filepath.Join(filepath.Dir(root), "home")
+	sys := filepath.Join(filepath.Dir(root), "sysdir")
+	os.MkdirAll(home, 0o755)
+	os.MkdirAll(sys, 0o755)
+	old := broadDirs
+	defer func() { broadDirs = old }()
+	broadDirs = func() files.BroadDirs { return files.BroadDirs{Home: home, System: []string{sys}} }
+
+	vol := filepath.VolumeName(root) + string(filepath.Separator)
+	for name, v := range map[string]string{"home": home, "system": sys, "volume": vol} {
+		lines, errw, code := runMain(t, []string{"--allow-root", v}, nil, rpc(1, "tools/list", ""))
+		if code != 0 || len(lines) != 1 {
+			t.Fatalf("%s: must start: exit %d %q", name, code, errw)
+		}
+		if !strings.Contains(errw, "WARNING: --allow-root") || !strings.Contains(errw, "sent to the remote Ollama") {
+			t.Fatalf("%s: no warning on stderr: %q", name, errw)
+		}
+		if strings.Contains(string(strings.Join(lines, "")), "WARNING") {
+			t.Fatalf("%s: warning leaked to stdout", name)
+		}
+	}
+	_, errw, code := runMain(t, []string{"--allow-root", root}, nil)
+	if code != 0 || strings.Contains(errw, "WARNING") {
+		t.Fatalf("normal root: exit %d, stderr %q", code, errw)
 	}
 }

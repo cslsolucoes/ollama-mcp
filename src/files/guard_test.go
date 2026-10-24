@@ -120,7 +120,7 @@ func TestNewGuardValidatesRoots(t *testing.T) {
 }
 
 func TestSplitRoots(t *testing.T) {
-	got := SplitRoots(` a , ,b,, c `)
+	got := SplitRoots(` a ; ;b;; c `)
 	if strings.Join(got, "|") != "a|b|c" {
 		t.Fatalf("%q", got)
 	}
@@ -645,4 +645,139 @@ func snapshot(t *testing.T, dir string) []string {
 	})
 	sort.Strings(out)
 	return out
+}
+
+// SEC-m-02: the separator is os.PathListSeparator, so a comma is part of a name.
+func TestSplitRootsCommaIsAValidNameCharacter(t *testing.T) {
+	sep := string(os.PathListSeparator)
+	got := SplitRoots("a,b" + sep + " c, d " + sep + sep)
+	if strings.Join(got, "|") != "a,b|c, d" {
+		t.Fatalf("%q", got)
+	}
+	w := newWorld(t)
+	dir := filepath.Join(w.base, "Cliente, Inc")
+	write(t, filepath.Join(dir, "f.txt"), "ola")
+	g, err := NewGuard(SplitRoots(dir+sep+w.root), 100)
+	if err != nil {
+		t.Fatalf("root with a comma: %v", err)
+	}
+	if len(g.Roots()) != 2 {
+		t.Fatalf("roots = %v, want 2", g.Roots())
+	}
+	if f, err := g.Read(filepath.Join(dir, "f.txt")); err != nil || f.Text != "ola" {
+		t.Fatalf("read under comma root: %v", err)
+	}
+}
+
+// SEC-m-03: a relative root is refused at the start, whatever it resolves to.
+func TestNewGuardRefusesRelativeRoots(t *testing.T) {
+	w := newWorld(t)
+	t.Chdir(w.base)
+	for _, r := range []string{".", "root", "./root", ".." + string(filepath.Separator) + "x", `\root`} {
+		_, err := NewGuard([]string{r}, 10)
+		if err == nil || !strings.Contains(err.Error(), "--allow-root") {
+			t.Fatalf("relative root %q accepted (err=%v)", r, err)
+		}
+		if strings.Contains(err.Error(), w.base) {
+			t.Fatalf("message leaks the cwd: %q", err)
+		}
+	}
+	if !strings.Contains(func() string { _, e := NewGuard([]string{"root"}, 10); return e.Error() }(), "absoluto") {
+		t.Fatal("message must say the root has to be absolute")
+	}
+}
+
+// SEC-m-04: nested or repeated roots are refused, in both orders.
+func TestNewGuardRefusesNestedRoots(t *testing.T) {
+	w := newWorld(t)
+	sub := filepath.Join(w.root, "sub", "deep")
+	write(t, filepath.Join(sub, "f.txt"), "x")
+	for name, roots := range map[string][]string{
+		"outer first": {w.root, sub},
+		"inner first": {sub, w.root},
+		"repeated":    {w.root, w.root},
+		"case/clean":  {w.root, w.root + string(filepath.Separator) + "."},
+	} {
+		if _, err := NewGuard(roots, 10); err == nil || !strings.Contains(err.Error(), "aninhadas") {
+			t.Fatalf("%s: err = %v", name, err)
+		}
+	}
+	// siblings that merely share a name prefix are not nested
+	if _, err := NewGuard([]string{w.root, w.sibling}, 10); err != nil {
+		t.Fatalf("siblings refused: %v", err)
+	}
+}
+
+// Owner decision 4: a broad root is accepted, and reported so the caller warns.
+func TestBroadRoots(t *testing.T) {
+	w := newWorld(t)
+	g := w.guard(t, 10)
+	if got := g.BroadRoots(BroadDirs{Home: w.base, System: []string{w.sibling}}); len(got) != 0 {
+		t.Fatalf("a normal root is not broad: %v", got)
+	}
+	if got := g.BroadRoots(BroadDirs{Home: w.root}); len(got) != 1 {
+		t.Fatalf("home as root: %v", got)
+	}
+	if got := g.BroadRoots(BroadDirs{System: []string{w.sibling, w.root}}); len(got) != 1 {
+		t.Fatalf("system dir as root: %v", got)
+	}
+	if runtime.GOOS == "windows" {
+		if got := g.BroadRoots(BroadDirs{Home: strings.ToUpper(w.root)}); len(got) != 1 {
+			t.Fatalf("comparison must be case-insensitive on Windows: %v", got)
+		}
+	}
+	// a volume root is accepted by NewGuard (nothing is read) and is broad
+	vol := filepath.VolumeName(w.base) + string(filepath.Separator)
+	gv, err := NewGuard([]string{vol}, 10)
+	if err != nil {
+		t.Fatalf("volume root must be accepted: %v", err)
+	}
+	if got := gv.BroadRoots(BroadDirs{}); len(got) != 1 {
+		t.Fatalf("volume root not reported: %v", got)
+	}
+	if (*Guard)(nil).BroadRoots(BroadDirs{}) != nil {
+		t.Fatal("nil guard")
+	}
+	// the real defaults are only computed, never read: they must be non-empty
+	if d := DefaultBroadDirs(); d.Home == "" {
+		t.Log("no home directory on this machine")
+	}
+}
+
+// SEC-m-06: a root that is a junction is refused at the start, with a clear message.
+func TestNewGuardRefusesJunctionRoot(t *testing.T) {
+	w := newWorld(t)
+	write(t, filepath.Join(w.root, "a.txt"), "x")
+	j := filepath.Join(w.base, "jroot")
+	mklinkJunction(t, j, w.root)
+	_, err := NewGuard([]string{j}, 10)
+	if err == nil || !strings.Contains(err.Error(), "junction") {
+		t.Fatalf("junction root: err = %v", err)
+	}
+}
+
+// The real home and Windows directories are only compared, never read.
+func TestBroadRootsRealHomeAndWindowsDir(t *testing.T) {
+	d := DefaultBroadDirs()
+	cands := []string{d.Home}
+	if runtime.GOOS == "windows" {
+		cands = append(cands, os.Getenv("SystemRoot"), os.Getenv("ProgramFiles"), os.Getenv("ProgramData"))
+	}
+	n := 0
+	for _, c := range cands {
+		if c == "" {
+			continue
+		}
+		g, err := NewGuard([]string{c}, 10)
+		if err != nil {
+			t.Fatalf("%s must be accepted: %v", c, err)
+		}
+		if len(g.BroadRoots(d)) != 1 {
+			t.Fatalf("%s not reported as broad", c)
+		}
+		n++
+	}
+	if n == 0 {
+		t.Skip("no home or system directory available")
+	}
 }
