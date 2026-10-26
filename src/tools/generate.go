@@ -18,6 +18,7 @@ func (d Deps) generateTool() mcp.ToolEntry {
 			Title: "Generate text with the local model",
 			Description: "Runs a single prompt on the self-hosted Ollama model and returns the answer. " +
 				"Use it to offload bulk mechanical work (drafts, rewrites, extraction) to the local model; no state is kept between calls. " +
+				"Counts and arithmetic are unreliable: ask for steps or a list and check outside. " +
 				"The answer ends with a [uso] line with the token counters.",
 			InputSchema: objectSchema([]string{"prompt"}, schemaMap{
 				"prompt":      nonEmptyStringProp("The prompt text."),

@@ -171,7 +171,7 @@ Input schema:
 
 **Title:** Generate text with the local model
 
-Runs a single prompt on the self-hosted Ollama model and returns the answer. Use it to offload bulk mechanical work (drafts, rewrites, extraction) to the local model; no state is kept between calls. The answer ends with a [uso] line with the token counters.
+Runs a single prompt on the self-hosted Ollama model and returns the answer. Use it to offload bulk mechanical work (drafts, rewrites, extraction) to the local model; no state is kept between calls. Counts and arithmetic are unreliable: ask for steps or a list and check outside. The answer ends with a [uso] line with the token counters.
 
 Annotations: readOnlyHint=true destructiveHint=false idempotentHint=false openWorldHint=false
 
