@@ -1,0 +1,9 @@
+﻿1
+-rw-r--r--. 1 root root 980 out 26 14:16 /etc/systemd/system/ollama.service.d/10-performance.conf
+9:Environment="OLLAMA_MAX_LOADED_MODELS=2"
+12:Environment="OLLAMA_CONTEXT_LENGTH=65536"
+17:Environment="CUDA_VISIBLE_DEVICES=0,1,2,3"
+OLLAMA_MAX_LOADED_MODELS=2
+"load_duration":21992454325
+qwen3-ia:latest    abf610827d19    23 GB    100% GPU     65536      llamacpp    Forever    
+1b.4=1932

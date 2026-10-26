@@ -5,8 +5,9 @@
 > **orquestrador**: decide, planeja e verifica. O trabalho mecânico em volume é
 > **delegado ao modelo local**, que custa **zero** da cota Anthropic.
 >
-> Estado: **concepção** (2026-10-23). Os fontes ficam em `src/` (criada, ainda vazia);
-> esta página define o objetivo e a arquitetura alvo.
+> Estado (2026-10-26): **Fases 1 a 6 concluídas** (7 tools implementadas e validadas no
+> Claude Code; economia medida na Fase 6). Os fontes ficam em `src/`; o catálogo das tools
+> está em `TOOLS.md`.
 
 ---
 
@@ -46,7 +47,7 @@ o Claude passa a chamar o modelo local como uma tool nativa, em vez de um comand
                          │ HTTPS + Bearer (LAN: :8443 · internet: Cloudflare Tunnel)
              ┌───────────▼────────────┐
              │ nginx → ollama :11434  │  ia.cslsolucoes.com.br (10.100.2.2)
-             │ qwen3-ia · 3× RTX 3070 │  100% GPU, num_ctx 65536 (MoE 30B; provisório)
+             │ qwen3-ia · 4× RTX 3070 │  100% GPU, num_ctx 65536 (MoE 30B; 150 W por GPU)
              └────────────────────────┘
 ```
 
@@ -134,7 +135,7 @@ src/
 | --- | --- |
 | Host | `ia.cslsolucoes.com.br` = `10.100.2.2` (CentOS Stream 10, 4× RTX 3070 8 GB) |
 | Ollama | v0.40.8 · modelo **`qwen3-ia`** = MoE `qwen3-coder:30b-a3b` (100% GPU; ~97 tok/s de geração e ~5.000 tok/s de prefill, medidos em 2026-10-23); embeddings `nomic-embed-text` (768 dimensões); também `qwen3.8:27b-q4_K_M` e `qwen3.8:27b-64k` (nível `local`) |
-| Contexto | **provisório: 3 GPUs e `num_ctx` 65536.** A GPU 3 está fora por falha de PCIe, que reiniciava a máquina com prompt grande (incidente mitigado em 2026-10-23). Volta a 4 GPUs e 131072 após o reparo. Ver `.workspace/reports/MCPOllam2026-10-23-191600-resposta-incidente-ollama-prompt-grande.report.md` |
+| Contexto | **4 GPUs, `num_ctx` 65536 e 150 W por GPU** (2026-10-26). 4 GPUs com 131072 derrubou a máquina (5/5); 170 W caiu em ~5 min de carga máxima contínua; 150 W aguentou 10 min. O link PCIe da GPU `03:00.0` (porta `00:1b.4`) acumula erros corrigíveis e aguarda reparo. Mantém 2 modelos residentes (`OLLAMA_MAX_LOADED_MODELS=2`). Ver `.workspace/reports/MCPOllam2026-10-26-122500-teste-stress.report.md` |
 | Na LAN | `https://ia.cslsolucoes.com.br:8443` (porta explícita; cert Cloudflare Origin CA → `--tls-ca` ou `-k`) |
 | Pela internet | `https://ia.cslsolucoes.com.br` (Cloudflare Tunnel, sem porta) |
 | Auth | `Authorization: Bearer <token>` → `200` válido · `401` sem token · `403` endpoint bloqueado |

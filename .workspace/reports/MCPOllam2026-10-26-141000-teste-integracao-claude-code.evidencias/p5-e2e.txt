@@ -1,0 +1,5 @@
+﻿Modelo: Haiku 5.5 · 2026-10-26 14:27
+
+TESTE1: Projeto OpenWolf usa contexto gerido. Regras always-on em `.claude/rules/openwolf.md`. Conexões teste em `DADOS_CONEXAO_TESTE.md`. Idioma português (pt-PT), código em inglês. Projeto não compilável atualmente. Estrutura alvo: `src/`, `backend/` vazio, `modules/` com ProvidersORM v2.x e v3.0.0. Módulos numerados 000–020. Backend headless, Horse framework. Ferramentas TUI por módulo. Multi-tenant nativo. Contrato HTTP imutável D25. Prerrogativas perenes: acesso via ProvidersORM, LDAP via ActiveDirectoryORM, layering backend. Fases/Ondas disciplina de planeamento. SSOT em `.cursor/`.
+
+TESTE2: ERRO. A chamada falhou com "acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido". O arquivo `.mcp.json` não foi lido.

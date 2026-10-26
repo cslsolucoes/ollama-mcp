@@ -18,6 +18,7 @@ func (d Deps) embedTool() mcp.ToolEntry {
 			Title: "Compute embeddings with the local embeddings model",
 			Description: "Computes embeddings for one text or a batch with the dedicated embeddings model (--embed-model, never the generation model). " +
 				"By default it returns only a summary (count, dimensions, counters); set include_vectors for the numbers, limited to a few items. " +
+				"Batch texts: if the server keeps one model loaded, embed evicts the generation model (~25 s reload). " +
 				"The answer ends with a [uso] line with the counters.",
 			InputSchema: objectSchema([]string{"input"}, schemaMap{
 				"input": schemaMap{

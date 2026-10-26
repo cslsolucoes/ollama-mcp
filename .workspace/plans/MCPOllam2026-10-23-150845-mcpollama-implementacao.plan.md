@@ -925,3 +925,36 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P9-2:** monitorar os erros AER da `00:1b.4`;
   - **P8-1** (PSU), **P8-3** (GPU 0), **P7-6**, **P7-8**, **P7-9** e **P7-10** continuam.
 - **Artefatos:** relatório §9; 6 evidências novas.
+
+### 2026-10-26 14:30 — resposta ao report de integração da sessão GestorERP (`MCPOllam2026-10-26-141000-teste-integracao-claude-code.report.md` §7)
+- **Decisões do owner (AskUserQuestion):**
+  - P1: `MAX_LOADED_MODELS=2` mais documentação;
+  - P2–P4: medir;
+  - `qwen3-coder:30b-a3b-q4_K_M` (recriado às 12:57 junto da restauração do `qwen3-ia`): manter;
+  - P5: adicionar a raiz do GestorERP.
+- **P1 (fechado):**
+  - **Servidor:** `OLLAMA_MAX_LOADED_MODELS=2` (backup `.maxloaded1`, gravação atômica, `sync`, restart). Aceite pelo cliente real: `embed`→`generate` com `load_ms=0` em 3/3; 2 modelos residentes.
+  - **Código:** descrição do `embed` atualizada (`src/tools/embed.go`); `TOOLS.md` regenerado.
+  - **Gate:** `vet` OK, `go test -count=1 ./...` verde, `tools/list` = 4.309 de 4.400 bytes. A 1ª versão estourou os testes de orçamento e foi encurtada.
+- **P2 (fechado):** a "alucinação" vinha da **linha 8 do README, desatualizada** ("Estado: concepção ... src/ ainda vazia").
+  - Corrigido no README: linha 8, diagrama do §2 com 4 GPUs e 150 W, linha "Contexto" do §5.
+  - "Concepção" nos resumos: 8/20 → **0/20**. Sem mudança de código.
+- **P3 (medido):** direto 5/25; "passo a passo + `RESULTADO:`" **15/15**, com ~90–140 tokens a mais. Recomendação de uso; documentar fica para o owner.
+- **P4 (aprovado):** cos12 = 0,552 > cos13 = 0,336 e > cos23 = 0,486.
+- **P5 (feito):**
+  - `.mcp.json` real do GestorERP: `--allow-root "E:\MCPOllam;E:\Dropbox\Claiton Linhares\GestorERP"`.
+  - Teste ponta a ponta (`claude -p` com Haiku e a config do GestorERP): leitura do `CLAUDE.md` OK; leitura do `.mcp.json` **recusada** pela lista fixa.
+  - Falta reiniciar a sessão do GestorERP para valer lá.
+- **Não deu certo:**
+  - 2ª rodada de medição com **34/71 HTTP 429** (limite de taxa do nginx com respostas do cache de ~44 ms). Descartada; a 3ª, com 1 s entre chamadas, deu 71/71.
+  - O argumento do `claude -p` quebrou nas aspas duplas (PowerShell 5.1). Refeito com aspas simples.
+- **Erro meu:** em uma mensagem de status escrevi "14:22" no cabeçalho, horário inventado (o hook seguinte marcou 14:21:00).
+- **Artefatos:**
+  - report §7;
+  - evidências: 10 arquivos em `…141000-teste-integracao-claude-code.evidencias/` (varredura: 0 segredos conhecidos; as 47 ocorrências genéricas são menções a "token" e `--api-key`);
+  - `README.md`, `src/tools/embed.go`, `TOOLS.md`.
+- **Pendências:**
+  - **P10-1:** reiniciar o Claude Code no GestorERP;
+  - **P10-2 (opcional):** documentar a recomendação "passo a passo" na descrição de `generate`/`chat`;
+  - **P10-3:** recompilar o binário em `D:\MCP` com a nova descrição do `embed`;
+  - **P9-1** (link `00:1b.4`, 1.932 erros às 14:16) continua.

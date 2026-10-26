@@ -1,0 +1,155 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=577.1µs
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=quality inicio=14:21:59.553
+SRV-STDERR method=tools/call tool=embed status=ok dur=94.2606ms prompt_eval_count=33 total_ms=50 load_ms=0 queue_ms=0
+CALL modo=p4 idx=0 tool=embed tamanho_prompt_chars=0 inicio=14:21:59.564 wall_ms=94 isError=false erro="" uso=[uso] modelo=nomic-embed-text prompt_eval_count=33 total_ms=50 load_ms=0 queue_ms=0
+P4 dims=768 cos12=0.5523 cos13=0.3363 cos23=0.4860 aprovado=true
+SRV-STDERR method=tools/call tool=generate status=ok dur=231.9383ms prompt_eval_count=36 eval_count=4 total_ms=230 load_ms=0 queue_ms=0
+CALL modo=p3d idx=0 tool=generate tamanho_prompt_chars=0 inicio=14:21:59.660 wall_ms=232 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=230 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=48.8827ms prompt_eval_count=36 eval_count=4 total_ms=47 load_ms=0 queue_ms=0
+CALL modo=p3d idx=1 tool=generate tamanho_prompt_chars=0 inicio=14:21:59.892 wall_ms=48 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=47 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.397ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=2 tool=generate tamanho_prompt_chars=0 inicio=14:21:59.941 wall_ms=47 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.5924ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=3 tool=generate tamanho_prompt_chars=0 inicio=14:21:59.988 wall_ms=46 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=47.3297ms prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0
+CALL modo=p3d idx=4 tool=generate tamanho_prompt_chars=0 inicio=14:22:00.034 wall_ms=47 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1836523s prompt_eval_count=48 eval_count=112 total_ms=1181 load_ms=0 queue_ms=0
+CALL modo=p3s idx=5 tool=generate tamanho_prompt_chars=0 inicio=14:22:00.082 wall_ms=1183 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=112 total_ms=1181 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1725228s prompt_eval_count=48 eval_count=112 total_ms=1170 load_ms=0 queue_ms=0
+CALL modo=p3s idx=6 tool=generate tamanho_prompt_chars=0 inicio=14:22:01.265 wall_ms=1173 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=112 total_ms=1170 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1734377s prompt_eval_count=48 eval_count=112 total_ms=1171 load_ms=0 queue_ms=0
+CALL modo=p3s idx=7 tool=generate tamanho_prompt_chars=0 inicio=14:22:02.438 wall_ms=1173 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=112 total_ms=1171 load_ms=0 queue_ms=0 fim=stop
+P3 expr="17*23 + 144/12" esperado=403 direto_ok=0/5 direto_respostas=[415 415 415 415 415] passo_ok=3/3 passo_eval_medio=112
+SRV-STDERR method=tools/call tool=generate status=ok dur=76.2754ms prompt_eval_count=34 eval_count=4 total_ms=74 load_ms=0 queue_ms=0
+CALL modo=p3d idx=8 tool=generate tamanho_prompt_chars=0 inicio=14:22:03.612 wall_ms=76 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=74 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.9853ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=9 tool=generate tamanho_prompt_chars=0 inicio=14:22:03.689 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.2047ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=10 tool=generate tamanho_prompt_chars=0 inicio=14:22:03.734 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.9569ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=11 tool=generate tamanho_prompt_chars=0 inicio=14:22:03.779 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.6415ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=12 tool=generate tamanho_prompt_chars=0 inicio=14:22:03.824 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.4813309s prompt_eval_count=46 eval_count=141 total_ms=1479 load_ms=0 queue_ms=0
+CALL modo=p3s idx=13 tool=generate tamanho_prompt_chars=0 inicio=14:22:03.870 wall_ms=1481 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=141 total_ms=1479 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.4704974s prompt_eval_count=46 eval_count=141 total_ms=1468 load_ms=0 queue_ms=0
+CALL modo=p3s idx=14 tool=generate tamanho_prompt_chars=0 inicio=14:22:05.351 wall_ms=1470 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=141 total_ms=1468 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.4694803s prompt_eval_count=46 eval_count=141 total_ms=1467 load_ms=0 queue_ms=0
+CALL modo=p3s idx=15 tool=generate tamanho_prompt_chars=0 inicio=14:22:06.822 wall_ms=1469 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=141 total_ms=1467 load_ms=0 queue_ms=0 fim=stop
+P3 expr="48*12 - 96/8" esperado=564 direto_ok=0/5 direto_respostas=[552 552 552 552 552] passo_ok=3/3 passo_eval_medio=141
+SRV-STDERR method=tools/call tool=generate status=ok dur=74.2901ms prompt_eval_count=34 eval_count=4 total_ms=72 load_ms=0 queue_ms=0
+CALL modo=p3d idx=16 tool=generate tamanho_prompt_chars=0 inicio=14:22:08.292 wall_ms=74 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=72 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.7221ms prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=17 tool=generate tamanho_prompt_chars=0 inicio=14:22:08.366 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.2692ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=18 tool=generate tamanho_prompt_chars=0 inicio=14:22:08.412 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.9164ms prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=19 tool=generate tamanho_prompt_chars=0 inicio=14:22:08.458 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.1642ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=20 tool=generate tamanho_prompt_chars=0 inicio=14:22:08.504 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1770777s prompt_eval_count=46 eval_count=112 total_ms=1175 load_ms=0 queue_ms=0
+CALL modo=p3s idx=21 tool=generate tamanho_prompt_chars=0 inicio=14:22:08.549 wall_ms=1177 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=112 total_ms=1175 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1749177s prompt_eval_count=46 eval_count=112 total_ms=1173 load_ms=0 queue_ms=0
+CALL modo=p3s idx=22 tool=generate tamanho_prompt_chars=0 inicio=14:22:09.727 wall_ms=1174 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=112 total_ms=1173 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1710169s prompt_eval_count=46 eval_count=112 total_ms=1168 load_ms=0 queue_ms=0
+CALL modo=p3s idx=23 tool=generate tamanho_prompt_chars=0 inicio=14:22:10.901 wall_ms=1171 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=112 total_ms=1168 load_ms=0 queue_ms=0 fim=stop
+P3 expr="125*4 + 81/9" esperado=509 direto_ok=5/5 direto_respostas=[509 509 509 509 509] passo_ok=3/3 passo_eval_medio=112
+SRV-STDERR method=tools/call tool=generate status=ok dur=75.819ms prompt_eval_count=36 eval_count=4 total_ms=74 load_ms=0 queue_ms=0
+CALL modo=p3d idx=24 tool=generate tamanho_prompt_chars=0 inicio=14:22:12.073 wall_ms=75 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=74 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.4939ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=25 tool=generate tamanho_prompt_chars=0 inicio=14:22:12.148 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.9337ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=26 tool=generate tamanho_prompt_chars=0 inicio=14:22:12.194 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.7401ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=27 tool=generate tamanho_prompt_chars=0 inicio=14:22:12.239 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.7951ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=28 tool=generate tamanho_prompt_chars=0 inicio=14:22:12.284 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.3020307s prompt_eval_count=48 eval_count=123 total_ms=1300 load_ms=0 queue_ms=0
+CALL modo=p3s idx=29 tool=generate tamanho_prompt_chars=0 inicio=14:22:12.329 wall_ms=1302 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=123 total_ms=1300 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.2947774s prompt_eval_count=48 eval_count=123 total_ms=1292 load_ms=0 queue_ms=0
+CALL modo=p3s idx=30 tool=generate tamanho_prompt_chars=0 inicio=14:22:13.631 wall_ms=1294 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=123 total_ms=1292 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.2922357s prompt_eval_count=48 eval_count=123 total_ms=1290 load_ms=0 queue_ms=0
+CALL modo=p3s idx=31 tool=generate tamanho_prompt_chars=0 inicio=14:22:14.926 wall_ms=1292 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=123 total_ms=1290 load_ms=0 queue_ms=0 fim=stop
+P3 expr="36*27 - 512/16" esperado=940 direto_ok=0/5 direto_respostas=[896 896 896 896 896] passo_ok=3/3 passo_eval_medio=123
+SRV-STDERR method=tools/call tool=generate status=ok dur=79.3981ms prompt_eval_count=36 eval_count=4 total_ms=76 load_ms=0 queue_ms=0
+CALL modo=p3d idx=32 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.218 wall_ms=79 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=76 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.7803ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=33 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.297 wall_ms=46 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.9679ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=34 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.344 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.5543ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=35 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.390 wall_ms=46 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=559µs
+CALL modo=p3d idx=36 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.437 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=506.6µs
+CALL modo=p3s idx=37 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.437 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=1.1346ms
+CALL modo=p3s idx=38 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.438 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=524.2µs
+CALL modo=p3s idx=39 tool=generate tamanho_prompt_chars=0 inicio=14:22:16.439 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+P3 expr="19*19 + 210/14" esperado=376 direto_ok=0/5 direto_respostas=[241 241 241 241 429] passo_ok=0/3 passo_eval_medio=0
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=521.9µs
+CALL modo=p2f idx=0 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.441 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=1.0512ms
+CALL modo=p2f idx=1 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.442 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=524µs
+CALL modo=p2f idx=2 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.443 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=513.5µs
+CALL modo=p2f idx=3 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.444 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=1.0429ms
+CALL modo=p2f idx=4 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.444 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=517.7µs
+CALL modo=p2f idx=5 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.445 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=1.0445ms
+CALL modo=p2f idx=6 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.446 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=637.7µs
+CALL modo=p2f idx=7 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.447 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=526µs
+CALL modo=p2f idx=8 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.447 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=5.2289ms
+CALL modo=p2f idx=9 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.449 wall_ms=5 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=524.9µs
+CALL modo=p2n idx=0 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.454 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=1.1382ms
+CALL modo=p2n idx=1 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.455 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+CALL modo=p2n idx=2 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.456 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=559.9µs
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=1.0293ms
+CALL modo=p2n idx=3 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.458 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=1.0397ms
+CALL modo=p2n idx=4 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.459 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=524.5µs
+CALL modo=p2n idx=5 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.460 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=512.2µs
+CALL modo=p2n idx=6 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.460 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=535.4µs
+CALL modo=p2n idx=7 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.461 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=523.8µs
+CALL modo=p2n idx=8 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.462 wall_ms=1 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=summarize_file status=tool_error dur=519.7µs
+CALL modo=p2n idx=9 tool=summarize_file tamanho_prompt_chars=0 inicio=14:22:16.463 wall_ms=0 isError=true erro="requisição recusada pelo servidor (HTTP 429)" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=519.2µs
+CALL modo=p2t idx=0 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.463 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=551.7µs
+CALL modo=p2t idx=1 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.464 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=525.1µs
+CALL modo=p2t idx=2 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.465 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=0s
+CALL modo=p2t idx=3 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.466 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=520.7µs
+CALL modo=p2t idx=4 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.466 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=540.1µs
+CALL modo=p2t idx=0 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.468 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=511.2µs
+CALL modo=p2t idx=1 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.468 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=0s
+CALL modo=p2t idx=2 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.469 wall_ms=0 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=518.9µs
+CALL modo=p2t idx=3 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.469 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=1.0729ms
+CALL modo=p2t idx=4 tool=generate tamanho_prompt_chars=12991 inicio=14:22:16.470 wall_ms=1 isError=true erro="requisição recusada pelo servidor [HTTP 429 POST /api/generate]: 429 Too Many Requests 429 Too Many Requests nginx" uso=
+P2 resumos_em=D:\Users\claiton.linhares\AppData\Local\Temp\claude\e--MCPOllam\19be7a02-91dd-4049-bbce-a0473f6228d1\scratchpad\stress\quality2-resumos.txt
+SUMMARY total=71 ok=37 isError=34 erros_protocolo=0 wall_ms_p50=44 p95=1302 max=1481 prompt_eval_count_soma=1441 eval_count_soma=1560 tok_s_agregado_relogio=92.3 tok_s_por_chamada_wall=92.6 queue_ms_max=0 load_ms_max=0 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=16.9

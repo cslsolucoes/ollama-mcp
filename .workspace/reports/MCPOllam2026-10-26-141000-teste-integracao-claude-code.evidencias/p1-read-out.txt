@@ -1,0 +1,37 @@
+﻿2026-10-26 14:13:48
+2026-10-26 13:32:25
+== env
+OLLAMA_KEEP_ALIVE=-1
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_MAX_LOADED_MODELS=1
+OLLAMA_CONTEXT_LENGTH=65536
+OLLAMA_SCHED_SPREAD=1
+CUDA_VISIBLE_DEVICES=0,1,2,3
+ActiveEnterTimestamp=Mon 2026-10-26 13:32:35 -03
+NeedDaemonReload=no
+== ollama list
+NAME                          ID              SIZE      MODIFIED          
+qwen3-ia:latest               abf610827d19    18 GB     About an hour ago    
+qwen3-coder:30b-a3b-q4_K_M    06c1097efce0    18 GB     About an hour ago    
+nomic-embed-text:latest       0a109f422b47    274 MB    2 days ago           
+== ollama ps
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL   
+qwen3-ia:latest    abf610827d19    23 GB    100% GPU     65536      llamacpp    Forever    
+== vram
+0, 6309 MiB, 8192 MiB, 150.00 W
+1, 5661 MiB, 8192 MiB, 150.00 W
+2, 5661 MiB, 8192 MiB, 150.00 W
+3, 5733 MiB, 8192 MiB, 150.00 W
+== base model history
+/usr/share/ollama/.ollama/models/manifests/registry.ollama.ai/library/nomic-embed-text/:
+total 4
+-rw-r--r--. 1 ollama ollama 871 2026-10-23_15:26:32 latest
+
+/usr/share/ollama/.ollama/models/manifests/registry.ollama.ai/library/qwen3-coder/:
+total 4
+-rw-r--r--. 1 ollama ollama 874 2026-10-26_12:57:29 30b-a3b-q4_K_M
+out 26 12:27:57 ia.cslsolucoes.com.br ollama[1799]: [GIN] 2026/10/26 - 12:27:57 | 200 |  401.257532ms |       127.0.0.1 | POST     "/api/create"
+out 26 12:52:06 ia.cslsolucoes.com.br ollama[1828]: [GIN] 2026/10/26 - 12:52:06 | 200 |  403.414469ms |       127.0.0.1 | POST     "/api/create"
+out 26 12:57:29 ia.cslsolucoes.com.br ollama[4818]: [GIN] 2026/10/26 - 12:57:29 | 200 |  4.945570545s |       127.0.0.1 | POST     "/api/create"
+== 1b.4 AER
+1841

@@ -1,0 +1,362 @@
+===== P2-focus #0 | [uso] modelo=qwen3-ia prompt_eval_count=4300 eval_count=183 total_ms=3312 load_ms=0 queue_ms=0 partes=1 fim=stop
+O `mcpollama` é um servidor MCP em Go que permite ao Ollama da CSL atuar como ferramenta para o Claude, reduzindo o consumo de tokens Anthropic. Ele serve para delegar tarefas mecânicas, como resumos e extrações, para o modelo local, mantendo dados sensíveis na LAN. Configura-se no cliente via arquivo `.mcp.json`, especificando o caminho do executável, URL do Ollama, certificado TLS e token de acesso. As ferramentas incluem `summarize_file`, `extract` e `translate`, que operam localmente, além de `list_models`, `generate`, `chat` e `embed`. Funciona com modelos como `qwen3-ia` e `nomic-embed-text`, em ambiente seguro com autenticação via Bearer Token.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #1 | [uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=291 total_ms=4653 load_ms=1 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais Ollama (como `qwen3-ia`) como ferramentas, reduzindo o uso de tokens Anthropic. Ele serve para delegar tarefas como resumo, extração e tradução de arquivos, mantendo dados sensíveis na LAN.
+
+### Como se configura:
+- O cliente (Claude Code, Cursor ou VS Code) chama o executável `mcpollama-mcp.exe` via JSON-RPC 2.0.
+- Configurações são feitas em arquivos `.mcp.json`, com caminho do servidor (`--ollama-url`), certificado TLS (`--tls-ca`) e token de acesso (`--api-key`).
+- O binário deve ser colocado em `D:\MCP\`, junto a outros servidores MCP da CSL.
+
+### Ferramentas:
+- **Base:** `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas:** `summarize_file`, `extract`, `translate` — leem arquivos localmente e retornam resultados compactos.
+- Nenhuma ferramenta administração; acesso restrito via nginx com autenticação Bearer.
+
+O sistema evita envio de dados brutos para Claude, economizando contexto e custo.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #2 | [uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=309 total_ms=4891 load_ms=0 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais Ollama (como `qwen3-ia`) para tarefas que consumiriam tokens Anthropic, economizando custos. Ele serve como uma ferramenta nativa, integrando-se ao **Cursor**, **VS Code** e **Claude Code** via protocolo MCP.
+
+### Para que serve:
+Reduz o uso de tokens Anthropic ao delegar tarefas como resumo, extração e tradução para o modelo local Ollama, mantendo dados sensíveis na LAN.
+
+### Como se configura no cliente:
+- Adiciona o servidor em `.mcp.json` ou `claude.json`, apontando para o executável `mcpollama-mcp.exe`.
+- Configura parâmetros como `--ollama-url`, `--api-key`, `--tls-ca` e `--allow-root`.
+
+### Ferramentas:
+- **Base:** `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas:** `summarize_file`, `extract`, `translate` — leem arquivos localmente, sem expor conteúdo ao Claude.
+- **Segurança:** tokens e caminhos protegidos; uso de TLS e restrições de acesso.
+
+O projeto está em fase inicial (2026), com arquitetura modular e suporte a múltiplos clientes.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #3 | [uso] modelo=qwen3-ia prompt_eval_count=4302 eval_count=270 total_ms=4381 load_ms=0 queue_ms=0 partes=1 fim=stop
+O `mcpollama` é um servidor MCP em Go que permite ao Claude usar modelos locais (como `qwen3-ia`) para tarefas repetitivas, reduzindo o uso de tokens Anthropic. Ele funciona como uma ferramenta nativa, lendo arquivos localmente e devolvendo apenas resultados resumidos ou extraídos.
+
+**Para que serve:** delegar tarefas mecânicas (resumo, extração, tradução) ao Ollama local, mantendo o Claude focado em decisões estratégicas. Isso economiza tokens e melhora performance.
+
+**Como se configura no cliente:** adiciona-se um servidor MCP via JSON (`mcp.json`) apontando para o executável `mcpollama-mcp.exe`, com parâmetros como URL do Ollama, certificado TLS e chave de acesso. Funciona em Claude Code, Cursor e VS Code.
+
+**Ferramentas disponíveis:**  
+- `list_models`, `generate`, `chat`, `embed` (base);  
+- `summarize_file`, `extract`, `translate` (economia): leem arquivos no servidor, sem expor conteúdo ao Claude.  
+
+O sistema é seguro e otimizado para uso local com GPU.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #4 | [uso] modelo=qwen3-ia prompt_eval_count=4308 eval_count=304 total_ms=4825 load_ms=0 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que integra o Ollama local com o Claude, reduzindo o uso de tokens Anthropic ao delegar tarefas mecânicas ao modelo local. Serve para economizar contexto no Claude, especialmente em ambientes como Cursor e VS Code.
+
+**Para que serve:**  
+Reduz o consumo de tokens do Claude ao processar arquivos localmente (resumo, extração, tradução) e enviar apenas resultados ao orquestrador.
+
+**Como se configura no cliente:**  
+O servidor é chamado via `mcpollama-mcp.exe`, com configurações em arquivos `.mcp.json` ou `.cursor/mcp.json`. Exige token Bearer e caminho seguro para o Ollama (`--ollama-url`, `--api-key`, `--tls-ca`). As ferramentas são registradas por meio de flags, como `--allow-root` para acesso a arquivos.
+
+**Ferramentas disponíveis:**  
+- Base: `list_models`, `generate`, `chat`, `embed`.  
+- Economia: `summarize_file`, `extract`, `translate` (leitura local, sem saída ao Claude).  
+- Contadores de uso: exibem estatísticas de cada chamada.
+
+Funciona com modelos como `qwen3-ia` e `nomic-embed-text`, em ambiente seguro com TLS e autenticação.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #5 | [uso] modelo=qwen3-ia prompt_eval_count=4302 eval_count=225 total_ms=3788 load_ms=0 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao Claude usar modelos locais (via Ollama) para tarefas como resumo, extração e tradução, economizando tokens Anthropic. Ele se integra a **Claude Code**, **Cursor** e **VS Code** via protocolo MCP, com configuração feita por arquivos JSON (`mcp.json`) que apontam para o executável e definem parâmetros como URL do Ollama, certificados e chave de acesso. As ferramentas incluem `summarize_file`, `extract` e `translate`, que operam localmente sem expor dados sensíveis à internet. O servidor roda em `ia.cslsolucoes.com.br:8443`, com TLS e autenticação Bearer, e pode ser configurado via flags ou variáveis de ambiente. Exige permissão para ler arquivos locais (`--allow-root`) e suporta modelos como `qwen3-ia` e `nomic-embed-text`.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #6 | [uso] modelo=qwen3-ia prompt_eval_count=4306 eval_count=241 total_ms=3987 load_ms=0 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais Ollama (como `qwen3-ia`) para tarefas que consumiriam tokens, reduzindo custos. Ele serve como orquestrador, delegando tarefas como resumos e extrações de arquivos para o modelo local, evitando envio de dados sensíveis ao Claude.
+
+**Como se configura:**  
+- O cliente (Claude Code, Cursor ou VS Code) aponta para `mcpollama-mcp.exe` via arquivo `.mcp.json`.
+- Configurações incluem URL do Ollama, certificado TLS e chave Bearer.
+- A ferramenta exige `--allow-root` para ler arquivos locais.
+
+**Ferramentas disponíveis:**  
+- `list_models`, `generate`, `chat`, `embed` (base);
+- `summarize_file`, `extract`, `translate` (economizam contexto, lêem arquivos no servidor).
+
+Funciona com modelo local Ollama em rede LAN ou via Cloudflare Tunnel.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #7 | [uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=287 total_ms=4600 load_ms=0 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que integra o Ollama local com Claude, permitindo que tarefas mecânicas, como resumos e extrações de arquivos, sejam feitas localmente, economizando tokens do Claude. Ele serve para reduzir custos e melhorar performance em ambientes com Claude Code, Cursor e VS Code.
+
+**Como se configura:**  
+- O cliente (Claude ou Cursor) chama o executável `mcpollama-mcp.exe` via JSON-RPC 2.0.
+- Configurações são feitas no arquivo `.mcp.json` (ou equivalentes), com caminho do servidor, certificado TLS e token Bearer.
+- O binário pode ser usado em múltiplos clientes, com arquivos de configuração diferentes.
+
+**Ferramentas disponíveis:**  
+- `list_models`, `generate`, `chat`, `embed` (base);
+- `summarize_file`, `extract`, `translate` (economia de contexto, somente com `--allow-root`);
+- Contadores de uso e proteção contra acesso não autorizado a arquivos sensíveis.
+
+O servidor roda em `ia.cslsolucoes.com.br:8443`, com modelo `qwen3-ia` e `nomic-embed-text`.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #8 | [uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=161 total_ms=2938 load_ms=0 queue_ms=0 partes=1 fim=stop
+O `mcpollama` é um servidor MCP em Go que permite ao Claude usar modelos locais Ollama como ferramentas, reduzindo o uso de tokens Anthropic. Ele serve para delegar tarefas mecânicas, como resumos e extrações, para o modelo local, mantendo dados sensíveis na LAN. Configura-se no cliente (Claude Code, Cursor, VS Code) via `.mcp.json`, apontando para o executável e definindo parâmetros como URL do Ollama, certificado TLS e chave de acesso. Ferramentas incluem `summarize_file`, `extract` e `translate`, com suporte a modelos como `qwen3-ia` e `nomic-embed-text`.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-focus #9 | [uso] modelo=qwen3-ia prompt_eval_count=4302 eval_count=347 total_ms=5391 load_ms=0 queue_ms=0 partes=1 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (via Ollama) para tarefas como resumo, extração e tradução, economizando tokens Anthropic. Ele serve como orquestrador, delegando trabalho mecânico ao modelo local.
+
+**Para que serve:** Reduz o uso de tokens do Claude ao realizar tarefas em arquivos locais, evitando passagem de dados sensíveis para a nuvem.
+
+**Como se configura no cliente (Claude/VS Code/Cursor):** Adiciona o servidor via JSON em `.mcp.json`, especificando caminho do executável, URL do Ollama, certificado TLS e token Bearer. Exemplo:
+```json
+{
+  "mcpServers": {
+    "mcpOllama": {
+      "command": "D:\\MCP\\mcpollama-mcp.exe",
+      "args": ["--ollama-url", "https://ia.cslsolucoes.com.br:8443", "--tls-ca", "cert.pem", "--allow-root", "E:\\MCPOllam", "--api-key", "<token>"]
+    }
+  }
+}
+```
+
+**Ferramentas disponíveis:**  
+- `list_models`, `generate`, `chat`, `embed` (base);  
+- `summarize_file`, `extract`, `translate` (economia de tokens, leitura local).  
+
+O servidor roda em `ia.cslsolucoes.com.br` com modelo `qwen3-ia` e suporte a RAG via embeddings.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #0 | [uso] modelo=qwen3-ia prompt_eval_count=4278 eval_count=201 total_ms=3484 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor em Go que integra o Ollama local com o Claude via MCP, permitindo que tarefas mecânicas sejam feitas pelo modelo local, economizando tokens do Claude. Ele permite que o Claude chame ferramentas locais como `summarize_file`, `extract` e `translate`, evitando que dados sensíveis saiam da LAN. O sistema usa um binário compartilhado para diferentes clientes (VS Code, Cursor, Claude Code), com configurações via JSON e segurança por token Bearer. O servidor roda no Ollama com o modelo `qwen3-ia`, em uma máquina com GPU RTX 3070, acessível localmente ou pela internet via proxy nginx e Cloudflare. A arquitetura segue padrões MCP, com ferramentas implementadas em Go e configurações flexíveis por flags e variáveis de ambiente.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #1 | [uso] modelo=qwen3-ia prompt_eval_count=4274 eval_count=211 total_ms=3588 load_ms=1 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor em Go que integra o Ollama local com o Claude, usando o protocolo MCP. Ele permite que tarefas mecânicas, como leitura de arquivos e extração de dados, sejam feitas localmente pelo Ollama, economizando tokens do Claude. O servidor expõe ferramentas como `summarize_file`, `extract` e `translate`, que operam no ambiente local, evitando envio de dados sensíveis para a nuvem. A integração ocorre via JSON-RPC 2.0, com suporte a clientes como Claude Code, Cursor e VS Code. O projeto está em fase inicial (2026), com arquitetura baseada em Go, e usa modelos como `qwen3-ia` e `nomic-embed-text`. A segurança é garantida por tokens Bearer e configurações locais, evitando exposição de credenciais.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #2 | [uso] modelo=qwen3-ia prompt_eval_count=4282 eval_count=208 total_ms=3560 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor MCP em Go que permite ao Claude usar modelos locais Ollama (como `qwen3-ia`) para tarefas que consumiriam tokens Anthropic, economizando custos. Ele opera localmente, lendo arquivos e devolvendo apenas resultados resumidos ou extraídos, evitando envio de dados sensíveis à nuvem. O servidor pode ser integrado ao Claude Code, Cursor e VS Code via MCP, com autenticação segura por token Bearer. A arquitetura usa Go, Ollama, nginx como proxy e suporta configurações flexíveis via flags ou variáveis de ambiente. As ferramentas implementadas incluem `summarize_file`, `extract` e `translate`, todas com segurança e limites de uso. O projeto está em fase inicial (concepção), com planejamento para evolução e integração com outros sistemas da CSL.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #3 | [uso] modelo=qwen3-ia prompt_eval_count=4278 eval_count=194 total_ms=3378 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor MCP em Go que integra o Ollama local com o Claude, permitindo que tarefas mecânicas sejam feitas pelo modelo local, economizando tokens do Claude. Ele funciona como uma ferramenta nativa, via protocolo MCP, e permite que o Claude chame o Ollama para tarefas como resumo, extração e tradução de arquivos locais, sem expor dados sensíveis à internet. O servidor roda em uma máquina local com GPU, acessível via HTTPS, e pode ser usado por clientes como Claude Code, Cursor e VS Code. A segurança é mantida com tokens Bearer e restrições de acesso a arquivos. O projeto está em fase inicial (concepção), com arquitetura baseada em Go, e integra funcionalidades como listagem de modelos, geração, chat e embeddings.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #4 | [uso] modelo=qwen3-ia prompt_eval_count=4274 eval_count=227 total_ms=3805 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor MCP em Go que integra o Ollama local com o Claude, permitindo que tarefas rotineiras, como leitura de arquivos e extração de dados, sejam feitas localmente pelo modelo Ollama, reduzindo o uso de tokens do Claude. Ele funciona como uma ferramenta nativa para Claude Code, VS Code e Cursor, operando em rede local via protocolo MCP. O servidor permite que o Claude chame funções locais, como `summarize_file`, `extract` e `translate`, sem expor dados sensíveis à internet. A integração é feita por meio de um executável que se comunica com o Ollama via HTTPS, usando autenticação via token Bearer. O projeto está em fase inicial (concepção), com arquitetura baseada em Go e configurações flexíveis, como modelos, timeouts e limites de tamanho de arquivos. A segurança é priorizada, mantendo credenciais fora do controle de versão.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #5 | [uso] modelo=qwen3-ia prompt_eval_count=4280 eval_count=197 total_ms=3418 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor em Go que permite ao Ollama (modelo local da CSL) atuar como ferramentas para o Claude, reduzindo o consumo de tokens Anthropic. Ele delega tarefas como leitura e extração de arquivos ao modelo local, mantendo dados sensíveis dentro da LAN. O sistema usa o protocolo MCP, permite integração com Cursor e VS Code, e opera via HTTPS com autenticação Bearer. O servidor roda em uma máquina com GPU RTX 3070, executando modelos como `qwen3-ia` e `nomic-embed-text`, com configurações flexíveis via flags ou variáveis de ambiente. As ferramentas implementadas incluem resumo, extração e tradução de arquivos, além de geração e embeddings. A segurança é mantida com tokens e acesso controlado ao servidor Ollama.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #6 | [uso] modelo=qwen3-ia prompt_eval_count=4280 eval_count=212 total_ms=3613 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor em Go que integra o Ollama local com o Claude, usando o protocolo MCP. Ele permite que tarefas como resumo, extração e tradução de arquivos sejam feitas localmente, reduzindo o uso de tokens do Claude. O sistema opera via rede local ou internet (via Cloudflare Tunnel), com segurança baseada em token Bearer. O servidor expõe ferramentas para Claude, delegando tarefas mecânicas ao modelo local, que custa zero tokens Anthropic. Funciona com modelos como `qwen3-ia` e `nomic-embed-text`, rodando em GPU RTX 3070. A integração é feita via JSON-RPC 2.0, e o executável serve diferentes clientes (Claude Code, Cursor, VS Code). O projeto está em fase de concepção, com arquitetura alvo baseada em outros projetos da CSL.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #7 | [uso] modelo=qwen3-ia prompt_eval_count=4280 eval_count=240 total_ms=3981 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor MCP em Go que integra o Ollama local com o Claude, permitindo que tarefas mecânicas sejam feitas pelo modelo local, economizando tokens do Claude. Ele funciona como orquestrador, delegando tarefas como leitura de arquivos e extração de dados para o Ollama, que roda localmente em uma máquina com GPU. O servidor permite integração com Claude Code, Cursor e VS Code via MCP, usando autenticação segura com token Bearer. As ferramentas implementadas incluem resumo, extração e tradução de arquivos, além de geração e embeddings. O sistema é projetado para operar em uma rede local (LAN) com proxy HTTPS via nginx e Cloudflare Tunnel, garantindo segurança e acesso remoto. A arquitetura é baseada em Go, com configurações por flags e variáveis de ambiente, e o modelo principal é o `qwen3-ia`. O projeto ainda está em fase inicial, com implementações planejadas para otimizar uso de contexto e custos.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #8 | [uso] modelo=qwen3-ia prompt_eval_count=4282 eval_count=203 total_ms=3497 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor MCP em Go que integra o Ollama local (qwen3-ia) com o Claude, permitindo que tarefas mecânicas sejam feitas localmente, economizando tokens do Claude. Ele funciona como uma ferramenta nativa para Claude e Cursor, lendo arquivos localmente e devolvendo apenas resultados resumidos ou extraídos. O sistema usa HTTPS com autenticação via bearer token e permite configurações flexíveis por linha de comando ou variáveis de ambiente. As tools implementadas incluem `summarize_file`, `extract` e `translate`, todas com segurança e limites configuráveis, como tamanho máximo de arquivos e número de chunks. O servidor roda em uma máquina com GPU RTX 3070, acessível via LAN ou Cloudflare Tunnel, e foi projetado para integrar-se a ambientes de desenvolvimento como VS Code e Cursor.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-semfocus #9 | [uso] modelo=qwen3-ia prompt_eval_count=4278 eval_count=173 total_ms=3092 load_ms=0 queue_ms=0 partes=1 fim=stop
+O projeto **mcpollama** é um servidor MCP em Go que integra o Ollama local com o Claude, permitindo que tarefas mecânicas sejam feitas pelo modelo local, economizando tokens do Claude. Ele permite que o Claude chame ferramentas locais via MCP, evitando que dados sensíveis saiam da LAN. O servidor usa o modelo `qwen3-ia` e oferece funcionalidades como resumo, extração e tradução de arquivos, com segurança e controle de acesso via token Bearer. Ele pode ser usado com Claude Code, Cursor e VS Code, e roda em uma máquina local com GPU RTX 3070. O projeto está em fase inicial (concepção) e já define sua arquitetura e integrações.
+
+[arquivo] nome=README.md bytes=12536 caracteres=11855 partes=1 chamadas=1 omitidas=0
+
+===== P2-generate-temp0.0 #0 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=277 total_ms=6930 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como o `qwen3-ia` do Ollama) como ferramentas, reduzindo o uso de tokens Anthropic. Ele serve para delegar tarefas mecânicas, como resumos e extrações, para o modelo local, mantendo dados sensíveis na LAN.
+
+**Como configurar:**  
+No cliente (Claude Code, Cursor ou VS Code), adiciona-se uma entrada em `.mcp.json` apontando para `mcpollama-mcp.exe`, com parâmetros como `--ollama-url`, `--tls-ca` e `--api-key`. O token deve ser mantido seguro, fora do git.
+
+**Ferramentas:**  
+- **Base:** `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas:** `summarize_file`, `extract`, `translate` (leem arquivos locais e retornam resultados compactos).
+- **Segurança:** só funciona com `--allow-root`, evitando acesso a caminhos ou arquivos sensíveis.
+
+O servidor roda em `ia.cslsolucoes.com.br:8443`, com TLS e autenticação Bearer.
+
+===== P2-generate-temp0.0 #1 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4056 load_ms=1 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como o `qwen3-ia` do Ollama) para tarefas repetitivas, economizando tokens. Ele serve como orquestrador, delegando leitura e extração de arquivos ao modelo local, mantendo dados sensíveis na LAN.
+
+### Para que serve:
+- Reduzir consumo de tokens no Claude.
+- Executar tarefas como resumo, extração e tradução em modelos locais.
+- Manter dados confidenciais fora do contexto do Claude.
+
+### Como se configura:
+- Instale o binário `mcpollama-mcp.exe` e configure os clientes (Claude Code, Cursor, VS Code) com caminho para o executável e parâmetros como `--ollama-url`, `--tls-ca` e `--api-key`.
+- Arquivo de configuração: `.mcp.json` ou `.claude.json`.
+
+### Ferramentas:
+- **Base**: `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas**: `summarize_file`, `extract`, `translate` (leitura local, sem saída ao Claude).
+- Sem acesso administrativo ao Ollama; apenas leitura de arquivos locais.
+
+O sistema é compatível com múltiplos clientes e usa TLS e autenticação Bearer.
+
+===== P2-generate-temp0.0 #2 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4056 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como o `qwen3-ia` do Ollama) para tarefas repetitivas, economizando tokens. Ele serve como orquestrador, delegando leitura e extração de arquivos ao modelo local, mantendo dados sensíveis na LAN.
+
+### Para que serve:
+- Reduzir consumo de tokens no Claude.
+- Executar tarefas como resumo, extração e tradução em modelos locais.
+- Manter dados confidenciais fora do contexto do Claude.
+
+### Como se configura:
+- Instale o binário `mcpollama-mcp.exe` e configure os clientes (Claude Code, Cursor, VS Code) com caminho para o executável e parâmetros como `--ollama-url`, `--tls-ca` e `--api-key`.
+- Arquivo de configuração: `.mcp.json` ou `.claude.json`.
+
+### Ferramentas:
+- **Base**: `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas**: `summarize_file`, `extract`, `translate` (leitura local, sem saída ao Claude).
+- Sem acesso administrativo ao Ollama; apenas leitura de arquivos locais.
+
+O sistema é compatível com múltiplos clientes e usa TLS e autenticação Bearer.
+
+===== P2-generate-temp0.0 #3 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4063 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como o `qwen3-ia` do Ollama) para tarefas repetitivas, economizando tokens. Ele serve como orquestrador, delegando leitura e extração de arquivos ao modelo local, mantendo dados sensíveis na LAN.
+
+### Para que serve:
+- Reduzir consumo de tokens no Claude.
+- Executar tarefas como resumo, extração e tradução em modelos locais.
+- Manter dados confidenciais fora do contexto do Claude.
+
+### Como se configura:
+- Instale o binário `mcpollama-mcp.exe` e configure os clientes (Claude Code, Cursor, VS Code) com caminho para o executável e parâmetros como `--ollama-url`, `--tls-ca` e `--api-key`.
+- Arquivo de configuração: `.mcp.json` ou `.claude.json`.
+
+### Ferramentas:
+- **Base**: `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas**: `summarize_file`, `extract`, `translate` (leitura local, sem saída ao Claude).
+- Sem acesso administrativo ao Ollama; apenas leitura de arquivos locais.
+
+O sistema é compatível com múltiplos clientes e usa TLS e autenticação Bearer.
+
+===== P2-generate-temp0.0 #4 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4057 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como o `qwen3-ia` do Ollama) para tarefas repetitivas, economizando tokens. Ele serve como orquestrador, delegando leitura e extração de arquivos ao modelo local, mantendo dados sensíveis na LAN.
+
+### Para que serve:
+- Reduzir consumo de tokens no Claude.
+- Executar tarefas como resumo, extração e tradução em modelos locais.
+- Manter dados confidenciais fora do contexto do Claude.
+
+### Como se configura:
+- Instale o binário `mcpollama-mcp.exe` e configure os clientes (Claude Code, Cursor, VS Code) com caminho para o executável e parâmetros como `--ollama-url`, `--tls-ca` e `--api-key`.
+- Arquivo de configuração: `.mcp.json` ou `.claude.json`.
+
+### Ferramentas:
+- **Base**: `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas**: `summarize_file`, `extract`, `translate` (leitura local, sem saída ao Claude).
+- Sem acesso administrativo ao Ollama; apenas leitura de arquivos locais.
+
+O sistema é compatível com múltiplos clientes e usa TLS e autenticação Bearer.
+
+===== P2-generate-temp0.2 #0 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=272 total_ms=3606 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (via Ollama) para tarefas que consumiriam tokens, economizando custos. Ele serve como orquestrador, delegando tarefas como leitura de arquivos e extração de dados para o modelo local, mantendo o conteúdo sensível dentro da LAN.
+
+**Como se configura:**  
+- O cliente (Claude Code, Cursor ou VS Code) aponta para `mcpollama-mcp.exe` via `.mcp.json`, informando URL do Ollama, certificado TLS e token de acesso.
+- O executável recebe parâmetros como `--ollama-url`, `--api-key`, `--tls-ca`, `--allow-root`.
+
+**Ferramentas:**  
+- **Base:** `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas:** `summarize_file`, `extract`, `translate` (leem arquivos locais, sem expor conteúdo ao Claude).
+- Sem ferramentas administrativas; acesso restrito via nginx com autenticação Bearer.
+
+**Objetivo:** reduzir uso de tokens do Claude delegando tarefas simples para Ollama local.
+
+===== P2-generate-temp0.2 #1 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=285 total_ms=3775 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como `qwen3-ia` no Ollama) para tarefas que consumiriam tokens do Anthropic. Ele reduz o uso de contexto no Claude delegando tarefas como leitura, resumo e extração de arquivos para o modelo local, mantendo dados sensíveis na LAN.
+
+**Para que serve:** Reduz custo de tokens no Claude ao processar tarefas locais com Ollama.
+
+**Como se configura:**  
+- Cliente (VS Code, Cursor, Claude CLI):  
+  - Adicionar `mcpollama-mcp.exe` em `.mcp.json` com parâmetros como `--ollama-url`, `--tls-ca`, `--api-key`.
+  - Arquivo de configuração: `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`.
+
+**Ferramentas:**  
+- `summarize_file`, `extract`, `translate` (leitura local, sem saída no contexto do Claude).  
+- `list_models`, `generate`, `chat`, `embed` (base).  
+- Segurança via Bearer Token e TLS.
+
+O servidor é compatível com múltiplos clientes e usa Ollama como backend local.
+
+===== P2-generate-temp0.2 #2 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=281 total_ms=3724 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como `qwen3-ia` no Ollama) para tarefas que consumiriam tokens do Anthropic. Ele reduz o uso de contexto ao processar arquivos localmente e devolver apenas resumos ou extratos.
+
+### Para que serve:
+- Reduz o consumo de tokens do Claude delegando tarefas como leitura, extração e tradução para o modelo local.
+- Mantém dados sensíveis dentro da LAN.
+
+### Como se configura no cliente:
+- Adiciona `mcpollama-mcp.exe` como servidor MCP em arquivos `.mcp.json` (VS Code, Cursor ou Claude Code).
+- Usa flags como `--ollama-url`, `--api-key` e `--tls-ca`.
+
+### Ferramentas:
+- **Base:** `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas:** `summarize_file`, `extract`, `translate` (só com `--allow-root`).
+- Sem acesso administrativo ao Ollama; apenas leitura de arquivos locais.
+
+O servidor é compatível com **Claude Code**, **Cursor** e **VS Code**, usando o protocolo MCP via JSON-RPC.
+
+===== P2-generate-temp0.2 #3 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=326 total_ms=4329 load_ms=1 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como o `qwen3-ia` do Ollama) como ferramentas, reduzindo o uso de tokens na Anthropic. Ele serve para delegar tarefas como resumo e extração de arquivos para o modelo local, mantendo dados sensíveis dentro da LAN.
+
+**Como se configura:**  
+- O cliente (Claude Code, Cursor ou VS Code) aponta para `mcpollama-mcp.exe` via arquivo `.mcp.json`.
+- Configurações incluem URL do Ollama (`--ollama-url`), certificado TLS (`--tls-ca`) e token de acesso (`--api-key`).
+- Para funcionar, precisa da flag `--allow-root` para acessar arquivos locais.
+
+**Ferramentas:**  
+- **Base:** `list_models`, `generate`, `chat`, `embed`.
+- **Econômicas:** `summarize_file`, `extract`, `translate` — leem arquivos no servidor e retornam resultados compactos.
+- Nenhuma ferramenta administrativa; acesso ao Ollama é restrito via nginx com autenticação Bearer.
+
+**Resumo:**  
+O mcpollama permite integrar modelos locais ao Claude, economizando tokens e mantendo dados seguros. Funciona como uma bridge entre o orquestrador (Claude) e o modelo local (Ollama), usando o protocolo MCP.
+
+===== P2-generate-temp0.2 #4 | [uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=315 total_ms=4170 load_ms=0 queue_ms=0 fim=stop
+O **mcpollama** é um servidor MCP em Go que permite ao **Claude** usar modelos locais (como `qwen3-ia` do Ollama) para tarefas que consumiriam tokens do Anthropic. Ele reduz o uso de contexto no Claude delegando tarefas como leitura e resumo de arquivos para o modelo local, mantendo dados sensíveis na LAN.
+
+**Para que serve:** Reduz custo de tokens em Claude Code e Cursor ao processar tarefas locais com Ollama.
+
+**Como se configura:**  
+- Cliente (VS Code/Cursor/Claude CLI): adiciona `mcpollama-mcp.exe` no arquivo `.mcp.json`, com parâmetros como `--ollama-url`, `--api-key` e `--tls-ca`.
+- Arquivo de configuração: `~/.claude.json`, `.cursor/mcp.json`, `.vscode/mcp.json`.
+
+**Ferramentas:**  
+- **Base:** `list_models`, `generate`, `chat`, `embed`.  
+- **Econômicas:** `summarize_file`, `extract`, `translate` (só com `--allow-root`).  
+- **Segurança:** uso de token Bearer, TLS e restrições de caminho.
+
+O servidor roda em `ia.cslsolucoes.com.br:8443`, com modelo `qwen3-ia` e `nomic-embed-text`.
+

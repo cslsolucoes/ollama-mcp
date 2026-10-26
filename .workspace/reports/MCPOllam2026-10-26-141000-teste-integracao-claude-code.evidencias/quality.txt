@@ -1,0 +1,155 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=530.3µs
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=quality inicio=14:18:27.754
+SRV-STDERR method=tools/call tool=embed status=ok dur=104.2028ms prompt_eval_count=33 total_ms=60 load_ms=1 queue_ms=0
+CALL modo=p4 idx=0 tool=embed tamanho_prompt_chars=0 inicio=14:18:27.766 wall_ms=104 isError=false erro="" uso=[uso] modelo=nomic-embed-text prompt_eval_count=33 total_ms=60 load_ms=1 queue_ms=0
+P4 dims=768 cos12=0.5523 cos13=0.3363 cos23=0.4860 aprovado=true
+SRV-STDERR method=tools/call tool=generate status=ok dur=154.223ms prompt_eval_count=36 eval_count=4 total_ms=152 load_ms=0 queue_ms=0
+CALL modo=p3d idx=0 tool=generate tamanho_prompt_chars=0 inicio=14:18:27.872 wall_ms=154 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=152 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=47.3332ms prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0
+CALL modo=p3d idx=1 tool=generate tamanho_prompt_chars=0 inicio=14:18:28.026 wall_ms=47 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.9773ms prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0
+CALL modo=p3d idx=2 tool=generate tamanho_prompt_chars=0 inicio=14:18:28.075 wall_ms=46 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=47.8422ms prompt_eval_count=36 eval_count=4 total_ms=46 load_ms=0 queue_ms=0
+CALL modo=p3d idx=3 tool=generate tamanho_prompt_chars=0 inicio=14:18:28.122 wall_ms=47 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=46 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=47.5259ms prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0
+CALL modo=p3d idx=4 tool=generate tamanho_prompt_chars=0 inicio=14:18:28.170 wall_ms=47 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.2530578s prompt_eval_count=48 eval_count=113 total_ms=1251 load_ms=0 queue_ms=0
+CALL modo=p3s idx=5 tool=generate tamanho_prompt_chars=0 inicio=14:18:28.217 wall_ms=1253 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=113 total_ms=1251 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1795111s prompt_eval_count=48 eval_count=112 total_ms=1177 load_ms=0 queue_ms=0
+CALL modo=p3s idx=6 tool=generate tamanho_prompt_chars=0 inicio=14:18:29.471 wall_ms=1179 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=112 total_ms=1177 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1791931s prompt_eval_count=48 eval_count=112 total_ms=1177 load_ms=0 queue_ms=0
+CALL modo=p3s idx=7 tool=generate tamanho_prompt_chars=0 inicio=14:18:30.650 wall_ms=1179 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=112 total_ms=1177 load_ms=0 queue_ms=0 fim=stop
+P3 expr="17*23 + 144/12" esperado=403 direto_ok=0/5 direto_respostas=[401 401 401 401 401] passo_ok=3/3 passo_eval_medio=112
+SRV-STDERR method=tools/call tool=generate status=ok dur=86.3644ms prompt_eval_count=34 eval_count=4 total_ms=84 load_ms=0 queue_ms=0
+CALL modo=p3d idx=8 tool=generate tamanho_prompt_chars=0 inicio=14:18:31.830 wall_ms=86 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=84 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.6561ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=9 tool=generate tamanho_prompt_chars=0 inicio=14:18:31.916 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.7662ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=10 tool=generate tamanho_prompt_chars=0 inicio=14:18:31.961 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.3864ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=11 tool=generate tamanho_prompt_chars=0 inicio=14:18:32.006 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.0309ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=12 tool=generate tamanho_prompt_chars=0 inicio=14:18:32.050 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.4794766s prompt_eval_count=46 eval_count=136 total_ms=1476 load_ms=0 queue_ms=0
+CALL modo=p3s idx=13 tool=generate tamanho_prompt_chars=0 inicio=14:18:32.095 wall_ms=1479 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=136 total_ms=1476 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.4783586s prompt_eval_count=46 eval_count=141 total_ms=1475 load_ms=0 queue_ms=0
+CALL modo=p3s idx=14 tool=generate tamanho_prompt_chars=0 inicio=14:18:33.575 wall_ms=1478 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=141 total_ms=1475 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.4782533s prompt_eval_count=46 eval_count=141 total_ms=1476 load_ms=0 queue_ms=0
+CALL modo=p3s idx=15 tool=generate tamanho_prompt_chars=0 inicio=14:18:35.053 wall_ms=1478 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=141 total_ms=1476 load_ms=0 queue_ms=0 fim=stop
+P3 expr="48*12 - 96/8" esperado=564 direto_ok=0/5 direto_respostas=[552 552 552 552 552] passo_ok=3/3 passo_eval_medio=139
+SRV-STDERR method=tools/call tool=generate status=ok dur=2.9369034s prompt_eval_count=34 eval_count=4 total_ms=2935 load_ms=0 queue_ms=0
+CALL modo=p3d idx=16 tool=generate tamanho_prompt_chars=0 inicio=14:18:36.531 wall_ms=2937 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=2935 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.4163ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=17 tool=generate tamanho_prompt_chars=0 inicio=14:18:39.469 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.3918ms prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=18 tool=generate tamanho_prompt_chars=0 inicio=14:18:39.514 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.3804ms prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=19 tool=generate tamanho_prompt_chars=0 inicio=14:18:39.560 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.7603ms prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=20 tool=generate tamanho_prompt_chars=0 inicio=14:18:39.605 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=34 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.2258148s prompt_eval_count=46 eval_count=112 total_ms=1224 load_ms=0 queue_ms=0
+CALL modo=p3s idx=21 tool=generate tamanho_prompt_chars=0 inicio=14:18:39.651 wall_ms=1225 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=112 total_ms=1224 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.1739798s prompt_eval_count=46 eval_count=112 total_ms=1171 load_ms=0 queue_ms=0
+CALL modo=p3s idx=22 tool=generate tamanho_prompt_chars=0 inicio=14:18:40.877 wall_ms=1173 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=112 total_ms=1171 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.167715s prompt_eval_count=46 eval_count=112 total_ms=1166 load_ms=0 queue_ms=0
+CALL modo=p3s idx=23 tool=generate tamanho_prompt_chars=0 inicio=14:18:42.051 wall_ms=1167 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=112 total_ms=1166 load_ms=0 queue_ms=0 fim=stop
+P3 expr="125*4 + 81/9" esperado=509 direto_ok=5/5 direto_respostas=[509 509 509 509 509] passo_ok=3/3 passo_eval_medio=112
+SRV-STDERR method=tools/call tool=generate status=ok dur=76.3309ms prompt_eval_count=36 eval_count=4 total_ms=74 load_ms=0 queue_ms=0
+CALL modo=p3d idx=24 tool=generate tamanho_prompt_chars=0 inicio=14:18:43.219 wall_ms=76 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=74 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.249ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=25 tool=generate tamanho_prompt_chars=0 inicio=14:18:43.295 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.7784ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=26 tool=generate tamanho_prompt_chars=0 inicio=14:18:43.340 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.9419ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=27 tool=generate tamanho_prompt_chars=0 inicio=14:18:43.385 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=44.7568ms prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0
+CALL modo=p3d idx=28 tool=generate tamanho_prompt_chars=0 inicio=14:18:43.430 wall_ms=44 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=43 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.5160996s prompt_eval_count=48 eval_count=140 total_ms=1514 load_ms=0 queue_ms=0
+CALL modo=p3s idx=29 tool=generate tamanho_prompt_chars=0 inicio=14:18:43.475 wall_ms=1516 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=140 total_ms=1514 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.3025013s prompt_eval_count=48 eval_count=123 total_ms=1301 load_ms=0 queue_ms=0
+CALL modo=p3s idx=30 tool=generate tamanho_prompt_chars=0 inicio=14:18:44.991 wall_ms=1302 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=123 total_ms=1301 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1.3045377s prompt_eval_count=48 eval_count=123 total_ms=1302 load_ms=0 queue_ms=0
+CALL modo=p3s idx=31 tool=generate tamanho_prompt_chars=0 inicio=14:18:46.294 wall_ms=1304 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=123 total_ms=1302 load_ms=0 queue_ms=0 fim=stop
+P3 expr="36*27 - 512/16" esperado=940 direto_ok=0/5 direto_respostas=[896 896 896 896 896] passo_ok=3/3 passo_eval_medio=128
+SRV-STDERR method=tools/call tool=generate status=ok dur=77.6996ms prompt_eval_count=36 eval_count=4 total_ms=76 load_ms=1 queue_ms=0
+CALL modo=p3d idx=32 tool=generate tamanho_prompt_chars=0 inicio=14:18:47.598 wall_ms=77 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=76 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.4997ms prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0
+CALL modo=p3d idx=33 tool=generate tamanho_prompt_chars=0 inicio=14:18:47.676 wall_ms=46 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=45.7031ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=34 tool=generate tamanho_prompt_chars=0 inicio=14:18:47.723 wall_ms=45 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=46.1209ms prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0
+CALL modo=p3d idx=35 tool=generate tamanho_prompt_chars=0 inicio=14:18:47.768 wall_ms=46 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=44 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=47.1634ms prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0
+CALL modo=p3d idx=36 tool=generate tamanho_prompt_chars=0 inicio=14:18:47.814 wall_ms=47 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=36 eval_count=4 total_ms=45 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=979.4331ms prompt_eval_count=48 eval_count=88 total_ms=977 load_ms=0 queue_ms=0
+CALL modo=p3s idx=37 tool=generate tamanho_prompt_chars=0 inicio=14:18:47.862 wall_ms=979 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=88 total_ms=977 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=961.8203ms prompt_eval_count=48 eval_count=91 total_ms=959 load_ms=0 queue_ms=0
+CALL modo=p3s idx=38 tool=generate tamanho_prompt_chars=0 inicio=14:18:48.842 wall_ms=961 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=91 total_ms=959 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=964.8278ms prompt_eval_count=48 eval_count=91 total_ms=962 load_ms=0 queue_ms=0
+CALL modo=p3s idx=39 tool=generate tamanho_prompt_chars=0 inicio=14:18:49.803 wall_ms=964 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=48 eval_count=91 total_ms=962 load_ms=0 queue_ms=0 fim=stop
+P3 expr="19*19 + 210/14" esperado=376 direto_ok=0/5 direto_respostas=[241 241 241 241 241] passo_ok=3/3 passo_eval_medio=90
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.324445s prompt_eval_count=4300 eval_count=183 total_ms=3312 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=0 tool=summarize_file tamanho_prompt_chars=0 inicio=14:18:50.768 wall_ms=3325 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4300 eval_count=183 total_ms=3312 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=4.6655168s prompt_eval_count=4304 eval_count=291 total_ms=4653 load_ms=1 queue_ms=0 parts=1
+CALL modo=p2f idx=1 tool=summarize_file tamanho_prompt_chars=0 inicio=14:18:54.093 wall_ms=4665 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=291 total_ms=4653 load_ms=1 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=4.9030119s prompt_eval_count=4304 eval_count=309 total_ms=4891 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=2 tool=summarize_file tamanho_prompt_chars=0 inicio=14:18:58.759 wall_ms=4903 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=309 total_ms=4891 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=4.3963297s prompt_eval_count=4302 eval_count=270 total_ms=4381 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=3 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:03.662 wall_ms=4396 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4302 eval_count=270 total_ms=4381 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=4.8393963s prompt_eval_count=4308 eval_count=304 total_ms=4825 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=4 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:08.059 wall_ms=4839 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4308 eval_count=304 total_ms=4825 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.8008605s prompt_eval_count=4302 eval_count=225 total_ms=3788 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=5 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:12.898 wall_ms=3800 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4302 eval_count=225 total_ms=3788 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.9997501s prompt_eval_count=4306 eval_count=241 total_ms=3987 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=6 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:16.700 wall_ms=3999 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4306 eval_count=241 total_ms=3987 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=4.6113572s prompt_eval_count=4304 eval_count=287 total_ms=4600 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=7 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:20.700 wall_ms=4612 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=287 total_ms=4600 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=2.9507407s prompt_eval_count=4304 eval_count=161 total_ms=2938 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=8 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:25.312 wall_ms=2950 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4304 eval_count=161 total_ms=2938 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=5.4044092s prompt_eval_count=4302 eval_count=347 total_ms=5391 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2f idx=9 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:28.262 wall_ms=5404 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4302 eval_count=347 total_ms=5391 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.495444s prompt_eval_count=4278 eval_count=201 total_ms=3484 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=0 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:33.667 wall_ms=3495 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4278 eval_count=201 total_ms=3484 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.6006252s prompt_eval_count=4274 eval_count=211 total_ms=3588 load_ms=1 queue_ms=0 parts=1
+CALL modo=p2n idx=1 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:37.162 wall_ms=3600 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4274 eval_count=211 total_ms=3588 load_ms=1 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.5746623s prompt_eval_count=4282 eval_count=208 total_ms=3560 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=2 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:40.763 wall_ms=3575 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4282 eval_count=208 total_ms=3560 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.392108s prompt_eval_count=4278 eval_count=194 total_ms=3378 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=3 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:44.338 wall_ms=3392 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4278 eval_count=194 total_ms=3378 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.8178396s prompt_eval_count=4274 eval_count=227 total_ms=3805 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=4 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:47.731 wall_ms=3817 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4274 eval_count=227 total_ms=3805 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.4308482s prompt_eval_count=4280 eval_count=197 total_ms=3418 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=5 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:51.548 wall_ms=3430 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4280 eval_count=197 total_ms=3418 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.6270812s prompt_eval_count=4280 eval_count=212 total_ms=3613 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=6 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:54.980 wall_ms=3627 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4280 eval_count=212 total_ms=3613 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.994828s prompt_eval_count=4280 eval_count=240 total_ms=3981 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=7 tool=summarize_file tamanho_prompt_chars=0 inicio=14:19:58.607 wall_ms=3995 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4280 eval_count=240 total_ms=3981 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.5099243s prompt_eval_count=4282 eval_count=203 total_ms=3497 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=8 tool=summarize_file tamanho_prompt_chars=0 inicio=14:20:02.602 wall_ms=3509 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4282 eval_count=203 total_ms=3497 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=summarize_file status=ok dur=3.1047282s prompt_eval_count=4278 eval_count=173 total_ms=3092 load_ms=0 queue_ms=0 parts=1
+CALL modo=p2n idx=9 tool=summarize_file tamanho_prompt_chars=0 inicio=14:20:06.112 wall_ms=3105 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4278 eval_count=173 total_ms=3092 load_ms=0 queue_ms=0 partes=1 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=6.9418829s prompt_eval_count=4298 eval_count=277 total_ms=6930 load_ms=0 queue_ms=0
+CALL modo=p2t idx=0 tool=generate tamanho_prompt_chars=12829 inicio=14:20:09.218 wall_ms=6941 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=277 total_ms=6930 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=4.0679481s prompt_eval_count=4298 eval_count=306 total_ms=4056 load_ms=1 queue_ms=0
+CALL modo=p2t idx=1 tool=generate tamanho_prompt_chars=12829 inicio=14:20:16.160 wall_ms=4068 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4056 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=4.0682086s prompt_eval_count=4298 eval_count=306 total_ms=4056 load_ms=0 queue_ms=0
+CALL modo=p2t idx=2 tool=generate tamanho_prompt_chars=12829 inicio=14:20:20.228 wall_ms=4068 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4056 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=4.0742273s prompt_eval_count=4298 eval_count=306 total_ms=4063 load_ms=0 queue_ms=0
+CALL modo=p2t idx=3 tool=generate tamanho_prompt_chars=12829 inicio=14:20:24.297 wall_ms=4074 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4063 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=4.0686507s prompt_eval_count=4298 eval_count=306 total_ms=4057 load_ms=0 queue_ms=0
+CALL modo=p2t idx=4 tool=generate tamanho_prompt_chars=12829 inicio=14:20:28.372 wall_ms=4069 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=306 total_ms=4057 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=3.6177147s prompt_eval_count=4298 eval_count=272 total_ms=3606 load_ms=0 queue_ms=0
+CALL modo=p2t idx=0 tool=generate tamanho_prompt_chars=12829 inicio=14:20:32.442 wall_ms=3617 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=272 total_ms=3606 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=3.7892317s prompt_eval_count=4298 eval_count=285 total_ms=3775 load_ms=0 queue_ms=0
+CALL modo=p2t idx=1 tool=generate tamanho_prompt_chars=12829 inicio=14:20:36.060 wall_ms=3789 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=285 total_ms=3775 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=3.7360188s prompt_eval_count=4298 eval_count=281 total_ms=3724 load_ms=0 queue_ms=0
+CALL modo=p2t idx=2 tool=generate tamanho_prompt_chars=12829 inicio=14:20:39.849 wall_ms=3736 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=281 total_ms=3724 load_ms=0 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=4.3407624s prompt_eval_count=4298 eval_count=326 total_ms=4329 load_ms=1 queue_ms=0
+CALL modo=p2t idx=3 tool=generate tamanho_prompt_chars=12829 inicio=14:20:43.586 wall_ms=4341 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=326 total_ms=4329 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=4.1834893s prompt_eval_count=4298 eval_count=315 total_ms=4170 load_ms=0 queue_ms=0
+CALL modo=p2t idx=4 tool=generate tamanho_prompt_chars=12829 inicio=14:20:47.927 wall_ms=4183 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=4298 eval_count=315 total_ms=4170 load_ms=0 queue_ms=0 fim=stop
+P2 resumos_em=D:\Users\claiton.linhares\AppData\Local\Temp\claude\e--MCPOllam\19be7a02-91dd-4049-bbce-a0473f6228d1\scratchpad\stress\quality-resumos.txt
+SUMMARY total=71 ok=71 isError=0 erros_protocolo=0 wall_ms_p50=1304 p95=4839 max=6941 prompt_eval_count_soma=130423 eval_count_soma=9511 tok_s_agregado_relogio=65.9 tok_s_por_chamada_wall=65.9 queue_ms_max=0 load_ms_max=1 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=144.3
