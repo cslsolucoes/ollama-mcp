@@ -959,3 +959,18 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P10-3:** recompilar o binário em `D:\MCP` com a nova descrição do `embed`;
   - **P9-1** (link `00:1b.4`, 1.932 erros às 14:16) continua.
 - **P10-3 fechada (14:29):** binário D:\MCP\mcpollama-mcp.exe =  .5.1-0b2aab6 (o antigo foi renomeado para .exe~ pelo go build, porque estava em uso). Smoke do 	ools/list OK, com a nova frase do embed. Os clientes pegam a versão nova ao reiniciar; depois disso, apagar o .exe~.
+
+### 2026-10-26 14:50 — §8 do report de integração (sessão GestorERP) + resposta §9, R1 e R2
+- **Correções ao §8:**
+  - o binário testado era o `0.5.1-0b2aab6` (processo iniciado às 14:35:01; exe gravado às 14:29:25);
+  - os commits `0b2aab6` e `b9ec039` já existiam;
+  - R3: o restart das 14:16 **não** explica a mudança. Deu 401 às 14:18 e 415 às 14:21 e 14:23, sem restart entre elas; a saída é estável dentro de uma rodada e varia entre rodadas.
+- **Decisões do owner:** R1 medir; R2 documentar só no `generate`.
+- **R1:** contar direto 15/30 (50%); listar em JSON e contar no script **15/15**.
+  - **Erro meu:** a 1ª rodada da listagem falhou 15/15 por bug no parser (cortava no `]` da linha `[arquivo]`). Corrigido e refeito.
+- **R2:** frase no `generate` (commit `10e879a`). `tools/list` = 4.390 de 4.400 bytes (sobram 10). Binário `D:\MCP` = `0.5.2-10e879a`, smoke OK.
+- **Artefatos:** report §9 (`c72d9df` + este commit); evidências `r1-count.txt` e `r1-count2.txt`.
+- **Pendências:**
+  - **P11-1:** reiniciar os clientes para carregarem o 0.5.2 e depois apagar o `.exe~`;
+  - **P11-2:** o próximo texto em qualquer tool exige rever `toolsListBudget`;
+  - R4.2 (cofre / CLAUDE.md do GestorERP) e P9-1 (PCIe) continuam.

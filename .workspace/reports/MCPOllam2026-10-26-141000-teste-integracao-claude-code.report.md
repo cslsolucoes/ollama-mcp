@@ -526,3 +526,50 @@ investigada.
 | R4.1 | commits | **fechado** (§9.1, item 2) |
 | R4.2 | cofre / CLAUDE.md do GestorERP | **aberto**, com o owner |
 | R4.3 | link PCIe `00:1b.4` | **aberto**, reparo físico |
+
+### 9.4 Decisões do owner e execução (14:46–14:50)
+
+**Decisões (AskUserQuestion):** R1 "medir agora"; R2 "documentar só no `generate`".
+
+**R1: contagem no `extract`. Medido; a hipótese "listar e contar por fora" foi confirmada.**
+
+Modo `count` no driver (`r1-count2.txt`): `extract` em 3 arquivos com contagem conhecida, 5 vezes em
+cada modo, com 1 s entre chamadas. O gabarito é calculado no script.
+
+| Caso | Esperado | "Responda apenas com o número" | "Liste em array JSON" (o script conta) |
+| --- | --- | --- | --- |
+| tabela "Rules activas" do GestorERP (o caso do §8, teste 10) | 19 | 3/5 (18, 18, 19, 19, 19) | **5/5** |
+| linhas de flag da tabela de configuração do README | 16 | **0/5** (17, 20, 17, 19, 19) | **5/5** |
+| cabeçalhos `## \`tool\`` do `TOOLS.md` | 7 | 5/5 | **5/5** |
+| **Total** | | **8/15 (53%)** | **15/15 (100%)** |
+
+- **1ª rodada** (`r1-count.txt`): a contagem direta deu 7/15. A listagem saiu como `parse_erro` em
+  15/15 por **erro no meu parser**: ele cortava o texto no último `]`, que pertence à linha
+  `[arquivo] ...` depois do array. O modelo tinha devolvido JSON válido, como uma chamada manual
+  confirmou (`["\`chat\`", ..., "\`translate\`"]`, 7 itens). Corrigi o parser e repeti a medição.
+- **Somando as duas rodadas:** contar direto, **15/30 (50%)**; listar, **15/15 (100%)**.
+- O `extract` usa `fileTemperature = 0.2`, o que explica a variação entre as execuções da contagem
+  direta.
+- **Recomendação de uso:** para contar, peça **a lista** (em JSON) e conte por fora.
+
+**R2: documentação. Feito (commit `10e879a`).**
+
+- `generate` ganhou "Counts and arithmetic are unreliable: ask for steps or a list and check
+  outside."
+- `TOOLS.md` regenerado (`-check` = in sync); `go vet` OK; `go test -count=1 ./...` verde.
+- `tools/list` = **4.390 de 4.400 bytes**. Sobram 10 bytes: uma próxima frase em qualquer tool vai
+  exigir rever o teto `toolsListBudget` (decisão do owner).
+- `chat` e `extract` **não** receberam a frase, por decisão do owner (orçamento).
+- **Binário:** `D:\MCP\mcpollama-mcp.exe` = **`0.5.2-10e879a`** (14:47). O smoke do `tools/list`
+  contém a frase nova. O `.exe~` agora é o 0.5.1, que estava em uso. Os clientes pegam o 0.5.2 ao
+  reiniciar.
+
+**Estado consolidado atualizado:**
+
+| # | Item | Estado (14:50) |
+| --- | --- | --- |
+| R1 | contagem no `extract` | **medido**: contar 50%, listar 100%. Recomendação documentada só no `generate` |
+| R2 | documentar o limite | **feito** (`generate`), binário 0.5.2 |
+| R3 | não determinismo com `temperature 0` | explicado em parte (§9.1) |
+| R4.2 | cofre / CLAUDE.md do GestorERP | **aberto**, com o owner |
+| R4.3 | link PCIe `00:1b.4` | **aberto**, reparo físico |
