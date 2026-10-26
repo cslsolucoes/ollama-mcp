@@ -958,3 +958,4 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P10-2 (opcional):** documentar a recomendação "passo a passo" na descrição de `generate`/`chat`;
   - **P10-3:** recompilar o binário em `D:\MCP` com a nova descrição do `embed`;
   - **P9-1** (link `00:1b.4`, 1.932 erros às 14:16) continua.
+- **P10-3 fechada (14:29):** binário D:\MCP\mcpollama-mcp.exe =  .5.1-0b2aab6 (o antigo foi renomeado para .exe~ pelo go build, porque estava em uso). Smoke do 	ools/list OK, com a nova frase do embed. Os clientes pegam a versão nova ao reiniciar; depois disso, apagar o .exe~.
