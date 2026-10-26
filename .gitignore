@@ -1,5 +1,7 @@
 # Binarios compilados (Go) — gerados de src/ para a raiz, nunca versionar
 *.exe
+# no Windows o go build renomeia o .exe em uso (servidor MCP aberto no cliente) para .exe~
+*.exe~
 /mcpollama-mcp
 
 # Config de MCP servers project-level — contem o Bearer token do Ollama em texto
