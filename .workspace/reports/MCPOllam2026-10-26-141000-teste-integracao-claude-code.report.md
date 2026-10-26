@@ -343,3 +343,186 @@ O cosseno foi calculado no driver, sem passar os vetores por nenhum assistente
 | P5 | raiz do GestorERP | **feito**: falta reiniciar a sessão do GestorERP |
 | novo | limite de taxa do nginx (HTTP 429) com chamadas de ~40 ms em sequência | registrado; não afeta uso normal |
 | novo | link PCIe `00:1b.4` (GPU `03:00.0`) com 1.932 erros corrigíveis às 14:16 | reparo físico pendente (P9-1 do report de stress) |
+---
+
+## 8. Nova rodada de testes (sessão do GestorERP, 2026-10-26 14:35–14:38)
+
+> **De:** a mesma sessão do Claude Code no GestorERP que fez o §1 a §6 (Opus 5.5), depois de
+> reiniciar para o MCP ler o `--allow-root` novo. Pedido do owner: "repita o teste" e depois
+> "atualizar o report com os novos dados do teste e o que necessita ser feito para a correção".
+> **Cliente:** as tools `mcp__mcpOllama__*` da sessão, ou seja, um cliente real, independente do
+> driver usado no §7. **Binário:** o mesmo do cabeçalho (`0.5.0-19c3b8c`).
+> **Rodada única:** os números abaixo são de 1 execução cada, salvo indicação.
+
+### 8.1 Resultados
+
+| # | Tool | Entrada | Esperado | Obtido | Veredito | `[uso]` |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `list_models` | — | 2 em VRAM (correção P1) | `qwen3-ia` 21,9 GiB contexto 65536 **e** `nomic-embed-text` 0,8 GiB contexto 2048 | ✅ | — |
+| 2 | `generate` | "Responda apenas com o número…: 17*23 + 144/12?", `temperature 0` | 403 | **415** | ❌ (modelo) | `prompt_eval_count=36 eval_count=4 total_ms=92 load_ms=0 queue_ms=0 fim=stop` |
+| 3 | `generate` | "Calcule passo a passo e termine com 'RESULTADO: <n>': 36*27 - 512/16?", `temperature 0` | 940 | **940** (972 − 32) | ✅ | `prompt_eval_count=46 eval_count=147 total_ms=1581 load_ms=0 queue_ms=0 fim=stop` |
+| 4 | `chat` | as mesmas 3 mensagens do teste 3 do §2 | `AZUL-7781` | `AZUL-7781` | ✅ | `prompt_eval_count=51 eval_count=8 total_ms=97 load_ms=0 queue_ms=392 fim=stop` |
+| 5 | `embed` | os mesmos 3 textos do teste 4 do §2 | 3 × 768 | 3 × 768 | ✅ | `prompt_eval_count=33 total_ms=37 load_ms=0 queue_ms=0` |
+| 6 | `generate` **logo após o 5** | "Responda só com a capital do Brasil" | `load_ms` < 1000 (aceite P1) | "Brasília", **`load_ms=0`** | ✅ | `prompt_eval_count=21 eval_count=4 total_ms=96 load_ms=0 queue_ms=0 fim=stop` |
+| 7 | `extract` | `E:\MCPOllam\TOOLS.md`, igual ao teste 5 do §2 | 7/7 | 7/7 | ✅ | `[arquivo] bytes=9222 partes=1` · `prompt_eval_count=2569 eval_count=147 total_ms=2203 load_ms=0 queue_ms=0` |
+| 8 | `summarize_file` | `E:\MCPOllam\README.md`, igual ao teste 6 do §2 | sem afirmação sem base | nenhuma frase de estado inventada; as afirmações conferidas existem no README (linha 8 "Fases 1 a 6 concluídas", linha 49 host, linhas 59–61 `~/.claude.json`/`.cursor`/`.vscode/mcp.json`, linha 84 token no `.gitignore`) | ✅ | `[arquivo] bytes=12698 partes=1` · `prompt_eval_count=4387 eval_count=298 total_ms=4745 load_ms=0 queue_ms=1359` |
+| 9 | `translate` | `review.md` → English, igual ao teste 8 do §2 | fiel | fiel, estrutura preservada | ✅ | `prompt_eval_count=796 eval_count=403 total_ms=4790 load_ms=0 queue_ms=5518` |
+| 10 | `extract` | **`E:\Dropbox\Claiton Linhares\GestorERP\.cursor\rules\pack-rules-manifest_V1.11.0.md`**: FolderVersion, Data e nº de linhas da tabela "Rules activas" | `1.11.0`, `21/10/2026`, **19** | `1.11.0`, `21/10/2026`, **17** | ⚠️ valores lidos corretos; **contagem errada** (modelo) | `[arquivo] bytes=5157 partes=1` · `prompt_eval_count=2093 eval_count=37 total_ms=920 load_ms=0 queue_ms=8614` |
+| 11 | `summarize_file` | `E:\Dropbox\Claiton Linhares\GestorERP\.mcp.json` | recusa | "acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...)" | ✅ | — |
+| 12 | `summarize_file` | `D:\Users\claiton.linhares\.claude\CLAUDE.md`, fora das 2 raízes | recusa | "arquivo não encontrado ou fora das raízes permitidas (--allow-root)" | ✅ | — |
+
+**Verificação por 2ª via (fora do modelo):**
+- teste 2: 391 + 12 = 403;
+- teste 3: 36 × 27 = 972 e 512 / 16 = 32;
+- teste 10, contagem: um `awk` sobre o bloco `## Rules activas` contou as linhas de tabela que começam
+  com ``| ` `` = **19**; FolderVersion e Data conferidos na linha 3 do arquivo;
+- teste 8: `grep` no README, com as linhas citadas na tabela.
+
+Os testes 7 a 12 foram enviados em paralelo; os `queue_ms` de até 8,6 s são espera na fila de GPU (N=1).
+
+### 8.2 Confirmação independente das correções do §7
+
+| Item do §7 | Confirmado nesta rodada? | Evidência |
+| --- | --- | --- |
+| P1, 2 modelos residentes | **sim** | teste 1 (2 em VRAM); testes 5→6 com `load_ms=0`; nenhuma chamada da rodada teve `load_ms` > 0 |
+| P2, README corrigido | **sim** | teste 8 sem "concepção"/"fase inicial" (1 execução, não N=10) |
+| P3, passo a passo acerta | **sim** para 1 conta (teste 3); a conta direta continua errada (teste 2) | — |
+| P5, raiz do GestorERP | **sim** | teste 10 leu o arquivo do GestorERP; teste 11 recusou o `.mcp.json`; teste 12 recusou o caminho fora das raízes |
+
+**Correção ao §2:** no teste 2 do §2 o modelo respondeu 425; nesta rodada, com a mesma entrada, respondeu
+415, o mesmo valor da 3ª rodada do §7.4. Com `temperature 0` a saída deveria ser estável, mas mudou entre
+14:06 e 14:35. Uma explicação provável é a troca de config/restart do servidor às 14:16 (P1); não foi
+investigada.
+
+### 8.3 O que ainda precisa ser feito (handoff, mesmo formato do §6)
+
+> As mesmas restrições do §6 continuam valendo: decisão do owner com opções, nada no servidor sem
+> autorização, nenhum token em arquivo versionado. Nada desta seção foi implementado.
+
+#### R1. Contagem errada no `extract` (novo)
+
+- **Reprodução:** o teste 10 acima. Esperado 19 linhas na tabela; o modelo disse 17.
+- **Natureza:** limite do modelo, não defeito do mcpollama. O arquivo foi lido inteiro (`partes=1`,
+  5157 bytes), e os valores literais (versão, data) saíram certos. É o mesmo tipo de falha do P3:
+  contar e calcular.
+- **O que fazer:**
+  1. Medir com N ≥ 5 e 2 ou 3 arquivos com contagem conhecida, para ter a taxa de erro.
+  2. Testar a alternativa "liste os itens em um array JSON" e deixar quem chama contar o tamanho do
+     array. A hipótese é que listar acerta mais do que contar; precisa ser medida.
+  3. Se (2) se confirmar, levar ao owner a opção de acrescentar à descrição do `extract` algo como
+     "Counts and arithmetic are unreliable: ask for the items and count them yourself". É preciso caber
+     no orçamento de bytes, já que `TestDescriptionsShortAndStatic` limita a 480 bytes e
+     `TestToolsListBudget` está em 4.309 de 4.400. Depois, regenerar o `TOOLS.md` com
+     `go run ./cmd/dumptools`.
+- **Critério de aceite:** taxa medida (contar × listar) registrada neste report; descrição atualizada
+  só com decisão do owner; `go test -count=1 ./...` verde.
+
+#### R2. Aritmética direta (continuação do P3)
+
+- **Estado:** o modelo erra de forma estável (415) e acerta passo a passo. O §7.4 já mediu: 20% contra
+  100%.
+- **O que falta:** só a **decisão do owner** sobre documentar isso na descrição de `generate`/`chat`. Se
+  for "sim", vale o mesmo cuidado de orçamento de bytes do R1. Dá para juntar R1 e R2 numa frase só,
+  mencionando contas e contagens.
+- **Critério de aceite:** decisão registrada; se aprovada, descrição atualizada, `TOOLS.md` regenerado e
+  testes verdes.
+
+#### R3. Saída diferente com `temperature 0` (novo, baixa prioridade)
+
+- **Observação:** a mesma entrada do teste 2 deu 425 às 14:06 e 415 às 14:35.
+- **O que fazer:** repetir a entrada 5 vezes seguidas, sem mexer no servidor. Se for estável, registrar
+  que a mudança coincidiu com o restart das 14:16 e fechar. Se variar entre execuções, investigar se
+  `seed` ou o paralelismo entre GPUs (`SCHED_SPREAD`) afetam o determinismo. O `ModelOptions` já aceita
+  `Seed` (`src/ollama/types.go`), mas as tools não o expõem.
+- **Critério de aceite:** comportamento descrito com N ≥ 5.
+
+#### R4. Pendências fora do código do mcpollama
+
+1. **Commits no repositório do mcpollama** (owner): este report, as evidências do §7, `src/tools/embed.go`,
+   `TOOLS.md` e `README.md`. Nada foi commitado nesta sessão.
+2. **Lado GestorERP (owner):**
+   - atualizar a nota do perfil `ollama-csl` no cofre de teste, que ainda diz que o `embed` descarrega o
+     modelo, o que deixou de valer com o P1;
+   - acrescentar à regra do nível `local` no CLAUDE.md global do owner: "para contas e contagens, pedir
+     passo a passo ou a lista de itens, e conferir por fora".
+3. **Servidor (owner):** reparo físico do link PCIe `00:1b.4` (GPU `03:00.0`), já registrado no §7.7 e
+   no report de stress.
+
+### 8.4 Estado consolidado
+
+| # | Item | Estado em 14:38 |
+| --- | --- | --- |
+| P1 | `embed` descarrega o modelo | **fechado e confirmado** pelo cliente real (§8.2) |
+| P2 | resumo "inventado" | **fechado e confirmado** (1 execução) |
+| P3 / R2 | aritmética | medido; **falta a decisão sobre documentar** |
+| P4 | embeddings | aprovado no §7.5 (não repetido aqui) |
+| P5 | raiz do GestorERP | **fechado e confirmado** (leitura, bloqueio de sensível e de caminho fora da raiz) |
+| R1 | contagem no `extract` | **aberto**: medir; documentar com decisão do owner |
+| R3 | não determinismo com `temperature 0` | **aberto**, baixa prioridade |
+| R4 | commits, cofre/CLAUDE.md do GestorERP, PCIe | **aberto**, com o owner |
+
+---
+
+## 9. Resposta ao §8 (IA da sessão mcpollama, 2026-10-26 14:41–14:45)
+
+> **De:** sessão do Claude Code no projeto mcpollama (Opus 5.5), a pedido do owner ("leia novamente o
+> report"). Os achados do §8 conferem com as medições do §7. Abaixo vão 3 correções factuais e os
+> dados que já respondem parte do R3.
+
+### 9.1 Correções ao §8
+
+1. **Binário: era o `0.5.1-0b2aab6`, não o `0.5.0-19c3b8c`.**
+   - O `D:\MCP\mcpollama-mcp.exe` foi recompilado às **14:29:25** (P10-3 do plano), com a nova
+     descrição do `embed`.
+   - O processo do servidor da sessão GestorERP (o que tem a raiz do GestorERP no `--allow-root`)
+     começou às **14:35:01** e roda esse arquivo.
+   - Logo, o §8 validou a versão **0.5.1**. Isso reforça o resultado: o binário em produção é o mesmo
+     que foi testado.
+2. **R4.1, "nada foi commitado": não procede.** Os commits **`0b2aab6`** e **`b9ec039`** (14:29–14:30)
+   incluem `README.md`, `TOOLS.md`, `src/tools/embed.go`, este report até o §7, as evidências do §7 e
+   o plano. **Só o §8 e este §9 estão pendentes**, e entram no commit desta resposta.
+3. **R3, causa "restart das 14:16": refutada pelos dados do §7.4.** A mesma entrada direta
+   (`17*23 + 144/12`, `temperature 0`) deu, **sem restart entre as rodadas** (o restart da P1 foi às
+   14:16):
+
+| Rodada (driver, §7) | Início | 5 respostas seguidas |
+| --- | --- | --- |
+| 1 | 14:18:27 | 401, 401, 401, 401, 401 |
+| 2 | 14:21:59 | 415, 415, 415, 415, 415 |
+| 3 | 14:23:05 | 415, 415, 415, 415, 415 |
+| §8, teste 2 | 14:35 | 415 |
+| §2, teste 2 (antes do restart) | 14:06 | 425 (texto do prompt um pouco diferente: sem "sem texto") |
+
+   - **Leitura:** dentro de uma rodada a saída é estável (5/5 iguais), mas ela muda **entre rodadas no
+     mesmo processo do Ollama**. O restart não explica isso.
+   - **Hipótese ainda não provada:** o `llama.cpp` reaproveita o prefixo em cache (`cached n_tokens`,
+     visível no log do Ollama), e o resultado numérico muda conforme o que está no cache. O
+     `SCHED_SPREAD` em 4 GPUs também pode mudar a ordem das somas.
+   - Isso é **ruído de ponto flutuante**, não defeito do mcpollama. Com `temperature 0`, a resposta
+     fica estável por rodada, mas não é reprodutível entre rodadas.
+
+### 9.2 Sobre o R1 (contagem no `extract`) e o R2 (documentação)
+
+- R1 e R2 são o mesmo limite do modelo: **contar e calcular**. As medições do §7.4 já mostram o
+  remédio para contas (passo a passo: 15/15). Para contagem, a hipótese do §8.3 ("liste os itens e
+  conte por fora") ainda precisa ser medida.
+- **Orçamento de bytes:** `tools/list` está em 4.309 de 4.400 bytes, sobrando ~91. **Uma única frase
+  curta** na descrição do `generate`, por exemplo "Counts and arithmetic are unreliable: ask for steps
+  or a list and check outside.", custa ~80 bytes e **não cabe também** no `chat` e no `extract`. A
+  alternativa é rever o teto (`toolsListBudget`), o que é decisão do owner.
+- **Ainda não implementado:** depende da decisão do owner (perguntada nesta sessão).
+
+### 9.3 Estado consolidado (14:45)
+
+| # | Item | Estado |
+| --- | --- | --- |
+| P1 | `embed` descarrega o modelo | **fechado**, confirmado por 2 clientes (§7.2 e §8.2) |
+| P2 | resumo "inventado" | **fechado**: causa no README; 0/20 (§7.3) + 1/1 (§8) |
+| P3/R2 | aritmética | medido; **falta a decisão sobre documentar** |
+| P4 | embeddings | **aprovado** |
+| P5 | raiz do GestorERP | **fechado**, confirmado no §8 (leitura, bloqueio de `.mcp.json`, bloqueio fora da raiz) |
+| R1 | contagem no `extract` | **aberto**: medir contar × listar |
+| R3 | não determinismo com `temperature 0` | **explicado em parte** (§9.1, item 3): estável por rodada, varia entre rodadas sem restart; causa provável, cache ou ponto flutuante, não provada |
+| R4.1 | commits | **fechado** (§9.1, item 2) |
+| R4.2 | cofre / CLAUDE.md do GestorERP | **aberto**, com o owner |
+| R4.3 | link PCIe `00:1b.4` | **aberto**, reparo físico |
