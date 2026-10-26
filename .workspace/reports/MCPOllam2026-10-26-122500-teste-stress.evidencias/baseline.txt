@@ -1,0 +1,26 @@
+﻿Warning: Permanently added '10.100.2.2' (ED25519) to the list of known hosts.
+=== data/uptime
+2026-10-26 11:51:51
+2026-10-23 18:11:55
+up 2 days, 17 hours, 39 minutes
+=== ultimos boots
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 18:11   still running
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:23   still running
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:21   still running
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:20   still running
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 15:31   still running
+=== journal persistente
+/var/log/journal
+IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
+  0 ce285434aa7a46f49cb1d5fa3ccdb168 Fri 2026-10-23 15:11:56 -03 Mon 2026-10-26 11:51:51 -03
+=== GPUs
+0, 00000000:01:00.0, 1, 16, 17.00 W, 240.00 W, 39, 7445 MiB, 8192 MiB
+1, 00000000:04:00.0, 1, 1, 12.82 W, 240.00 W, 44, 6883 MiB, 8192 MiB
+2, 00000000:05:00.0, 1, 1, 17.69 W, 240.00 W, 43, 6905 MiB, 8192 MiB
+3, 00000000:07:00.0, 1, 1, 14.65 W, 240.00 W, 37, 1 MiB, 8192 MiB
+=== Xid/AER/NVRM desde o boot
+84
+=== ollama
+active
+NRestarts=0
+ActiveEnterTimestamp=Fri 2026-10-23 19:14:35 -03

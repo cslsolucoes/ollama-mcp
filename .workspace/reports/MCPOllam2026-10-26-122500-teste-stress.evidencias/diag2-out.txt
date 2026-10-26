@@ -1,0 +1,174 @@
+﻿== journal dir
+drwxr-sr-x+ 3 root systemd-journal 4096 out 26 12:09 /var/log/journal
+46387f26c0a94b50ae8329048d63c051
+== messages 12:00-12:09:40 (filtered)
+Oct 26 12:04:09 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 728.975 MiB)
+Oct 26 12:04:24 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 3.219 MiB)
+Oct 26 12:04:24 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.507 MiB)
+Oct 26 12:04:24 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 39.675 MiB)
+Oct 26 12:04:24 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 728.579 MiB)
+Oct 26 12:04:40 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.876 MiB)
+Oct 26 12:04:40 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.507 MiB)
+Oct 26 12:04:40 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 40.360 MiB)
+Oct 26 12:04:40 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 728.500 MiB)
+Oct 26 12:04:56 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.718 MiB)
+Oct 26 12:04:56 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.507 MiB)
+Oct 26 12:04:56 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 40.176 MiB)
+Oct 26 12:04:56 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 729.001 MiB)
+Oct 26 12:05:14 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.929 MiB)
+Oct 26 12:05:14 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.507 MiB)
+Oct 26 12:05:14 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 38.461 MiB)
+Oct 26 12:05:14 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 728.975 MiB)
+Oct 26 12:05:29 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.903 MiB)
+Oct 26 12:05:29 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.533 MiB)
+Oct 26 12:05:29 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 39.912 MiB)
+Oct 26 12:05:29 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 730.346 MiB)
+Oct 26 12:05:45 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.771 MiB)
+Oct 26 12:05:45 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 2.533 MiB)
+Oct 26 12:05:45 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 39.305 MiB)
+Oct 26 12:05:45 ia ollama[6916]: srv         alloc:  - making room for prompt cache entry, removing oldest entry (size = 728.342 MiB)
+Oct 26 12:09:29 ia systemd[1]: nvidia-powercap.service: Found ordering cycle on multi-user.target/start; has dependency on ollama-warm.service/start, nvidia-powercap.service/start
+Oct 26 12:09:29 ia systemd[1]: nvidia-powercap.service: Job ollama-warm.service/start deleted to break ordering cycle starting with nvidia-powercap.service/start
+Oct 26 12:09:30 ia kernel: NVRM: loading NVIDIA UNIX Open Kernel Module for x86_64  610.57.04  Release Build  (root@localhost.localdomain)  qui 22 out 2026 15:14:02 -03
+Oct 26 12:09:30 ia systemd[1]: selinux-autorelabel-mark.service - Mark the need to relabel after reboot was skipped because of an unmet condition check (ConditionSecurity=!selinux).
+Oct 26 12:09:30 ia systemd[1]: Received SIGRTMIN+20 from PID 688 (plymouthd).
+Oct 26 12:09:30 ia systemd[1]: Starting systemd-update-utmp.service - Record System Boot/Shutdown in UTMP...
+Oct 26 12:09:30 ia systemd[1]: Finished systemd-update-utmp.service - Record System Boot/Shutdown in UTMP.
+Oct 26 12:09:30 ia systemd[1]: Started dnf-makecache.timer - dnf makecache --timer.
+Oct 26 12:09:30 ia systemd[1]: Starting dracut-shutdown.service - Restore /run/initramfs on shutdown...
+Oct 26 12:09:30 ia systemd[1]: Starting foomaticrip-upgrade.service - Allowing already installed printers for foomatic-rip...
+Oct 26 12:09:30 ia systemd[1]: Started nvidia-powerd.service - nvidia-powerd service.
+Oct 26 12:09:30 ia systemd[1]: Starting systemd-logind.service - User Login Management...
+Oct 26 12:09:30 ia systemd[1]: Finished dracut-shutdown.service - Restore /run/initramfs on shutdown.
+Oct 26 12:09:30 ia nvidia-powerd[1263]: nvidia-powerd version:2.0 (build 1)
+Oct 26 12:09:30 ia systemd[1]: foomaticrip-upgrade.service: Deactivated successfully.
+Oct 26 12:09:30 ia systemd[1]: Finished foomaticrip-upgrade.service - Allowing already installed printers for foomatic-rip.
+Oct 26 12:09:30 ia systemd-logind[1279]: Watching system buttons on /dev/input/event2 (Power Button)
+Oct 26 12:09:30 ia systemd-logind[1279]: Watching system buttons on /dev/input/event1 (Power Button)
+Oct 26 12:09:30 ia systemd-logind[1279]: Watching system buttons on /dev/input/event0 (Sleep Button)
+Oct 26 12:09:30 ia systemd-logind[1279]: New seat seat0.
+Oct 26 12:09:30 ia systemd[1]: Started systemd-logind.service - User Login Management.
+Oct 26 12:09:31 ia systemd[1]: Starting tuned.service - Dynamic System Tuning Daemon...
+Oct 26 12:09:31 ia systemd[1]: Received SIGRTMIN+21 from PID 688 (plymouthd).
+Oct 26 12:09:31 ia systemd[1]: Started tuned.service - Dynamic System Tuning Daemon.
+Oct 26 12:09:37 ia nvidia-powerd[1263]: ERROR! UnSupported System.
+Oct 26 12:09:37 ia kdumpctl[1820]: kdump: kexec: loaded kdump kernel
+Oct 26 12:09:38 ia systemd[1]: nvidia-powerd.service: Deactivated successfully.
+Oct 26 12:09:38 ia systemd[1]: nvidia-powerd.service: Consumed 5.829s CPU time, 3.4M memory peak.
+Oct 26 12:09:45 ia systemd[1]: Starting nvidia-powercap.service - NVIDIA GPU power cap for stable 4-GPU inference (240W MAX post-riser-fix)...
+Oct 26 12:09:46 ia bash[2861]: Power limit for GPU 00000000:01:00.0 was set to 240.00 W from 220.00 W.
+Oct 26 12:09:46 ia bash[2870]: Power limit for GPU 00000000:03:00.0 was set to 240.00 W from 220.00 W.
+Oct 26 12:09:46 ia bash[2878]: Power limit for GPU 00000000:05:00.0 was set to 240.00 W from 220.00 W.
+Oct 26 12:09:46 ia bash[2887]: Power limit for GPU 00000000:06:00.0 was set to 240.00 W from 220.00 W.
+Oct 26 12:09:46 ia systemd[1]: Finished nvidia-powercap.service - NVIDIA GPU power cap for stable 4-GPU inference (240W MAX post-riser-fix).
+Oct 26 12:09:54 ia ollama[1799]: print_info: rope_finetuned        = unknown
+== messages last 40 lines before boot
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cc0a520:   27606 tokens, checkpoints:  0,   728.210 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x1939a720:     105 tokens, checkpoints:  0,     2.771 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3c7cafa0:      96 tokens, checkpoints:  0,     2.533 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3c9c8b20:    1533 tokens, checkpoints:  0,    40.440 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cbf6790:   27599 tokens, checkpoints:  0,   728.025 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x30da4300:     105 tokens, checkpoints:  0,     2.771 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3d124690:      97 tokens, checkpoints:  0,     2.560 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cb08020:    1499 tokens, checkpoints:  0,    39.543 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cb2c570:   27639 tokens, checkpoints:  0,   729.080 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cb08ad0:     116 tokens, checkpoints:  0,     3.061 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x2c698930:      97 tokens, checkpoints:  0,     2.560 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cbba080:    1544 tokens, checkpoints:  0,    40.730 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3c960bd0:   27645 tokens, checkpoints:  0,   729.238 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x2c6a0290:     129 tokens, checkpoints:  0,     3.404 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cfeb9d0:      97 tokens, checkpoints:  0,     2.560 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3c9d6390:    1494 tokens, checkpoints:  0,    39.411 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3cfe7840:   27576 tokens, checkpoints:  0,   727.418 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3d283970:     127 tokens, checkpoints:  0,     3.351 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3caf89a0:      97 tokens, checkpoints:  0,     2.560 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3321ed00:    1604 tokens, checkpoints:  0,    42.312 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv        update:    - prompt 0x3d2c3060:   27587 tokens, checkpoints:  0,   727.708 MiB
+Oct 26 12:05:46 ia ollama[6916]: srv  get_availabl: prompt cache update took 717.29 ms
+Oct 26 12:05:46 ia ollama[6916]: slot launch_slot_: id  0 | task -1 | sampler chain: logits -> penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> ?min-p -> ?xtc -> temp-ext -> dist
+Oct 26 12:05:46 ia ollama[6916]: slot launch_slot_: id  0 | task -1 | sampler params:
+Oct 26 12:05:46 ia ollama[6916]: #011repeat_last_n = 64, repeat_penalty = 1.050, frequency_penalty = 0.000, presence_penalty = 0.000
+Oct 26 12:05:46 ia ollama[6916]: #011dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+Oct 26 12:05:46 ia ollama[6916]: #011top_k = 20, top_p = 0.800, min_p = 0.000, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.700
+Oct 26 12:05:46 ia ollama[6916]: #011mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+Oct 26 12:05:46 ia ollama[6916]: slot launch_slot_: id  0 | task 28916 | processing task, is_child = 0
+Oct 26 12:05:46 ia ollama[6916]: slot   operator(): id  0 | task 28916 | new prompt, n_ctx_slot = 65536, n_keep = 4, task.n_tokens = 34
+Oct 26 12:05:46 ia ollama[6916]: slot   operator(): id  0 | task 28916 | cached n_tokens = 1, memory_seq_rm [1, end)
+Oct 26 12:05:46 ia ollama[6916]: slot init_sampler: id  0 | task 28916 | init sampler, took 0.01 ms, tokens: text = 34, total = 34
+Oct 26 12:05:46 ia ollama[6916]: slot print_timing: id  0 | task 28916 | prompt eval time =      59.59 ms /    33 tokens (    1.81 ms per token,   553.83 tokens per second)
+Oct 26 12:05:46 ia ollama[6916]: slot print_timing: id  0 | task 28916 |        eval time =     806.66 ms /    78 tokens (   10.48 ms per token,    95.45 tokens per second)
+Oct 26 12:05:46 ia ollama[6916]: slot print_timing: id  0 | task 28916 |       total time =     866.25 ms /   111 tokens
+Oct 26 12:05:46 ia ollama[6916]: slot print_timing: id  0 | task 28916 |    graphs reused =      26386
+Oct 26 12:05:46 ia ollama[6916]: slot print_timing: id  0 | task 28916 |   graph reallocs =          0    /     0        (same size) / (changed size)
+Oct 26 12:05:46 ia ollama[6916]: slot      release: id  0 | task 28916 | stop processing: n_tokens = 111, truncated = 0
+Oct 26 12:05:46 ia ollama[6916]: srv  update_slots: all slots are idle
+Oct 26 12:05:46 ia ollama[6916]: [GIN] 2026/10/26 - 12:05:46 | 200 |  1.586127997s |     10.100.2.30 | POST     "/api/generate"
+== secure 11:50-12:09
+Oct 26 11:51:51 ia sshd-session[104954]: Accepted publickey for root from 10.100.2.30 port 39562 ssh2: RSA SHA256:jYknPMxjuomnVBLJCqWMWTcdbOJlI6uZBhKtXYd53tU
+Oct 26 11:51:51 ia sshd-session[104977]: Received disconnect from 10.100.2.30 port 39562:11: disconnected by user
+Oct 26 11:51:51 ia sshd-session[104977]: Disconnected from user root 10.100.2.30 port 39562
+Oct 26 11:54:18 ia unix_chkpwd[105144]: password check failed for user (claiton)
+Oct 26 11:54:18 ia sudo[105142]: pam_unix(sudo:auth): authentication failure; logname=claiton uid=1000 euid=0 tty=/dev/pts/0 ruser=claiton rhost=  user=claiton
+Oct 26 11:54:24 ia sudo[105142]: claiton : TTY=pts/0 ; PWD=/home/claiton ; USER=root ; COMMAND=/bin/su -
+Oct 26 12:09:31 ia sshd[1454]: Server listening on 0.0.0.0 port 22.
+Oct 26 12:09:31 ia sshd[1454]: Server listening on :: port 22.
+== secure logins 11:50-12:09
+Oct 26 11:51:51 ia sshd-session[104954]: Accepted publickey for root from 10.100.2.30 port 39562 ssh2: RSA SHA256:jYknPMxjuomnVBLJCqWMWTcdbOJlI6uZBhKtXYd53tU
+Oct 26 11:54:07 ia sshd-session[105081]: Accepted publickey for claiton from 10.100.2.30 port 19230 ssh2: RSA SHA256:IHD22cCh0DFPNx+OYqXj581U80N5sBTeqjoAPH7eM+k
+Oct 26 11:54:18 ia sudo[105142]: pam_unix(sudo:auth): authentication failure; logname=claiton uid=1000 euid=0 tty=/dev/pts/0 ruser=claiton rhost=  user=claiton
+Oct 26 11:54:24 ia sudo[105142]: claiton : TTY=pts/0 ; PWD=/home/claiton ; USER=root ; COMMAND=/bin/su -
+Oct 26 11:54:24 ia sudo[105142]: pam_unix(sudo:session): session opened for user root(uid=0) by claiton(uid=1000)
+== cron/timers
+Oct 26 12:01:01 ia CROND[105366]: (root) CMD (run-parts /etc/cron.hourly)
+Oct 26 12:01:01 ia run-parts[105369]: (/etc/cron.hourly) starting 0anacron
+Oct 26 12:01:01 ia run-parts[105375]: (/etc/cron.hourly) finished 0anacron
+Oct 26 12:01:01 ia CROND[105365]: (root) CMDEND (run-parts /etc/cron.hourly)
+Oct 26 12:09:31 ia crond[1466]: (CRON) STARTUP (1.7.0)
+Oct 26 12:09:31 ia crond[1466]: (CRON) INFO (RANDOM_DELAY will be scaled with factor 96% if used.)
+Oct 26 12:09:31 ia crond[1466]: (CRON) INFO (running with inotify support)
+NEXT                          LEFT LAST                        PASSED UNIT                         ACTIVATES
+Mon 2026-10-26 12:22:08 -03   9min Mon 2026-10-26 11:11:59 -03      - fwupd-refresh.timer          fwupd-refresh.service
+Mon 2026-10-26 12:24:26 -03  11min -                                - systemd-tmpfiles-clean.timer systemd-tmpfiles-clean.service
+Mon 2026-10-26 12:52:32 -03  39min -                                - dnf-makecache.timer          dnf-makecache.service
+Tue 2026-10-27 00:07:02 -03    11h Mon 2026-10-26 00:59:35 -03      - plocate-updatedb.timer       plocate-updatedb.service
+Tue 2026-10-27 00:34:25 -03    12h Mon 2026-10-26 00:17:56 -03      - logrotate.timer              logrotate.service
+Sun 2026-11-01 01:00:00 -03 5 days Sun 2026-10-25 01:00:16 -03      - raid-check.timer             raid-check.service
+Mon 2026-11-02 00:24:04 -03 6 days Mon 2026-10-26 00:09:16 -03      - fstrim.timer                 fstrim.service
+Mon 2026-11-02 00:25:56 -03 6 days Mon 2026-10-26 00:44:16 -03      - ollama-cf-ips.timer          ollama-cf-ips.service
+
+8 timers listed.
+== dnf-automatic/needs-restarting
+not-found
+not-found
+== dnf history recent
+ID     | Linha de comando         | Data e hora      | Ação(ões)      | Alterad
+-------------------------------------------------------------------------------
+    13 | install -y --nogpgcheck  | 23-10-2026 13:34 | Install        |    3   
+    12 | install yum-utils        | 23-10-2026 13:30 | Install        |    1   
+    11 |                          | 23-10-2026 11:36 | Install        |    1   
+== this boot kernel Xid/AER/NVRM
+2026-10-26T09:09:27-03:00 localhost kernel: acpi PNP0A08:00: _OSC: OS now controls [AER PCIeCapability LTR DPC]
+2026-10-26T09:09:27-03:00 localhost kernel: pcieport 0000:00:1b.4: AER: enabled with IRQ 122
+2026-10-26T09:09:27-03:00 localhost kernel: pcieport 0000:00:1c.2: AER: enabled with IRQ 124
+2026-10-26T09:09:27-03:00 localhost kernel: pcieport 0000:00:1c.3: AER: enabled with IRQ 125
+2026-10-26T09:09:27-03:00 localhost kernel: pcieport 0000:00:1c.4: AER: enabled with IRQ 126
+2026-10-26T09:09:27-03:00 localhost kernel: pcieport 0000:00:1d.0: AER: enabled with IRQ 127
+2026-10-26T09:09:28-03:00 localhost kernel: r8169 0000:07:00.0 eth0: RTL8168h/8111h, 24:4b:fe:9a:4d:85, XID 541, IRQ 129
+2026-10-26T12:09:30-03:00 localhost kernel: NVRM: loading NVIDIA UNIX Open Kernel Module for x86_64  610.57.04  Release Build  (root@localhost.localdomain)  qui 22 out 2026 15:14:02 -03
+2026-10-26T12:10:27-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:10:27-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:11:14-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:11:14-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:11:18-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:11:18-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+== wtmp runlevel
+runlevel (to lvl 3)   6.12.0-278.el10. Mon Oct 26 12:09   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:09   still running
+shutdown system down  6.12.0-278.el10. Mon Oct 26 12:07 - 12:09  (00:02)
+runlevel (to lvl 3)   6.12.0-278.el10. Fri Oct 23 18:12 - 12:07 (2+17:54)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 18:11 - 12:07 (2+17:55)
+runlevel (to lvl 3)   6.12.0-278.el10. Fri Oct 23 16:23 - 18:12  (01:48)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:23 - crash  (01:48)
+runlevel (to lvl 3)   6.12.0-278.el10. Fri Oct 23 16:21 - 16:23  (00:01)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:21 - crash  (00:01)
+runlevel (to lvl 3)   6.12.0-278.el10. Fri Oct 23 16:20 - 16:21  (00:01)

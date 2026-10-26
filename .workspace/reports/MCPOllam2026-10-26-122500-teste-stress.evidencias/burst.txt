@@ -1,0 +1,158 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=0s
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=burst inicio=11:53:26.348
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:28.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=178.5µs
+PING inicio=11:53:30.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=75.2µs
+PING inicio=11:53:32.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:34.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=178.8µs
+PING inicio=11:53:36.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=174.6µs
+PING inicio=11:53:38.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:40.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:42.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=16.3719088s prompt_eval_count=51 eval_count=1500 total_ms=16328 load_ms=0 queue_ms=0
+CALL modo=burst idx=2 tool=generate tamanho_prompt_chars=134 inicio=11:53:26.362 wall_ms=16372 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=51 eval_count=1500 total_ms=16328 load_ms=0 queue_ms=0 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:44.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=18.300552s prompt_eval_count=1399 eval_count=132 total_ms=1921 load_ms=0 queue_ms=16371
+CALL modo=burst idx=1 tool=generate tamanho_prompt_chars=8048 inicio=11:53:26.362 wall_ms=18301 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1399 eval_count=132 total_ms=1921 load_ms=0 queue_ms=16371 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=19.0608208s prompt_eval_count=32 eval_count=64 total_ms=758 load_ms=0 queue_ms=18300
+CALL modo=burst idx=18 tool=generate tamanho_prompt_chars=67 inicio=11:53:26.362 wall_ms=19061 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=32 eval_count=64 total_ms=758 load_ms=0 queue_ms=18300 fim=length
+SRV-STDERR method=tools/call tool=generate status=ok dur=19.789566s prompt_eval_count=30 eval_count=64 total_ms=727 load_ms=0 queue_ms=19060
+CALL modo=burst idx=3 tool=generate tamanho_prompt_chars=65 inicio=11:53:26.362 wall_ms=19790 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=30 eval_count=64 total_ms=727 load_ms=0 queue_ms=19060 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:46.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:48.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:50.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:52.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:54.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:53:56.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=252.4µs
+PING inicio=11:53:58.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=92µs
+PING inicio=11:54:00.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:02.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=36.0906942s prompt_eval_count=51 eval_count=1500 total_ms=16295 load_ms=0 queue_ms=19789
+CALL modo=burst idx=5 tool=generate tamanho_prompt_chars=134 inicio=11:53:26.362 wall_ms=36092 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=51 eval_count=1500 total_ms=16295 load_ms=0 queue_ms=19789 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:04.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:06.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:08.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:10.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:12.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:14.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:16.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=51.116333s prompt_eval_count=51 eval_count=1377 total_ms=15019 load_ms=0 queue_ms=36090
+CALL modo=burst idx=8 tool=generate tamanho_prompt_chars=134 inicio=11:53:26.363 wall_ms=51116 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=51 eval_count=1377 total_ms=15019 load_ms=0 queue_ms=36090 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=51.884236s prompt_eval_count=30 eval_count=64 total_ms=766 load_ms=0 queue_ms=51116
+CALL modo=burst idx=0 tool=generate tamanho_prompt_chars=65 inicio=11:53:26.363 wall_ms=51884 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=30 eval_count=64 total_ms=766 load_ms=0 queue_ms=51116 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:18.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=52.618053s prompt_eval_count=31 eval_count=64 total_ms=732 load_ms=0 queue_ms=51884
+CALL modo=burst idx=9 tool=generate tamanho_prompt_chars=66 inicio=11:53:26.362 wall_ms=52619 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=31 eval_count=64 total_ms=732 load_ms=0 queue_ms=51884 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:20.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:22.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:24.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:26.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:28.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=120.3µs
+PING inicio=11:54:30.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:32.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:34.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m8.8964337s prompt_eval_count=52 eval_count=1500 total_ms=16271 load_ms=0 queue_ms=52618
+CALL modo=burst idx=11 tool=generate tamanho_prompt_chars=135 inicio=11:53:26.362 wall_ms=68897 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=52 eval_count=1500 total_ms=16271 load_ms=0 queue_ms=52618 fim=length
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m9.6670591s prompt_eval_count=32 eval_count=64 total_ms=769 load_ms=0 queue_ms=68895
+CALL modo=burst idx=15 tool=generate tamanho_prompt_chars=67 inicio=11:53:26.363 wall_ms=69667 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=32 eval_count=64 total_ms=769 load_ms=0 queue_ms=68895 fim=length
+SRV-STDERR method=ping status=ok dur=96.5µs
+PING inicio=11:54:36.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m11.3052053s prompt_eval_count=1380 eval_count=116 total_ms=1630 load_ms=0 queue_ms=69667
+CALL modo=burst idx=4 tool=generate tamanho_prompt_chars=8075 inicio=11:53:26.363 wall_ms=71305 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1380 eval_count=116 total_ms=1630 load_ms=0 queue_ms=69667 fim=stop
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:38.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m12.0574361s prompt_eval_count=31 eval_count=64 total_ms=751 load_ms=0 queue_ms=71304
+CALL modo=burst idx=6 tool=generate tamanho_prompt_chars=66 inicio=11:53:26.363 wall_ms=72058 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=31 eval_count=64 total_ms=751 load_ms=0 queue_ms=71304 fim=length
+SRV-STDERR method=ping status=ok dur=132.2µs
+PING inicio=11:54:40.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=130.6µs
+PING inicio=11:54:42.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:44.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:46.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:48.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:50.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:52.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:54.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m28.4155999s prompt_eval_count=53 eval_count=1500 total_ms=16352 load_ms=0 queue_ms=72057
+CALL modo=burst idx=17 tool=generate tamanho_prompt_chars=136 inicio=11:53:26.363 wall_ms=88416 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=53 eval_count=1500 total_ms=16352 load_ms=0 queue_ms=72057 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:54:56.363 latencia_ms=0 erro=<nil>
+PING inicio=11:54:58.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:55:00.365 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:55:02.364 latencia_ms=1 erro=<nil>
+PING inicio=11:55:04.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:55:06.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:55:08.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:55:10.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m44.7622018s prompt_eval_count=53 eval_count=1500 total_ms=16334 load_ms=0 queue_ms=88415
+CALL modo=burst idx=14 tool=generate tamanho_prompt_chars=136 inicio=11:53:26.363 wall_ms=104764 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=53 eval_count=1500 total_ms=16334 load_ms=0 queue_ms=88415 fim=length
+SRV-STDERR method=ping status=ok dur=0s
+PING inicio=11:55:12.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m46.4932063s prompt_eval_count=1378 eval_count=121 total_ms=1721 load_ms=0 queue_ms=104762
+CALL modo=burst idx=16 tool=generate tamanho_prompt_chars=8031 inicio=11:53:26.363 wall_ms=106495 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1378 eval_count=121 total_ms=1721 load_ms=0 queue_ms=104762 fim=stop
+PING inicio=11:55:14.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+CALL modo=burst idx=7 tool=generate tamanho_prompt_chars=8108 inicio=11:53:26.363 wall_ms=108115 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1399 eval_count=112 total_ms=1612 load_ms=0 queue_ms=106492 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m48.1146664s prompt_eval_count=1399 eval_count=112 total_ms=1612 load_ms=0 queue_ms=106492
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m48.8722722s prompt_eval_count=32 eval_count=64 total_ms=750 load_ms=0 queue_ms=108114
+CALL modo=burst idx=12 tool=generate tamanho_prompt_chars=67 inicio=11:53:26.363 wall_ms=108874 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=32 eval_count=64 total_ms=750 load_ms=0 queue_ms=108114 fim=length
+PING inicio=11:55:16.364 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m50.4262578s prompt_eval_count=1388 eval_count=109 total_ms=1545 load_ms=0 queue_ms=108872
+CALL modo=burst idx=19 tool=generate tamanho_prompt_chars=8036 inicio=11:53:26.362 wall_ms=110429 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1388 eval_count=109 total_ms=1545 load_ms=0 queue_ms=108872 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m51.7287005s prompt_eval_count=1390 eval_count=84 total_ms=1292 load_ms=0 queue_ms=110425
+CALL modo=burst idx=10 tool=generate tamanho_prompt_chars=8045 inicio=11:53:26.363 wall_ms=111729 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1390 eval_count=84 total_ms=1292 load_ms=0 queue_ms=110425 fim=stop
+PING inicio=11:55:18.363 latencia_ms=0 erro=<nil>
+SRV-STDERR method=ping status=ok dur=0s
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m53.4949049s prompt_eval_count=1389 eval_count=126 total_ms=1758 load_ms=0 queue_ms=111728
+CALL modo=burst idx=13 tool=generate tamanho_prompt_chars=8071 inicio=11:53:26.363 wall_ms=113496 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=1389 eval_count=126 total_ms=1758 load_ms=0 queue_ms=111728 fim=stop
+SUMMARY total=20 ok=20 isError=0 erros_protocolo=0 wall_ms_p50=69667 p95=111729 max=113496 prompt_eval_count_soma=10252 eval_count_soma=10125 tok_s_agregado_relogio=89.2 tok_s_por_chamada_wall=7.2 queue_ms_max=111728 load_ms_max=0 ping_n=56 ping_erros=0 ping_ms_p50=0 ping_ms_max=1 duracao_total_s=113.5

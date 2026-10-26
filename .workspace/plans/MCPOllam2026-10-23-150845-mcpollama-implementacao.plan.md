@@ -790,3 +790,36 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
 - **Pendências:**
   - **P6-1:** rotacionar o token do Ollama;
   - **P6-2:** depois de reiniciar o Claude Code, que hoje ainda roda o binário da raiz, apagar o `E:\MCPOllam\mcpollama-mcp.exe` antigo, que deixa de ser usado.
+
+### 2026-10-26 12:25 — teste de stress (ordem do owner: "faça um teste de stress")
+- **Decisões do owner (AskUserQuestion):** os três tipos (mcpollama local com mock; ao vivo moderado; servidor no limite, com risco de reboot). Em caso de queda: "Parar, investigar logs e tentar 1 vez de novo".
+- **Execução:**
+  1. **Mock** (`src/mcpollama-mcp/stress_test.go`, build tag `stress`, 6 cenários; escrito por um agente Sonnet). 2ª execução no loop principal: `go test -tags stress -count=1 -v -run Stress ./mcpollama-mcp` → exit 0, **8 PASS / 0 FAIL**. Resultados: 500 chamadas concorrentes sem perda nem duplicata, concorrência máxima no backend 1, `ping` p99 1 ms, cancelamento em massa correto, goroutines 6→6, linha de 8 MB recusada sem derrubar o servidor, map-reduce sem passar do teto.
+  2. **Ao vivo:** driver `stressdrv` (cliente MCP stdio real, token por scrub).
+     - Linha de base às 11:51.
+     - Rajada: **20/20 OK**, p95 111,7 s, `ping` máx. 1 ms.
+     - Sustentado de 10 min: **148/148 OK**, p95 15,3 s, fila máx. 14,7 s, ~1,07 milhão de tokens de entrada.
+  3. **Limite:**
+     - **1ª tentativa (12:07): o servidor estava fora do ar.** Houve um reboot **ordenado** às 12:07, entre o sustentado e o limite, antes de qualquer prompt grande. As 6 chamadas falharam ao conectar, e a 7ª estourou o timeout. O driver parou, como manda a decisão do owner.
+     - **Investigação** (2 conexões SSH root):
+       - não houve `crash`;
+       - o `/var/log/messages` não tem Xid nem AER antes da queda;
+       - havia uma shell root interativa (`sudo su -` às 11:54, vinda de 10.100.2.30);
+       - a topologia PCIe mudou;
+       - o journal não persistiu o boot anterior.
+     - **Nova tentativa (12:13): 8/8 OK.** Foram 5 prompts de 58.783 tokens em ~21–24 s cada e 3 gerações de 7.000 tokens em ~87 s cada.
+     - **2ª via (SSH 12:19):** sem reboot, `NRestarts=0`, Xid 0, AER não-corrigível 0, 6 AER corrigíveis em `00:1b.4`.
+- **Deu certo:** o mcpollama aguentou todos os cenários **sem nenhum defeito de código**. O Ollama, com 3 GPUs e 64k, aguentou prompts de ~90% do contexto. A 1ª tentativa também provou, ao vivo, que o cancelamento por timeout chega ao Ollama (`srv stop: cancel task`).
+- **Não deu certo:** a 1ª tentativa do limite foi perdida pelo reboot de 12:07, e a causa não está provada (provável intervenção manual). Os logs do desligamento se perderam porque o journal não está persistente.
+- **Achados:**
+  - **A1:** a espera na fila conta para o `--timeout`;
+  - **A2:** o journal não persiste entre boots;
+  - **A3:** uma geração de 7.000 tokens (~87 s) fica perto do timeout de 120 s;
+  - **A4:** a GPU com defeito é excluída por **índice**, a topologia mudou e não há UUID registrado (índice 3 hoje = `06:00.0` / `GPU-d7166024-…`).
+- **Artefatos:** relatório `.workspace/reports/MCPOllam2026-10-26-122500-teste-stress.report.md` e evidências `.evidencias/` (varredura de segredos: `known_hits=0`; a ocorrência genérica analisada é falso positivo).
+- **Pendências:**
+  - **P7-1:** o owner confirmar o reboot de 12:07;
+  - **P7-2:** excluir a GPU com defeito pelo UUID e registrar o UUID no `CONEXAO-IA.md`;
+  - **P7-3 (decisão opcional):** contar o `--timeout` só a partir da saída da fila;
+  - **P7-4:** journal persistente (`Storage=persistent`);
+  - **P7-5:** remover a linha duplicada `CUDA_VISIBLE_DEVICES=0,1` do drop-in do `ollama.service`.

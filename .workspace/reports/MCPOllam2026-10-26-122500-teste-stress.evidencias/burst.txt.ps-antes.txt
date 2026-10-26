@@ -1,0 +1,8 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=68.3µs
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=ps inicio=11:53:26.234
+SRV-STDERR method=tools/call tool=list_models status=ok dur=55.4511ms
+CALL modo=ps idx=0 tool=list_models tamanho_prompt_chars=0 inicio=11:53:26.247 wall_ms=56 isError=false erro="" uso=
+SUMMARY total=1 ok=1 isError=0 erros_protocolo=0 wall_ms_p50=56 p95=56 max=56 prompt_eval_count_soma=0 eval_count_soma=0 tok_s_agregado_relogio=0.0 tok_s_por_chamada_wall=0.0 queue_ms_max=0 load_ms_max=0 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=0.1

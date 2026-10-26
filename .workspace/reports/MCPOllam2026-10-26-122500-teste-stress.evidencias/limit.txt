@@ -1,0 +1,21 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=0s
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=limit inicio=12:07:22.426
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0601999s
+CALL modo=limit idx=0 tool=generate tamanho_prompt_chars=154923 inicio=12:07:22.444 wall_ms=21064 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0429356s
+CALL modo=limit idx=1 tool=generate tamanho_prompt_chars=154923 inicio=12:07:43.510 wall_ms=21046 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.062807s
+CALL modo=limit idx=2 tool=generate tamanho_prompt_chars=154923 inicio=12:08:04.557 wall_ms=21064 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0424018s
+CALL modo=limit idx=3 tool=generate tamanho_prompt_chars=154923 inicio=12:08:25.623 wall_ms=21043 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0426799s
+CALL modo=limit idx=4 tool=generate tamanho_prompt_chars=154923 inicio=12:08:46.668 wall_ms=21044 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0492515s
+CALL modo=limit idx=5 tool=generate tamanho_prompt_chars=131 inicio=12:09:07.713 wall_ms=21049 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=2m0.0007585s
+CALL modo=limit idx=6 tool=generate tamanho_prompt_chars=131 inicio=12:09:28.763 wall_ms=120001 isError=true erro="tempo esgotado após 2m0s (--timeout 2m0s); a primeira chamada depois de o modelo sair da VRAM leva ~36 s (carga a frio): tente de novo ou aumente --timeout [te..." uso=
+STOP motivo="tempo esgotado após 2m0s (--timeout 2m0s); a primeira chamada depois de o modelo sair da VRAM leva ~36 s (carga a frio): tente de novo ou aumente --timeout [te..."
+SUMMARY total=7 ok=0 isError=7 erros_protocolo=0 wall_ms_p50=21049 p95=120001 max=120001 prompt_eval_count_soma=0 eval_count_soma=0 tok_s_agregado_relogio=0.0 tok_s_por_chamada_wall=0.0 queue_ms_max=0 load_ms_max=0 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=246.3
