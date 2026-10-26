@@ -719,3 +719,26 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
     - token na saída: 0.
 - **Docs:** `README.md` (linha `--allowed-models` na tabela) e `CLAUDE.md` (flag na lista de configuração).
 - **Observação:** a sessão atual do Claude Code continua com o processo antigo do servidor (nome `mcpOllamaCSL`, binário anterior). O binário novo e o nome `mcpOllama` valem a partir do próximo início do Claude Code.
+- **Commits:** `6acd0d3` (allowlist + docs) e `6596bec` (`.gitignore` com `*.exe~`).
+
+### 2026-10-26 11:32 — encerramento (ordem do owner: "ok, finalize")
+- **Verificação após o reinício do Claude Code pelo owner:**
+  - as tools carregaram como `mcp__mcpOllama__*`, confirmando o nome novo;
+  - o `list_models` traz a linha "Modelos permitidos neste servidor: qwen3-ia, nomic-embed-text", que só existe na 0.5.0, confirmando o binário novo;
+  - o processo `mcpollama-mcp` em execução é `E:\MCPOllam\mcpollama-mcp.exe`, e `--version` = `0.5.0-19c3b8c`;
+  - o `mcpollama-mcp.exe~` antigo foi apagado (já não estava em uso).
+- **`CONEXAO-IA.md`** (cópia local `D:\Users\claiton.linhares\.ssh\.workspace\Backup\ia\`, fora do repositório): linha "Modelos disponíveis" atualizada (só os otimizados; os 3 removidos e o porquê; allowlist do MCP) e data de atualização. A seção de 3 GPUs/64k já estava em dia, atualizada pelo owner no incidente. **A cópia no servidor (`/root/CONEXAO-IA.md`) não foi atualizada**: exigiria SSH como root.
+- **Estado final:**
+
+  | Fase / frente | Estado |
+  | --- | --- |
+  | 0 a 6 | concluídas |
+  | Só modelos otimizados (mcpollama, nível local, `CLAUDE.md` global, servidor) | concluída |
+  | Binário em uso | `0.5.0-19c3b8c` |
+
+- **Pendências que ficam (todas do owner, nenhuma bloqueante), numeradas:**
+  1. **P5-3:** rotacionar a API key do TrueNAS (exposta nos `args` do `mcpTrueNas`) e movê-la para `env`;
+  2. **P5-4:** rotacionar a senha `sa` do SQL Server e limpar as regras herdadas do `.claude/settings.local.json`;
+  3. reparar a GPU 3 (riser, cabo ou PSU) e depois voltar a 4 GPUs, `num_ctx` 131072 e o teste de prompt grande;
+  4. copiar o `CONEXAO-IA.md` atualizado para `/root/` no servidor;
+  5. opcionais: P-8 (`rank_files` e tools assíncronas), P5-2 (Cursor/VS Code), versionar o pack `.cursor/`, e trocar as senhas de `referencias/MCPVMWare/.mcp.json`.
