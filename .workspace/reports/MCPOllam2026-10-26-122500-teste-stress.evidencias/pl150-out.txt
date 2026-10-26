@@ -1,0 +1,12 @@
+﻿-rw-r--r--. 1 root root 753 out 26 13:34 /etc/systemd/system/nvidia-powercap.service
+10:# Power limit 150W nas 4 GPUs (owner 2026-10-26 13:34; 200W cortou energia, 170W caiu em ~5 min de carga maxima); SEM locked clocks (deixa o clock gerir-se =
+11:ExecStart=/bin/bash -c 'for i in $(nvidia-smi --query-gpu=index --format=csv,noheader); do nvidia-smi -i "$i" -pm 1; nvidia-smi -i "$i" -pl 150; nvidia-smi -
+Result=success
+LoadState=loaded
+ActiveState=active
+UnitFileState=enabled
+NeedDaemonReload=no
+0, 150.00 W, 150.00 W
+1, 150.00 W, 150.00 W
+2, 150.00 W, 150.00 W
+3, 150.00 W, 150.00 W

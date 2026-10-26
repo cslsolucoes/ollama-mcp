@@ -1,0 +1,17 @@
+﻿2026-10-26 13:46:24
+2026-10-26 13:32:25
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 13:32   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 13:21   still running
+NRestarts=0
+Xid=0 uncorr=0
+00:1b.4 corr=1471 nonfatal=0 fatal=0
+00:1c.2 corr=0 nonfatal=0 fatal=0
+00:1c.3 corr=0 nonfatal=0 fatal=0
+    286 Multiple Correctable
+     91 type=Data Link Layer
+   1094 type=Physical Layer
+0, 150.00 W, 46
+1, 150.00 W, 43
+2, 150.00 W, 48
+3, 150.00 W, 39
+qwen3-ia:latest    abf610827d19    23 GB    100% GPU     65536      llamacpp    Forever    

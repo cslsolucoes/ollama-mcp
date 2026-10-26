@@ -910,3 +910,18 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7-6** e **P7-8** continuam.
 - **Artefatos:** relatório §8; 18 evidências novas (incluindo `power-200w.csv`, `power-170w.csv` e
   `w170-max10m.txt`).
+
+### 2026-10-26 13:47 — 150 W: carga máxima de 10 min aprovada (pedidos do owner: "coloque em 150W" e "repita o ultimo teste")
+- **Aplicado:** 150 W persistente. Antes de gravar, conferi que a unit não estava vazia; gravação atômica e `sync`.
+- **Teste máximo de 10 min: 30/30 OK** (630 s, ~1,76 milhão de tokens de prefill).
+  - prefill de 20,2 s por 58,8 mil tokens, só ~1,8% mais lento que a 170 W;
+  - GPUs com média de 518 W e pico de 566 W; GPU 0 com máximo de 83 °C.
+- **2ª via:** sem reboot, Xid 0, 0 erros não-corrigíveis.
+- **Alerta:** **1.471 erros corrigíveis na `00:1b.4`** (91 de `Data Link Layer`); as demais portas com 0.
+- **Deu certo:** 4 GPUs, 64k e 150 W aguentaram a carga máxima contínua, e é a configuração em uso.
+- **Não deu certo:** nada falhou. O link `00:1b.4` está muito degradado.
+- **Pendências:**
+  - **P9-1 (urgente, físico):** reparo do link da GPU `03:00.0`;
+  - **P9-2:** monitorar os erros AER da `00:1b.4`;
+  - **P8-1** (PSU), **P8-3** (GPU 0), **P7-6**, **P7-8**, **P7-9** e **P7-10** continuam.
+- **Artefatos:** relatório §9; 6 evidências novas.

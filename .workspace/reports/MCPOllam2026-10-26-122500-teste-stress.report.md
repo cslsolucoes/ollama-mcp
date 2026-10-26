@@ -385,3 +385,48 @@ parar em **qualquer** erro. Foi o que funcionou às 12:41, quando parou depois d
   - no ar desde 13:32:25, com 170 W, 4 GPUs e 64k;
   - **sem modelo carregado**, porque o `ollama-warm` não roda na partida (P7-8);
   - em uso normal, com intervalos, o histórico de hoje é estável; em carga máxima contínua, cai.
+
+## 9. 150 W e carga máxima contínua por 10 min (pedidos do owner às 13:34 e 13:35)
+
+- **Aplicação** (`pl150-out.txt`):
+  - antes de gravar, conferi que a unit não estava vazia (`test -s`) e fiz backup `.170w.bak2`;
+  - gravação atômica (`.new` + `mv`) e `sync`; `-pl 150`; `daemon-reload` e restart;
+  - unit `loaded`/`enabled`, **150 W nas 4 GPUs**.
+- **Teste** (`w150-max10m.txt`, modo `max`, mesmo do §8.3): **30/30 OK em 630 s**, sem nenhuma falha.
+  - ~1,76 milhão de tokens de prefill;
+  - a 1ª chamada incluiu a carga a frio (22,6 s);
+  - fila máxima de 41,2 s.
+- **Desempenho:** prefill médio de **20,2 s** por prompt de 58.784 tokens (~2.905 tok/s), contra
+  19,9 s (~2.957 tok/s) a 170 W. **150 W custa só ~1,8%.**
+- **Potência e temperatura** (`power-150w.csv`, 112 amostras sob carga de 13:36:01 a 13:46:01):
+
+| GPU | W máx. | W média | °C máx. | MHz médio |
+| --- | --- | --- | --- | --- |
+| 0 (`01:00`) | 149,7 | 132,2 | 83 | 1.596 |
+| 1 (`03:00`, porta `00:1b.4`) | 140,7 | 120,5 | 66 | 1.743 |
+| 2 (`05:00`) | 148,3 | 124,9 | 81 | 1.704 |
+| 3 (`06:00`) | 141,2 | 119,2 | 66 | 1.708 |
+| **Soma das GPUs** | **566,1** | **518,0** | — | — |
+
+- **2ª via** (SSH 13:46, `post150-out.txt`):
+  - sem reboot (uptime desde 13:32:25), `NRestarts=0`, Xid 0, 0 erros não-corrigíveis;
+  - GPUs a 39–48 °C logo depois da carga.
+- **ALERTA:** a porta **`00:1b.4` acumulou 1.471 erros corrigíveis neste boot**: 1.094 `Physical
+  Layer`, **91 `Data Link Layer`** e 286 `Multiple Correctable`. As portas `00:1c.2` e `00:1c.3`
+  ficaram em **0**.
+  - Para comparar: a 170 W foram 42 linhas de kernel em ~5 min antes do corte.
+  - O link da GPU `03:00.0` está **muito degradado**. Ele funciona porque o PCIe retransmite, mas os
+    erros de camada de enlace indicam replay de pacotes.
+- **Leitura:**
+  - **a 150 W, a configuração de 4 GPUs com 64k aguentou 10 min de carga máxima contínua**;
+  - a 170 W, caiu em ~5 min com média de 548 W nas GPUs; a 150 W, a média foi de 518 W;
+  - a diferença de potência é pequena (~30 W, ~6%), mas foi a que separou "cai" de "aguenta". Isso
+    é compatível com uma fonte no limite, mas **não prova**: o link `00:1b.4` também é suspeito, e
+    com 1.471 erros em 10 min ele pode ceder a qualquer momento.
+- **Pendências:**
+  - **P9-1 (urgente, físico):** reparar o link da GPU `03:00.0` (riser, cabo ou slot da porta
+    `00:1b.4`). É a única porta com erro; as outras 3 estão em 0;
+  - **P8-1** continua: potência e modelo da PSU;
+  - **P9-2:** monitorar a contagem de erros na `00:1b.4`
+    (`/sys/bus/pci/devices/0000:00:1b.4/aer_dev_correctable`) para ver se ela dispara ainda mais;
+  - **P8-3:** GPU 0 a 83 °C (era 88 °C a 170 W).
