@@ -742,3 +742,34 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   3. reparar a GPU 3 (riser, cabo ou PSU) e depois voltar a 4 GPUs, `num_ctx` 131072 e o teste de prompt grande;
   4. copiar o `CONEXAO-IA.md` atualizado para `/root/` no servidor;
   5. opcionais: P-8 (`rank_files` e tools assíncronas), P5-2 (Cursor/VS Code), versionar o pack `.cursor/`, e trocar as senhas de `referencias/MCPVMWare/.mcp.json`.
+
+### 2026-10-26 11:40 — documentação do servidor atualizada (ordem do owner) + correção do `ollama-warm`
+- **Conexões SSH:** 3, todas `lx-ai01-root`, por chave, para inventário, download e upload. Mais a de 11:25 (`lx-ai01`), são 4 no dia, sem incidente de fail2ban.
+- **Inventário:**
+  - 3 documentos em `/root` (`CONEXAO-IA.md` 600, `OLLAMA-SETUP.md` 644, `OLLAMA-SETUP-DETALHADO.md` 644), todos com menções desatualizadas;
+  - varredura de segredos nas cópias: `known_hits=0`; as strings longas eram só caminhos;
+  - o `CONEXAO-IA.md` do servidor = a cópia local menos as 2 edições de hoje, sem divergência.
+- **Achado:** `/usr/local/bin/ollama-warm` + `ollama-warm.service` (enabled) **pré-carregava o `qwen3.8:27b-64k` no boot**:
+  - depois da remoção, falharia no próximo reboot (`set -euo pipefail` + `curl -sf`);
+  - explica o `qwen3.8` residente sozinho depois dos reboots do incidente (inferência compatível com o observado em 24/10).
+  - **Decisão do owner:** trocar para `qwen3-ia`.
+- **Feito:**
+  1. `ollama-warm`: modelo → `qwen3-ia` (mantidos `num_ctx` 65536 e `num_predict` 1), mais o comentário; `Description` do service atualizada.
+  2. 3 documentos editados por um agente Sonnet com a lista de fatos medidos:
+     - modelos (só os 2 otimizados, a remoção e o porquê, ~16 GB liberados);
+     - 3 GPUs/64k atual e 4/128k como alvo pós-reparo;
+     - `ollama-warm`;
+     - clientes (`mcpOllama` 0.5.0 com allowlist e nível `local` com `qwen3-ia`);
+     - **chaves SSH em `D:\Users\claiton.linhares\.ssh\`** (o owner informou durante a tarefa; os documentos diziam `C:\`);
+     - datas de atualização.
+     - O conferido pelo loop principal: `num_gpu 999`/`num_ctx 65536` batem com o `/api/show` de 24/10; as menções a `qwen3.8` que sobraram são só históricas; 0 `C:\Users\...\.ssh`; varredura 0; `bash -n` do script ok.
+  3. **Upload (1 conexão):**
+     - backup dos 5 originais em `/root/doc-backup-20261026/`;
+     - `install` preservando dono/modo (600/644/755/644);
+     - **md5 no servidor igual ao local nos 5** (`3f639f3d4dd4`, `e85a724e1d70`, `93038c64e911`, `ba909fd49075`, `12a92b37df1b`);
+     - `bash -n` ok; `daemon-reload` ok; `ollama-warm` enabled;
+     - **`ollama-warm` executado: exit 0**, `/api/ps` com o `qwen3-ia` residente;
+     - `/tmp/docup` removido.
+  4. Cópia local `D:\...\.ssh\.workspace\Backup\ia\CONEXAO-IA.md` sincronizada (md5 igual ao do servidor). Os 2 `OLLAMA-SETUP*` existem só no servidor.
+- **Ressalva:** o `OLLAMA-SETUP-DETALHADO.md` tinha fim de linha misto (420 CRLF e 13 LF), e a edição normalizou tudo para CRLF. Não afeta a leitura; o original está no backup.
+- **Pendência (4) da lista acima, copiar o `CONEXAO-IA.md` para `/root`:** **fechada.**
