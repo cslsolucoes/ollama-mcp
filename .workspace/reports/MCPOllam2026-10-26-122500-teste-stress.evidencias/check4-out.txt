@@ -1,0 +1,19 @@
+﻿2026-10-26 12:57:17.865933141 -0300 /etc/systemd/system/ollama.service.d/10-performance.conf
+2026-10-26 11:38:31.122898789 -0300 /usr/local/bin/ollama-warm
+2026-10-23 19:14:35.322272439 -0300 /root/gpu4-backup-20261026/10-performance.conf
+2026-10-26 12:27:12.953255825 -0300 /root/gpu4-backup-20261026/10-performance.conf.4gpu-131k-falhou
+2026-10-26 11:38:31.122898789 -0300 /root/gpu4-backup-20261026/ollama-warm
+2026-10-26 12:27:12.946477338 -0300 /root/gpu4-backup-20261026/qwen3-ia.Modelfile
+NRestarts=0
+ActiveEnterTimestamp=Mon 2026-10-26 12:57:18 -03
+NeedDaemonReload=yes
+OLLAMA_CONTEXT_LENGTH=65536
+CUDA_VISIBLE_DEVICES=0,1,2
+num_ctx                        65536
+"num_ctx":65536
+out 26 12:57:17 ia.cslsolucoes.com.br systemd[1]: Stopping ollama.service - Ollama Service...
+out 26 12:57:18 ia.cslsolucoes.com.br systemd[1]: Stopped ollama.service - Ollama Service.
+out 26 12:57:18 ia.cslsolucoes.com.br systemd[1]: Started ollama.service - Ollama Service.
+out 26 12:57:31 ia.cslsolucoes.com.br ollama[4818]: ggml_cuda_init: found 3 CUDA devices (Total VRAM: 23518 MiB):
+out 26 13:01:27 ia.cslsolucoes.com.br ollama[4818]: ggml_cuda_init: found 3 CUDA devices (Total VRAM: 23518 MiB):
+grep: /var/log/secure: arquivo binário coincide com o padrão

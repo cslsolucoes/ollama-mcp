@@ -1,0 +1,22 @@
+﻿2026-10-26 13:03:14
+2026-10-26 12:42:12
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:42   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:37   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:32   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:31   still running
+0, 00000000:01:00.0, GPU-13ce3be3-9fa8-3729-491f-3add358bbf81, 7445 MiB
+1, 00000000:03:00.0, GPU-13d97d49-7bdf-79b2-7994-28c4dc0e2ac8, 6883 MiB
+2, 00000000:05:00.0, GPU-5f254212-4068-1e03-d590-d5759554409e, 6905 MiB
+3, 00000000:06:00.0, GPU-d7166024-7c32-3cb8-6e85-4e9188e933e7, 1 MiB
+/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0
+/sys/devices/pci0000:00/0000:00:1b.4/0000:03:00.0
+/sys/devices/pci0000:00/0000:00:1c.2/0000:05:00.0
+/sys/devices/pci0000:00/0000:00:1c.3/0000:06:00.0
+0000:00:1b.4 corr=13
+0000:00:1c.2 corr=0
+0000:00:1c.3 corr=0
+0000:00:1c.4 corr=0
+0000:00:1d.0 corr=0
+Environment="OLLAMA_CONTEXT_LENGTH=65536"
+Environment="CUDA_VISIBLE_DEVICES=0,1,2,3"
+qwen3-ia:latest    abf610827d19    21 GB    100% GPU     65536      llamacpp    Forever    

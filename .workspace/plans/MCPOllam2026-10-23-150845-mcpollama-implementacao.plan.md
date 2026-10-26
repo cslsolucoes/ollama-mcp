@@ -863,3 +863,19 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7-9:** journald `SyncIntervalSec` curto;
   - **P7-10:** registrar o mapa UUID/barramento/porta e o episódio no `CONEXAO-IA.md`, com autorização do owner;
   - **P7-2** continua aberta: a exclusão é por índice, e o índice 1 é a placa ruim.
+
+### 2026-10-26 13:11 — nova repetição: 4 GPUs com 64k aprovada (pedido do owner: "repita o teste")
+- **Encontrado:** o owner tinha mudado o drop-in às 12:57 para `0,1,2,3` com 64k, mas sem `daemon-reload`, então o serviço seguia com 3 GPUs.
+- **Aplicado:** `daemon-reload` e restart. Resultado: 4 GPUs, 100% GPU, carga em 22 s.
+- **Teste no limite: 8/8 OK.** Os prompts de 58.783 tokens rodaram em ~18–20 s (mais rápido que com 3 GPUs) e as gerações de 7.000 tokens em ~87–89 s.
+- **2ª via:**
+  - sem reboot, Xid 0, 0 erros não-corrigíveis;
+  - `00:1b.4` com +3 corrigíveis (16 no total);
+  - GPU reativada (`00:1c.3`) com 0.
+- **Deu certo:** 4 GPUs com 64k é estável. A combinação que cai é 4 GPUs com 131k.
+- **Não deu certo:** nada nesta etapa. O link `00:1b.4` segue marginal, com ~1 erro corrigível por chamada pesada.
+- **Pendências:**
+  - **P7-6** continua: reparo físico antes de tentar 131k de novo;
+  - **P7-2** suspensa: com as 4 GPUs em uso, a exclusão por índice não é risco;
+  - **P7-8, P7-9 e P7-10** continuam.
+- **Artefatos:** relatório §7; 9 evidências novas.

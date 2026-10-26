@@ -1,0 +1,22 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=0s
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=limit inicio=13:04:22.856
+SRV-STDERR method=tools/call tool=generate status=ok dur=18.3464897s prompt_eval_count=58783 eval_count=17 total_ms=18223 load_ms=1 queue_ms=0
+CALL modo=limit idx=0 tool=generate tamanho_prompt_chars=154923 inicio=13:04:22.873 wall_ms=18349 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=58783 eval_count=17 total_ms=18223 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=19.7767831s prompt_eval_count=58783 eval_count=17 total_ms=19700 load_ms=1 queue_ms=0
+CALL modo=limit idx=1 tool=generate tamanho_prompt_chars=154923 inicio=13:04:41.223 wall_ms=19778 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=58783 eval_count=17 total_ms=19700 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=19.8909922s prompt_eval_count=58783 eval_count=17 total_ms=19817 load_ms=1 queue_ms=0
+CALL modo=limit idx=2 tool=generate tamanho_prompt_chars=154923 inicio=13:05:01.002 wall_ms=19893 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=58783 eval_count=17 total_ms=19817 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=19.9974524s prompt_eval_count=58783 eval_count=17 total_ms=19924 load_ms=1 queue_ms=0
+CALL modo=limit idx=3 tool=generate tamanho_prompt_chars=154923 inicio=13:05:20.896 wall_ms=19999 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=58783 eval_count=17 total_ms=19924 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=19.8600048s prompt_eval_count=58783 eval_count=12 total_ms=19773 load_ms=1 queue_ms=0
+CALL modo=limit idx=4 tool=generate tamanho_prompt_chars=154923 inicio=13:05:40.897 wall_ms=19862 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=58783 eval_count=12 total_ms=19773 load_ms=1 queue_ms=0 fim=stop
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m28.6653164s prompt_eval_count=64 eval_count=7000 total_ms=88660 load_ms=0 queue_ms=0
+CALL modo=limit idx=5 tool=generate tamanho_prompt_chars=131 inicio=13:06:00.760 wall_ms=88665 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=64 eval_count=7000 total_ms=88660 load_ms=0 queue_ms=0 fim=length
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m27.1138021s prompt_eval_count=64 eval_count=7000 total_ms=87109 load_ms=0 queue_ms=0
+CALL modo=limit idx=6 tool=generate tamanho_prompt_chars=131 inicio=13:07:29.427 wall_ms=87114 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=64 eval_count=7000 total_ms=87109 load_ms=0 queue_ms=0 fim=length
+SRV-STDERR method=tools/call tool=generate status=ok dur=1m27.0997898s prompt_eval_count=64 eval_count=7000 total_ms=87092 load_ms=0 queue_ms=0
+CALL modo=limit idx=7 tool=generate tamanho_prompt_chars=131 inicio=13:08:56.542 wall_ms=87100 isError=false erro="" uso=[uso] modelo=qwen3-ia prompt_eval_count=64 eval_count=7000 total_ms=87092 load_ms=0 queue_ms=0 fim=length
+SUMMARY total=8 ok=8 isError=0 erros_protocolo=0 wall_ms_p50=19893 p95=88665 max=88665 prompt_eval_count_soma=294107 eval_count_soma=21080 tok_s_agregado_relogio=58.4 tok_s_por_chamada_wall=58.4 queue_ms_max=0 load_ms_max=1 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=360.8

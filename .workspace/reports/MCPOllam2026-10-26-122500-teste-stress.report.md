@@ -266,3 +266,34 @@ parar em **qualquer** erro. Foi o que funcionou às 12:41, quando parou depois d
     e este episódio. Exige autorização do owner para mexer nos documentos do servidor.
   - **P7-2 atualizada:** a exclusão por índice continua, e o índice 1 é a placa ruim; quando houver
     exclusão, fazer por UUID.
+
+## 7. Nova repetição com 4 GPUs e 64k (pedido do owner às 13:03: "repita o teste")
+
+- **Estado encontrado** (`check3-out.txt`, `check4-out.txt`):
+  - o owner editou o drop-in às 12:57:17 para `CUDA_VISIBLE_DEVICES=0,1,2,3` com
+    `OLLAMA_CONTEXT_LENGTH=65536` e reiniciou o `ollama`, **sem `systemctl daemon-reload`**
+    (`NeedDaemonReload=yes`). O serviço seguia com `0,1,2` e `found 3 CUDA devices`;
+  - sem reboot nem mudança física desde 12:42; a porta `00:1b.4` estava com 13 AER corrigíveis.
+- **Aplicação** (`apply4x64-out.txt`):
+  - `daemon-reload` e restart → `CUDA_VISIBLE_DEVICES=0,1,2,3`;
+  - previsão de 22.558 MiB para 30.700 MiB livres; 49/49 camadas; `n_ctx = 65536`; **100% GPU**;
+  - carga em 22 s, com 5,6–6,3 GB por GPU;
+  - nenhum AER novo durante a carga.
+- **Teste no limite** (`limit-4gpu-64k.txt`; driver que para na 1ª queda): **8/8 OK**.
+  - 5 prompts de 58.783 tokens em **18,3 / 19,8 / 19,9 / 20,0 / 19,9 s**, mais rápido que com 3 GPUs
+    (21–24 s).
+  - 3 gerações de 7.000 tokens em 88,7 / 87,1 / 87,1 s.
+- **2ª via** (SSH 13:10, `post3-out.txt`):
+  - **sem reboot** (uptime desde 12:42:12), `NRestarts=0`;
+  - **Xid 0**, nenhuma mensagem `Uncorrected` ou `Fatal`;
+  - `00:1b.4` de 13 para **16 corrigíveis**: 3 erros espaçados (13:05:49, 13:07:38, 13:08:49);
+    `00:1c.2` = 0; `00:1c.3` (GPU reativada) = **0**;
+  - GPUs entre 34 e 45 °C.
+- **Conclusão:** **4 GPUs com 64k ficou OK** e está em uso. O que derrubava a máquina era a
+  combinação **4 GPUs + 131k**. O link `00:1b.4` (GPU `03:00.0`) continua acumulando erros
+  corrigíveis sob carga, cerca de 1 por chamada pesada, e é o ponto a vigiar. A **P7-6 (reparo físico)**
+  continua valendo antes de qualquer nova tentativa com 131k.
+- **Observações:**
+  - `CUDA_VISIBLE_DEVICES=0,1,2,3` inclui todas as placas, então a mudança de índice deixa de ser
+    risco enquanto as 4 estiverem em uso. A P7-2 fica suspensa;
+  - o `ollama-warm` (`num_ctx 65536`) e o Modelfile (`num_ctx 65536`) estão coerentes com o drop-in.

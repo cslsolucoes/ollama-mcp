@@ -1,0 +1,16 @@
+﻿2026-10-26 13:10:43
+2026-10-26 12:42:12
+NRestarts=0
+Xid=0 nonfatal_fatal_msgs=0
+00:01.0 corr= nonfatal= fatal=
+00:1b.4 corr=16 nonfatal=0 fatal=0
+00:1c.2 corr=0 nonfatal=0 fatal=0
+00:1c.3 corr=0 nonfatal=0 fatal=0
+      1 2026-10-26T13:05:49-03:00 kernel:
+      1 2026-10-26T13:07:38-03:00 kernel:
+      1 2026-10-26T13:08:49-03:00 kernel:
+0, 45, 6309 MiB
+1, 38, 5661 MiB
+2, 43, 5661 MiB
+3, 34, 5733 MiB
+qwen3-ia:latest    abf610827d19    23 GB    100% GPU     65536      llamacpp    Forever    
