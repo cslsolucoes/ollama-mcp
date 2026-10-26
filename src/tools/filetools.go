@@ -74,7 +74,7 @@ func (d Deps) summarizeFileTool() mcp.ToolEntry {
 				"focus":     stringProp("Optional: what the summary should emphasise."),
 				"language":  stringProp("Summary language; default Brazilian Portuguese."),
 				"max_words": intProp("Optional target length in words.", 20, 2000),
-				"model":     stringProp("Optional model name; defaults to the server model (--model)."),
+				"model":     stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 			}),
 			Annotations: readOnlyClosed("Summarize a file with the local model", false),
 		},
@@ -93,7 +93,7 @@ func (d Deps) extractTool() mcp.ToolEntry {
 				"path":        nonEmptyStringProp(pathDesc),
 				"instruction": nonEmptyStringProp("What to extract from the file."),
 				"format":      stringProp("Output format, e.g. a JSON array of {name, line} or a markdown table."),
-				"model":       stringProp("Optional model name; defaults to the server model (--model)."),
+				"model":       stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 			}),
 			Annotations: readOnlyClosed("Extract information from a file with the local model", false),
 		},
@@ -111,7 +111,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 			InputSchema: objectSchema([]string{"path", "target_language"}, schemaMap{
 				"path":            nonEmptyStringProp(pathDesc),
 				"target_language": nonEmptyStringProp("Language to translate into, e.g. English."),
-				"model":           stringProp("Optional model name; defaults to the server model (--model)."),
+				"model":           stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 			}),
 			Annotations: readOnlyClosed("Translate a file with the local model", false),
 		},
@@ -145,7 +145,7 @@ func (d Deps) summarizeFile(ctx context.Context, raw json.RawMessage) (mcp.ToolC
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	model, err := a.optString("model")
+	model, err := d.modelArg(a)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -189,7 +189,7 @@ func (d Deps) extract(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRes
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	model, err := a.optString("model")
+	model, err := d.modelArg(a)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -225,7 +225,7 @@ func (d Deps) translate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallR
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	model, err := a.optString("model")
+	model, err := d.modelArg(a)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}

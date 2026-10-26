@@ -51,7 +51,9 @@ func TestGenerateSuccessUsageLineAndNoThinking(t *testing.T) {
 
 func TestGenerateModelPerCall(t *testing.T) {
 	m := newMock(t, generateOK)
-	if _, err := call(t, m.deps(t, nil), "generate", `{"prompt":"x","model":"outro:7b"}`); err != nil {
+	d := m.deps(t, nil)
+	d.AllowedModels = []string{"qwen3-ia", "outro:7b"}
+	if _, err := call(t, d, "generate", `{"prompt":"x","model":"outro:7b"}`); err != nil {
 		t.Fatal(err)
 	}
 	if m.body(0)["model"] != "outro:7b" {

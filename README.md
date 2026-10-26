@@ -101,6 +101,7 @@ src/
 | `--insecure` | `OLLAMA_INSECURE` | `false` (gera WARNING a cada start) |
 | `--model` | `OLLAMA_MODEL` | `qwen3-ia` |
 | `--embed-model` | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
+| `--allowed-models` | `MCPOLLAMA_ALLOWED_MODELS` | `qwen3-ia;nomic-embed-text` (só os modelos otimizados para as GPUs do servidor; outro modelo exige incluí-lo aqui) |
 | `--timeout` | `OLLAMA_TIMEOUT` | `120s` (decisão P-7; gerações longas com modelo frio podem estourar e recebem erro claro) |
 | `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` (~48k tokens) |
 | `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |

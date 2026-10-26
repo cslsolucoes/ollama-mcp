@@ -17,7 +17,8 @@ func (d Deps) listModelsTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "list_models",
 			Title: "List installed and loaded models",
-			Description: "Lists the models installed on the Ollama server and the ones currently resident in VRAM, with the server defaults. " +
+			Description: "Lists the allowed models (--allowed-models) installed and resident in VRAM, with the server defaults. " +
+				"A resident model outside the allowlist appears on a separate line (it takes VRAM; it cannot be used). " +
 				"It does not load any model and does not wait in the GPU queue.",
 			InputSchema: objectSchema(nil, schemaMap{}),
 			Annotations: readOnlyClosed("List installed and loaded models", true),
@@ -45,14 +46,38 @@ func (d Deps) listModels(ctx context.Context, raw json.RawMessage) (mcp.ToolCall
 	}
 	ps, psErr := be.PS(ctx)
 
+	list := d.allowedModels()
+	allowed := func(name string) bool { return len(list) == 0 || ModelAllowed(list, name) }
+	var installed []ollama.TagModel
+	for _, m := range tags.Models {
+		if allowed(m.Name) {
+			installed = append(installed, m)
+		}
+	}
+
 	var b strings.Builder
-	fmt.Fprintf(&b, "Instalados (%d):\n", len(tags.Models))
-	writeTags(&b, tags.Models)
+	fmt.Fprintf(&b, "Instalados (%d):\n", len(installed))
+	writeTags(&b, installed)
+	var outside []string
 	if psErr != nil {
 		fmt.Fprintf(&b, "Em VRAM: indisponível (%s)\n", psErr.Error())
 	} else {
-		fmt.Fprintf(&b, "Em VRAM (%d):\n", len(ps.Models))
-		writeRunning(&b, ps.Models)
+		var running []ollama.RunningModel
+		for _, m := range ps.Models {
+			if allowed(m.Name) {
+				running = append(running, m)
+			} else {
+				outside = append(outside, fmt.Sprintf("%s (vram %s)", m.Name, gib(m.SizeVRAM)))
+			}
+		}
+		fmt.Fprintf(&b, "Em VRAM (%d):\n", len(running))
+		writeRunning(&b, running)
+	}
+	if len(outside) > 0 {
+		fmt.Fprintf(&b, "Fora da allowlist (ocupa VRAM): %s\n", strings.Join(outside, ", "))
+	}
+	if len(list) > 0 {
+		fmt.Fprintf(&b, "Modelos permitidos neste servidor: %s\n", strings.Join(list, ", "))
 	}
 	fmt.Fprintf(&b, "Padrões do servidor MCP: geração=%s embeddings=%s", d.Model, d.EmbedModel)
 	return mcp.TextResult(b.String(), false), nil

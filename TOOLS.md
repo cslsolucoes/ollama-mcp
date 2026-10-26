@@ -48,7 +48,7 @@ Input schema:
       "type": "array"
     },
     "model": {
-      "description": "Optional model name; defaults to the server model (--model).",
+      "description": "Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model).",
       "type": "string"
     },
     "num_predict": {
@@ -113,7 +113,7 @@ Input schema:
       ]
     },
     "model": {
-      "description": "Optional embeddings model; defaults to --embed-model.",
+      "description": "Optional embeddings model; any model of the allowlist (--allowed-models); defaults to --embed-model.",
       "type": "string"
     }
   },
@@ -150,7 +150,7 @@ Input schema:
       "type": "string"
     },
     "model": {
-      "description": "Optional model name; defaults to the server model (--model).",
+      "description": "Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model).",
       "type": "string"
     },
     "path": {
@@ -182,7 +182,7 @@ Input schema:
   "additionalProperties": false,
   "properties": {
     "model": {
-      "description": "Optional model name; defaults to the server model (--model).",
+      "description": "Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model).",
       "type": "string"
     },
     "num_predict": {
@@ -218,7 +218,7 @@ Input schema:
 
 **Title:** List installed and loaded models
 
-Lists the models installed on the Ollama server and the ones currently resident in VRAM, with the server defaults. It does not load any model and does not wait in the GPU queue.
+Lists the allowed models (--allowed-models) installed and resident in VRAM, with the server defaults. A resident model outside the allowlist appears on a separate line (it takes VRAM; it cannot be used). It does not load any model and does not wait in the GPU queue.
 
 Annotations: readOnlyHint=true destructiveHint=false idempotentHint=true openWorldHint=false
 
@@ -263,7 +263,7 @@ Input schema:
       "type": "integer"
     },
     "model": {
-      "description": "Optional model name; defaults to the server model (--model).",
+      "description": "Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model).",
       "type": "string"
     },
     "path": {
@@ -296,7 +296,7 @@ Input schema:
   "additionalProperties": false,
   "properties": {
     "model": {
-      "description": "Optional model name; defaults to the server model (--model).",
+      "description": "Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model).",
       "type": "string"
     },
     "path": {

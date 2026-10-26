@@ -48,6 +48,7 @@ func buildTools(cfg Config, lg *logger) []ToolEntry {
 		Queue:          tools.NewQueue(1),
 		Model:          cfg.Model,
 		EmbedModel:     cfg.EmbedModel,
+		AllowedModels:  cfg.allowedModelList(),
 		Files:          guard,
 		MaxPromptChars: cfg.MaxPromptChars,
 		MaxChunks:      cfg.MaxChunks,

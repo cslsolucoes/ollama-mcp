@@ -663,3 +663,59 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - reparo da GPU 3 (voltar a 4 GPUs e 131072);
   - versionar o pack `.cursor/`.
 - **Plano:** todas as fases (0–6) concluídas.
+- **Commit:** `19c3b8c`.
+
+### 2026-10-26 11:25 — "só modelos otimizados para o hardware" (decisão do owner)
+- **Evidência (medida):**
+  - `qwen3-ia` (MoE 30,5B, Q4_K_M): **100% na GPU** (20,17 de 20,17 GiB, `/api/ps` às 11:17), ~97 tok/s;
+  - `qwen3.8:27b-64k` (denso 27,3B): 11,0 GiB em VRAM para 16,5 GiB de pesos (`list_models` de 24/10), ou seja, **offload para a CPU**, ~22 tok/s (guia do servidor);
+  - `nomic-embed-text`: 0,85 GB, 100% na GPU;
+  - `qwen3-coder:30b-a3b-q4_K_M`: base redundante do `qwen3-ia`.
+- **Abrangência decidida (AskUserQuestion, as 4 opções):**
+  1. allowlist no mcpollama;
+  2. nível local (`ia-local.ps1`);
+  3. `CLAUDE.md` global;
+  4. remover os outros do servidor. O owner depois autorizou: "pode remover você".
+- **Feito:**
+  1. **Nível local:**
+     - backups `*.bak-20261026-1120` de `ia-local.ps1`, `csl-ollama.env` e `CLAUDE.md` global;
+     - no `csl-ollama.env`, só a linha `OPENAI_MODEL` trocada (`qwen3.8:27b-64k` → `qwen3-ia`), por script, sem exibir o token. As 4 chaves foram preservadas e o CRLF mantido;
+     - comentário do cabeçalho do `ia-local.ps1` atualizado; o contexto (65536) já casava;
+     - **testado:** `-Check` OK com `model=qwen3-ia`; tarefa só de texto em **3,6 s**; tarefa com a ferramenta `Read` (ler o `README.md` e resumir) correta em **5,7 s** (antes ~40–90 s). O tool calling pela API OpenAI-compatível funciona.
+  2. **`CLAUDE.md` global:** linha do nível `local` com o modelo novo e os tempos medidos. **`CLAUDE.md` do projeto:** o nível `local` agora usa o mesmo `qwen3-ia`, e a disputa de VRAM acabou.
+  3. **Servidor** (1 conexão SSH `lx-ai01`, usuário de operação, sem root):
+     - antes: 5 modelos, disco 55 GB usados;
+     - FROM do `qwen3-ia` = FROM da base = `sha256-1194192c…` (pesos compartilhados), condição para remover a base;
+     - `ollama rm qwen3.8:27b-64k qwen3.8:27b-q4_K_M qwen3-coder:30b-a3b-q4_K_M`: os 3 "deleted";
+     - depois: `qwen3-ia` e `nomic-embed-text`, **disco 39 GB usados (~16 GB liberados)**;
+     - teste local no servidor: `qwen3-ia` → "ok" (`load_duration` 20,6 s, porque a remoção o tirou da VRAM).
+     - **2ª via (`list_models` do mcpollama):** instalados apenas `qwen3-ia` e `nomic-embed-text`; `qwen3-ia` em VRAM com 20,2 GiB e ctx 65536.
+- **Não deu certo (sem efeito no resultado):**
+  - o pipe do PowerShell 5.1 para o `ssh` pôs um **BOM** na 1ª linha (`set -u` falhou) e um `\r` na última (`ollama ps` falhou);
+  - o `ls` do blob deu "Permissão negada" (o usuário `claiton` não lê `/usr/share/ollama`); a integridade foi provada pelo `generate` e pela 2ª via.
+  - **Lição:** para enviar script por `ssh` a partir do PowerShell 5.1, gravar o script em arquivo UTF-8 sem BOM com LF e usar `ssh host 'bash -s' < arquivo` (via `cmd /c`), ou `[Console]::OutputEncoding` sem BOM.
+- **Pendências:**
+  - allowlist no código do mcpollama (agente Sonnet em execução);
+  - o owner atualizar a tabela de modelos do `CONEXAO-IA.md` (§4).
+
+### 2026-10-26 11:35 — allowlist de modelos no mcpollama (agente Sonnet + correção e verificação do loop principal)
+- **Feito (agente):**
+  - `src/tools/allowlist.go`: `SplitModels` (`;` ou `,`), `ModelAllowed` (exato, `:latest` implícito, case-sensitive), `checkModel`/`modelArg`;
+  - as 6 tools com `model` passam por `modelArg` **antes** de qualquer acesso ao Ollama;
+  - `list_models` filtra pela allowlist, mostra "Fora da allowlist (ocupa VRAM)" quando houver e "Modelos permitidos neste servidor";
+  - flag `--allowed-models`/`MCPOLLAMA_ALLOWED_MODELS` com validação na partida (exit 2);
+  - testes novos em `allowlist_test.go` e `config_test.go`; `TOOLS.md` regenerado.
+- **Defeito de especificação (meu), achado na verificação:** o prompt pedia o default "= `--model` + `--embed-model` efetivos". Assim, qualquer `--model` entrava na lista e a partida com `--model qwen3.8:27b-64k` **subia (exit 0)**: a restrição "só modelos otimizados" não valia.
+  - **Correção:** o default passou a ser o **conjunto fixo `qwen3-ia;nomic-embed-text`** (`config.go`, `allowedModelList`); usar outro modelo exige `--allowed-models` explícito.
+  - O teste antigo `TestAllowedModelsDefaultsToEffectiveModels` foi substituído por `TestAllowedModelsDefaultIsTheTunedSet`, que cobre: default, `--model` fora → erro de partida, e opt-in explícito com `--allowed-models`.
+- **Verificação do loop principal (lida):**
+  - gate limpo: build, `vet` e `vet -tags live` = 0; **262 PASS, 0 FAIL, 1 SKIP**; `-race` com 0 DATA RACE (rodado de novo depois da correção); `gofmt` vazio; `dumptools -check` em sincronia;
+  - binário `0.5.0-19c3b8c`;
+  - partida com `--model qwen3.8:27b-64k` → **exit 2** "não está na lista de modelos permitidos (--allowed-models: qwen3-ia, nomic-embed-text)"; partida default → exit 0;
+  - **ao vivo (servidor real, token só em memória):**
+    - `generate` com `model: qwen3.8:27b-64k` → `isError` "modelo qwen3.8:27b-64k não permitido neste servidor; permitidos: qwen3-ia, nomic-embed-text";
+    - `generate` default → "ok" em `total_ms=55`;
+    - `list_models` → só os 2 modelos e a lista de permitidos;
+    - token na saída: 0.
+- **Docs:** `README.md` (linha `--allowed-models` na tabela) e `CLAUDE.md` (flag na lista de configuração).
+- **Observação:** a sessão atual do Claude Code continua com o processo antigo do servidor (nome `mcpOllamaCSL`, binário anterior). O binário novo e o nome `mcpOllama` valem a partir do próximo início do Claude Code.

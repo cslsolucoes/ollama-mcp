@@ -27,7 +27,7 @@ func (d Deps) chatTool() mcp.ToolEntry {
 					"content": nonEmptyStringProp("Message text."),
 				})),
 				"system":      stringProp("Optional system instruction, placed before messages."),
-				"model":       stringProp("Optional model name; defaults to the server model (--model)."),
+				"model":       stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 				"temperature": numberProp("Sampling temperature, 0 to 2.", 0, 2),
 				"num_predict": intProp("Maximum tokens to generate.", 1, maxGeneratePredict),
 			}),
@@ -105,7 +105,7 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 	if strings.TrimSpace(system) != "" {
 		msgs = append([]ollama.ChatMessage{{Role: "system", Content: system}}, msgs...)
 	}
-	model, err := a.optString("model")
+	model, err := d.modelArg(a)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}

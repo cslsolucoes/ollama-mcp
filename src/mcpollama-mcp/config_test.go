@@ -207,3 +207,58 @@ func TestOllamaOptionsFromConfig(t *testing.T) {
 		t.Fatalf("%+v", o)
 	}
 }
+
+// The default allowlist is the fixed set tuned for the server hardware, not
+// whatever --model says: otherwise any --model would be allowed and the start
+// check could never refuse a model that does not fit the GPUs.
+func TestAllowedModelsDefaultIsTheTunedSet(t *testing.T) {
+	c := parse(t, nil, nil)
+	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3-ia|nomic-embed-text" {
+		t.Fatalf("default: %s", got)
+	}
+	c = parse(t, []string{"--model", "qwen3.8:27b-64k"}, nil)
+	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3-ia|nomic-embed-text" {
+		t.Fatalf("default must not follow --model: %s", got)
+	}
+	if err := c.validate(); err == nil || !strings.Contains(err.Error(), "--model") {
+		t.Fatalf("a --model outside the tuned set must stop the start, got %v", err)
+	}
+	// Opting in to another model is explicit.
+	c = parse(t, []string{"--model", "m1", "--embed-model=e1", "--allowed-models", "m1;e1"}, nil)
+	if err := c.validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAllowedModelsEnvFlagAndSeparators(t *testing.T) {
+	c := parse(t, nil, map[string]string{"MCPOLLAMA_ALLOWED_MODELS": "qwen3-ia, nomic-embed-text;x:latest"})
+	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3-ia|nomic-embed-text|x:latest" {
+		t.Fatalf("env: %s", got)
+	}
+	c = parse(t, []string{"--allowed-models", "qwen3-ia:latest;nomic-embed-text"}, map[string]string{"MCPOLLAMA_ALLOWED_MODELS": "zzz"})
+	if c.AllowedModels != "qwen3-ia:latest;nomic-embed-text" {
+		t.Fatalf("flag must win: %+v", c)
+	}
+	if err := c.validate(); err != nil { // :latest is implicit
+		t.Fatal(err)
+	}
+}
+
+func TestAllowedModelsMustContainDefaults(t *testing.T) {
+	for _, args := range [][]string{
+		{"--allowed-models", "nomic-embed-text"},
+		{"--allowed-models", "qwen3-ia"},
+		{"--allowed-models", "Qwen3-IA;nomic-embed-text"},
+	} {
+		c := parse(t, args, nil)
+		err := c.validate()
+		if err == nil || !strings.Contains(err.Error(), "não está na lista de modelos permitidos") {
+			t.Errorf("%v: err=%v", args, err)
+		}
+	}
+	var out, errb bytes.Buffer
+	code := realMain([]string{"--allowed-models", "outro"}, func(string) string { return "" }, strings.NewReader(""), &out, &errb)
+	if code != 2 || !strings.Contains(errb.String(), "não está na lista de modelos permitidos") {
+		t.Fatalf("exit=%d stderr=%q", code, errb.String())
+	}
+}

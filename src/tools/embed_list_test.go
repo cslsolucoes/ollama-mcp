@@ -47,7 +47,8 @@ func TestEmbedSummaryByDefault(t *testing.T) {
 
 func TestEmbedStringInputAndVectors(t *testing.T) {
 	m := newMock(t, embedOK)
-	d := m.deps(t, nil)
+	d := m.deps(t, func(o *ollama.Options) {})
+	d.AllowedModels = []string{"qwen3-ia", "nomic-embed-text", "outro-embed"}
 	res, err := call(t, d, "embed", `{"input":"so um","include_vectors":true,"model":"outro-embed"}`)
 	if err != nil {
 		t.Fatal(err)

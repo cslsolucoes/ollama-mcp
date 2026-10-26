@@ -14,6 +14,7 @@ import (
 
 	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/ollama"
+	"github.com/cslsoftwares/mcpollama/tools"
 )
 
 // Defaults. The prompt ceiling is a character budget decided by the owner
@@ -37,6 +38,7 @@ type Config struct {
 	Insecure       bool
 	Model          string
 	EmbedModel     string
+	AllowedModels  string // raw list separated by ; or ,; empty means Model and EmbedModel only
 	Timeout        time.Duration
 	MaxPromptChars int
 	MaxLineBytes   int
@@ -75,6 +77,9 @@ Every flag falls back to its environment variable; the flag wins.
   --insecure              skip TLS verification (not recommended)  (OLLAMA_INSECURE)
   --model NAME            generation model, default qwen3-ia       (OLLAMA_MODEL)
   --embed-model NAME      embeddings model, default nomic-embed-text (OLLAMA_EMBED_MODEL)
+  --allowed-models LIST   models the tools may use, separated by ; or ,; default is
+                          qwen3-ia;nomic-embed-text (tuned for the server GPUs);
+                          --model and --embed-model must be in it (MCPOLLAMA_ALLOWED_MODELS)
   --timeout DURATION      per-call deadline, default 2m0s          (OLLAMA_TIMEOUT)
   --max-prompt-chars N    prompt ceiling in characters, default 128000 (MCPOLLAMA_MAX_PROMPT_CHARS)
   --max-file-bytes N      file ceiling in bytes, default 4194304   (MCPOLLAMA_MAX_FILE_BYTES)
@@ -105,6 +110,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fInsecure = fs.Bool("insecure", false, "")
 		fModel    = fs.String("model", "", "")
 		fEmbed    = fs.String("embed-model", "", "")
+		fAllowed  = fs.String("allowed-models", "", "")
 		fTimeout  = fs.Duration("timeout", 0, "")
 		fPrompt   = fs.Int("max-prompt-chars", 0, "")
 		fFile     = fs.Int("max-file-bytes", 0, "")
@@ -163,6 +169,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		Insecure:       boolean("insecure", "OLLAMA_INSECURE", fInsecure),
 		Model:          str("model", "OLLAMA_MODEL", defaultModel, fModel),
 		EmbedModel:     str("embed-model", "OLLAMA_EMBED_MODEL", defaultEmbedModel, fEmbed),
+		AllowedModels:  str("allowed-models", "MCPOLLAMA_ALLOWED_MODELS", "", fAllowed),
 		MaxPromptChars: integer("max-prompt-chars", "MCPOLLAMA_MAX_PROMPT_CHARS", defaultMaxPromptChars, fPrompt),
 		MaxFileBytes:   integer("max-file-bytes", "MCPOLLAMA_MAX_FILE_BYTES", defaultMaxFileBytes, fFile),
 		MaxChunks:      integer("max-chunks", "MCPOLLAMA_MAX_CHUNKS", defaultMaxChunks, fChunks),
@@ -193,6 +200,9 @@ func (c Config) validate() error {
 	if c.ToolsVerbosity != "full" && c.ToolsVerbosity != "compact" {
 		return fmt.Errorf("--tools-verbosity must be full or compact, got %q", c.ToolsVerbosity)
 	}
+	if err := c.checkModelsAllowed(); err != nil {
+		return err
+	}
 	if c.Timeout <= 0 {
 		return errors.New("--timeout must be positive")
 	}
@@ -215,6 +225,29 @@ func (c Config) validate() error {
 		}
 		if !x509.NewCertPool().AppendCertsFromPEM(pem) {
 			return fmt.Errorf("--tls-ca: no PEM certificate found in %s", c.TLSCA)
+		}
+	}
+	return nil
+}
+
+// allowedModelList is the effective allowlist: --allowed-models when it names
+// at least one model, otherwise the fixed set of models tuned for the CSL
+// server hardware (owner decision 2026-10-26). It is not derived from --model:
+// that would let any --model through and the start check would never fire.
+func (c Config) allowedModelList() []string {
+	if l := tools.SplitModels(c.AllowedModels); len(l) > 0 {
+		return l
+	}
+	return []string{defaultModel, defaultEmbedModel}
+}
+
+// checkModelsAllowed makes a start fatal when a default model is outside the
+// allowlist: every call without an explicit model would be refused.
+func (c Config) checkModelsAllowed() error {
+	list := c.allowedModelList()
+	for _, m := range []struct{ flag, name string }{{"--model", c.Model}, {"--embed-model", c.EmbedModel}} {
+		if !tools.ModelAllowed(list, m.name) {
+			return fmt.Errorf("%s %q não está na lista de modelos permitidos (--allowed-models: %s)", m.flag, m.name, strings.Join(list, ", "))
 		}
 	}
 	return nil

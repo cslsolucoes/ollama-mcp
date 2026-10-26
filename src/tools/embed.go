@@ -27,7 +27,7 @@ func (d Deps) embedTool() mcp.ToolEntry {
 						arrayProp("A batch of texts.", nonEmptyStringProp("One text.")),
 					},
 				},
-				"model":           stringProp("Optional embeddings model; defaults to --embed-model."),
+				"model":           stringProp("Optional embeddings model; any model of the allowlist (--allowed-models); defaults to --embed-model."),
 				"include_vectors": boolProp(fmt.Sprintf("Return the vectors too (at most %d texts). Default false: summary only.", maxVectorItems)),
 			}),
 			Annotations: readOnlyClosed("Compute embeddings with the local embeddings model", true),
@@ -78,7 +78,7 @@ func (d Deps) embed(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResul
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	model, err := a.optString("model")
+	model, err := d.modelArg(a)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}

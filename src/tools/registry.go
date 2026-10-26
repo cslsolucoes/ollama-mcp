@@ -51,6 +51,9 @@ type Deps struct {
 	// the real defaults.
 	Model      string
 	EmbedModel string
+	// AllowedModels is the model allowlist (":latest" implicit). Empty means
+	// Model and EmbedModel only; see allowlist.go.
+	AllowedModels []string
 	// Files is the read gate of the economy tools. nil (no --allow-root) means
 	// summarize_file, extract and translate are not registered at all
 	// (FILE-001): they are absent from tools/list and tools/call answers

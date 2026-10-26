@@ -22,7 +22,7 @@ func (d Deps) generateTool() mcp.ToolEntry {
 			InputSchema: objectSchema([]string{"prompt"}, schemaMap{
 				"prompt":      nonEmptyStringProp("The prompt text."),
 				"system":      stringProp("Optional system instruction."),
-				"model":       stringProp("Optional model name; defaults to the server model (--model)."),
+				"model":       stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 				"temperature": numberProp("Sampling temperature, 0 to 2.", 0, 2),
 				"num_predict": intProp("Maximum tokens to generate.", 1, maxGeneratePredict),
 			}),
@@ -61,7 +61,7 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	model, err := a.optString("model")
+	model, err := d.modelArg(a)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
