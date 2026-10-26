@@ -1,0 +1,21 @@
+﻿2026-10-26 12:42:38
+2026-10-26 12:42:12
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:42   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:37   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:32   still running
+== prev boot (-1) source counts
+      3 pcieport 0000:00:1b.4:
+      3 pcieport 0000:00:1c.2:
+      3 pcieport 0000:00:1c.3:
+      3 pcieport 0000:00:1c.4:
+      3 pcieport 0000:00:1d.0:
+== prev boot first/last runtime AER
+== prev boot last 6 lines
+2026-10-26T12:40:23-03:00 ia.cslsolucoes.com.br systemd[1]: Started NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service.
+2026-10-26T12:40:33-03:00 ia.cslsolucoes.com.br systemd[1]: NetworkManager-dispatcher.service: Deactivated successfully.
+2026-10-26T12:40:34-03:00 ia.cslsolucoes.com.br NetworkManager[1441]: <info>  [1793029234.4194] dhcp4 (enp7s0): state changed new lease, address=10.100.2.2
+2026-10-26T12:40:34-03:00 ia.cslsolucoes.com.br systemd[1]: Starting NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service...
+2026-10-26T12:40:34-03:00 ia.cslsolucoes.com.br systemd[1]: Started NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service.
+2026-10-26T12:40:44-03:00 ia.cslsolucoes.com.br systemd[1]: NetworkManager-dispatcher.service: Deactivated successfully.
+== ollama now
+active

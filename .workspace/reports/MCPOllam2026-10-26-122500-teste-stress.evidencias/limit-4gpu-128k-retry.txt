@@ -1,0 +1,9 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=0s
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=limit inicio=12:41:08.847
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=1m15.0905349s
+CALL modo=limit idx=0 tool=generate tamanho_prompt_chars=307143 inicio=12:41:08.866 wall_ms=75097 isError=true erro="o servidor encerrou a conexão após 1m15.1s sem resposta; o servidor Ollama pode estar reiniciando ou carregando o modelo (carga a frio ~36 s), ou o prompt é ..." uso=
+STOP motivo="o servidor encerrou a conexão após 1m15.1s sem resposta; o servidor Ollama pode estar reiniciando ou carregando o modelo (carga a frio ~36 s), ou o prompt é ..."
+SUMMARY total=1 ok=0 isError=1 erros_protocolo=0 wall_ms_p50=75097 p95=75097 max=75097 prompt_eval_count_soma=0 eval_count_soma=0 tok_s_agregado_relogio=0.0 tok_s_por_chamada_wall=0.0 queue_ms_max=0 load_ms_max=0 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=75.1

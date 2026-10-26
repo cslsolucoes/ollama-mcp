@@ -1,0 +1,30 @@
+﻿backup ok: 10-performance.conf ollama-warm qwen3-ia.Modelfile 
+10:# Contexto 128k (2026-10-26: 4 GPUs de novo, GPU3 em slot direto 00:1c.3 apos manutencao do owner).
+11:Environment="OLLAMA_CONTEXT_LENGTH=131072"
+14:# 4x RTX 3070 (32 GB) por UUID (o indice muda se a topologia PCIe mudar); camadas espalhadas -> 100% GPU.
+16:Environment="CUDA_VISIBLE_DEVICES=GPU-13ce3be3-9fa8-3729-491f-3add358bbf81,GPU-13d97d49-7bdf-79b2-7994-28c4dc0e2ac8,GPU-5f254212-4068-1e03-d590-d5759554409e,GPU-d7166024-7c32-3cb8-6e85-4e9188e933e7"
+15:    -d '{"model":"qwen3-ia","prompt":"hi","stream":false,"think":false,"options":{"num_ctx":131072,"num_predict":1}}' \
+9:PARAMETER num_ctx 131072
+writing manifest [K
+success [K[?25h[?2026l
+num_ctx                        131072
+"total_duration":22118336111
+"load_duration":22018918033
+load_wall_s=22
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL   
+qwen3-ia:latest    76abb4436e7a    25 GB    100% GPU     131072     llamacpp    Forever    
+0, 00000000:01:00.0, 6763 MiB, 8192 MiB, 49
+1, 00000000:03:00.0, 6115 MiB, 8192 MiB, 42
+2, 00000000:05:00.0, 6115 MiB, 8192 MiB, 40
+3, 00000000:06:00.0, 6151 MiB, 8192 MiB, 41
+out 26 12:28:08 ia.cslsolucoes.com.br ollama[4512]: ggml_cuda_init: found 4 CUDA devices (Total VRAM: 31358 MiB):
+out 26 12:28:09 ia.cslsolucoes.com.br ollama[4512]: common_params_fit_impl: projected to use 24425 MiB of device memory vs. 30700 MiB of free device memory
+out 26 12:28:10 ia.cslsolucoes.com.br ollama[4512]: load_tensors: offloaded 49/49 layers to GPU
+out 26 12:28:28 ia.cslsolucoes.com.br ollama[4512]: llama_context: n_ctx                 = 131072
+out 26 12:28:28 ia.cslsolucoes.com.br ollama[4512]: llama_context: n_ctx_seq             = 131072
+out 26 12:28:28 ia.cslsolucoes.com.br ollama[4512]: llama_context: n_ctx_seq (131072) < n_ctx_train (262144) -- the full capacity of the model will not be utilized
+Xid=0
+00:01.0 corr= nonfatal= fatal=
+00:1b.4 corr=3 nonfatal=0 fatal=0
+00:1c.2 corr=3 nonfatal=0 fatal=0
+00:1c.3 corr=0 nonfatal=0 fatal=0

@@ -1,0 +1,8 @@
+﻿2026-10-26 12:53:21
+2026-10-26 12:42:12
+NRestarts=0
+Xid=0
+00:1b.4 corr=8 nonfatal=0 fatal=0
+00:1c.2 corr=0 nonfatal=0 fatal=0
+00:1c.3 corr=0 nonfatal=0 fatal=0
+qwen3-ia:latest    9fd693d7d33f    21 GB    100% GPU     65536      llamacpp    Forever    

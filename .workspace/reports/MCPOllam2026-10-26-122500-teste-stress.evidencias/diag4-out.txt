@@ -1,0 +1,32 @@
+﻿== now/uptime
+2026-10-26 12:38:11
+2026-10-26 12:37:54
+== last
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:37   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:32   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:31   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:29   still running
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:09   still running
+shutdown system down  6.12.0-278.el10. Mon Oct 26 12:07 - 12:09  (00:02)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 18:11 - 12:07 (2+17:55)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:23 - crash  (01:48)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:21 - crash  (00:01)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:20 - crash  (00:01)
+== boots
+IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
+ -4 c7afa42754174408a7f37794049b9422 Mon 2026-10-26 09:09:27 -03 Mon 2026-10-26 12:28:28 -03
+ -3 cc7069c5405947d8866b1116dd6a5e98 Mon 2026-10-26 09:29:34 -03 Mon 2026-10-26 12:30:06 -03
+ -2 c76370f942e948a29828ec639533fd23 Mon 2026-10-26 09:31:11 -03 Mon 2026-10-26 12:31:37 -03
+ -1 532413d5789e49cf91612ac76094df81 Mon 2026-10-26 09:32:48 -03 Mon 2026-10-26 12:33:21 -03
+  0 2997b4fd29a7447583e69770ba136cab Mon 2026-10-26 09:37:55 -03 Mon 2026-10-26 12:38:10 -03
+== messages 12:28-12:40 kernel/nvidia/uvm/aer
+== messages per-port AER count 12:28-12:40
+grep: /var/log/messages: arquivo binário coincide com o padrão
+== last lines of each boot segment
+grep: /var/log/messages: arquivo binário coincide com o padrão
+== ollama now
+active
+0, 00000000:01:00.0, 3, 16, 7 MiB
+1, 00000000:03:00.0, 3, 1, 1 MiB
+2, 00000000:05:00.0, 3, 1, 1 MiB
+3, 00000000:06:00.0, 3, 1, 1 MiB

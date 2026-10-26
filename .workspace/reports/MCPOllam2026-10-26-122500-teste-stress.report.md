@@ -19,8 +19,12 @@
 **O mcpollama passou em tudo, sem nenhum defeito.** O servidor Ollama aguentou 5 prompts de 58.783
 tokens (~90% do contexto) e 3 gerações de 7.000 tokens, sem reboot e sem Xid. Houve **um reboot
 ordenado às 12:07, entre o teste sustentado e o teste no limite**, antes de qualquer prompt grande
-ser enviado. As evidências apontam para uma intervenção manual, mas isso **não está provado**; o
-owner precisa confirmar (pendência 1).
+ser enviado. O owner confirmou que foi a manutenção física dele (pendência 1, fechada).
+
+**Atualização das 12:55 (§6):** a ativação da 4ª GPU com contexto de 131k **foi reprovada**: 5
+reboots em 5 tentativas. A causa é o link PCIe da GPU `03:00.0` (porta `00:1b.4`), **não** a GPU
+reativada. A configuração de 3 GPUs/64k foi restaurada por decisão do owner e validada (58.783
+tokens em 21,9 s, sem reboot), mas continua usando a placa com o link ruim.
 
 ## 1. Stress local com mock (`src/mcpollama-mcp/stress_test.go`, build tag `stress`)
 
@@ -143,8 +147,9 @@ para provar** que o índice 3 de hoje é a mesma placa física. Se outra placa a
 GPU com defeito estaria **em uso**. A nova tentativa sob carga máxima, porém, não teve Xid nem AER
 não-corrigível. Ver pendência 2.
 
-Observação: o `ollama.service` tem duas linhas `Environment="CUDA_VISIBLE_DEVICES=…"` nos drop-ins
-(`0,1,2` e `0,1`). Vale a última, `0,1,2`, mas a duplicata confunde (pendência 5).
+~~Observação: o `ollama.service` tem duas linhas `CUDA_VISIBLE_DEVICES`.~~ **Corrigido às 12:26:** a
+linha `0,1` está só em `10-performance.conf.bak-20261023-002653`, que o systemd **não** lê. Não há
+duplicata ativa; a pendência 5 foi um erro meu de leitura.
 
 ## 4. Achados
 
@@ -159,9 +164,8 @@ Observação: o `ollama.service` tem duas linhas `Environment="CUDA_VISIBLE_DEVI
 
 ## 5. Pendências (numeradas)
 
-1. **Owner:** confirmar se reiniciou ou mexeu no servidor às 12:07. Às 11:54 houve um `sudo su -`
-   interativo vindo de 10.100.2.30. Se não foi o owner, o reboot ordenado precisa ser investigado
-   (quem tinha a shell root).
+1. ~~**Owner:** confirmar se reiniciou ou mexeu no servidor às 12:07.~~ **Fechada:** o owner confirmou
+   que o reboot foi a manutenção física dele na GPU (AskUserQuestion, 12:26: "Sim, fui eu").
 2. **Owner, servidor:** identificar fisicamente a GPU com defeito e passar a excluí-la **pelo UUID**
    (`CUDA_VISIBLE_DEVICES=GPU-…`) em vez do índice. Registrar o UUID no `CONEXAO-IA.md`. Hoje o
    índice 3 é `06:00.0` / `GPU-d7166024-…`.
@@ -170,5 +174,95 @@ Observação: o `ollama.service` tem duas linhas `Environment="CUDA_VISIBLE_DEVI
 4. **Owner, servidor:** tornar o journal persistente de fato (`Storage=persistent` no
    `journald.conf`, depois `systemctl restart systemd-journald` e `journalctl --flush`) e conferir
    com `journalctl --list-boots` depois do próximo reboot.
-5. **Owner, servidor:** remover a linha duplicada `CUDA_VISIBLE_DEVICES=0,1` do drop-in do
-   `ollama.service`.
+5. ~~**Owner, servidor:** remover a linha duplicada `CUDA_VISIBLE_DEVICES=0,1`.~~ **Não procede:** a
+   linha está só no `.bak` (ver §3.4).
+
+## 6. Ativação da 4ª GPU (pedido do owner às 12:24: "ativei a outra placa, pode analisar se ficou ok")
+
+### 6.1 Análise com a configuração ainda em 3 GPUs (12:25, `gpu4-out.txt`)
+
+- **GPU 3 no hardware:** reconhecida (`06:00.0`, UUID `GPU-d7166024-…`), ligada **direto** na root
+  port `00:1c.3`. A ponte `09:07.0`, com 42 AER no histórico, saiu da topologia. A porta `00:1c.3`
+  tinha 0 AER, mas a placa estava ociosa.
+- **No Ollama:** a GPU 3 continuava excluída (`CUDA_VISIBLE_DEVICES=0,1,2`; `found 3 CUDA devices`).
+  Com 3 GPUs, a memória estava no limite (`cannot meet free memory targets ... 737 MiB less`).
+- **Contexto fixado em 3 lugares:** drop-in (`OLLAMA_CONTEXT_LENGTH`), **Modelfile** do `qwen3-ia`
+  (`PARAMETER num_ctx 65536`, que vale sobre a variável de ambiente) e `ollama-warm`
+  (`"num_ctx":65536`).
+- **Decisão do owner (AskUserQuestion):** "4 GPUs e volta a 131072".
+
+### 6.2 Aplicação (12:27, `apply-gpu4-out.txt`)
+
+- **Backup** em `/root/gpu4-backup-20261026/`: drop-in, `ollama-warm` e `qwen3-ia.Modelfile`.
+- **Mudanças:**
+  - `CUDA_VISIBLE_DEVICES` = os 4 UUIDs;
+  - `OLLAMA_CONTEXT_LENGTH=131072`;
+  - Modelfile recriado com `num_ctx 131072` (`ollama create`);
+  - `ollama-warm` com `num_ctx` 131072;
+  - `daemon-reload` e restart do serviço.
+- **Resultado do carregamento:**
+  - `found 4 CUDA devices` (31.358 MiB); previsão de 24.425 MiB para 30.700 MiB livres;
+  - 49/49 camadas, `n_ctx = 131072`, **100% GPU**, GPU 3 com 6.151 MiB;
+  - carga em 22 s; Xid 0.
+
+### 6.3 Validação no limite com 4 GPUs e 131k: **reprovada, 5 reboots**
+
+| Hora | Execução | Resultado |
+| --- | --- | --- |
+| 12:28:52 | `limit-4gpu-128k.txt`, 5 × 307.143 caracteres (~115 mil tokens) + 3 gerações longas, `OLLAMA_TIMEOUT=300s` | 4 chamadas com a conexão cortada (60 / 90 / 105 / 195 s), depois o host inacessível. **Reboots às 12:29, 12:31, 12:32 e 12:37** |
+| 12:41:08 | `limit-4gpu-128k-retry.txt` (o owner pediu "teste novamente"), driver já corrigido | a 1ª chamada teve a conexão cortada em 75 s; **reboot às 12:42**; o driver parou |
+
+**Erro meu de processo:** a 1ª execução causou 4 reboots em vez de 1. A regex que detecta queda no
+driver só reconhecia mensagens em inglês, e os erros do mcpollama são em português ("o servidor
+encerrou a conexão", "não foi possível falar com"). **Solução:** no modo limite, o driver passa a
+parar em **qualquer** erro. Foi o que funcionou às 12:41, quando parou depois de 1 queda.
+
+**Causa, pelo journal (agora persistente; `diag5-out.txt`):**
+
+| Boot que caiu | RxErr na root port `00:1b.4` antes do corte | demais portas |
+| --- | --- | --- |
+| 12:09–12:28:28 | sem registro: o corte veio na 1ª chamada, antes de o journal gravar em disco | só as 3 linhas da partida |
+| 12:29–12:30:06 | **51** (`Physical Layer, RxErr`), até o último segundo | 3 (partida) |
+| 12:31–12:31:37 | 7; **caiu durante `load_tensors`** (carga do modelo, sem prompt) | 3 (partida) |
+| 12:32–12:33:21 | **279**, até o último segundo | 3 (partida) |
+| 12:37–12:40:44 | sem registro: o journal grava a cada 5 min (`SyncIntervalSec` padrão) e o último registro é anterior à chamada de 12:41 | — |
+
+- **A culpada é a GPU `03:00.0`** (índice 1, UUID `GPU-13d97d49-7bdf-79b2-7994-28c4dc0e2ac8`),
+  ligada à root port `00:1b.4` (Intel `8086:06ac`). **Não é a GPU 3** que o owner ativou: a porta
+  dela, `00:1c.3`, não teve nenhum erro em operação.
+- Com 4 GPUs e 131k passam mais dados pelo PCIe (carga das camadas e prefill), e o link de
+  `00:1b.4` cede. Na configuração de 3 GPUs e 64k ele já dava erros corrigíveis (3 às 12:10–12:11).
+
+### 6.4 Restauração (decisão do owner: "Restaurar o backup exato"; 12:52, `restore-out.txt`)
+
+- **Arquivos:** drop-in, `ollama-warm` e Modelfile voltaram ao backup. A versão de 4 GPUs ficou
+  salva como `10-performance.conf.4gpu-131k-falhou`.
+- **Config:** `CUDA_VISIBLE_DEVICES=0,1,2` (índice) e contexto 65536 nos 3 lugares.
+- **Carga:** `found 3 CUDA devices`, 49/49 camadas, `n_ctx = 65536`, 100% GPU, carga em 20 s.
+- **Validação** (`restore-validate.txt`): 1 prompt de 58.783 tokens → **OK em 21,9 s**.
+- **2ª via** (SSH 12:53, `post2-out.txt`): sem reboot (uptime desde 12:42:12), `NRestarts=0`, Xid 0.
+  **`00:1b.4` = 8 erros corrigíveis** depois de uma única carga e um único prompt; `00:1c.2` = 0 e
+  `00:1c.3` = 0.
+
+### 6.5 Achados e pendências desta etapa
+
+- **A5 (risco físico, principal):** o link PCIe da GPU `03:00.0`, na porta `00:1b.4`, está ruim.
+  - Com 4 GPUs e 131k, derruba a máquina sempre (5/5).
+  - Com 3 GPUs e 64k, aguenta, mas acumula RxErr (8 em 1 chamada).
+  - **A configuração restaurada ainda usa essa placa**, por decisão do owner.
+- **A6:** o `ollama-warm` não roda na partida: `nvidia-powercap.service: Found ordering cycle ...
+  Job ollama-warm.service/start deleted`. O modelo só carrega na 1ª chamada.
+- **A7:** o journal agora persiste entre boots (5 boots listados), mas grava em disco a cada 5 min.
+  Os segundos antes de um corte seco se perdem.
+- **Pendências:**
+  - **P7-6 (owner, físico):** trocar o riser ou o slot da GPU `03:00.0` (`GPU-13d97d49-…`, porta
+    `00:1b.4`) e só então revalidar 4 GPUs/131k. O teste de referência é
+    `stressdrv -mode limit -n 5 -prompt-tokens 115000`, que agora para na 1ª queda.
+  - **P7-7 (decisão do owner):** enquanto o reparo não vem, excluir a `03:00.0` e usar `01`, `05` e
+    `06` por UUID com 64k, ou manter a configuração restaurada.
+  - **P7-8 (servidor):** quebrar o ciclo de ordenação `nvidia-powercap` ↔ `ollama-warm`.
+  - **P7-9 (servidor, opcional):** `SyncIntervalSec=10s` no journald, para guardar o fim de um corte seco.
+  - **P7-10:** registrar no `CONEXAO-IA.md` (servidor e cópia local) o mapa UUID ↔ barramento ↔ porta
+    e este episódio. Exige autorização do owner para mexer nos documentos do servidor.
+  - **P7-2 atualizada:** a exclusão por índice continua, e o índice 1 é a placa ruim; quando houver
+    exclusão, fazer por UUID.

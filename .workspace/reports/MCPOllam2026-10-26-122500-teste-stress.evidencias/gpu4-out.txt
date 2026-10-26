@@ -1,0 +1,96 @@
+﻿== now/uptime
+2026-10-26 12:25:00
+2026-10-26 12:09:26
+== boots
+reboot   system boot  6.12.0-278.el10. Mon Oct 26 12:09   still running
+shutdown system down  6.12.0-278.el10. Mon Oct 26 12:07 - 12:09  (00:02)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 18:11 - 12:07 (2+17:55)
+reboot   system boot  6.12.0-278.el10. Fri Oct 23 16:23 - crash  (01:48)
+== nvidia-smi
+0, 00000000:01:00.0, GPU-13ce3be3-9fa8-3729-491f-3add358bbf81, 1, 3, 16, 16, 240.00 W, 39, 7469 MiB, 8192 MiB, 0 %
+1, 00000000:03:00.0, GPU-13d97d49-7bdf-79b2-7994-28c4dc0e2ac8, 1, 3, 1, 16, 240.00 W, 36, 6907 MiB, 8192 MiB, 0 %
+2, 00000000:05:00.0, GPU-5f254212-4068-1e03-d590-d5759554409e, 1, 3, 1, 16, 240.00 W, 36, 6929 MiB, 8192 MiB, 0 %
+3, 00000000:06:00.0, GPU-d7166024-7c32-3cb8-6e85-4e9188e933e7, 1, 3, 1, 16, 240.00 W, 34, 1 MiB, 8192 MiB, 0 %
+== root ports
+/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0
+/sys/devices/pci0000:00/0000:00:1b.4/0000:03:00.0
+/sys/devices/pci0000:00/0000:00:1c.2/0000:05:00.0
+/sys/devices/pci0000:00/0000:00:1c.3/0000:06:00.0
+== ollama unit env
+OLLAMA_KEEP_ALIVE=-1
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_CONTEXT_LENGTH=65536
+OLLAMA_FLASH_ATTENTION=1
+OLLAMA_KV_CACHE_TYPE=q4_0
+OLLAMA_SCHED_SPREAD=1
+CUDA_VISIBLE_DEVICES=0,1,2
+== drop-ins
+1:# /etc/systemd/system/ollama.service
+17:# /etc/systemd/system/ollama.service.d/10-performance.conf
+24:Environment="OLLAMA_NUM_PARALLEL=1"
+28:Environment="OLLAMA_CONTEXT_LENGTH=65536"
+32:Environment="OLLAMA_SCHED_SPREAD=1"
+33:Environment="CUDA_VISIBLE_DEVICES=0,1,2"
+== ollama state
+active
+NRestarts=0
+ActiveEnterTimestamp=Mon 2026-10-26 12:09:36 -03
+== ollama ps
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL   
+qwen3-ia:latest    abf610827d19    21 GB    100% GPU     65536      llamacpp    Forever    
+== ollama log: gpu discovery/offload (this start)
+2026-10-26T12:09:36-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:36.564-03:00 level=INFO source=routes.go:2450 msg="server config" env="map[CUDA_VISIBLE_DEVICES:0,1,2 GGML_VK_VISIBLE_DEVICES: GPU_DEVICE_ORDINAL: HIP_VISIBLE_DEVICES: HSA_OVERRIDE_GFX_VERSION: HTTPS_PROXY: HTTP_PROXY: LLAMA_ARG_FIT: LLAMA_ARG_FIT_TARGET: NO_PROXY: OLLAMA_CONTEXT_LENGTH:65536 OLLAMA_CREATE_REMOTE:false OLLAMA_DEBUG:INFO OLLAMA_DEBUG_LOG_REQUESTS:false OLLAMA_EDITOR: OLLAMA_FLASH_ATTENTION:true OLLAMA_GO_TEMPLATE:true OLLAMA_GPU_OVERHEAD:0 OLLAMA_HOST:http://0.0.0.0:11434 OLLAMA_IGPU_ENABLE: OLLAMA_KEEP_ALIVE:2562047h47m16.854775807s OLLAMA_KV_CACHE_TYPE:q4_0 OLLAMA_LLM_LIBRARY: OLLAMA_LOAD_TIMEOUT:15m0s OLLAMA_MAX_LOADED_MODELS:1 OLLAMA_MAX_QUEUE:8 OLLAMA_MAX_TRANSFER_STREAMS:4 OLLAMA_MODELS:/usr/share/ollama/.ollama/models OLLAMA_NOHISTORY:false OLLAMA_NOPRUNE:false OLLAMA_NO_CLOUD:true OLLAMA_NUM_PARALLEL:1 OLLAMA_ORIGINS:[* http://localhost https://localhost http://localhost:* https://localhost:* http://127.0.0.1 https://127.0.0.1 http://127.0.0.1:* https://127.0.0.1:* http://0.0.0.0 https://0.0.0.0 http://0.0.0.0:* https://0.0.0.0:* app://* file://* tauri://* vscode-webview://* vscode-file://*] OLLAMA_REMOTES:[ollama.com] OLLAMA_SCHED_SPREAD:true OLLAMA_VULKAN:false ROCR_VISIBLE_DEVICES: http_proxy: https_proxy: no_proxy:]"
+2026-10-26T12:09:36-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:36.569-03:00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=3h32m17.931941649s consecutive_failures=0
+2026-10-26T12:09:36-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:36.569-03:00 level=WARN source=runner.go:722 msg="user overrode visible devices" CUDA_VISIBLE_DEVICES=0,1,2
+2026-10-26T12:09:51-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:51.943-03:00 level=INFO source=types.go:32 msg="inference compute" id=1 filter_id=1 library=CUDA compute=8.6 name=CUDA1 description="NVIDIA GeForce RTX 3070" libdirs=ollama,cuda_v13 driver=13.3 pci_id=0000:03:00.0 type=discrete total="7.7 GiB" available="7.5 GiB"
+2026-10-26T12:09:51-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:51.943-03:00 level=INFO source=types.go:32 msg="inference compute" id=2 filter_id=2 library=CUDA compute=8.6 name=CUDA2 description="NVIDIA GeForce RTX 3070" libdirs=ollama,cuda_v13 driver=13.3 pci_id=0000:05:00.0 type=discrete total="7.7 GiB" available="7.5 GiB"
+2026-10-26T12:09:51-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:51.943-03:00 level=INFO source=types.go:32 msg="inference compute" id=0 filter_id=0 library=CUDA compute=8.6 name=CUDA0 description="NVIDIA GeForce RTX 3070" libdirs=ollama,cuda_v13 driver=13.3 pci_id=0000:01:00.0 type=discrete total="7.7 GiB" available="7.5 GiB"
+2026-10-26T12:09:51-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:51.943-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="23.0 GiB" default_num_ctx=4096
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:53.481-03:00 level=INFO source=sched.go:665 msg="gpu memory" id=0 library=CUDA available="7.0 GiB" free="7.5 GiB" minimum="457.0 MiB" overhead="0 B"
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:53.481-03:00 level=INFO source=sched.go:665 msg="gpu memory" id=1 library=CUDA available="7.0 GiB" free="7.5 GiB" minimum="457.0 MiB" overhead="0 B"
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: time=2026-10-26T12:09:53.481-03:00 level=INFO source=sched.go:665 msg="gpu memory" id=2 library=CUDA available="7.0 GiB" free="7.5 GiB" minimum="457.0 MiB" overhead="0 B"
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: ggml_cuda_init: found 3 CUDA devices (Total VRAM: 23518 MiB):
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]:   Device 0: NVIDIA GeForce RTX 3070, compute capability 8.6, VMM: yes, VRAM: 7840 MiB
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]:   Device 1: NVIDIA GeForce RTX 3070, compute capability 8.6, VMM: yes, VRAM: 7839 MiB
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]:   Device 2: NVIDIA GeForce RTX 3070, compute capability 8.6, VMM: yes, VRAM: 7839 MiB
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: load_backend: loaded CUDA backend from /usr/local/lib/ollama/cuda_v13/libggml-cuda.so
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: cmn  common_param: device_info:
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: cmn  common_param:   - CUDA0   : NVIDIA GeForce RTX 3070 (7840 MiB, 7671 MiB free)
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: cmn  common_param:   - CUDA1   : NVIDIA GeForce RTX 3070 (7839 MiB, 7676 MiB free)
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: cmn  common_param:   - CUDA2   : NVIDIA GeForce RTX 3070 (7839 MiB, 7676 MiB free)
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: cmn  common_param: system_info: n_threads = 6 (n_threads_batch = 6) / 12 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | REPACK = 1 | CUDA : ARCHS = 750,800,860,870,890,900,1000,1030,1100,1200,1210 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 |
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: cmn  common_init_: fitting params to device memory ...
+2026-10-26T12:09:53-03:00 ia.cslsolucoes.com.br ollama[1799]: common_params_fit_impl: getting device memory data for initial parameters:
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_memory_breakdown_print: |   - CUDA0 (RTX 3070)   |  7840 = 7671 + (7249 =  6145 +     612 +     492) +       -7080 |
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_memory_breakdown_print: |   - CUDA1 (RTX 3070)   |  7839 = 7676 + (6709 =  5660 +     576 +     472) +       -6546 |
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_memory_breakdown_print: |   - CUDA2 (RTX 3070)   |  7839 = 7676 + (6730 =  5718 +     540 +     472) +       -6567 |
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_params_fit_impl:   - CUDA0 (NVIDIA GeForce RTX 3070):   7840 total,   7249 used,    421 free vs. target of   1024
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_params_fit_impl:   - CUDA1 (NVIDIA GeForce RTX 3070):   7839 total,   6709 used,    967 free vs. target of   1024
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_params_fit_impl:   - CUDA2 (NVIDIA GeForce RTX 3070):   7839 total,   6730 used,    945 free vs. target of   1024
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_params_fit_impl: projected to use 20689 MiB of device memory vs. 23024 MiB of free device memory
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_params_fit_impl: cannot meet free memory targets on all devices, need to use 737 MiB less in total
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 999, abort
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 3070) (0000:01:00.0) - 7671 MiB free
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: llama_prepare_model_devices: using device CUDA1 (NVIDIA GeForce RTX 3070) (0000:03:00.0) - 7676 MiB free
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: llama_prepare_model_devices: using device CUDA2 (NVIDIA GeForce RTX 3070) (0000:05:00.0) - 7676 MiB free
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: print_info: n_ctx_train           = 262144
+2026-10-26T12:09:54-03:00 ia.cslsolucoes.com.br ollama[1799]: print_info: n_ctx_orig_yarn       = 262144
+2026-10-26T12:10:04-03:00 ia.cslsolucoes.com.br ollama[1799]: load_tensors: offloading output layer to GPU
+2026-10-26T12:10:04-03:00 ia.cslsolucoes.com.br ollama[1799]: load_tensors: offloading 47 repeating layers to GPU
+2026-10-26T12:10:04-03:00 ia.cslsolucoes.com.br ollama[1799]: load_tensors: offloaded 49/49 layers to GPU
+2026-10-26T12:10:04-03:00 ia.cslsolucoes.com.br ollama[1799]: load_tensors:        CUDA0 model buffer size =  6145.23 MiB
+== kernel since boot: Xid/NVRM/AER
+0
+6
+2026-10-26T12:10:27-03:00 kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical
+2026-10-26T12:11:14-03:00 kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical
+2026-10-26T12:11:18-03:00 kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical
+2026-10-26T12:14:04-03:00 kernel: pcieport 0000:00:1c.2: PCIe Bus Error: severity=Correctable, type=Physical
+2026-10-26T12:14:35-03:00 kernel: pcieport 0000:00:1c.2: PCIe Bus Error: severity=Correctable, type=Physical
+2026-10-26T12:16:23-03:00 kernel: pcieport 0000:00:1c.2: PCIe Bus Error: severity=Correctable, type=Physical
+== AER counters per gpu port
+0000:00:1b.4 corr=3 nonfatal=0 fatal=0
+0000:00:1c.2 corr=3 nonfatal=0 fatal=0
+0000:00:1c.3 corr=0 nonfatal=0 fatal=0
+0000:00:1c.4 corr=0 nonfatal=0 fatal=0
+0000:00:1d.0 corr=0 nonfatal=0 fatal=0

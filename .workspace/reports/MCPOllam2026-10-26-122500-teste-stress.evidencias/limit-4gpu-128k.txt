@@ -1,0 +1,22 @@
+﻿SRV-STDERR mcpollama 0.5.0-19c3b8c ready (stdio)
+SRV-STDERR file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_chunks=40; the text of files under the roots is sent to the Ollama server
+SRV-STDERR method=initialize status=ok dur=523.5µs
+SRV-STDERR method=notifications/initialized status=notification dur=0s
+INIT ok modo=limit inicio=12:28:52.483
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=1m0.0665393s
+CALL modo=limit idx=0 tool=generate tamanho_prompt_chars=307143 inicio=12:28:52.500 wall_ms=60072 isError=true erro="o servidor encerrou a conexão após 1m0.1s sem resposta; o servidor Ollama pode estar reiniciando ou carregando o modelo (carga a frio ~36 s), ou o prompt é g..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=1m30.0565939s
+CALL modo=limit idx=1 tool=generate tamanho_prompt_chars=307143 inicio=12:29:52.573 wall_ms=90062 isError=true erro="o servidor encerrou a conexão após 1m30.1s sem resposta; o servidor Ollama pode estar reiniciando ou carregando o modelo (carga a frio ~36 s), ou o prompt é ..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=1m45.0516695s
+CALL modo=limit idx=2 tool=generate tamanho_prompt_chars=307143 inicio=12:31:22.637 wall_ms=105056 isError=true erro="o servidor encerrou a conexão após 1m45s sem resposta; o servidor Ollama pode estar reiniciando ou carregando o modelo (carga a frio ~36 s), ou o prompt é gr..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=3m15.1209342s
+CALL modo=limit idx=3 tool=generate tamanho_prompt_chars=307143 inicio=12:33:07.695 wall_ms=195124 isError=true erro="o servidor encerrou a conexão após 3m15.1s sem resposta; o servidor Ollama pode estar reiniciando ou carregando o modelo (carga a frio ~36 s), ou o prompt é ..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0453898s
+CALL modo=limit idx=4 tool=generate tamanho_prompt_chars=307143 inicio=12:36:22.821 wall_ms=21049 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0556254s
+CALL modo=limit idx=5 tool=generate tamanho_prompt_chars=131 inicio=12:36:43.871 wall_ms=21055 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.0535682s
+CALL modo=limit idx=6 tool=generate tamanho_prompt_chars=131 inicio=12:37:04.927 wall_ms=21054 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SRV-STDERR method=tools/call tool=generate status=tool_error dur=21.048551s
+CALL modo=limit idx=7 tool=generate tamanho_prompt_chars=131 inicio=12:37:25.981 wall_ms=21048 isError=true erro="não foi possível falar com https://ia.cslsolucoes.com.br:8443: dial tcp 10.100.2.2:8443: connectex: Uma tentativa de conexão falhou porque o componente conec..." uso=
+SUMMARY total=8 ok=0 isError=8 erros_protocolo=0 wall_ms_p50=21055 p95=195124 max=195124 prompt_eval_count_soma=0 eval_count_soma=0 tok_s_agregado_relogio=0.0 tok_s_por_chamada_wall=0.0 queue_ms_max=0 load_ms_max=0 ping_n=0 ping_erros=0 ping_ms_p50=0 ping_ms_max=0 duracao_total_s=534.5

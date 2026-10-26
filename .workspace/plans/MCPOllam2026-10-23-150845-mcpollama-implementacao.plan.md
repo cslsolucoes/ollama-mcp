@@ -823,3 +823,43 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7-3 (decisão opcional):** contar o `--timeout` só a partir da saída da fila;
   - **P7-4:** journal persistente (`Storage=persistent`);
   - **P7-5:** remover a linha duplicada `CUDA_VISIBLE_DEVICES=0,1` do drop-in do `ollama.service`.
+
+### 2026-10-26 12:55 — ativação da 4ª GPU (pedido do owner: "ativei a outra placa, pode analisar se ficou ok")
+- **Análise inicial (12:25):**
+  - A GPU 3 (`06:00.0`, `GPU-d7166024-…`) estava ligada direto na porta `00:1c.3`, com 0 AER, mas o Ollama ainda a excluía.
+  - O contexto estava fixado em 3 lugares: drop-in, Modelfile `num_ctx` e `ollama-warm`.
+- **Decisões do owner (AskUserQuestion):**
+  - "4 GPUs e volta a 131072";
+  - o reboot de 12:07 foi a manutenção física dele (**P7-1 fechada**);
+  - depois da 1ª falha: "teste novamente";
+  - depois da 2ª falha: "Restaurar o backup exato".
+- **Execução:**
+  1. **Aplicação (12:27):**
+     - backup em `/root/gpu4-backup-20261026/`;
+     - 4 UUIDs, 131072 nos 3 lugares;
+     - carga OK: 4 GPUs, 100% GPU, 22 s.
+  2. **Teste no limite (5 × ~115 mil tokens), duas execuções:** reboots às 12:29, 12:31, 12:32, 12:37 e 12:42, ou seja, **5/5 quedas**.
+  3. **Journal (agora persistente):** enxurrada de RxErr na porta **`00:1b.4` = GPU `03:00.0` (`GPU-13d97d49-…`)**, com 51 e 279 eventos até o corte. Um dos reboots aconteceu durante a carga do modelo, sem prompt.
+  4. **Restauração (12:52):**
+     - backup exato aplicado: índices 0,1,2 e 64k;
+     - validação com 1 prompt de 58.783 tokens: OK em 21,9 s;
+     - 2ª via: sem reboot, Xid 0, mas **`00:1b.4` com 8 AER corrigíveis** depois de 1 chamada.
+- **Deu certo:**
+  - a GPU reativada (`06:00.0`) está sã;
+  - a restauração voltou a um estado estável;
+  - o journal persistente permitiu provar a porta culpada.
+- **Não deu certo:**
+  - 4 GPUs/131k é inviável enquanto o link `00:1b.4` não for reparado;
+  - **erro meu:** o driver só reconhecia erros de conexão em inglês e não parou na 1ª queda, o que causou 3 reboots a mais. **Solução:** no modo limite, o driver para em qualquer erro (confirmado às 12:41).
+- **Correção de um erro meu:** a "linha duplicada `CUDA_VISIBLE_DEVICES=0,1`" (P7-5) estava só no `.bak` e nunca esteve ativa. A P7-5 não procede.
+- **Artefatos:**
+  - relatório `MCPOllam2026-10-26-122500-teste-stress.report.md` §6;
+  - evidências: 18 arquivos novos em `.evidencias/`;
+  - varredura de segredos: `known_hits=0` (a ocorrência genérica já analisada é falso positivo).
+- **Pendências:**
+  - **P7-6:** reparo físico do link da GPU `03:00.0` (porta `00:1b.4`);
+  - **P7-7:** decisão sobre excluir a `03:00.0` por UUID até o reparo;
+  - **P7-8:** ciclo de ordenação `nvidia-powercap` ↔ `ollama-warm` (o warm não roda na partida);
+  - **P7-9:** journald `SyncIntervalSec` curto;
+  - **P7-10:** registrar o mapa UUID/barramento/porta e o episódio no `CONEXAO-IA.md`, com autorização do owner;
+  - **P7-2** continua aberta: a exclusão é por índice, e o índice 1 é a placa ruim.

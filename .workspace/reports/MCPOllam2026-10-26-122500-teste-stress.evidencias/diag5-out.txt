@@ -1,0 +1,97 @@
+﻿===== boot -4: last kernel lines matching GPU/PCIe
+2026-10-26T09:09:28-03:00 localhost kernel: r8169 0000:07:00.0 eth0: RTL8168h/8111h, 24:4b:fe:9a:4d:85, XID 541, IRQ 129
+2026-10-26T12:09:30-03:00 localhost kernel: NVRM: loading NVIDIA UNIX Open Kernel Module for x86_64  610.57.04  Release Build  (root@localhost.localdomain)  qui 22 out 2026 15:14:02 -03
+2026-10-26T12:10:27-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:10:27-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:11:14-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:11:14-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:11:18-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:11:18-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:14:04-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1c.2: AER: Correctable error message received from 0000:00:1c.2
+2026-10-26T12:14:04-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1c.2: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:14:35-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1c.2: AER: Correctable error message received from 0000:00:1c.2
+2026-10-26T12:14:35-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1c.2: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:16:23-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1c.2: AER: Correctable error message received from 0000:00:1c.2
+2026-10-26T12:16:23-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1c.2: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+-- count by source
+     15 pcieport 0000:00:1b.4:
+     15 pcieport 0000:00:1c.2:
+      3 pcieport 0000:00:1c.3:
+      3 pcieport 0000:00:1c.4:
+      3 pcieport 0000:00:1d.0:
+-- very last 4 lines of boot
+2026-10-26T12:28:28-03:00 ia.cslsolucoes.com.br ollama[4512]: sched_reserve: graph: nodes = 3609, splits = 5, input objects = 4, input tensors = 11
+2026-10-26T12:28:28-03:00 ia.cslsolucoes.com.br ollama[4512]: sched_reserve: reserve took 167.44 ms, sched copies = 4
+2026-10-26T12:28:28-03:00 ia.cslsolucoes.com.br ollama[4512]: cmn          init: llama threadpool init, n_threads = 6
+2026-10-26T12:28:28-03:00 ia.cslsolucoes.com.br ollama[4512]: cmn  common_init_: warming up the model with an empty run - please wait ... (--no-warmup to disable)
+===== boot -3: last kernel lines matching GPU/PCIe
+2026-10-26T12:29:55-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:29:55-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:29:56-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:29:56-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:29:59-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:29:59-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:30:00-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:30:00-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:30:01-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:30:01-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:30:04-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:30:04-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:30:06-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:30:06-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+-- count by source
+     51 pcieport 0000:00:1b.4:
+      3 pcieport 0000:00:1c.2:
+      3 pcieport 0000:00:1c.3:
+      3 pcieport 0000:00:1c.4:
+      3 pcieport 0000:00:1d.0:
+-- very last 4 lines of boot
+2026-10-26T12:30:06-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:30:06-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:30:06-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4:   device [8086:06ac] error status/mask=00000001/00002000
+2026-10-26T12:30:06-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4:    [ 0] RxErr                  (First)
+===== boot -2: last kernel lines matching GPU/PCIe
+2026-10-26T09:31:11-03:00 localhost kernel: NMI watchdog: Enabled. Permanently consumes one hw-PMU counter.
+2026-10-26T09:31:12-03:00 localhost kernel: r8169 0000:07:00.0 eth0: RTL8168h/8111h, 24:4b:fe:9a:4d:85, XID 541, IRQ 129
+2026-10-26T12:31:14-03:00 localhost kernel: NVRM: loading NVIDIA UNIX Open Kernel Module for x86_64  610.57.04  Release Build  (root@localhost.localdomain)  qui 22 out 2026 15:14:02 -03
+2026-10-26T12:31:19-03:00 localhost.localdomain kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:31:19-03:00 localhost.localdomain kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+-- count by source
+      7 pcieport 0000:00:1b.4:
+      3 pcieport 0000:00:1c.2:
+      3 pcieport 0000:00:1c.3:
+      3 pcieport 0000:00:1c.4:
+      3 pcieport 0000:00:1d.0:
+-- very last 4 lines of boot
+2026-10-26T12:31:37-03:00 ia.cslsolucoes.com.br ollama[1808]: print_info: EOG token             = 151663 '<|repo_name|>'
+2026-10-26T12:31:37-03:00 ia.cslsolucoes.com.br ollama[1808]: print_info: EOG token             = 151664 '<|file_sep|>'
+2026-10-26T12:31:37-03:00 ia.cslsolucoes.com.br ollama[1808]: print_info: max token length      = 256
+2026-10-26T12:31:37-03:00 ia.cslsolucoes.com.br ollama[1808]: load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+===== boot -1: last kernel lines matching GPU/PCIe
+2026-10-26T12:33:19-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:19-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:19-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:19-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:20-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:20-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:20-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:20-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:20-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:20-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+-- count by source
+    279 pcieport 0000:00:1b.4:
+      3 pcieport 0000:00:1c.2:
+      3 pcieport 0000:00:1c.3:
+      3 pcieport 0000:00:1c.4:
+      3 pcieport 0000:00:1d.0:
+-- very last 4 lines of boot
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: AER: Correctable error message received from 0000:00:1b.4
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4: PCIe Bus Error: severity=Correctable, type=Physical Layer, (Receiver ID)
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4:   device [8086:06ac] error status/mask=00000001/00002000
+2026-10-26T12:33:21-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4:    [ 0] RxErr                  (First)
+===== now
+inactive
