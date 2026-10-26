@@ -27,7 +27,8 @@ interno, TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/red
 vivo ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama` ou `./tools`,
 uma chamada de cada vez).
 **Fase 5:** o foco é o **Claude Code** (decisão do owner, 2026-10-24). O servidor se chama
-**`mcpOllama`** no `.mcp.json` da raiz (escopo de projeto, fora do git; token literal) e já
+**`mcpOllama`** no `.mcp.json` da raiz (escopo de projeto, fora do git; executável `D:\MCP\mcpollama-mcp.exe`; token como argumento
+`--api-key`) e já
 foi validado nele; Cursor (`.cursor/mcp.json`) e VS Code (`.vscode/mcp.json`) estão
 configurados, mas a validação neles é opcional.
 **Fase 6 (medição):** resumir um arquivo de ~72 mil caracteres com `summarize_file` custou
@@ -61,14 +62,16 @@ Se falhar por falta de privilégios de Administrador: informar e **parar**.
 
 ## Comandos
 
-Os fontes ficam em `src/`; o **executável fica na raiz** do projeto (`E:\MCPOllam\mcpollama-mcp.exe`),
-que é o caminho registrado nos clientes MCP. Binários não são versionados.
+Os fontes ficam em `src/`; o **executável fica em `D:\MCP\mcpollama-mcp.exe`** (junto dos outros
+servidores MCP da CSL, decisão do owner de 2026-10-26), que é o caminho registrado nos clientes
+MCP. Binários não são versionados. Se o servidor estiver aberto num cliente, o `go build` renomeia
+o `.exe` em uso para `.exe~`; apague-o depois de reiniciar o cliente.
 
 ```powershell
 # dentro de src/
 go build ./...                                          # compila tudo
-go build -o ..\mcpollama-mcp.exe ./mcpollama-mcp        # binário Windows → raiz
-$env:GOOS='linux'; go build -o ..\mcpollama-mcp ./mcpollama-mcp; Remove-Item Env:GOOS   # binário Linux → raiz
+go build -ldflags "-X main.Version=<versao>" -o D:\MCP\mcpollama-mcp.exe ./mcpollama-mcp   # binário Windows → D:\MCP
+$env:GOOS='linux'; go build -o D:\MCP\mcpollama-mcp ./mcpollama-mcp; Remove-Item Env:GOOS   # binário Linux → D:\MCP
 go vet ./...
 go test ./...                                           # suíte completa
 go test ./tools -run TestNomeDoTeste -v                 # um teste
@@ -77,12 +80,12 @@ go test -count=1 ./...                                  # sem cache de teste (va
 $env:PATH="E:\MCPOllam\deps\gcc-mingw-w64\bin;$env:PATH"; $env:CC="gcc"; $env:CGO_ENABLED='1'; go test -race -count=1 ./...; Remove-Item Env:CC,Env:CGO_ENABLED
 ```
 
-Smoke test do protocolo (stdio), sem cliente MCP, a partir da raiz:
+Smoke test do protocolo (stdio), sem cliente MCP:
 
 ```powershell
-.\mcpollama-mcp.exe --version
+D:\MCP\mcpollama-mcp.exe --version
 '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}',
-'{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | .\mcpollama-mcp.exe --ollama-url https://ia.cslsolucoes.com.br:8443 --tls-ca <pem>
+'{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | D:\MCP\mcpollama-mcp.exe --ollama-url https://ia.cslsolucoes.com.br:8443 --tls-ca <pem>
 ```
 
 Plano de implementação (fases, estado e changelog): `.workspace/plans/MCPOllam*-mcpollama-implementacao.plan.md`.
@@ -106,7 +109,8 @@ src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao
 ```
 
 - **Configuração:** flags com fallback para variável de ambiente, como em `TruenasMcp`/`mcpvmware-mcp`:
-  `--ollama-url`/`OLLAMA_HOST`, `--api-key`/`OLLAMA_API_KEY` (preferir a env; sem `--api-key-file`),
+  `--ollama-url`/`OLLAMA_HOST`, `--api-key`/`OLLAMA_API_KEY` (nas configs dos clientes o token vai como argumento `--api-key`,
+  decisão do owner de 2026-10-26; sem `--api-key-file`),
   `--tls-ca`/`OLLAMA_TLS_CA`, `--insecure`/`OLLAMA_INSECURE`, `--model`/`OLLAMA_MODEL`
   (default `qwen3-ia`), `--embed-model`/`OLLAMA_EMBED_MODEL` (default `nomic-embed-text`),
   `--allowed-models`/`MCPOLLAMA_ALLOWED_MODELS` (default fixo `qwen3-ia;nomic-embed-text`: **só

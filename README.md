@@ -65,10 +65,11 @@ Exemplo (Claude Code / Cursor), no mesmo molde do `mcpvmware-mcp` e do `TruenasM
 {
   "mcpServers": {
     "mcpOllama": {
-      "command": "E:\\MCPOllam\\mcpollama-mcp.exe",
+      "command": "D:\\MCP\\mcpollama-mcp.exe",
       "args": ["--ollama-url", "https://ia.cslsolucoes.com.br:8443",
-               "--tls-ca", "C:\\Users\\<user>\\.openclaude\\certs\\cloudflare-origin-ca.pem"],
-      "env": { "OLLAMA_API_KEY": "<token — ver nota de segurança>" }
+               "--tls-ca", "D:\\Users\\<user>\\.openclaude\\certs\\cloudflare-origin-ca.pem",
+               "--allow-root", "E:\\MCPOllam",
+               "--api-key", "<token — ver nota de segurança>"]
     }
   }
 }
@@ -76,8 +77,11 @@ Exemplo (Claude Code / Cursor), no mesmo molde do `mcpvmware-mcp` e do `TruenasM
 
 > **Segurança:** o Bearer token **nunca** vai para o git, logs ou chat. A fonte está
 > no servidor (`/root/API-Key`, 2ª linha) e já existe uma cópia local para o OpenClaude
-> em `%USERPROFILE%\.openclaude\csl-ollama.env`. Quando possível, prefira variável de
-> ambiente a `args`. `.mcp.json` com segredo fica no `.gitignore`.
+> em `%USERPROFILE%\.openclaude\csl-ollama.env`. Por decisão do owner (2026-10-26), o
+> token vai como **argumento** (`--api-key`) nas configs dos clientes. Cuidado: `args`
+> aparecem na lista de processos da máquina. `.mcp.json`, `.cursor/mcp.json` e
+> `.vscode/mcp.json` com o token ficam no `.gitignore`. O executável fica em
+> **`D:\MCP\`**, junto dos outros servidores MCP da CSL, e não na pasta do projeto.
 
 ## 3. Arquitetura alvo (molde MCPVMWare / MCPNas)
 
@@ -96,7 +100,7 @@ src/
 | Flag | Env | Default |
 | --- | --- | --- |
 | `--ollama-url` | `OLLAMA_HOST` | — (sem default; o erro vem por chamada, a partir da Fase 2) |
-| `--api-key` | `OLLAMA_API_KEY` | — (Bearer do nginx; prefira a env: `args` aparecem na lista de processos) |
+| `--api-key` | `OLLAMA_API_KEY` | — (Bearer do nginx; nas configs dos clientes vai como argumento, decisão do owner; `args` aparecem na lista de processos) |
 | `--tls-ca` | `OLLAMA_TLS_CA` | — (PEM da Cloudflare Origin CA) |
 | `--insecure` | `OLLAMA_INSECURE` | `false` (gera WARNING a cada start) |
 | `--model` | `OLLAMA_MODEL` | `qwen3-ia` |

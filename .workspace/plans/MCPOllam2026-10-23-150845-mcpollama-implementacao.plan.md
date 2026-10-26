@@ -773,3 +773,20 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   4. Cópia local `D:\...\.ssh\.workspace\Backup\ia\CONEXAO-IA.md` sincronizada (md5 igual ao do servidor). Os 2 `OLLAMA-SETUP*` existem só no servidor.
 - **Ressalva:** o `OLLAMA-SETUP-DETALHADO.md` tinha fim de linha misto (420 CRLF e 13 LF), e a edição normalizou tudo para CRLF. Não afeta a leitura; o original está no backup.
 - **Pendência (4) da lista acima, copiar o `CONEXAO-IA.md` para `/root`:** **fechada.**
+- **Commit:** `4b98b34`.
+
+### 2026-10-26 11:50 — token como argumento e executável em `D:\MCP` (decisões do owner)
+- **Decisões (ordem direta do owner):**
+  1. "OLLAMA_API_KEY tem que ser um argumento do executável": o token passa de `env` para `--api-key` nos `args` das configs dos clientes. O código já aceitava `--api-key`; nada mudou em `src/`. A P-1 continua: sem `--api-key-file`.
+  2. "o exe não vai ficar na pasta do projeto, vai ficar aqui D:\MCP": o executável passa a ser `D:\MCP\mcpollama-mcp.exe`, junto de `mcpvmware-mcp.exe` e `TruenasMcp.exe`, que já estavam lá.
+- **INCIDENTE (do owner, registrado sem o valor):** ao colar o `.mcp.json` no chat, o owner expôs o **token do Ollama em texto puro** na conversa. **Recomendação: rotacionar o token** (fonte `/root/API-Key` 2ª linha, cópia do nginx `/etc/nginx/ollama/api-key` e o mapa `auth.conf`; nos clientes, o `csl-ollama.env` e as 3 configs). **Pendência P6-1.**
+- **Feito:**
+  - nas 3 configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`), por script, sem exibir o token: `--api-key <token>` acrescentado aos `args`, `env` removido e `command` = `D:\MCP\mcpollama-mcp.exe`. Conferido: JSON válido, 8 args, o `--api-key` seguido do token, sem `env`, o `command` existe, e os 3 continuam ignorados pelo git;
+  - binário copiado para `D:\MCP\` (md5 igual ao da raiz; `--version` = `0.5.0-19c3b8c`);
+  - **teste real** (`claude -p --mcp-config .mcp.json --strict-mcp-config`, Haiku): `list_models` → "Instalados (2):", exit 0. O token, passado por argumento, autenticou (sem 401); token na saída: 0. Antes do `D:\MCP`, o mesmo teste também passou com o binário da raiz.
+- **Docs:**
+  - `README.md`: exemplo de config com `command` em `D:\MCP`, `--allow-root` e `--api-key` nos `args`; nota de segurança (decisão do owner, o risco da lista de processos e as 3 configs no `.gitignore`); linha `--api-key` da tabela;
+  - `CLAUDE.md`: local do executável, build com `-o D:\MCP\...` (Windows e Linux), smoke a partir de `D:\MCP`, nota do `.exe~`, Fase 5 e lista de flags.
+- **Pendências:**
+  - **P6-1:** rotacionar o token do Ollama;
+  - **P6-2:** depois de reiniciar o Claude Code, que hoje ainda roda o binário da raiz, apagar o `E:\MCPOllam\mcpollama-mcp.exe` antigo, que deixa de ser usado.
