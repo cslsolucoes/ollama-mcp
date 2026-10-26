@@ -297,3 +297,91 @@ parar em **qualquer** erro. Foi o que funcionou às 12:41, quando parou depois d
   - `CUDA_VISIBLE_DEVICES=0,1,2,3` inclui todas as placas, então a mudança de índice deixa de ser
     risco enquanto as 4 estiverem em uso. A P7-2 fica suspensa;
   - o `ollama-warm` (`num_ctx 65536`) e o Modelfile (`num_ctx 65536`) estão coerentes com o drop-in.
+
+## 8. Limite de potência e carga máxima contínua (pedidos do owner às 13:19 e 13:23)
+
+### 8.1 Potência de 170 W para 200 W ("aumente 170w para 200w e repita os testes")
+
+- **Estado encontrado** (`pl-read-out.txt`):
+  - `nvidia-powercap.service` aplica `-pl 170` nas 4 GPUs. O owner tinha mudado de 240 W para
+    170 W às 12:57, com o comentário "pos Xid 79 ... na placa PCI 01:00 sob carga a 240W";
+  - faixa da placa: mínimo 100 W, padrão 220 W, máximo 240 W.
+- **Aplicação** (`pl-apply-out.txt`): backup `.170w`, `-pl 200`, `daemon-reload` e restart da unit.
+  Resultado: 200 W nas 4 GPUs.
+- **Teste** (`w200-limit.txt`, `power-200w.csv`):
+  - o 1º prompt de 58.783 tokens começou a carregar às 13:20:26;
+  - no único ponto de carga gravado (13:20:30), as GPUs estavam em **178 + 159 + 156 + 151 ≈ 644 W**;
+  - em seguida, **corte seco e reboot às 13:21** (`diag7-out.txt`);
+  - o último registro do journal é de 13:20:20, sem Xid e sem AER. O driver parou na 1ª queda.
+- **Inferência (não provada):** um corte instantâneo, sem erro registrado, no salto de potência
+  indica a **fonte (PSU) desarmando**. Com 170 W, o mesmo teste tinha passado 8/8.
+- **Decisão do owner (AskUserQuestion):** "Voltar a 170 W e repetir".
+
+### 8.2 Erro meu na reversão: unit esvaziada (vista como "mascarada")
+
+- **O que aconteceu:**
+  - o backup `.170w`, criado às 13:20, uns 10 s antes do corte, ficou com **0 bytes** depois do
+    reboot: o XFS ainda não tinha gravado o conteúdo em disco;
+  - a reversão copiou esse arquivo vazio por cima da unit, e o systemd passou a tratá-la como
+    `masked` (`pl-state-out.txt`);
+  - eu atribuí o mascaramento ao owner antes de investigar; **estava errado**.
+- **Solução** (`pl-fix-out.txt`):
+  - unit recriada a partir da cópia íntegra de 200 W, com `-pl 170` e o comentário de volta;
+  - `sync`, `daemon-reload` e restart → `loaded`/`enabled`, **170 W nas 4 GPUs**;
+  - backup `.170w` regravado (670 bytes);
+  - a busca por arquivos zerados nas últimas 4 h encontrou só 2 arquivos de sistema que normalmente
+    ficam vazios (`tuned`, `foomatic`). Os arquivos editados hoje estão íntegros.
+- **Lição:** depois de gravar no servidor, rodar `sync`; antes de restaurar um backup, conferir o
+  tamanho dele.
+
+### 8.3 Carga máxima contínua por 10 min a 170 W ("repita o teste de stress por 10 min forçando ao máximo")
+
+- **Cadeia interrompida:** a cadeia limite → rajada → sustentado a 170 W tinha passado 1 prompt de
+  58,8 mil tokens, com carga a frio de 32 s. Foi interrompida para dar lugar a este teste.
+- **Modo `max`** criado no driver: 2 workers mandam prompts **únicos** (nonce) de ~58 mil tokens sem
+  intervalo, com `num_predict` 256. Sempre há uma chamada na fila e o prefill fica contínuo. Para na
+  1ª falha.
+- **Resultado** (`w170-max10m.txt`): **22 chamadas OK** de 13:27 a 13:31, com ~20 s de prefill e
+  ~20 s de fila cada. A 23ª teve a conexão cortada. **Reboot às 13:32**, depois de **~5 min** de
+  carga máxima (`diag8-out.txt`).
+- **Potência e temperatura** (`power-170w.csv`, 60 amostras de 13:27:04 a 13:31:59):
+
+| GPU | W máx. | W média | °C máx. |
+| --- | --- | --- | --- |
+| 0 (`01:00`) | 167,2 | 146,9 | **88** |
+| 1 (`03:00`, porta `00:1b.4`) | 155,0 | 131,6 | 70 |
+| 2 (`05:00`) | 158,1 | 135,8 | 83 |
+| 3 (`06:00`) | 151,7 | 133,8 | 70 |
+| **Soma das GPUs** | **623,5** | **548,1** | — |
+
+- **Kernel antes do corte** (`diag8-out.txt`):
+  - **42 linhas de AER corrigível na porta `00:1b.4`**, em frequência crescente. Inclui
+    `Data Link Layer` e `Multiple Correctable`, não só `Physical Layer`;
+  - 0 Xid; 0 erros não-corrigíveis;
+  - o journal do Ollama vai até 13:31:48, com o prefill a 85% e ~4.000 tok/s; depois, corte seco.
+- **Leitura:**
+  - **4 GPUs com 64k a 170 W aguenta uso real**, com intervalos entre chamadas (8/8 no limite, 148
+    chamadas no sustentado de 3 GPUs);
+  - **não aguenta carga máxima contínua**: caiu em ~5 min com ~550 W médios só nas GPUs, sem
+    contar CPU e placa-mãe;
+  - o padrão é "cai instantâneo a ~644 W, cai em minutos a ~550 W, aguenta com intervalos". Isso é
+    compatível com uma **fonte no limite**, por sobrecorrente ou sobretemperatura;
+  - o link `00:1b.4` piorando sob carga é um 2º suspeito. Os dois sobem juntos com a carga e **não
+    dá para separar** sem um teste que isole um deles;
+  - a GPU 0 chegou a **88 °C**, perto do limite de throttling da RTX 3070 (~93 °C).
+
+### 8.4 Pendências desta etapa
+
+- **P8-1 (owner):** informar a potência e o modelo da fonte, para confirmar ou descartar a hipótese
+  de PSU.
+- **P8-2 (decisão):** teste que isole a causa:
+  - (a) 4 GPUs a ~130 W (~450 W) por 10 min: menos potência, com a `00:1b.4` incluída;
+  - (b) 3 GPUs sem a `03:00.0` a 170 W por 10 min: sem o link ruim, ~450 W.
+  - Se (a) passar e (b) também, a potência é o fator principal. Se (a) cair e (b) passar, a causa é
+    o link `00:1b.4`.
+- **P8-3:** a refrigeração da GPU 0 (88 °C) merece atenção.
+- **P7-6 continua:** reparo físico do link `00:1b.4`.
+- **Estado do servidor às 13:33:**
+  - no ar desde 13:32:25, com 170 W, 4 GPUs e 64k;
+  - **sem modelo carregado**, porque o `ollama-warm` não roda na partida (P7-8);
+  - em uso normal, com intervalos, o histórico de hoje é estável; em carga máxima contínua, cai.

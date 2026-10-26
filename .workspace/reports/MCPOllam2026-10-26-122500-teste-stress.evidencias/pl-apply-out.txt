@@ -1,0 +1,11 @@
+﻿10:# Power limit 200W nas 4 GPUs (owner 2026-10-26 13:19; era 170W); SEM locked clocks (deixa o clock gerir-se = menor stress/pico).
+11:ExecStart=/bin/bash -c 'for i in $(nvidia-smi --query-gpu=index --format=csv,noheader); do nvidia-smi -i "$i" -pm 1; nvidia-smi -i "$i" -pl 200; nvidia-smi -i "$i" -rgc; done'
+Result=success
+ActiveState=active
+0, 00000000:01:00.0, 200.00 W, 200.00 W, 16.73 W
+1, 00000000:03:00.0, 200.00 W, 200.00 W, 15.13 W
+2, 00000000:05:00.0, 200.00 W, 200.00 W, 12.81 W
+3, 00000000:06:00.0, 200.00 W, 200.00 W, 17.15 W
+NeedDaemonReload=no
+NeedDaemonReload=no
+qwen3-ia:latest    abf610827d19    23 GB    100% GPU     65536      llamacpp    Forever    

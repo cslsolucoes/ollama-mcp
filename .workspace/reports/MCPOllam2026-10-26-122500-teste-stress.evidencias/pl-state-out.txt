@@ -1,0 +1,39 @@
+﻿2026-10-26 13:22:18
+ls: não foi possível acessar '/run/systemd/system/nvidia-powercap.service': Arquivo ou diretório inexistente
+-rw-r--r--. 1 root root    0 out 26 12:57 /etc/systemd/system/nvidia-powercap.service
+
+/root/gpu4-backup-20261026/:
+total 28
+-rw-r--r--. 1 root root   882 out 23 19:14 10-performance.conf
+-rw-r--r--. 1 root root  1086 out 26 12:27 10-performance.conf.4gpu-131k-falhou
+-rw-r--r--. 1 root root     0 out 26 12:57 nvidia-powercap.service.170w
+-rw-r--r--. 1 root root   705 out 26 13:20 nvidia-powercap.service.200w-falhou
+-rwxr-xr-x. 1 root root   571 out 26 11:38 ollama-warm
+-rw-r--r--. 1 root root 11881 out 26 12:27 qwen3-ia.Modelfile
+masked
+LoadState=masked
+ActiveState=active
+FragmentPath=/etc/systemd/system/nvidia-powercap.service
+UnitFileState=masked
+0, 200.00 W, 200.00 W, 8.04 W
+1, 200.00 W, 200.00 W, 6.84 W
+2, 200.00 W, 200.00 W, 6.14 W
+3, 200.00 W, 200.00 W, 7.47 W
+-rw-r--r--. 1 root root   0 out 26 12:57 /etc/systemd/system/nvidia-powercap.service
+-rw-r--r--. 1 root root 273 out 26 11:38 /etc/systemd/system/ollama-warm.service
+-rw-r--r--. 1 root root 410 out 23 13:39 /etc/systemd/system/gpu-fan.service
+-rw-r--r--. 1 root root 248 out 23 00:46 /etc/systemd/system/cloudflared-update.service
+-rw-r--r--. 1 root root 307 out 23 00:46 /etc/systemd/system/cloudflared.service
+2026-10-26T13:21:00-03:00 localhost systemd[1]: multi-user.target: Found ordering cycle on ollama-warm.service/start; has dependency on nvidia-powercap.service/start, multi-user.ta
+2026-10-26T13:21:07-03:00 ia.cslsolucoes.com.br systemd[1]: iscsi.service: Unit cannot be reloaded because it is inactive.
+2026-10-26T13:21:07-03:00 ia.cslsolucoes.com.br systemd[1]: iscsi.service: Unit cannot be reloaded because it is inactive.
+2026-10-26T13:21:07-03:00 ia.cslsolucoes.com.br rsyslogd[1828]: imjournal: journal files changed, reloading...  [v8.2604.0-6.el10 try https://www.rsyslog.com/e/0 ]
+2026-10-26T13:21:09-03:00 ia.cslsolucoes.com.br kernel: pcieport 0000:00:1b.4:   device [8086:06ac] error status/mask=00000001/00002000
+2026-10-26T13:21:13-03:00 ia.cslsolucoes.com.br systemd[1]: Starting nvidia-powercap.service - NVIDIA GPU power cap for stable 4-GPU inference (240W MAX post-riser-fix)...
+2026-10-26T13:21:14-03:00 ia.cslsolucoes.com.br systemd[1]: Finished nvidia-powercap.service - NVIDIA GPU power cap for stable 4-GPU inference (240W MAX post-riser-fix).
+2026-10-26T13:21:30-03:00 ia.cslsolucoes.com.br sshd-session[3287]: Accepted publickey for root from 10.100.2.30 port 63215 ssh2: RSA SHA256:jYknPMxjuomnVBLJCqWMWTcdbOJlI6uZBhKtXYd
+2026-10-26T13:22:05-03:00 ia.cslsolucoes.com.br sshd-session[3373]: Accepted publickey for root from 10.100.2.30 port 52793 ssh2: RSA SHA256:jYknPMxjuomnVBLJCqWMWTcdbOJlI6uZBhKtXYd
+2026-10-26T13:22:05-03:00 ia.cslsolucoes.com.br systemd[1]: Reload requested from client PID 3427 ('systemctl') (unit session-3.scope)...
+2026-10-26T13:22:05-03:00 ia.cslsolucoes.com.br systemd[1]: Reloading...
+2026-10-26T13:22:05-03:00 ia.cslsolucoes.com.br systemd[1]: Reloading finished in 175 ms.
+2026-10-26T13:22:18-03:00 ia.cslsolucoes.com.br sshd-session[3496]: Accepted publickey for root from 10.100.2.30 port 55796 ssh2: RSA SHA256:jYknPMxjuomnVBLJCqWMWTcdbOJlI6uZBhKtXYd

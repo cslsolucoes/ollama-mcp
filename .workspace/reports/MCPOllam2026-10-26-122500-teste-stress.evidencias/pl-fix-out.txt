@@ -1,0 +1,21 @@
+﻿-rw-r--r--. 1 root root 670 out 26 13:22 /etc/systemd/system/nvidia-powercap.service
+-rw-r--r--. 1 root root 670 out 26 13:22 /root/gpu4-backup-20261026/nvidia-powercap.service.170w
+10:# Power limit 170W nas 4 GPUs; SEM locked clocks (deixa o clock gerir-se = menor stress/pico).
+11:ExecStart=/bin/bash -c 'for i in $(nvidia-smi --query-gpu=index --format=csv,noheader); do nvidia-smi -i "$i" -pm 1; nvidia-smi -i "$i" -pl 170; nv
+LoadState=loaded
+UnitFileState=enabled
+Result=success
+ActiveState=active
+0, 170.00 W, 170.00 W
+1, 170.00 W, 170.00 W
+2, 170.00 W, 170.00 W
+3, 170.00 W, 170.00 W
+== zero-length files changed in last 4h
+/etc/tuned/post_loaded_profile
+/etc/foomatic/hashes.d/hashes.new
+== sizes of today-edited files
+-rw-r--r--. 1 root root 884 out 26 12:57 /etc/systemd/system/ollama.service.d/10-performance.conf
+-rw-r--r--. 1 root root 273 out 26 11:38 /etc/systemd/system/ollama-warm.service
+-rwxr-xr-x. 1 root root 571 out 26 11:38 /usr/local/bin/ollama-warm
+Environment="OLLAMA_CONTEXT_LENGTH=65536"
+Environment="CUDA_VISIBLE_DEVICES=0,1,2,3"

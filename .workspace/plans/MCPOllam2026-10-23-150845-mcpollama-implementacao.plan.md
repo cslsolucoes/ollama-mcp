@@ -879,3 +879,34 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7-2** suspensa: com as 4 GPUs em uso, a exclusão por índice não é risco;
   - **P7-8, P7-9 e P7-10** continuam.
 - **Artefatos:** relatório §7; 9 evidências novas.
+
+### 2026-10-26 13:35 — potência (170→200→170 W) e carga máxima contínua por 10 min (pedidos do owner)
+- **200 W** (13:20):
+  - corte seco no 1º prompt pesado (~644 W nas GPUs), reboot às 13:21, sem Xid nem AER;
+  - inferência: fonte no limite (não provada);
+  - decisão do owner: voltar a 170 W.
+- **Erro meu:**
+  - o backup `.170w`, feito ~10 s antes do corte, ficou com 0 bytes (gravação do XFS perdida no
+    corte). A reversão o copiou e esvaziou a unit, que o systemd viu como `masked`;
+  - também atribuí o mascaramento ao owner antes de investigar, e estava errado;
+  - **solução:** unit recriada a partir da cópia íntegra, `sync`, 170 W em vigor, backup regravado.
+    Os demais arquivos editados hoje estão íntegros.
+- **Teste máximo de 10 min a 170 W** (modo `max` novo no driver: 2 workers, prompts únicos de ~58
+  mil tokens, sem intervalo):
+  - 22 chamadas OK; **reboot às 13:32, depois de ~5 min**;
+  - GPUs com média de 548 W e pico de 624 W; GPU 0 a 88 °C;
+  - 42 linhas de AER corrigível na `00:1b.4`, em frequência crescente, com `Data Link Layer` e
+    `Multiple`; 0 Xid.
+- **Deu certo:**
+  - o driver agora para na 1ª falha, e encerrei o worker restante para não carregar o servidor
+    recém-reiniciado;
+  - o monitor de potência gravou a evidência até o corte.
+- **Não deu certo:** a configuração atual (4 GPUs, 64k, 170 W) **não aguenta carga máxima
+  contínua**. Ela aguenta uso real, com intervalos entre as chamadas.
+- **Pendências:**
+  - **P8-1:** potência e modelo da PSU;
+  - **P8-2:** teste para isolar a causa (4 GPUs a 130 W **ou** 3 GPUs sem a `03:00.0` a 170 W);
+  - **P8-3:** refrigeração da GPU 0;
+  - **P7-6** e **P7-8** continuam.
+- **Artefatos:** relatório §8; 18 evidências novas (incluindo `power-200w.csv`, `power-170w.csv` e
+  `w170-max10m.txt`).
