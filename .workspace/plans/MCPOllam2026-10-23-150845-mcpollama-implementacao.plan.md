@@ -1242,3 +1242,34 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
      - aceite com `--allow-root "A:\Monitor\CSL Telecom\Contratos"` (unidade de rede: se o guard recusar, para e registra);
      - **numeração conferida por 2ª via no Word via COM** (`ListFormat.ListString`), só contando acertos, sem conteúdo.
 - **Regra do owner mantida:** cada agente acrescenta a sua linha no §12 do brief (`7.7a`, `7.7b`) ao concluir.
+
+### 2026-10-28 15:52 — 7.7b concluída: testes ao vivo + aceite com os contratos reais (agente Sonnet)
+- **Report:** `.workspace/reports/MCPOllam2026-10-28-155000-fase7-ao-vivo-aceite.report.md`. Só métricas: o loop principal conferiu 0 CPF, CNPJ, "R$", nomes de arquivo originais e token.
+- **Binário:** HEAD `ce8d248`, num caminho temporário (não `D:\MCP`). Uma chamada por vez, 0 HTTP 429, modelo residente. Os tempos podem estar inflados pelo fuzz paralelo.
+- **Ao vivo:**
+  - PDF: 5 chamadas, de 1,9 a 15,3 s de parede;
+  - DOCX: 3 chamadas, de 5,3 a 7,7 s;
+  - **recusas 4/4 corretas** (2 digitalizados e 2 com senha, de 7 a 70 ms, mensagens opacas);
+  - `paginas=` igual ao PyMuPDF em 4/4.
+  - 1ª chamada de PDF por processo: **+8,9 s** com o cache vazio (que ela preenche), **+7,7 s** sem cache, **+0,6 s** com o cache preenchido. Depois disso, a extração leva de 91 a 148 ms (PDF) e de 65 a 114 ms (DOCX).
+- **Aceite §7.7, todos os itens passaram:**
+  - a raiz de rede `A:\Monitor\CSL Telecom\Contratos` (`\\WN-DC03\Financeiro`) **foi aceita pelo guard**, sem afrouxar nada;
+  - `summarize_file` em DOCX: OK;
+  - `extract` de cláusulas: OK;
+  - **numeração conferida por 2ª via no Word 16 via COM** (`ListFormat.ListString`, somente leitura e invisível):
+    - **d01: 83/83**;
+    - **d02: 83/84** (o 84º é um parágrafo numerado vazio, sem texto a alinhar);
+    - os marcadores saem como `- `, conforme o brief;
+  - PDF com texto: `paginas=9`, igual à referência;
+  - PDF digitalizado e `.doc`: recusas do §6.
+- **Defeitos de produção:** nenhum.
+- **Observações:**
+  - a linha `[arquivo]` traz `nome=` (o nome do arquivo). Isso não é novidade: quem chama já mandou o `path` completo, então não é vazamento novo. Registrado para o owner;
+  - **não há `.pptx` no acervo**: PPTX validado só com fixtures sintéticas;
+  - o agente não leu o resumo para conferir se ele cita as cláusulas certas (sigilo); a numeração entregue ao modelo foi conferida;
+  - o `Quit` do Word falhou no PowerShell 5.1, e o agente encerrou os 2 `WINWORD` dele com `Stop-Process`, sem salvar nada.
+- **Dados de cliente fora do git** (ignorados, conferido):
+  - `.workspace/spike-pdf/docx/` e `mapa-docx.txt`;
+  - **`.workspace/spike-pdf/numchk/`, com texto extraído e JSON do Word, ou seja, conteúdo de cliente.**
+- **Pendência:**
+  - **P7.7-2:** apagar `numchk/` (e, ao fim da fase, decidir se o corpus `spike-pdf/` fica ou sai).
