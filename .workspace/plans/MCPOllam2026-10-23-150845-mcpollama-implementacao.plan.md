@@ -1328,3 +1328,31 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
      - **md5 idêntico na cópia local e no servidor** (`c6f115c0…`); perms 600; backup local `.bak-20261028`.
      - **Erro meu:** usei de novo uma função chamada `R`, que é **alias de `Invoke-History`** no PowerShell (armadilha já registrada nesta sessão), e as substituições não foram aplicadas. Restaurei do backup e refiz com `Rep1`: 10/10 aplicadas.
   - **Observação:** o servidor tinha reiniciado em **2026-10-27 às 12:04**, fora desta sessão.
+
+### 2026-10-28 16:30 — 7.7a concluída: revisão adversarial (Opus) + decisões do owner sobre as correções
+- **Report e testes de ataque:** `.workspace/reports/MCPOllam2026-10-28-161147-revisao-adversarial-fase7.report.md` + `.testes/` (testes de ataque, 7 diffs de correção + `fase7-todas.diff`, logs de gate). Commit `e7b05be`; `src/` ficou limpo (conferido).
+- **176 vetores:** 92 BLOQUEADO, 30 FIEL, 34 INFO, 10 ACHADO, **10 SILENCIOSO**, **0 ESCAPOU**. Nada vazou; o servidor ficou de pé em todos.
+- **Achados:**
+  - **Altos:**
+    - **A1:** DOCX de 1,2 KB → ~1 GiB alocado (pico de 293 MiB). O `lvlText` é copiado em cada parágrafo numerado e, dentro de tabela, não conta no teto;
+    - **A2:** PDF de 33 KB rodou 16 a 29 s com `--timeout` de 2 s e +2,9 a 5,4 GiB, porque o `ctx` só é checado entre páginas e não há teto de memória do WASM; ele também bloqueia os outros PDFs.
+  - **Médios (texto que some em silêncio):**
+    - **M1:** `fldChar` desbalanceado apaga o resto da parte;
+    - **M2:** `w:altChunk` descartado;
+    - **M3:** `numbering.xml` quebrado ou com mais de 100 mil elementos → toda a numeração some.
+  - **Baixos:**
+    - **B1:** nome de parte com outra caixa pula cabeçalho e notas;
+    - **B2:** cabeçalho apontando para `document.xml` duplica o corpo;
+    - **B3:** slide repetido no `sldIdLst` duplica (100 mil repetições = 15 a 24 s de CPU);
+    - **B4:** PPTX perde o `Fallback` sem `Choice`;
+    - **B5:** timeout no PPTX com mensagem em inglês;
+    - **B6:** a junção de hífen no PDF apaga hífens reais ("obriga-se" → "obrigase").
+  - Determinismo OK (DOCX e PPTX 50×, PDF 20×).
+- **Correções provadas numa cópia:** suíte verde, 0 SILENCIOSO, 0 ESCAPOU; A1 com pico de 0,4 a 6 MiB; A2 parando em 2,0 s com +223 a 440 MiB.
+- **Não testado:** limite de 4 GiB do WASM; Office real nos casos-limite; calibração no corpus real; `-race` nos testes de ataque; binário Linux.
+- **Decisões do owner (AskUserQuestion, 16:28):**
+  1. **aplicar A1 + A2 + M1 + B1–B5 + P7.7-3** (falso positivo de revisões), com o teto do A2 calibrado no corpus real;
+  2. **M2:** avisar no rodapé (`conteudo_importado=sim`; extrair texto, HTML ou DOCX importado; se não suportado, `[aviso]`);
+  3. **M3:** avisar no rodapé (`numeracao=indisponivel`);
+  4. **B6:** manter sempre o hífen real (só juntar o soft-hyphen `\x02` do PDFium); **texto oculto entra rotulado `[oculto]`**.
+- **Execução:** o agente Opus da revisão foi retomado para aplicar em `src/` em 2 passos (1: correções provadas + calibração; 2: M2, M3, B6 e texto oculto), com commit e gate do loop principal entre os passos.
