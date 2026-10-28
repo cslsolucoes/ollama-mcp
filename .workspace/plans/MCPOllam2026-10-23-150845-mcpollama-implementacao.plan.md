@@ -1439,3 +1439,38 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **Desvio:** a DLL 5.3.3 não exporta OSD. Com conf < 60, faz uma 2ª passada girada 180° (cabeça para baixo recuperada; 90° já é lido direto).
   - **Verificação do loop principal no worktree:** suíte verde, `CGO_ENABLED=0 go build ./...` OK, `GOOS=linux` (`ocr` e `main`) OK, `go mod tidy -diff` vazio.
 - **Em execução:** 7.9b (integração do OCR, agente Opus).
+
+### 2026-10-28 19:06 — 7.9b concluída + binário 0.7.0 + OCR ligado nos clientes + limpeza do corpus
+- **7.9b (agente Opus; commit `9f09aaa`):**
+  - 9 flags `--ocr-*`: `lib`, `lib-sha256`, `tessdata` (padrão `<dir da DLL>\tessdata\best`), `workers` (4 nesta máquina), `page-timeout` (60 s), `max-pages` (30), `max-mem` (1 GiB), `max-megapixels` (40), `dpi` (300);
+  - qualquer problema → `WARNING: OCR disabled` e o servidor sobe sem OCR;
+  - modo interno `--ocr-worker`, tratado antes de flags e env; o worker nunca vê o `--api-key`;
+  - **PDF:** OCR só nas páginas sem texto, em paralelo e em ordem;
+    - marcadores `[página N — OCR conf=..]`, baixa confiança (menos de 60), `girada=180`, falhou e tempo esgotado;
+    - página branca pulada por triagem a 50 dpi; dpi reduzido por megapixels;
+  - **imagens `.png`/`.jpg`:** `DecodeConfig` antes de decodificar; a bomba PNG de 100.000×100.000 foi recusada com 1,2 KB alocados;
+  - **saída:** rodapé com `paginas_ocr`, `conf_ocr_media`, `paginas_ocr_falhas` (e `_nao_processadas`) + `[aviso]` de conferência;
+  - o `doctext` continua sem importar `ocr` (o OCR entra por `Limits.OCR`).
+  - **Ataques:** Fase 4, 0 ESCAPOU; Fase 7, 166 vetores (8 de imagem novos), 0 ESCAPOU e 0 SILENCIOSO. Erro do agente, corrigido: um fixture JPEG incompleto dava falso ESCAPOU.
+  - **Aceite (agente, só métricas):**
+    - 26 páginas OCR em 7 PDFs, 0 falhas, conf de 54 a 92 (média 88);
+    - o08: 12 páginas em 18,8 s;
+    - **3/3 valores conferidos** contra a imagem (página do owner);
+    - **limitação:** 4 de 11 linhas de tabela sobre fundo sombreado sumiram, inclusive o total, e um símbolo de moeda saiu trocado.
+  - **Verificação do loop principal (worktree limpo):** suíte verde + **tag `ocr` com a DLL real** verde; `TOOLS.md` in sync; budget full **7.800/7.800** (sem folga), base 4.400.
+  - **Report:** `.workspace/reports/MCPOllam2026-10-28-183855-fase7-9-ocr.report.md` (sigilo conferido: as ocorrências de nome de arquivo eram genéricas).
+- **Binário 0.7.0-9f09aaa** (23.032.320 B; `CGO_ENABLED=0`, `-trimpath`, worktree em `9f09aaa`):
+  - smoke com hash certo: `OCR enabled: Tesseract 5.3.3, lang por, models best, workers 4`; com hash errado: `WARNING: OCR disabled…` e as tools seguem;
+  - **partida medida (com o fuzz ocupando a CPU):**
+    - sem OCR, `initialize` em 124 a 212 ms (a 1ª execução levou 21,5 s: varredura do antivírus no `.exe` novo, confirmado pela repetição);
+    - **com OCR, 0,7 a 3,6 s até o `initialize` e 3 a 8,6 s para encerrar** (espera a sonda). O agente afirmou que a sonda não atrasava o handshake, e isso não se confirmou. **P7.9-1:** medir de novo sem carga e, se o atraso persistir, tirar o trabalho síncrono da partida.
+- **Instalação em `D:\MCP\`:**
+  - **o `Remove-Item` foi bloqueado pela proteção da pasta** (correto). Instalado só com renomeação e cópia: o 0.6.0 virou `mcpollama-mcp-0.6.0.exe~`, e o `.exe~` (0.5.x) continua lá;
+  - **pendência do owner:** apagar os 2 `.exe~` depois de reiniciar os clientes.
+- **Aceite final do §11.9 (contrato digitalizado c07, driver local, sem o conteúdo sair da máquina):** `extract` de partes, CPF/CNPJ, valor e data → `paginas_ocr=9 conf_ocr_media=91 paginas_ocr_falhas=0` + `[aviso]` presente; JSON de 891 caracteres **não exibido**; 75 s (OCR + 13,6 s de modelo).
+- **Docs** (agente Sonnet; commit `8451449`): as 9 flags, a seção OCR, marcadores, rodapé, limites e limitações no README e no `CLAUDE.md`. O agente corrigiu um número que eu tinha passado (best de 4,5 a 6,7 s por página, conforme o report).
+- **Decisões do owner (AskUserQuestion, ~19:00):**
+  - **OCR ligado no MCPOllam e no GestorERP:** `--ocr-lib` + `--ocr-lib-sha256` inseridos antes do `--api-key`, sem exibir o token, backup no scratchpad, JSON válido com 14 args;
+  - **validação pelo Claude Code** nos 2 projetos (o08, 12 páginas): `paginas_ocr=12 conf_ocr_media=90 paginas_ocr_falhas=0` + `[aviso]` + OK;
+  - **corpus apagado:** `.workspace\spike-pdf\` (287 arquivos, 208,7 MB), mais os arquivos do driver de aceite no scratchpad que guardavam nomes originais de contratos (10 arquivos). Nenhum documento sobrou.
+- **Erro meu:** o cabeçalho "18:57" de uma mensagem foi estimado (o real era ~18:55).
