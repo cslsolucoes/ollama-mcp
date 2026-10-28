@@ -1287,3 +1287,44 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **jobs assíncronos** (padrão `tasks/` do `TruenasMcp`);
   - OCR com a `libtesseract64.so` (reabre a D-10);
   - junta-se à pendência "tool de inventariar pasta" (brief §9). Exige revisão de segurança própria.
+
+### 2026-10-28 16:20 — decisões do owner (pendências) + rodada 2 do aceite + ajustes no servidor
+- **Decisões (AskUserQuestion, 16:10–16:12):**
+  1. **Dados de cliente:** apagar o texto extraído já; o corpus fica até o fim da Fase 7.
+     - Feito: apagados `numchk/` (9 arquivos), `owner-out/` (12) e `extall/` (4).
+     - `out/` e `out_prev/` foram conferidos (204 JSON, só métricas, nenhum campo de texto) e ficam.
+  2. **7.8 aprovada:** binário 0.6.0 em `D:\MCP\` + `--pdf-cache-dir D:\MCP\cache\pdfium` nos `.mcp.json` do MCPOllam e do GestorERP, quando a 7.7 fechar verde.
+  3. **D-7:** OCR **opt-in** por `--ocr-lib` + `--ocr-lib-sha256`.
+  4. **D-11:** modelo de OCR **`best` por padrão**. A medição best × fast da 7.9 fica só como registro.
+  5. **Projeto jurídico:** "não, o caminho será informado no contexto, nada hardcode". Nada é preparado em `.mcp.json` de projeto jurídico.
+     - **Implicação técnica a levar ao owner na 7.8:** o servidor só lê dentro do `--allow-root`; um caminho "informado no contexto" só funciona se estiver numa raiz permitida.
+     - Alternativa a avaliar: suportar `roots` do protocolo MCP (raízes declaradas pelo cliente).
+  6. **Servidor:** os 3 ajustes autorizados.
+- **Rodada 2 do aceite** (documentos do owner em `Documents`; commit `9148331`; agente Sonnet):
+  - **PPTX real conferido com o PowerPoint (COM):**
+    - `Slides.Count` 9 = 9 e 150 = 150;
+    - ocultos 1 = 1; com notas 144 = 144;
+    - **razão de palavras por slide: 1,000** em todos os 146 slides com texto.
+  - **DOCX:** numeração 22/22 com o Word; palavras 2.449 (Word) contra 2.539 (nossa extração), razão 1,037 por causa dos marcadores.
+  - **PDF:** `paginas=` igual ao PyMuPDF em 4/4 (550, 338, 15, 14).
+  - **Ao vivo:**
+    - livro de 550 páginas resumido em 10 partes e 11 chamadas, **192,8 s**, sem estourar o `--timeout` de 120 s, que vale por chamada;
+    - PPTX de 43 MB recusado por tamanho (teto de 32 MiB);
+    - DOCX vazio recusado.
+  - **Achado menor:** `revisoes_pendentes=sim` falso positivo num DOCX com `<w:ins/>` **vazio** dentro de `w:numPr` (modelo da Microsoft de 1999); o Word conta 0 revisões.
+    - É conservador (erra para o lado de "não fechado").
+    - Correção sugerida: só sinalizar `w:ins` com conteúdo. **P7.7-3**, junto com as correções da revisão adversarial.
+  - **Observação:** a tool levou 192,8 s no total. Confirmar se o cliente MCP (Claude Code) aceita esse tempo numa chamada só; antes, 87 s foram validados. **P7.7-4**.
+- **Servidor (SSH; backups em `/root/srv-backup-20261028/`):**
+  1. **Ciclo `nvidia-powercap` ↔ `ollama-warm`:**
+     - causa: `After=multi-user.target` no powercap + `ollama-warm After=powercap` + `multi-user` esperando o warm;
+     - correção: `After=nvidia-persistenced.service` (gravação atômica + `sync`);
+     - **`systemd-analyze verify default.target`: 2 ciclos → 0**; `systemctl start ollama-warm` → `Result=success` (286 ms, modelo residente).
+     - A prova no boot real fica para o próximo reboot.
+  2. **journald:** drop-in `/etc/systemd/journald.conf.d/10-sync.conf` (`Storage=persistent`, `SyncIntervalSec=10s`), conferido com `systemd-analyze cat-config`; `systemd-journald` reiniciado.
+  3. **`CONEXAO-IA.md`:**
+     - 10 trechos desatualizados corrigidos: 3 → 4 GPUs, 240 → 150 W, `MAX_LOADED_MODELS=2`, base `qwen3-coder` recriada, warm, checklist e resumo;
+     - nova seção "2026-10-26/28": mapa UUID ↔ barramento ↔ porta, link `00:1b.4`, histórico de potência e reboots, ajustes de 28/10;
+     - **md5 idêntico na cópia local e no servidor** (`c6f115c0…`); perms 600; backup local `.bak-20261028`.
+     - **Erro meu:** usei de novo uma função chamada `R`, que é **alias de `Invoke-History`** no PowerShell (armadilha já registrada nesta sessão), e as substituições não foram aplicadas. Restaurei do backup e refiz com `Rep1`: 10/10 aplicadas.
+  - **Observação:** o servidor tinha reiniciado em **2026-10-27 às 12:04**, fora desta sessão.
