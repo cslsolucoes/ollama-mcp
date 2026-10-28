@@ -10,9 +10,9 @@ import (
 // text: CRLF and lone CR become LF, a leading BOM is dropped, invalid UTF-8 is
 // replaced by U+FFFD (and counted), and control characters other than \n and
 // \t are removed. If more than 1% of the resulting runes are U+FFFD the text
-// is refused with ReasonCorruptText, whose message is the PDF one of the brief
-// ("fontes sem mapeamento de caracteres"): that symptom comes from PDF fonts
-// without ToUnicode, and the wording is kept exactly as specified.
+// is refused with ReasonCorruptText. Its message is the PDF one of the brief
+// ("fontes sem mapeamento de caracteres", the symptom of PDF fonts without
+// ToUnicode) unless Extract records a DOCX/PPTX format in the error.
 func NormalizeText(s string) (string, error) {
 	s = strings.TrimPrefix(s, "\xef\xbb\xbf")
 	var b strings.Builder

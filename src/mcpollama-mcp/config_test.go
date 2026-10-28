@@ -43,7 +43,7 @@ func TestEnvFallback(t *testing.T) {
 		"MCPOLLAMA_TRACE": "t.log", "MCPOLLAMA_AUDIT_LOG": "a.log",
 	})
 	want := Config{OllamaURL: "https://h.invalid:8443", APIKey: "k", TLSCA: "ca.pem", Insecure: true, Model: "m",
-		EmbedModel: "e", Timeout: 90 * time.Second, MaxPromptChars: 1000, MaxLineBytes: 2048, MaxFileBytes: 4096, MaxChunks: 40,
+		EmbedModel: "e", Timeout: 90 * time.Second, MaxPromptChars: 1000, MaxLineBytes: 2048, MaxFileBytes: 4096, MaxDocBytes: defaultMaxDocBytes, MaxChunks: 40,
 		Debug: true, ToolsVerbosity: "compact", TraceFile: "t.log", AuditLogPath: "a.log"}
 	if c != want {
 		t.Fatalf("got  %+v\nwant %+v", c, want)
@@ -260,5 +260,42 @@ func TestAllowedModelsMustContainDefaults(t *testing.T) {
 	code := realMain([]string{"--allowed-models", "outro"}, func(string) string { return "" }, strings.NewReader(""), &out, &errb)
 	if code != 2 || !strings.Contains(errb.String(), "não está na lista de modelos permitidos") {
 		t.Fatalf("exit=%d stderr=%q", code, errb.String())
+	}
+}
+
+func TestDocFlags(t *testing.T) {
+	// defaults: 32 MiB for documents, no PDF cache (nothing written to disk)
+	c := parse(t, nil, nil)
+	if c.MaxDocBytes != 33554432 || c.PDFCacheDir != "" {
+		t.Fatalf("defaults: doc=%d cache=%q", c.MaxDocBytes, c.PDFCacheDir)
+	}
+	abs := filepath.Join(t.TempDir(), "wasm-cache")
+	// env
+	c = parse(t, nil, map[string]string{"MCPOLLAMA_MAX_DOC_BYTES": "1000", "MCPOLLAMA_PDF_CACHE_DIR": abs})
+	if c.MaxDocBytes != 1000 || c.PDFCacheDir != abs {
+		t.Fatalf("env: %+v", c)
+	}
+	if err := c.validate(); err != nil {
+		t.Fatal(err)
+	}
+	// the flag wins over the env
+	c = parse(t, []string{"--max-doc-bytes", "2000", "--pdf-cache-dir", abs}, map[string]string{"MCPOLLAMA_MAX_DOC_BYTES": "1000"})
+	if c.MaxDocBytes != 2000 || c.PDFCacheDir != abs {
+		t.Fatalf("flag: %+v", c)
+	}
+	// invalid
+	if _, err := parseConfig(nil, env(map[string]string{"MCPOLLAMA_MAX_DOC_BYTES": "lots"}), &bytes.Buffer{}); err == nil {
+		t.Error("a non-numeric MCPOLLAMA_MAX_DOC_BYTES should fail")
+	}
+	for _, mut := range []func(*Config){
+		func(c *Config) { c.MaxDocBytes = 0 },
+		func(c *Config) { c.MaxDocBytes = -5 },
+		func(c *Config) { c.PDFCacheDir = "relative/cache" },
+	} {
+		bad := parse(t, nil, nil)
+		mut(&bad)
+		if bad.validate() == nil {
+			t.Errorf("%+v should fail validation", bad)
+		}
 	}
 }

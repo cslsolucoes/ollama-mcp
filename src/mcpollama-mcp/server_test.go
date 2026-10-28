@@ -20,7 +20,7 @@ func testConfig() Config {
 	return Config{
 		Model: defaultModel, EmbedModel: defaultEmbedModel, Timeout: defaultTimeout,
 		MaxPromptChars: defaultMaxPromptChars, MaxLineBytes: defaultMaxLineBytes,
-		MaxFileBytes: defaultMaxFileBytes, ToolsVerbosity: "full", Version: "test",
+		MaxFileBytes: defaultMaxFileBytes, MaxDocBytes: defaultMaxDocBytes, ToolsVerbosity: "full", Version: "test",
 	}
 }
 

@@ -34,6 +34,10 @@ const (
 	ReasonTooLarge
 	ReasonBinary
 	ReasonEncoding
+	// ReasonDocument: the document extractor refused the file (content that
+	// does not match the extension, password, legacy format, no text, limits).
+	// The message is the extractor's own, already user-safe.
+	ReasonDocument
 )
 
 // Refusal is the error of every rejected request. Its message is addressed to

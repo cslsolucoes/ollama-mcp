@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/mcp"
 	"github.com/cslsoftwares/mcpollama/ollama"
 )
@@ -60,6 +61,9 @@ type fileTask struct {
 	mapTask    func(i, n int) string
 	reduceTask string // empty when concat
 	concat     bool
+	// docNotice is appended after the footer when the file was a document
+	// (translate: the result is text, no document is written).
+	docNotice string
 }
 
 func (d Deps) summarizeFileTool() mcp.ToolEntry {
@@ -67,7 +71,7 @@ func (d Deps) summarizeFileTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "summarize_file",
 			Title: "Summarize a file with the local model",
-			Description: "Summarizes a text file read on the server; the file text never enters your context. " +
+			Description: "Summarizes a text (UTF-8), .docx, .pptx or .pdf file read on the server; the file text never enters your context. " +
 				"Large files are split and combined automatically. The answer ends with a [uso] line.",
 			InputSchema: objectSchema([]string{"path"}, schemaMap{
 				"path":      nonEmptyStringProp(pathDesc),
@@ -87,7 +91,7 @@ func (d Deps) extractTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "extract",
 			Title: "Extract information from a file with the local model",
-			Description: "Extracts what the instruction asks from a text file read on the server, in the requested format. " +
+			Description: "Extracts what the instruction asks from a text (UTF-8), .docx, .pptx or .pdf file read on the server, in the requested format. " +
 				"The file text never enters your context. Large files are split and merged automatically. The answer ends with a [uso] line.",
 			InputSchema: objectSchema([]string{"path", "instruction"}, schemaMap{
 				"path":        nonEmptyStringProp(pathDesc),
@@ -106,7 +110,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "translate",
 			Title: "Translate a file with the local model",
-			Description: "Translates a text file read on the server; the file text never enters your context. " +
+			Description: "Translates a text (UTF-8), .docx, .pptx or .pdf file read on the server; the file text never enters your context. " +
 				"Large files are translated part by part. The answer ends with a [uso] line.",
 			InputSchema: objectSchema([]string{"path", "target_language"}, schemaMap{
 				"path":            nonEmptyStringProp(pathDesc),
@@ -119,7 +123,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 	}
 }
 
-const pathDesc = "Absolute path of a text file inside an allowed root; relative only when the server has a single root."
+const pathDesc = "Absolute path of a text (UTF-8), .docx, .pptx or .pdf file inside an allowed root; relative only when the server has a single root."
 
 func (d Deps) summarizeFile(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
 	a, err := parseArgs(raw, "path", "focus", "language", "max_words", "model")
@@ -230,7 +234,8 @@ func (d Deps) translate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallR
 		return mcp.ToolCallResult{}, err
 	}
 	task := fileTask{
-		concat: true,
+		concat:    true,
+		docNotice: "[aviso] tradução devolvida como texto; nenhum documento foi gravado",
 		mapTask: func(i, n int) string {
 			base := "Traduza para " + target + " o texto do arquivo abaixo. Preserve a formatação, as quebras de linha, o código, os nomes próprios e os identificadores; " +
 				"traduza apenas a linguagem natural. Responda somente com a tradução."
@@ -387,7 +392,7 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 	if !d.Files.Enabled() {
 		return mcp.ToolCallResult{}, errors.New("leitura de arquivos desabilitada: inicie o servidor com --allow-root")
 	}
-	f, err := d.Files.Read(path)
+	f, err := d.Files.ReadContext(ctx, path)
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -458,11 +463,39 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 			omitted, n, maxOutputChars)
 	}
 	body += fmt.Sprintf("\n\n[arquivo] nome=%s bytes=%d caracteres=%d partes=%d chamadas=%d omitidas=%d",
-		f.Name, f.Bytes, runes(f.Text), n, j.calls, omitted)
+		f.Name, f.Bytes, runes(f.Text), n, j.calls, omitted) + docFooter(f)
+	if task.docNotice != "" && f.Format != "" && f.Format != "txt" {
+		body += "\n" + task.docNotice
+	}
 	u := j.u
 	u.queue = j.waited
 	u.parts = n
 	return textResult(body, u), nil
+}
+
+// docFooter is the tail of the [arquivo] line: the format always, then only
+// the fields that apply to it (pages and pages without text for a PDF, slides
+// for a PPTX, pending revisions for a DOCX). They tell the caller how far to
+// trust the answer.
+func docFooter(f *files.File) string {
+	format := f.Format
+	if format == "" {
+		format = "txt"
+	}
+	out := " formato=" + format
+	switch format {
+	case "pdf":
+		out += fmt.Sprintf(" paginas=%d paginas_sem_texto=%d", f.Pages, f.PagesWithoutText)
+	case "pptx":
+		out += fmt.Sprintf(" slides=%d", f.Slides)
+	case "docx":
+		if f.PendingRevisions {
+			out += " revisoes_pendentes=sim"
+		} else {
+			out += " revisoes_pendentes=nao"
+		}
+	}
+	return out
 }
 
 // runConcat translates part by part and joins the results in order. It stops

@@ -134,7 +134,12 @@ const (
 
 // Error is the typed refusal of this package. Its message is addressed to the
 // user (pt-BR) and never carries a path or any document content.
-type Error struct{ Reason Reason }
+type Error struct {
+	Reason Reason
+	// Format is set by Extract on a ReasonCorruptText, so the message can name
+	// the right symptom; the zero value (FormatText) uses the PDF wording.
+	Format Format
+}
 
 func (e *Error) Error() string {
 	switch e.Reason {
@@ -153,8 +158,11 @@ func (e *Error) Error() string {
 	case ReasonTooLong:
 		return "documento extenso demais: o texto extraído passa do limite; divida o documento"
 	case ReasonCorruptText:
-		// The brief words this one for PDF; NormalizeText uses it as is
-		// (a DOCX/PPTX with this symptom is practically nonexistent).
+		// The brief words this one for PDF (fonts without ToUnicode); DOCX and
+		// PPTX get an equivalent wording, chosen by the format Extract recorded.
+		if e.Format == FormatDOCX || e.Format == FormatPPTX {
+			return "o texto extraído do documento está corrompido (caracteres inválidos em excesso); não é possível resumi-lo com segurança"
+		}
 		return "o texto extraído do PDF está corrompido (fontes sem mapeamento de caracteres); não é possível resumi-lo com segurança"
 	case ReasonTimeout:
 		return "a extração do texto excedeu o tempo limite (--timeout)"
@@ -299,6 +307,10 @@ func Extract(ctx context.Context, f Format, data []byte, lim Limits) (res *Resul
 	}
 	text, err := NormalizeText(r.Text)
 	if err != nil {
+		var de *Error
+		if errors.As(err, &de) && de.Reason == ReasonCorruptText {
+			return nil, &Error{Reason: de.Reason, Format: f}
+		}
 		return nil, err
 	}
 	if utf8.RuneCountInString(text) > lim.MaxTextRunes {

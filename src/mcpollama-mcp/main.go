@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/cslsoftwares/mcpollama/doctext"
 	"github.com/cslsoftwares/mcpollama/redact"
 )
 
@@ -43,6 +44,14 @@ func realMain(args []string, getenv func(string) string, stdin io.Reader, stdout
 		return 0
 	}
 	cfg.Version = Version
+	// Only records the PDF engine options (and creates the cache directory when
+	// asked): the WASM engine itself starts on the first PDF, so the start stays
+	// instant. ClosePDF releases it on the way out.
+	if err := setupDocs(cfg); err != nil {
+		fmt.Fprintln(stderr, "mcpollama-mcp: "+redact.New(cfg.secrets()...)(err.Error()))
+		return 2
+	}
+	defer doctext.ClosePDF()
 	// Both the server log and the Ollama client log reach stderr from several
 	// goroutines; one locked writer keeps the lines whole.
 	errw := &syncWriter{w: stderr}

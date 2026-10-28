@@ -2,6 +2,7 @@ package files
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,14 +19,60 @@ type Guard struct {
 	rawRoots []string // absolute and cleaned, as configured
 	roots    []string // absolute, cleaned and symlink-resolved
 	maxBytes int64
+
+	// Optional document support (phase 7): nil means every file is plain text,
+	// exactly as before, and a document is refused as binary (fail closed).
+	extractor DocExtractor
+	maxDoc    int64
 }
 
+// Extracted is the result of a document extraction, in the terms of this
+// package (it must not import the extractor). Text follows the File.Text
+// contract: UTF-8 without BOM, LF line endings.
+type Extracted struct {
+	Text             string
+	Format           string // "docx", "pptx" or "pdf"
+	Pages            int    // PDF
+	Slides           int    // PPTX
+	PagesWithoutText int    // PDF
+	PendingRevisions bool   // DOCX
+}
+
+// DocExtractor turns office documents into text. It is injected by the
+// binary, so package files stays pure and testable.
+//
+// IsDocument decides from the NAME alone (the extension of the resolved file)
+// whether the document ceiling and the extractor apply. It must be true for
+// every extension the extractor wants to see, including the legacy ones it
+// only refuses (.doc, .ppt, .xls), so that their explanation reaches the user
+// instead of "binary file".
+//
+// Extract receives the bytes the guard already read, after every path defence
+// ran. A returned error must carry a user-safe pt-BR message (no path, no
+// content): it is shown as is. A cancelled context may be returned unchanged.
+type DocExtractor interface {
+	IsDocument(name string) bool
+	Extract(ctx context.Context, name string, data []byte) (*Extracted, error)
+}
+
+// ErrNotDocument is what an extractor returns for a name it claimed but whose
+// bytes are not a document of that kind (a plain text file called notes.doc):
+// the guard then reads it as text, under the text ceiling, as before phase 7.
+var ErrNotDocument = errors.New("not a document")
+
 // File is the result of a successful Read. Text is UTF-8 without BOM and with
-// LF line endings.
+// LF line endings. For a document, Text is the extracted text and the fields
+// below Text describe the extraction; Bytes stays the size on disk.
 type File struct {
 	Name  string // base name of the resolved file, safe to show
 	Bytes int    // size on disk
 	Text  string
+
+	Format           string // "txt", "docx", "pptx" or "pdf"
+	Pages            int    // PDF
+	Slides           int    // PPTX
+	PagesWithoutText int    // PDF
+	PendingRevisions bool   // DOCX
 }
 
 // NewGuard validates the roots (each must exist and be a directory; the
@@ -170,6 +217,47 @@ func (g *Guard) Roots() []string {
 	return append([]string(nil), g.roots...)
 }
 
+// SetExtractor enables documents: ex is consulted for the names it claims and
+// maxDocBytes (--max-doc-bytes) replaces the text ceiling for them. It must be
+// called before the guard is shared between goroutines. A nil extractor turns
+// documents off again.
+func (g *Guard) SetExtractor(ex DocExtractor, maxDocBytes int64) error {
+	if ex != nil && maxDocBytes < 1 {
+		return errors.New("o limite de bytes do documento deve ser positivo")
+	}
+	g.extractor, g.maxDoc = ex, maxDocBytes
+	return nil
+}
+
+// docName is the name the document rules see: without the trailing dots and
+// spaces that Windows drops ("x.pdf." opens "x.pdf"), so such a name cannot
+// dodge the extension rules.
+func docName(name string) string { return strings.TrimRight(name, ". ") }
+
+// isDoc reports whether the resolved name goes to the extractor.
+func (g *Guard) isDoc(name string) bool {
+	return g.extractor != nil && g.extractor.IsDocument(docName(name))
+}
+
+// ceilingFor is the byte ceiling that applies to the resolved name: decided
+// from the extension before the file is opened, so the size check on the
+// directory entry and the bounded read use the same figure.
+func (g *Guard) ceilingFor(name string) int64 {
+	if g.isDoc(name) {
+		return g.maxDoc
+	}
+	return g.maxBytes
+}
+
+// MaxDocBytes is the per-document ceiling (--max-doc-bytes); 0 when documents
+// are not enabled.
+func (g *Guard) MaxDocBytes() int64 {
+	if g == nil || g.extractor == nil {
+		return 0
+	}
+	return g.maxDoc
+}
+
 // MaxBytes is the per-file ceiling (--max-file-bytes).
 func (g *Guard) MaxBytes() int64 {
 	if g == nil {
@@ -192,13 +280,31 @@ func (g *Guard) MaxBytes() int64 {
 //  7. no unresolved reparse point (junction) on the directories below the root
 //  8. open through os.Root: the kernel-level traversal guard, so a swap
 //     between steps 4 and 8 still cannot leave the root
-//  9. regular file only, size limit, binary and encoding checks
+//  9. regular file only, size limit (the text or the document ceiling, chosen
+//     by the extension of the resolved name), binary and encoding checks
 //  10. the path still resolves to the same place (TOCTOU window)
 //
 // Every failure of 4, 5, 7 and 8 returns the same opaque message.
+//
+// A document (when an extractor is injected) takes the same ten steps; the
+// only differences are the byte ceiling, decided before anything is opened,
+// and the last step, where the bytes go to the extractor instead of the text
+// decoder.
 func (g *Guard) Read(requested string) (*File, error) {
+	return g.ReadContext(context.Background(), requested)
+}
+
+// ReadContext is Read with a context: the extraction honors its cancellation
+// and deadline.
+func (g *Guard) ReadContext(ctx context.Context, requested string) (*File, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !g.Enabled() {
 		return nil, errNotAllowed()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if strings.TrimSpace(requested) == "" {
 		return nil, refuse(ReasonBadRequest, "informe o caminho do arquivo")
@@ -238,6 +344,9 @@ func (g *Guard) Read(requested string) (*File, error) {
 	if hasReparseDir(root, rel) {
 		return nil, errNotAllowed()
 	}
+	name := filepath.Base(resolved)
+	isDoc := g.isDoc(name)
+	ceiling := g.ceilingFor(name)
 
 	rt, err := os.OpenRoot(root)
 	if err != nil {
@@ -251,8 +360,8 @@ func (g *Guard) Read(requested string) (*File, error) {
 	if !pre.Mode().IsRegular() {
 		return nil, refuse(ReasonNotRegular, "o caminho não é um arquivo regular (diretório, dispositivo ou pipe)")
 	}
-	if pre.Size() > g.maxBytes {
-		return nil, tooLarge(pre.Size(), g.maxBytes)
+	if pre.Size() > ceiling {
+		return nil, tooLarge(pre.Size(), ceiling, isDoc)
 	}
 	f, err := rt.Open(rel)
 	if err != nil {
@@ -270,12 +379,12 @@ func (g *Guard) Read(requested string) (*File, error) {
 	if n, err := linkCount(f); err != nil || n != 1 {
 		return nil, errNotAllowed()
 	}
-	data, err := io.ReadAll(io.LimitReader(f, g.maxBytes+1))
+	data, err := io.ReadAll(io.LimitReader(f, ceiling+1))
 	if err != nil {
 		return nil, refuse(ReasonBadRequest, "não foi possível ler o arquivo")
 	}
-	if int64(len(data)) > g.maxBytes {
-		return nil, tooLarge(int64(len(data)), g.maxBytes)
+	if int64(len(data)) > ceiling {
+		return nil, tooLarge(int64(len(data)), ceiling, isDoc)
 	}
 
 	again, err := filepath.EvalSymlinks(abs)
@@ -283,16 +392,58 @@ func (g *Guard) Read(requested string) (*File, error) {
 		return nil, errNotAllowed()
 	}
 
+	if isDoc {
+		f, err := g.extract(ctx, name, data)
+		if !errors.Is(err, ErrNotDocument) {
+			return f, err
+		}
+		// Claimed but not a document: the text path, with the text ceiling.
+		if int64(len(data)) > g.maxBytes {
+			return nil, tooLarge(int64(len(data)), g.maxBytes, false)
+		}
+	}
 	text, rf := decode(data)
 	if rf != nil {
 		return nil, rf
 	}
-	return &File{Name: filepath.Base(resolved), Bytes: len(data), Text: text}, nil
+	return &File{Name: name, Bytes: len(data), Text: text, Format: "txt"}, nil
 }
 
-func tooLarge(size, max int64) *Refusal {
+// extract is the last step for a document: the bytes already passed every
+// path defence. The extractor's refusal is shown as is (its messages are
+// user-safe by contract); the text it returns gets a last check behind the
+// extractor's own normalization.
+func (g *Guard) extract(ctx context.Context, name string, data []byte) (*File, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	ex, err := g.extractor.Extract(ctx, docName(name), data)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrNotDocument) {
+			return nil, err
+		}
+		return nil, refuse(ReasonDocument, err.Error())
+	}
+	if ex == nil || !utf8.ValidString(ex.Text) {
+		return nil, refuse(ReasonDocument, "documento corrompido, malformado ou acima dos limites de segurança")
+	}
+	text := strings.ReplaceAll(strings.TrimPrefix(ex.Text, "\xEF\xBB\xBF"), "\r\n", "\n")
+	return &File{
+		Name: name, Bytes: len(data), Text: text, Format: ex.Format,
+		Pages: ex.Pages, Slides: ex.Slides, PagesWithoutText: ex.PagesWithoutText, PendingRevisions: ex.PendingRevisions,
+	}, nil
+}
+
+func tooLarge(size, max int64, doc bool) *Refusal {
+	flag := "--max-file-bytes"
+	if doc {
+		flag = "--max-doc-bytes"
+	}
 	return refuse(ReasonTooLarge, fmt.Sprintf(
-		"arquivo grande demais: %d bytes, o teto é %d (--max-file-bytes); divida o arquivo ou aumente o teto", size, max))
+		"arquivo grande demais: %d bytes, o teto é %d (%s); divida o arquivo ou aumente o teto", size, max, flag))
 }
 
 // absolute turns the request into an absolute, cleaned path. Only the cleaned

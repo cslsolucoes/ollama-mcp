@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -26,7 +27,8 @@ const (
 	defaultMaxPromptChars = 128000
 	defaultMaxLineBytes   = 8 << 20
 	defaultMaxFileBytes   = 4 << 20
-	defaultMaxChunks      = 40 // model calls per file request (FILE-011)
+	defaultMaxDocBytes    = 32 << 20 // .docx, .pptx and .pdf (D-3)
+	defaultMaxChunks      = 40       // model calls per file request (FILE-011)
 	defaultVerbosity      = "full"
 )
 
@@ -43,6 +45,8 @@ type Config struct {
 	MaxPromptChars int
 	MaxLineBytes   int
 	MaxFileBytes   int
+	MaxDocBytes    int    // ceiling for .docx/.pptx/.pdf; text keeps MaxFileBytes
+	PDFCacheDir    string // absolute directory of the WASM compilation cache; empty means no cache and no disk writes
 	MaxChunks      int
 	AllowRoot      string // directories separated by ; (os.PathListSeparator); empty disables the file tools
 	Debug          bool
@@ -83,6 +87,10 @@ Every flag falls back to its environment variable; the flag wins.
   --timeout DURATION      per-call deadline, default 2m0s          (OLLAMA_TIMEOUT)
   --max-prompt-chars N    prompt ceiling in characters, default 128000 (MCPOLLAMA_MAX_PROMPT_CHARS)
   --max-file-bytes N      file ceiling in bytes, default 4194304   (MCPOLLAMA_MAX_FILE_BYTES)
+  --max-doc-bytes N       .docx/.pptx/.pdf ceiling in bytes, default 33554432 (MCPOLLAMA_MAX_DOC_BYTES)
+  --pdf-cache-dir DIR     absolute directory for the PDF engine compilation cache
+                          (created if missing); without it nothing is written to
+                          disk and the first PDF takes a few seconds longer (MCPOLLAMA_PDF_CACHE_DIR)
   --allow-root DIR[;DIR]  absolute directories the file tools may read, separated by ;
                           (: on Linux), not nested; without it
                           summarize_file, extract and translate do not exist (MCPOLLAMA_ALLOW_ROOT)
@@ -114,6 +122,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fTimeout  = fs.Duration("timeout", 0, "")
 		fPrompt   = fs.Int("max-prompt-chars", 0, "")
 		fFile     = fs.Int("max-file-bytes", 0, "")
+		fDoc      = fs.Int("max-doc-bytes", 0, "")
+		fPDFCache = fs.String("pdf-cache-dir", "", "")
 		fChunks   = fs.Int("max-chunks", 0, "")
 		fRoot     = fs.String("allow-root", "", "")
 		fLine     = fs.Int("max-line-bytes", 0, "")
@@ -172,6 +182,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		AllowedModels:  str("allowed-models", "MCPOLLAMA_ALLOWED_MODELS", "", fAllowed),
 		MaxPromptChars: integer("max-prompt-chars", "MCPOLLAMA_MAX_PROMPT_CHARS", defaultMaxPromptChars, fPrompt),
 		MaxFileBytes:   integer("max-file-bytes", "MCPOLLAMA_MAX_FILE_BYTES", defaultMaxFileBytes, fFile),
+		MaxDocBytes:    integer("max-doc-bytes", "MCPOLLAMA_MAX_DOC_BYTES", defaultMaxDocBytes, fDoc),
+		PDFCacheDir:    str("pdf-cache-dir", "MCPOLLAMA_PDF_CACHE_DIR", "", fPDFCache),
 		MaxChunks:      integer("max-chunks", "MCPOLLAMA_MAX_CHUNKS", defaultMaxChunks, fChunks),
 		AllowRoot:      str("allow-root", "MCPOLLAMA_ALLOW_ROOT", "", fRoot),
 		MaxLineBytes:   integer("max-line-bytes", "MCPOLLAMA_MAX_LINE_BYTES", defaultMaxLineBytes, fLine),
@@ -208,6 +220,12 @@ func (c Config) validate() error {
 	}
 	if c.MaxPromptChars <= 0 || c.MaxFileBytes <= 0 || c.MaxLineBytes <= 0 || c.MaxChunks <= 0 {
 		return errors.New("--max-prompt-chars, --max-file-bytes, --max-line-bytes and --max-chunks must be positive")
+	}
+	if c.MaxDocBytes <= 0 {
+		return errors.New("--max-doc-bytes must be positive")
+	}
+	if c.PDFCacheDir != "" && !filepath.IsAbs(c.PDFCacheDir) {
+		return errors.New("--pdf-cache-dir must be an absolute path")
 	}
 	if _, err := c.guard(); err != nil {
 		return err
@@ -260,12 +278,24 @@ var broadDirs = files.DefaultBroadDirs
 // guard builds the file gate from --allow-root. It returns nil (no file tools)
 // when no root is configured, and an error when a root is unusable: a typo in
 // a root must stop the start, not silently leave the tools off.
-func (c Config) guard() (*files.Guard, error) {
+func (c Config) guard() (*files.Guard, error) { return c.guardWith(nil) }
+
+// guardWith is guard with a debug sink for the document extractor (metadata
+// only: format, pages, bytes, ms). Documents are always enabled with the file
+// tools: there is no switch to turn the extraction off.
+func (c Config) guardWith(logf func(string, ...any)) (*files.Guard, error) {
 	roots := files.SplitRoots(c.AllowRoot)
 	if len(roots) == 0 {
 		return nil, nil
 	}
-	return files.NewGuard(roots, int64(c.MaxFileBytes))
+	g, err := files.NewGuard(roots, int64(c.MaxFileBytes))
+	if err != nil {
+		return nil, err
+	}
+	if err := g.SetExtractor(newDocExtractor(c, logf), int64(c.MaxDocBytes)); err != nil {
+		return nil, err
+	}
+	return g, nil
 }
 
 // secrets returns every value that must never reach a log or an error:
