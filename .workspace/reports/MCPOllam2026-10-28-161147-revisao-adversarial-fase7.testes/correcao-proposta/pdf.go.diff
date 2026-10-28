@@ -1,0 +1,131 @@
+--- a/src/doctext/pdf.go
++++ b/src/doctext/pdf.go
+@@ -48,6 +48,11 @@
+ // than this counts as "without text" (a scanned page, a lone page number).
+ const pdfMinPageRunes = 20
+ 
++// pdfMaxWasmPages caps the linear memory of the PDFium module (64 KiB pages):
++// without it wazero allows 4 GiB, and a 33 KB PDF with a 16 MiB Flate content
++// stream took the process to +5 GiB. A document that needs more is refused.
++const pdfMaxWasmPages = 8192 // 512 MiB
++
+ // PDFOptions configures the PDF engine. The zero value means "no cache".
+ type PDFOptions struct {
+ 	// CacheDir is the directory of the wazero compilation cache. Empty means
+@@ -253,6 +258,11 @@
+ 			prev, _ := utf8.DecodeLastRuneInString(s[:i])
+ 			next, _ := utf8.DecodeRuneInString(s[i+2:])
+ 			if unicode.IsLetter(prev) && unicode.IsLower(next) {
++				// "obriga-\nse", "ex-\nempregado": a real hyphen at a line
++				// end; the line is joined but the hyphen stays.
++				if keepHyphen(s[:i], s[i+2:]) {
++					b.WriteByte('-')
++				}
+ 				i++ // skip the hyphen and the newline
+ 				continue
+ 			}
+@@ -282,13 +292,46 @@
+ 			continue
+ 		}
+ 		next, _ := utf8.DecodeRuneInString(s[i+1:])
+-		if !unicode.IsLower(next) {
++		switch {
++		case !unicode.IsLower(next):
+ 			b.WriteString("-\n")
++		case keepHyphen(s[:i], s[i+1:]):
++			b.WriteByte('-')
+ 		}
+ 	}
+ 	return b.String()
+ }
+ 
++// ptClitics and ptHyphenPrefixes are the pt-BR words that keep a hyphen broken
++// at a line end: enclitic pronouns ("obriga-se", "entregá-lo") and prefixes
++// that always take one ("ex-cônjuge", "pré-contrato").
++var ptClitics = map[string]bool{"se": true, "lhe": true, "lhes": true, "me": true, "te": true, "nos": true, "vos": true,
++	"o": true, "a": true, "os": true, "as": true, "lo": true, "la": true, "los": true, "las": true, "no": true, "na": true, "nas": true}
++
++var ptHyphenPrefixes = map[string]bool{"ex": true, "vice": true, "pré": true, "pós": true, "pró": true, "recém": true, "sem": true, "além": true, "aquém": true}
++
++// keepHyphen looks at the word before the hyphen (the end of before) and the
++// word after the line break (the start of after).
++func keepHyphen(before, after string) bool {
++	j := len(before)
++	for j > 0 {
++		r, n := utf8.DecodeLastRuneInString(before[:j])
++		if !unicode.IsLetter(r) {
++			break
++		}
++		j -= n
++	}
++	k := 0
++	for k < len(after) {
++		r, n := utf8.DecodeRuneInString(after[k:])
++		if !unicode.IsLetter(r) {
++			break
++		}
++		k += n
++	}
++	return ptClitics[strings.ToLower(after[:k])] || ptHyphenPrefixes[strings.ToLower(before[j:])]
++}
++
+ // ---------------------------------------------------------------------------
+ // The real engine: PDFium on wazero.
+ // ---------------------------------------------------------------------------
+@@ -301,7 +344,11 @@
+ func newPDFiumEngine(opts PDFOptions) (*pdfiumEngine, error) {
+ 	// The bundled module lowers setjmp/longjmp to WebAssembly exception
+ 	// handling, which wazero needs enabled explicitly.
+-	rc := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling)
++	rc := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling).
++		WithMemoryLimitPages(pdfMaxWasmPages).
++		// Kill (below) cancels the worker context; this makes wazero abort the
++		// WebAssembly call in flight instead of letting the page run to the end.
++		WithCloseOnContextDone(true)
+ 	e := &pdfiumEngine{}
+ 	if opts.CacheDir != "" {
+ 		c, err := wazero.NewCompilationCacheWithDir(opts.CacheDir)
+@@ -345,9 +392,13 @@
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	// The deadline must cut a single long call (one hostile page took 17 s
++	// with a 2 s timeout): when ctx ends, the instance is killed.
++	stop := context.AfterFunc(ctx, func() { _ = inst.Kill() })
+ 	empty := "" // permission-only protection has an empty user password
+ 	d, err := inst.OpenDocument(&requests.OpenDocument{File: &data, Password: &empty})
+ 	if err != nil {
++		stop()
+ 		_ = inst.Close()
+ 		if errors.Is(err, pdferrors.ErrPassword) {
+ 			return nil, errPDFPassword
+@@ -356,16 +407,18 @@
+ 	}
+ 	pc, err := inst.FPDF_GetPageCount(&requests.FPDF_GetPageCount{Document: d.Document})
+ 	if err != nil {
++		stop()
+ 		_ = inst.Close()
+ 		return nil, err
+ 	}
+-	return &pdfiumDoc{inst: inst, ref: d.Document, n: pc.PageCount}, nil
++	return &pdfiumDoc{inst: inst, ref: d.Document, n: pc.PageCount, stop: stop}, nil
+ }
+ 
+ type pdfiumDoc struct {
+ 	inst pdfium.Pdfium
+ 	ref  references.FPDF_DOCUMENT
+ 	n    int
++	stop func() bool // releases the ctx watchdog
+ }
+ 
+ func (d *pdfiumDoc) pages() int { return d.n }
+@@ -411,6 +464,9 @@
+ 
+ func (d *pdfiumDoc) close() {
+ 	defer func() { _ = recover() }()
++	if d.stop != nil {
++		d.stop()
++	}
+ 	_, _ = d.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: d.ref})
+ 	_ = d.inst.Close()
+ }

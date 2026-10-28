@@ -1,0 +1,10 @@
+﻿VET_EXIT=0
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.054s
+ok  	github.com/cslsoftwares/mcpollama/doctext	24.453s
+ok  	github.com/cslsoftwares/mcpollama/files	1.041s
+?   	github.com/cslsoftwares/mcpollama/mcp	[no test files]
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.524s
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.880s
+ok  	github.com/cslsoftwares/mcpollama/redact	0.061s
+ok  	github.com/cslsoftwares/mcpollama/tools	2.095s
+TEST_EXIT=0

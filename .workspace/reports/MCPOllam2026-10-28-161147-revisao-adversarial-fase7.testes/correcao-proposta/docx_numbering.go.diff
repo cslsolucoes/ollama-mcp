@@ -1,0 +1,82 @@
+--- a/src/doctext/docx_numbering.go
++++ b/src/doctext/docx_numbering.go
+@@ -6,6 +6,7 @@
+ 	"io"
+ 	"strconv"
+ 	"strings"
++	"unicode/utf8"
+ )
+ 
+ // DOCX list numbering (brief sections 1.3 and 4.1). The number of a clause is
+@@ -28,6 +29,10 @@
+ 
+ const maxStyleHops = 32
+ 
++// maxLvlTextRunes bounds w:lvlText. Word's own dialog accepts far less; with
++// at most 9 "%n" of at most 64 runes each, a prefix stays under ~700 runes.
++const maxLvlTextRunes = 128
++
+ type numLevel struct {
+ 	start       int
+ 	format      string
+@@ -73,13 +78,13 @@
+ // loadNumbering reads word/numbering.xml and the numbering part of
+ // word/styles.xml. It returns nil (no prefixes at all) when there is no
+ // numbering.xml or it cannot be parsed.
+-func loadNumbering(pkg *Package, lim Limits) paragraphNumberer {
++func loadNumbering(pkg *Package, lim Limits) (paragraphNumberer, error) {
+ 	if !pkg.Has("word/numbering.xml") {
+-		return nil
++		return nil, nil
+ 	}
+ 	data, err := pkg.Read("word/numbering.xml")
+ 	if err != nil {
+-		return nil
++		return nil, err
+ 	}
+ 	n := &docxNumbering{
+ 		abstract:  map[string]*numAbstract{},
+@@ -90,7 +95,7 @@
+ 		applied:   map[string]bool{},
+ 	}
+ 	if err := parseNumbering(data, lim, n); err != nil {
+-		return nil
++		return nil, err
+ 	}
+ 	if pkg.Has("word/styles.xml") {
+ 		if sd, err := pkg.Read("word/styles.xml"); err == nil {
+@@ -100,7 +105,7 @@
+ 			}
+ 		}
+ 	}
+-	return n
++	return n, nil
+ }
+ 
+ func wVal(se xml.StartElement) string {
+@@ -130,7 +135,7 @@
+ 		curNum   *numInstance
+ 		curLvl   *numLevel
+ 		ovIdx    = -1
+-		maxItems = 100000
++		maxItems = 4_000_000 // the part is already capped by MaxEntryBytes
+ 	)
+ 	for {
+ 		tok, err := dec.Next()
+@@ -188,7 +193,15 @@
+ 				}
+ 			case "lvlText":
+ 				if curLvl != nil {
+-					curLvl.text = wVal(t)
++					// The prefix is copied into EVERY numbered paragraph, so its
++					// size is an amplification factor: a level text longer than
++					// any real one ("CLÁUSULA %1ª", "%1.%2.%3.") is not drawn
++					// and the paragraph gets the bullet fallback.
++					if v := wVal(t); utf8.RuneCountInString(v) <= maxLvlTextRunes {
++						curLvl.text = v
++					} else {
++						curLvl.text, curLvl.format = "", "bullet"
++					}
+ 				}
+ 			case "suff":
+ 				if curLvl != nil {

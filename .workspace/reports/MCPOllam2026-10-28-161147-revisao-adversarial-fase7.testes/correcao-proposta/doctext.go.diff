@@ -1,0 +1,21 @@
+--- a/src/doctext/doctext.go
++++ b/src/doctext/doctext.go
+@@ -130,6 +130,9 @@
+ 	ReasonCorruptText
+ 	// ReasonTimeout: the extraction ran out of time.
+ 	ReasonTimeout
++	// ReasonAltChunk: a DOCX with w:altChunk (imported HTML/RTF/DOCX that Word
++	// shows but the package does not hold as WordprocessingML).
++	ReasonAltChunk
+ )
+ 
+ // Error is the typed refusal of this package. Its message is addressed to the
+@@ -166,6 +169,8 @@
+ 		return "o texto extraído do PDF está corrompido (fontes sem mapeamento de caracteres); não é possível resumi-lo com segurança"
+ 	case ReasonTimeout:
+ 		return "a extração do texto excedeu o tempo limite (--timeout)"
++	case ReasonAltChunk:
++		return "o documento tem conteúdo importado (altChunk) que não é extraído; abra no Word e salve de novo como .docx"
+ 	default:
+ 		return "documento corrompido, malformado ou acima dos limites de segurança"
+ 	}

@@ -1,0 +1,24 @@
+--- a/src/doctext/docx_numbering_test.go
++++ b/src/doctext/docx_numbering_test.go
+@@ -1,6 +1,7 @@
+ package doctext
+ 
+ import (
++	"context"
+ 	"strconv"
+ 	"strings"
+ 	"testing"
+@@ -188,9 +189,11 @@
+ 	dxWant(t, nbDocx(t, num, "", body), "zero\nindefinido\n- nivel ausente\n1. ok\n")
+ 	// No numbering.xml: numPr is ignored, nothing is prefixed, nothing fails.
+ 	dxWant(t, nbDocx(t, "", "", nbP("1", 0, "sem lista")), "sem lista\n")
+-	// Garbage numbering.xml: ignored too.
++	// Garbage numbering.xml: refused (it would drop every clause number in silence).
+ 	bad := dxBuild(t, nbP("1", 0, "x"), entry{name: "word/numbering.xml", data: []byte(`<w:numbering`)})
+-	dxWant(t, bad, "x\n")
++	if _, err := Extract(context.Background(), FormatDOCX, bad, Limits{}); err == nil {
++		t.Fatal("a broken numbering.xml must be refused")
++	}
+ }
+ 
+ func TestNumberingStyleCycleDoesNotHang(t *testing.T) {

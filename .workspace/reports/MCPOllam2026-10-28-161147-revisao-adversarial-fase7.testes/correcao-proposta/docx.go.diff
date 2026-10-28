@@ -1,0 +1,108 @@
+--- a/src/doctext/docx.go
++++ b/src/doctext/docx.go
+@@ -42,7 +42,7 @@
+ 
+ // numbererLoader builds the numberer of a package; nil when numbering is not
+ // available. docx_numbering.go installs it in init().
+-var numbererLoader func(pkg *Package, lim Limits) paragraphNumberer
++var numbererLoader func(pkg *Package, lim Limits) (paragraphNumberer, error)
+ 
+ // isWNS reports whether space is a WordprocessingML namespace (either dialect).
+ func isWNS(space string) bool { return inNS(space, NSWordprocessing, NSWordprocessingStrict) }
+@@ -96,6 +96,7 @@
+ 	out       strings.Builder
+ 	lastBlank bool
+ 	wrote     bool
++	cellRunes int // runes held by open cells/notes, already charged against maxRunes
+ 
+ 	skip   int   // >0 while inside a dropped subtree (counts open elements)
+ 	ac     []int // per open mc:AlternateContent: branches already taken
+@@ -136,6 +137,13 @@
+ func (h *docxWalker) emit(s string) {
+ 	if n := len(h.cells); n > 0 {
+ 		if f := strings.Join(strings.Fields(s), " "); f != "" {
++			// A cell (or a note block) only reaches the text when its row
++			// ends: charge it now, or a single row could grow without bound.
++			h.cellRunes += utf8.RuneCountInString(f) + 1
++			if *h.total+h.cellRunes > h.maxRunes {
++				h.err = refuse(ReasonTooLong)
++				return
++			}
+ 			c := h.cells[n-1]
+ 			c.parts = append(c.parts, f)
+ 		}
+@@ -144,7 +152,11 @@
+ 	if h.err != nil {
+ 		return
+ 	}
+-	*h.total += utf8.RuneCountInString(s) + 1
++	// What the cells already charged is part of this line.
++	if d := utf8.RuneCountInString(s) + 1 - h.cellRunes; d > 0 {
++		*h.total += d
++	}
++	h.cellRunes = 0
+ 	if *h.total > h.maxRunes {
+ 		h.err = refuse(ReasonTooLong)
+ 		return
+@@ -224,6 +236,9 @@
+ 	switch local {
+ 	case "ins", "moveTo":
+ 		h.pending = true
++	case "altChunk":
++		// Word renders the imported part; this extractor cannot: fail loudly.
++		h.err = refuse(ReasonAltChunk)
+ 	case "p":
+ 		h.paras = append(h.paras, &docxPara{})
+ 	case "pPr":
+@@ -501,6 +516,12 @@
+ 			return nil, h.err
+ 		}
+ 	}
++	// A field still in its code part at the end of the part hid everything
++	// after its begin (fldChar begin without separate/end, or with them inside
++	// a deleted run): refuse instead of returning a silently truncated text.
++	if h.code > 0 {
++		return nil, refuse(ReasonMalformed)
++	}
+ 	return &docxPart{text: h.out.String(), pending: h.pending, headerIDs: h.headerIDs, footerIDs: h.footerIDs}, nil
+ }
+ 
+@@ -530,6 +551,9 @@
+ 	return text
+ }
+ 
++// notesParts are read once, after the body, as their own blocks.
++var notesParts = map[string]bool{"word/footnotes.xml": true, "word/endnotes.xml": true, "word/comments.xml": true}
++
+ // extractDOCX extracts the text of a .docx. Output order: headers (each one
+ // once), body, footers, footnotes, endnotes, comments.
+ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) {
+@@ -545,7 +569,11 @@
+ 	total := 0
+ 	var num paragraphNumberer
+ 	if numbererLoader != nil {
+-		num = numbererLoader(pkg, lim)
++		// A numbering part that exists but cannot be read would drop every
++		// clause number in silence: refuse instead (Word refuses it too).
++		if num, err = numbererLoader(pkg, lim); err != nil {
++			return nil, err
++		}
+ 	}
+ 	body, err := parseDocxPart(ctx, pkg, docPart, lim, &total, num, false)
+ 	if err != nil {
+@@ -569,10 +597,13 @@
+ 			var blocks []string
+ 			for _, id := range ids {
+ 				target, ok := byID[id]
+-				if !ok || seen[target] || !pkg.Has(target) {
++				key := strings.ToLower(target)
++				// Never a part that is read elsewhere (the body or the notes):
++				// a rel pointing there would duplicate it as a header/footer.
++				if !ok || seen[key] || !pkg.Has(target) || key == docPart || notesParts[key] {
+ 					continue
+ 				}
+-				seen[target] = true
++				seen[key] = true
+ 				part, err := parseDocxPart(ctx, pkg, target, lim, &total, nil, false)
+ 				if err != nil {
+ 					return nil, err
