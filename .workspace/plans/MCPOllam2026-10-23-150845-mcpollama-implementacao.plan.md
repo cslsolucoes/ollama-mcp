@@ -1474,3 +1474,21 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **validação pelo Claude Code** nos 2 projetos (o08, 12 páginas): `paginas_ocr=12 conf_ocr_media=90 paginas_ocr_falhas=0` + `[aviso]` + OK;
   - **corpus apagado:** `.workspace\spike-pdf\` (287 arquivos, 208,7 MB), mais os arquivos do driver de aceite no scratchpad que guardavam nomes originais de contratos (10 arquivos). Nenhum documento sobrou.
 - **Erro meu:** o cabeçalho "18:57" de uma mensagem foi estimado (o real era ~18:55).
+
+### 2026-10-28 19:22 — FASE 7 CONCLUÍDA
+- **`FuzzOCRFrame` de 30 min** (worktree em `9f09aaa`): **PASS**, 56.586.481 execuções, 36 no corpus, 0 crashers. Resumo em `…fase7.testes/fuzz30/FuzzOCRFrame-resumo.log`; worktree removido; nenhum processo de teste restante.
+- **P7.9-1 FECHADA** (partida com OCR, medida sem carga, 3 rodadas alternadas com o binário instalado): `initialize` de **74 a 238 ms com OCR** contra 33 a 35 ms sem OCR; o processo encerra em ~0,6 s. Os 0,7 a 3,6 s anteriores eram contenção de CPU pelo fuzz.
+- **Report final:** `.workspace/reports/MCPOllam2026-10-28-191530-fase7-extracao-documentos.report.md` (agente Sonnet; marcadores preenchidos pelo loop principal; sigilo: 0 CPF, CNPJ, "R$" ou token).
+- **Brief:** §12 com todas as etapas concluídas; **checklist do §10: 15/15 marcados**. Os 5 itens que os agentes tinham deixado abertos foram marcados com evidência: limites/DTD/`External`/sem I/O, testes/fuzz/`-race`/revisão, ao vivo/aceite, docs/binário, e git sem segredo, binário ou documento (`git ls-files` = 0 arquivos proibidos).
+- **Estado final:** binário **0.7.0-9f09aaa** em `D:\MCP\`, com `--pdf-cache-dir` e OCR ligados nos `.mcp.json` do MCPOllam e do GestorERP; corpus de clientes apagado.
+- **Pendências do owner:**
+  1. reiniciar as sessões do Claude Code (MCPOllam e GestorERP) para carregar o 0.7.0;
+  2. apagar `D:\MCP\mcpollama-mcp.exe~` e `D:\MCP\mcpollama-mcp-0.6.0.exe~` (pasta protegida contra remoção pela sessão);
+  3. "caminho informado no contexto" versus `--allow-root` (proposta: suportar as roots do protocolo MCP);
+  4. reparo físico do link PCIe da GPU `03:00.0` e informar a PSU;
+  5. rotação dos segredos antigos;
+  6. arquivos de outras frentes no working tree (`MCPOllam.rar`, report de integração alterado, evidências v10).
+- **Candidatas a fases futuras** (discutidas com o owner, sem decisão de executar):
+  - **Fase 8a:** paralelismo (`--max-parallel` + `OLLAMA_NUM_PARALLEL=2` + `burst` no nginx + stress paralelo);
+  - **Fase 8b:** pista de transbordo na CPU do servidor (medir antes; a fonte é o limite);
+  - **Fase 8c:** worker Linux com jobs assíncronos e leitura somente leitura do `WN-DC03`.

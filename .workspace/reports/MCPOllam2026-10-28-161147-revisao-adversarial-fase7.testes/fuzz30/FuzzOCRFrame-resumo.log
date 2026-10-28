@@ -1,0 +1,11 @@
+﻿=== inicio=18:49:45
+fuzz: elapsed: 5m0s, execs: 6508131 (17535/sec), new interesting: 6 (total: 35)
+fuzz: elapsed: 10m0s, execs: 15173527 (12704/sec), new interesting: 7 (total: 36)
+fuzz: elapsed: 15m0s, execs: 23759402 (37700/sec), new interesting: 7 (total: 36)
+fuzz: elapsed: 20m0s, execs: 33941580 (31008/sec), new interesting: 7 (total: 36)
+fuzz: elapsed: 25m0s, execs: 44382943 (21188/sec), new interesting: 7 (total: 36)
+fuzz: elapsed: 30m0s, execs: 56586481 (34416/sec), new interesting: 7 (total: 36)
+fuzz: elapsed: 30m0s, execs: 56586481 (0/sec), new interesting: 7 (total: 36)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/ocr	1800.335s
+=== fim=19:19:48 exit=0
