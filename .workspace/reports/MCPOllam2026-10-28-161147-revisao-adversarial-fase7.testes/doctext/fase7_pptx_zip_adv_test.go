@@ -99,7 +99,12 @@ func TestAdvPPTX(t *testing.T) {
 		hidden := `<p:sp><p:nvSpPr><p:cNvPr id="9" name="h" hidden="1"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:p><a:r><a:t>FORMA-OCULTA</a:t></a:r></a:p></p:txBody></p:sp>`
 		data := buildPPTX(t, presXML("rId1"), []string{slideRel("rId1", "slides/slide1.xml")}, entry{name: "ppt/slides/slide1.xml", data: sldXML("", hidden)})
 		txt, _ := advPptx(data)
-		vec(t, "pptx", "forma-oculta", "INFO", fmt.Sprintf("extraida=%v (sem rotulo; slides ocultos sao rotulados, formas ocultas nao)", strings.Contains(txt, "FORMA-OCULTA")))
+		// passo 2: a forma oculta entra rotulada "[oculto]"
+		res := "SILENCIOSO"
+		if strings.Contains(txt, "[oculto] FORMA-OCULTA") {
+			res = "FIEL"
+		}
+		vec(t, "pptx", "forma-oculta", res, fmt.Sprintf("rotulada=%v", res == "FIEL"))
 	}
 	// 8. deadline no meio da extracao: erro nao tipado.
 	{

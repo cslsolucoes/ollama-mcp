@@ -33,6 +33,12 @@ const maxStyleHops = 32
 // at most 9 "%n" of at most 64 runes each, a prefix stays under ~700 runes.
 const maxLvlTextRunes = 128
 
+// maxNumberingItems bounds the w: elements of numbering.xml (each w:num and
+// w:lvl becomes a small struct). 100 000 refused a valid 2.9 MB part with 50
+// 000 w:num (documents pasted together many times); 300 000 keeps 3x margin
+// over it and the structs under ~40 MB. Above it: numeracao=indisponivel.
+const maxNumberingItems = 300000
+
 type numLevel struct {
 	start       int
 	format      string
@@ -76,15 +82,19 @@ type docxNumbering struct {
 }
 
 // loadNumbering reads word/numbering.xml and the numbering part of
-// word/styles.xml. It returns nil (no prefixes at all) when there is no
-// numbering.xml or it cannot be parsed.
-func loadNumbering(pkg *Package, lim Limits) paragraphNumberer {
+// word/styles.xml. Without numbering.xml it returns nil, false (no prefixes,
+// nothing missing). When numbering.xml exists but cannot be read (broken, or
+// over maxNumberingItems) it returns nil, true: the text goes out without list
+// numbers and the footer says numeracao=indisponivel (owner decision, 7.7a
+// M3). A broken styles.xml keeps the direct numbering but loses the numbering
+// inherited from styles, so it is flagged too.
+func loadNumbering(pkg *Package, lim Limits) (paragraphNumberer, bool) {
 	if !pkg.Has("word/numbering.xml") {
-		return nil
+		return nil, false
 	}
 	data, err := pkg.Read("word/numbering.xml")
 	if err != nil {
-		return nil
+		return nil, true
 	}
 	n := &docxNumbering{
 		abstract:  map[string]*numAbstract{},
@@ -95,17 +105,21 @@ func loadNumbering(pkg *Package, lim Limits) paragraphNumberer {
 		applied:   map[string]bool{},
 	}
 	if err := parseNumbering(data, lim, n); err != nil {
-		return nil
+		return nil, true
 	}
+	unavailable := false
 	if pkg.Has("word/styles.xml") {
-		if sd, err := pkg.Read("word/styles.xml"); err == nil {
+		sd, err := pkg.Read("word/styles.xml")
+		if err == nil {
+			err = parseNumStyles(sd, lim, n)
+		}
+		if err != nil {
 			// A broken styles part only loses style-inherited numbering.
-			if err := parseNumStyles(sd, lim, n); err != nil {
-				n.styles = map[string]*numStyle{}
-			}
+			n.styles = map[string]*numStyle{}
+			unavailable = true
 		}
 	}
-	return n
+	return n, unavailable
 }
 
 func wVal(se xml.StartElement) string {
@@ -135,7 +149,7 @@ func parseNumbering(data []byte, lim Limits, nb *docxNumbering) error {
 		curNum   *numInstance
 		curLvl   *numLevel
 		ovIdx    = -1
-		maxItems = 100000
+		maxItems = maxNumberingItems
 	)
 	for {
 		tok, err := dec.Next()

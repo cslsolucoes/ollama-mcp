@@ -1388,3 +1388,27 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
 - **Leitura honesta:** o fuzz guiado por cobertura **não** encontrou A1 (amplificação de `lvlText`) nem A2 (PDF lento com memória sem teto), que a revisão adversarial achou com vetores construídos. O critério do brief §7.5 (30 min por alvo sem panic e sem travar) foi cumprido, mas fuzz verde não substitui a revisão.
 - **Pendência:**
   - **P7.7-5 (opcional):** repetir o `FuzzDOCX` e o `FuzzPDF` no código já corrigido, em fase futura.
+
+### 2026-10-28 17:42 — correções da revisão adversarial, passo 2 (M2, M3, B6, texto oculto)
+- **Aplicado (agente Opus):**
+  - **M2:** `altChunk` com TXT (UTF-8), HTML ou DOCX importado (profundidade 1, mesmo orçamento e teto) é extraído no lugar.
+    - O HTML passa por um leitor simples, sem DTD e sem entidades definidas.
+    - Tipo não suportado → `[aviso] parte do conteúdo não pôde ser lida`.
+    - Rodapé `conteudo_importado=sim`.
+    - Novos `docx_import.go` e `docx_import_test.go`.
+  - **M3:** `numbering.xml` (ou `styles.xml`) quebrado ou acima do teto → texto sem números + `numeracao=indisponivel`. O teto subiu de 100.000 para 300.000 itens (o caso válido de 50.005 `w:num` voltou a ter números).
+  - **B6:** o PDFium devolve **o mesmo `\x02` para hífen real e para soft-hyphen**, sem como distinguir (medido).
+    - Regra aplicada: `\x02` antes de minúscula junta a linha e **mantém** o hífen ("obriga-se", "ex-empregado"); em qualquer outro caso o hífen e a quebra voltam; `-` literal no fim da linha fica.
+    - Custo: a quebra silábica também mantém o hífen ("con-trato"), o que é coerente com a decisão "manter hífen sempre".
+  - **Texto oculto:**
+    - **DOCX:** `w:vanish` direto, por estilo (caractere e parágrafo, `basedOn`, padrões do documento) → linha `[oculto] <texto>`. Simplificação: a alternância do `vanish` entre estilos aninhados não é calculada.
+    - **PPTX:** formas, grupos e tabelas com `hidden="1"` rotulados.
+    - Rodapé `texto_oculto=sim`.
+    - **PDF: limitação registrada.** O modo de renderização 3 só sai por chamada por caractere e é a camada de OCR dos PDFs digitalizados; rotulá-lo erraria no caso mais comum.
+- **Campos novos do rodapé** (só quando se aplicam): `numeracao=indisponivel`, `conteudo_importado=sim`, `texto_oculto=sim`. As descrições das tools não mudaram (`TOOLS.md` igual; budget 4.400/7.800).
+- **Verificação:**
+  - agente: gate com `-race` em todos os pacotes, 0 data race;
+  - ataques da Fase 7: 158 vetores, **0 ACHADO, 0 SILENCIOSO, 0 ESCAPOU**; bomba de PDF para em 2,0 s;
+  - Fase 4: 227 vetores, 0 ESCAPOU;
+  - **loop principal:** a árvore staged (sem o `src/ocr/` e o `go.mod` do agente do OCR, que estão em andamento) foi verificada num worktree limpo: `gofmt` vazio, `vet` OK, todos os pacotes `ok`.
+- **Observação:** o `src/ocr/` e as mudanças em `go.mod`/`go.sum` (`x/image`, `x/sys` direto) são da 7.9a, ainda em execução, e ficaram fora deste commit.

@@ -53,7 +53,9 @@ func (testDocExtractor) Extract(ctx context.Context, name string, data []byte) (
 		return nil, err
 	}
 	return &files.Extracted{Text: r.Text, Format: r.Format.String(), Pages: r.Pages, Slides: r.Slides,
-		PagesWithoutText: r.PagesWithoutText, PendingRevisions: r.PendingRevisions}, nil
+		PagesWithoutText: r.PagesWithoutText, PendingRevisions: r.PendingRevisions,
+		ImportedContent: r.ImportedContent, UnreadContent: r.UnreadContent,
+		NumberingUnavailable: r.NumberingUnavailable, HiddenText: r.HiddenText}, nil
 }
 
 // docDeps is fileEnv.deps with the document extractor installed.

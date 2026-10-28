@@ -1,0 +1,200 @@
+﻿=== RUN   TestAdvDOCXIntegrity
+    fase7_docx_adv_test.go:41: VEC|docx/ac-aninhado|FIEL|3 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:44: VEC|docx/ac-sem-choice|FIEL|2 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:48: VEC|docx/ac-dois-choice|FIEL|1 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:54: VEC|docx/ac-choice-vazio-fallback-texto|INFO|err=ok fallback_presente=false (le so o Choice, como o Word quando entende o Requires)
+    fase7_docx_adv_test.go:58: VEC|docx/sdt-aninhado|FIEL|3 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:71: VEC|docx/fldchar-begin-sem-fim|FIEL|reason=7
+    fase7_docx_adv_test.go:89: VEC|docx/fldchar-separate-end-em-del|FIEL|reason=7
+    fase7_docx_adv_test.go:93: VEC|docx/fldchar-end-em-del|FIEL|2 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:96: VEC|docx/fldchar-end-sem-begin|FIEL|1 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:98: VEC|docx/fldchar-aninhado|FIEL|2 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:117: VEC|docx/revisoes-aninhadas|FIEL|ins-em-del=0 del-em-ins=0 inserido=1 movido=1 pendentes=true
+    fase7_docx_adv_test.go:124: VEC|docx/marca-paragrafo-excluida|INFO|fundido=false (nenhum texto perdido; so a quebra de linha difere do Word)
+    fase7_docx_adv_test.go:129: VEC|docx/linha-excluida-trpr-del|INFO|linha_excluida_aparece=true (o Word marca tambem os runs com w:del; so arquivo forjado expoe isso)
+    fase7_docx_adv_test.go:133: VEC|docx/hyperlink-smarttag-customxml-dir|FIEL|6 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:143: VEC|docx/tabelas-aninhadas-3-niveis|FIEL|7 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:146: VEC|docx/tabelas-aninhadas-ordem|FIEL|ordem de leitura N1-A antes de N3-A
+    fase7_docx_adv_test.go:154: VEC|docx/merge-continuacao-com-texto|INFO|vMerge_cont_aparece=false hMerge_cont_aparece=false (descartado de proposito: o Word nao exibe texto de celula absorvida; arquivo so forjado)
+    fase7_docx_adv_test.go:164: VEC|docx/caixa-texto-cabecalho|FIEL|2 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:175: VEC|docx/notas-ids-repetidos-e-respostas|FIEL|4 marcadores presentes exatamente 1 vez
+    fase7_docx_adv_test.go:178: VEC|docx/nota-aninhada|INFO|err=ok A=1 B=1 C=1 (texto preservado; atribuicao de NF-C fica fora do rotulo; schema-invalido)
+    fase7_docx_adv_test.go:183: VEC|docx/t-fora-de-p|INFO|err=ok presente=false (schema-invalido; Word recusa)
+    fase7_docx_adv_test.go:193: VEC|docx/texto-oculto-vanish|FIEL|rotulado=true
+    fase7_docx_adv_test.go:203: VEC|docx/altchunk|FIEL|ok
+    fase7_docx_adv_test.go:215: VEC|docx/rels-alvo-caixa-diferente|FIEL|ok
+    fase7_docx_adv_test.go:222: VEC|docx/entrada-word-maiuscula|INFO|recusa ruidosa: ok (o Word abriria; nao ha perda silenciosa)
+    fase7_docx_adv_test.go:227: VEC|docx/rels-alvo-absoluto-opc|INFO|documento inteiro recusado: reason=7 (alvo absoluto /word/... e valido no OPC; recusa ruidosa)
+    fase7_docx_adv_test.go:237: VEC|docx/cabecalho-aponta-document-xml|FIEL|ok
+--- PASS: TestAdvDOCXIntegrity (0.01s)
+=== RUN   TestAdvDOCXNumbering
+    fase7_docx_adv_test.go:250: VEC|num/numid-inexistente|FIEL|texto preservado sem prefixo; saida="TEXTO-NUMID-INEXISTENTE\n1.\tPRIMEIRA\n"
+    fase7_docx_adv_test.go:257: VEC|num/ilvl-12|INFO|err=ok saida="(i)\tILVL" (texto preservado; prefixo por fixacao em 0..8)
+    fase7_docx_adv_test.go:257: VEC|num/ilvl--3|INFO|err=ok saida="1.\tILVL" (texto preservado; prefixo por fixacao em 0..8)
+    fase7_docx_adv_test.go:257: VEC|num/ilvl-abc|INFO|err=ok saida="1.\tILVL" (texto preservado; prefixo por fixacao em 0..8)
+    fase7_docx_adv_test.go:257: VEC|num/ilvl-99999999999999999999|INFO|err=ok saida="1.\tILVL" (texto preservado; prefixo por fixacao em 0..8)
+    fase7_docx_adv_test.go:263: VEC|num/percent-10|INFO|saida="10.\tA\n20.\tB\n" (%10 = %1 seguido de '0', igual ao Word: o 1o item vira "10.")
+    fase7_docx_adv_test.go:273: VEC|num/ciclo-stylelink|FIEL|ok - CICLO-OK
+    fase7_docx_adv_test.go:282: VEC|num/ciclo-basedon|FIEL|ok
+    fase7_docx_adv_test.go:294: VEC|num/numbering-xml-malformado|FIEL|texto preservado ("CLAUSULA-COM-NUMERO\n") e NumberingUnavailable=true (rodape numeracao=indisponivel)
+    fase7_docx_adv_test.go:311: VEC|num/numbering-100k-elementos|FIEL|ok
+--- PASS: TestAdvDOCXNumbering (0.22s)
+=== RUN   TestAdvDOCXLvlTextAmplification
+    fase7_docx_adv_test.go:355: VEC|rec/lvltext-amplificacao-raiz-1par|INFO|docx=1225 B; prefixo/paragrafo=4194304 runas; pico heap=0.6 MiB; alocado=0.6 MiB; 7ms; resultado=ok; razao pico/arquivo=523x
+    fase7_docx_adv_test.go:355: VEC|rec/lvltext-amplificacao-raiz-1par-lvltext-2MiB|INFO|docx=3169 B; prefixo/paragrafo=67108864 runas; pico heap=6.0 MiB; alocado=8.1 MiB; 37ms; resultado=ok; razao pico/arquivo=1995x
+    fase7_docx_adv_test.go:355: VEC|rec/lvltext-amplificacao-celula-8par|INFO|docx=1251 B; prefixo/paragrafo=4194304 runas; pico heap=0.6 MiB; alocado=0.6 MiB; 4ms; resultado=ok; razao pico/arquivo=480x
+    fase7_docx_adv_test.go:355: VEC|rec/lvltext-amplificacao-celula-16par|INFO|docx=1255 B; prefixo/paragrafo=4194304 runas; pico heap=0.4 MiB; alocado=0.6 MiB; 4ms; resultado=ok; razao pico/arquivo=367x
+    fase7_docx_adv_test.go:355: VEC|rec/lvltext-amplificacao-celula-32par|INFO|docx=1264 B; prefixo/paragrafo=4194304 runas; pico heap=0.6 MiB; alocado=0.7 MiB; 4ms; resultado=ok; razao pico/arquivo=509x
+--- PASS: TestAdvDOCXLvlTextAmplification (0.06s)
+=== RUN   TestAdvDOCXDeterminism
+    fase7_docx_adv_test.go:386: VEC|det/docx-50x|FIEL|1 hash(es) distintos em 50 extracoes (numeracao, estilos, 2 cabecalhos, rodape, notas, comentarios)
+--- PASS: TestAdvDOCXDeterminism (0.03s)
+=== RUN   TestAdvPDF
+    fase7_pdf_adv_test.go:119: VEC|pdf/js-launch-anexo-metadados|BLOQUEADO|visivel=true vazou=[]
+    fase7_pdf_adv_test.go:120: VEC|pdf/acroform-valor-e-aparencia|INFO|valor_campo=false aparencia_widget=false anotacao_freetext=false (formulario preenchido nao vai para o modelo, como o brief decide; perda sem sinal no rodape)
+    fase7_pdf_adv_test.go:131: VEC|pdf/arvore-ciclo-2-nos|BLOQUEADO|reason=7
+    fase7_pdf_adv_test.go:131: VEC|pdf/arvore-kid-de-si-mesmo|BLOQUEADO|reason=7
+    fase7_pdf_adv_test.go:152: VEC|pdf/stream-externo-F|BLOQUEADO|ok
+    fase7_pdf_adv_test.go:166: VEC|pdf/paginas-2001|BLOQUEADO|reason=7 em 14ms
+    fase7_pdf_adv_test.go:182: VEC|pdf/paginas-mistas|FIEL|paginas=3 sem_texto=1
+    fase7_pdf_adv_test.go:184: VEC|pdf/texto-invisivel|INFO|Tr3=true branco=true (texto que o leitor nao ve chega ao modelo; necessario para PDF com OCR embutido)
+    fase7_pdf_adv_test.go:197: VEC|pdf/truncado-antes-pag3|INFO|reason=7 paginas=0 (original 3; o que um leitor de PDF tambem mostraria)
+    fase7_pdf_adv_test.go:213: VEC|pdf/hifen-encliticos|FIEL|hifen_perdido=false hifens_mantidos=true
+    fase7_pdf_adv_test.go:215: VEC|pdf/hifen-apos-digito-softhyphen|INFO|pdfiumSoftHyphens("prazo 30\x02dias")="prazo 30-dias" (o hifen fica; a linha so e juntada)
+    fase7_pdf_adv_test.go:222: VEC|pdf/lixo-antes-do-cabecalho|INFO|detect=pdf/<nil> extract=ok texto=true
+--- PASS: TestAdvPDF (6.71s)
+=== RUN   TestAdvPDFContentBomb
+    fase7_pdf_adv_test.go:276: VEC|rec/pdf-bomba-conteudo-caminhos-1M|INFO|pdf=29442 B, conteudo=14 MiB; timeout=2s, durou 2s; reason=10; pico de memoria privada do processo=+273.4 MiB
+    fase7_pdf_adv_test.go:263: VEC|rec/pdf-bomba-residuo-caminhos-1M|INFO|memoria privada apos GC+FreeOSMemory: +0.0 MiB em relacao a antes
+    fase7_pdf_adv_test.go:276: VEC|rec/pdf-bomba-conteudo-caminhos-3M|INFO|pdf=87014 B, conteudo=42 MiB; timeout=2s, durou 2.002s; reason=10; pico de memoria privada do processo=+312.3 MiB
+    fase7_pdf_adv_test.go:263: VEC|rec/pdf-bomba-residuo-caminhos-3M|INFO|memoria privada apos GC+FreeOSMemory: -0.0 MiB em relacao a antes
+    fase7_pdf_adv_test.go:276: VEC|rec/pdf-bomba-conteudo-texto-1M-tj|INFO|pdf=33563 B, conteudo=16 MiB; timeout=2s, durou 2.019s; reason=10; pico de memoria privada do processo=+404.1 MiB
+    fase7_pdf_adv_test.go:263: VEC|rec/pdf-bomba-residuo-texto-1M-tj|INFO|memoria privada apos GC+FreeOSMemory: -0.0 MiB em relacao a antes
+--- PASS: TestAdvPDFContentBomb (14.32s)
+=== RUN   TestAdvPDFNoStdoutStderr
+    fase7_pdf_adv_test.go:314: VEC|pdf/wasm-stdout-stderr|BLOQUEADO|init do motor + 5 PDFs ([ok reason=7 reason=7 reason=7 ok]) + render: stdout=0 B stderr=0 B
+--- PASS: TestAdvPDFNoStdoutStderr (9.35s)
+=== RUN   TestAdvPDFPanicReleasesSlot
+    fase7_pdf_adv_test.go:344: VEC|pdf/panic-no-motor-libera-slot|BLOQUEADO|panic->reason=7 vazou_msg=false; PDF seguinte: ok
+    fase7_pdf_adv_test.go:354: VEC|panic/hook-docx|BLOQUEADO|reason=7
+    fase7_pdf_adv_test.go:354: VEC|panic/hook-pptx|BLOQUEADO|reason=7
+    fase7_pdf_adv_test.go:354: VEC|panic/hook-pdf|BLOQUEADO|reason=7
+--- PASS: TestAdvPDFPanicReleasesSlot (9.43s)
+=== RUN   TestAdvPDFDeterminism
+    fase7_pdf_adv_test.go:369: VEC|det/pdf-20x-tres-paginas|FIEL|1 hash(es)
+    fase7_pdf_adv_test.go:369: VEC|det/pdf-20x-acentos|FIEL|1 hash(es)
+    fase7_pdf_adv_test.go:369: VEC|det/pdf-20x-js-form|FIEL|1 hash(es)
+--- PASS: TestAdvPDFDeterminism (11.99s)
+=== RUN   TestAdvPPTX
+    fase7_pptx_zip_adv_test.go:34: VEC|pptx/sldid-duplicado|FIEL|reason=7
+    fase7_pptx_zip_adv_test.go:42: VEC|pptx/rel-faltando|BLOQUEADO|recusa ruidosa: reason=7
+    fase7_pptx_zip_adv_test.go:53: VEC|pptx/ac-sem-choice|FIEL|ok
+    fase7_pptx_zip_adv_test.go:60: VEC|pptx/ac-aninhado|FIEL|ocorrencias=1 ok
+    fase7_pptx_zip_adv_test.go:68: VEC|pptx/hmerge-com-texto|INFO|span=true hmerge_aparece=false (celula absorvida descartada, como o PowerPoint exibe)
+    fase7_pptx_zip_adv_test.go:80: VEC|pptx/notas-alvo-caixa-diferente|FIEL|ok
+    fase7_pptx_zip_adv_test.go:85: VEC|pptx/slide-alvo-caixa-diferente|INFO|recusa ruidosa: ok
+    fase7_pptx_zip_adv_test.go:95: VEC|pptx/smartart|INFO|smartart_extraido=false (fora do escopo do brief; perda sem sinal no rodape)
+    fase7_pptx_zip_adv_test.go:107: VEC|pptx/forma-oculta|FIEL|rotulada=true
+    fase7_pptx_zip_adv_test.go:120: VEC|pptx/deadline-nao-tipado|INFO|extractPPTX devolve a extração do texto excedeu o tempo limite (--timeout) (tipado=true); DOCX e PDF devolvem ReasonTimeout
+    fase7_pptx_zip_adv_test.go:142: VEC|rec/pptx-100k-sldid-mesmo-slide|INFO|pptx=240999 B; 30ms; pico heap=3.2 MiB; slides=0; reason=7 (CPU limitada pelo --timeout, checado por slide)
+--- PASS: TestAdvPPTX (0.10s)
+=== RUN   TestAdvPPTXDeterminism
+    fase7_pptx_zip_adv_test.go:156: VEC|det/pptx-50x|FIEL|1 hash(es) em 50 extracoes
+--- PASS: TestAdvPPTXDeterminism (0.03s)
+=== RUN   TestAdvZip
+    fase7_pptx_zip_adv_test.go:182: VEC|zip/bomba-sobreposta-12x30MiB|BLOQUEADO|arquivo=64393 B, 29 MiB por entrada, reason=7; pico heap=60.0 MiB; alocado=242.6 MiB; 6.021s
+    fase7_pptx_zip_adv_test.go:198: VEC|zip/muitas-pequenas-somam-acima-total|BLOQUEADO|40 x 300 KiB com MaxTotalBytes=4 MiB: reason=7
+    fase7_pptx_zip_adv_test.go:211: VEC|zip/entrada-declara-0|BLOQUEADO|reason=7
+    fase7_pptx_zip_adv_test.go:219: VEC|zip/zip-aninhado|BLOQUEADO|entradas aninhadas nunca lidas; ok; pico=0.0 MiB
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-dup-caixa|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-dup-barra-dupla|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-dup-ponto|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-dup-ponto-meio|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-fullwidth-nfkc|BLOQUEADO|ok texto="VARIANTE-0"
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-barra-final|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-backslash|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-drive|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:252: VEC|zip/nome-ponto-ponto-meio|BLOQUEADO|reason=7 texto=""
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-%2e%2e/%2e%2e/evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-..\evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-C:/evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-C:evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-file:///C:/evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-\\server\share\x.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-%5c%5cserver%5cx.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-%00x.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-http://example.invalid/x.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-/../evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-%2F..%2F..%2Fevil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-a/%2e%2e/%2e%2e/%2e%2e/evil.xml|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-%252e%252e/evil.xml|BLOQUEADO|ok; alvo_duplo_encode_lido=true (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:266: VEC|zip/rels-alvo-header1.xml%00.png|BLOQUEADO|reason=7; alvo_duplo_encode_lido=false (dentro do pacote)
+    fase7_pptx_zip_adv_test.go:273: VEC|zip/rels-external-file|BLOQUEADO|ok
+--- PASS: TestAdvZip (6.70s)
+=== RUN   TestAdvXML
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/entidade-sem-dtd|BLOQUEADO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/doctype-entidade|BLOQUEADO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/doctype-depois-raiz|BLOQUEADO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/char-ref-nul|BLOQUEADO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/utf16-bom|INFO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/encoding-latin1|BLOQUEADO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/profundidade-10000|BLOQUEADO|reason=7 len=0
+    fase7_pptx_zip_adv_test.go:306: VEC|xml/texto-gigante-20M|BLOQUEADO|reason=8 len=0
+    fase7_pptx_zip_adv_test.go:312: VEC|xml/cdata|FIEL|ok
+    fase7_pptx_zip_adv_test.go:319: VEC|xml/atributo-30MiB|INFO|arquivo=31689 B; ok; pico heap=115.0 MiB (limitado por MaxEntryBytes=64 MiB)
+    fase7_pptx_zip_adv_test.go:327: VEC|xml/comentario-40MiB|INFO|arquivo=42043 B; ok; pico heap=151.0 MiB; 659ms
+--- PASS: TestAdvXML (1.67s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/doctext	60.725s
+=== RUN   TestAdvGuardHostileExtractor
+    fase7_guard_adv_test.go:56: VEC|guard/ctx-extrator-bloqueado|BLOQUEADO|context deadline exceeded em 101ms
+    fase7_guard_adv_test.go:66: VEC|guard/extrator-nil-nil|BLOQUEADO|documento corrompido, malformado ou acima dos limites de segurança
+    fase7_guard_adv_test.go:66: VEC|guard/extrator-utf8-invalido|BLOQUEADO|documento corrompido, malformado ou acima dos limites de segurança
+    fase7_guard_adv_test.go:74: VEC|guard/mensagem-do-extrator-repassada|INFO|caminho_repassado=true (o guard confia no contrato; userSafe do binario filtra: ver leak/*)
+    fase7_guard_adv_test.go:91: VEC|guard/denylist-credentials.docx|BLOQUEADO|err=acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido chamadas_ao_extrator=0
+    fase7_guard_adv_test.go:91: VEC|guard/denylist-secrets/contrato.pdf|BLOQUEADO|err=acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido chamadas_ao_extrator=0
+    fase7_guard_adv_test.go:91: VEC|guard/denylist-minha-secret.pptx|BLOQUEADO|err=acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido chamadas_ao_extrator=0
+    fase7_guard_adv_test.go:91: VEC|guard/denylist-.env.pdf|BLOQUEADO|err=acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido chamadas_ao_extrator=0
+    fase7_guard_adv_test.go:99: VEC|guard/pdf-txt-vai-pelo-texto|BLOQUEADO|formato=&{relatorio.pdf.txt 5 texto txt 0 0 0 false false false false false} chamadas=0
+--- PASS: TestAdvGuardHostileExtractor (0.16s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/files	0.191s
+=== RUN   TestAdvGuardRealExtractor
+    fase7_e2e_adv_test.go:178: VEC|guard/texto-com-cabecalho.pdf|BLOQUEADO|recusa reason=9 "documento corrompido, malformado ou acima dos limites de segurança" (11.029s) vaza=[]
+    fase7_e2e_adv_test.go:178: VEC|guard/texto-sem-cabecalho.pdf|BLOQUEADO|recusa reason=9 "o conteúdo não corresponde à extensão do arquivo (.docx/.pptx/.pdf); o arquivo pode estar corrompido ou renomeado" (25ms) vaza=[]
+    fase7_e2e_adv_test.go:178: VEC|guard/texto.docx|BLOQUEADO|recusa reason=9 "o conteúdo não corresponde à extensão do arquivo (.docx/.pptx/.pdf); o arquivo pode estar corrompido ou renomeado" (6ms) vaza=[]
+    fase7_e2e_adv_test.go:178: VEC|guard/grande.doc|BLOQUEADO|recusa reason=6 "arquivo grande demais: 6291460 bytes, o teto é 4194304 (--max-file-bytes); divida o arquivo ou aumente o teto" (8ms) vaza=[]
+    fase7_e2e_adv_test.go:185: VEC|guard/pequeno.doc|FIEL|formato=txt bytes=1048600 runas=1048600 texto_puro_chegou=false (2ms)
+    fase7_e2e_adv_test.go:178: VEC|guard/binario.doc|BLOQUEADO|recusa reason=7 "arquivo binário recusado (contém bytes nulos); só texto UTF-8 é lido" (2ms) vaza=[]
+    fase7_e2e_adv_test.go:185: VEC|guard/MAIUSCULO.PDF|FIEL|formato=pdf bytes=760 runas=50 texto_puro_chegou=false (10ms)
+    fase7_e2e_adv_test.go:185: VEC|guard/Contrato.Docx|FIEL|formato=docx bytes=1193 runas=76 texto_puro_chegou=false (2ms)
+    fase7_e2e_adv_test.go:178: VEC|guard/grande-demais.pdf|BLOQUEADO|recusa reason=6 "arquivo grande demais: 34603724 bytes, o teto é 33554432 (--max-doc-bytes); divida o arquivo ou aumente o teto" (2ms) vaza=[]
+    fase7_e2e_adv_test.go:185: VEC|guard/pdf-com-lixo-de-30MiB-no-fim.pdf|FIEL|formato=pdf bytes=31458061 runas=50 texto_puro_chegou=false (4.654s)
+    fase7_e2e_adv_test.go:191: VEC|guard/doc-texto-4MiB+1|BLOQUEADO|arquivo grande demais: 4194305 bytes, o teto é 4194304 (--max-file-bytes); divida o arquivo ou aumente o teto
+    fase7_e2e_adv_test.go:201: VEC|guard/nome-ponto.pdf.-sufixo|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    fase7_e2e_adv_test.go:201: VEC|guard/nome-espaco.pdf-sufixo|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAdvGuardRealExtractor (17.68s)
+=== RUN   TestAdvTimeoutMessages
+    fase7_e2e_adv_test.go:238: VEC|timeout/lenta.pptx|INFO|mensagem ao usuario="a extração do texto excedeu o tempo limite (--timeout)" tipado=false
+    fase7_e2e_adv_test.go:238: VEC|timeout/lenta.docx|INFO|mensagem ao usuario="a extração do texto excedeu o tempo limite (--timeout)" tipado=false
+--- PASS: TestAdvTimeoutMessages (0.14s)
+=== RUN   TestAdvE2E
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-ciclo.pdf|BLOQUEADO|isError=true vaza=[] texto="documento corrompido, malformado ou acima dos limites de segurança"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-truncado.pdf|BLOQUEADO|isError=true vaza=[] texto="documento corrompido, malformado ou acima dos limites de segurança"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-malformado.docx|BLOQUEADO|isError=true vaza=[] texto="documento corrompido, malformado ou acima dos limites de segurança"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-dtd.docx|BLOQUEADO|isError=true vaza=[] texto="documento corrompido, malformado ou acima dos limites de segurança"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-sem-rel.pptx|BLOQUEADO|isError=true vaza=[] texto="documento corrompido, malformado ou acima dos limites de segurança"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-cifrado.docx|BLOQUEADO|isError=true vaza=[] texto="documento do Office protegido por senha não é suportado; salve uma cópia sem senha"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-bom.pdf|FIEL|isError=false vaza=[] texto="RESPOSTA-DO-MODELO"
+    fase7_e2e_adv_test.go:319: VEC|e2e/resposta-bom.docx|FIEL|isError=false vaza=[] texto="RESPOSTA-DO-MODELO"
+    fase7_e2e_adv_test.go:321: VEC|e2e/servidor-sobrevive|BLOQUEADO|8 documentos (6 hostis) + ping: 9 respostas, 2 sucessos, exit=0
+    fase7_e2e_adv_test.go:326: VEC|leak/stderr-debug|BLOQUEADO|27 linhas de stderr sem texto, autor, docProps, caminho, wazero/pdfium
+    fase7_e2e_adv_test.go:341: VEC|leak/docprops-no-prompt|BLOQUEADO|2 prompts
+    fase7_e2e_adv_test.go:342: VEC|leak/autor-comentario-no-prompt|INFO|autor_presente=true (por desenho: [comentário] <autor>: texto, brief 4.1)
+    fase7_e2e_adv_test.go:356: VEC|leak/injecao-marcador-forjado|BLOQUEADO|nonce real unico=true; marcador forjado dentro do bloco
+--- PASS: TestAdvE2E (9.25s)
+=== RUN   TestAdvTOCTOUContentSwap
+    fase7_e2e_adv_test.go:416: VEC|guard/toctou-troca-conteudo|BLOQUEADO|300 leituras em corrida: 18 docx ok, 282 recusas, 0 com texto puro
+--- PASS: TestAdvTOCTOUContentSwap (9.73s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	36.884s

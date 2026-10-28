@@ -79,9 +79,9 @@ func TestPDFAllBlankIsNoText(t *testing.T) {
 func TestPDFHyphenation(t *testing.T) {
 	r := mustPDF(t, pdfHyphen(t))
 	for _, w := range []string{
-		"Este contrato termina aqui e continua", // joined: next line starts lowercase
-		"Rio-\nSao nao junta",                   // capital: kept
-		"valor 10 -\nmais nao junta",            // hyphen after a space: kept
+		"Este contra-to termina aqui e continua", // joined, hyphen kept (B6): next line starts lowercase
+		"Rio-\nSao nao junta",                    // capital: kept
+		"valor 10 -\nmais nao junta",             // hyphen after a space: kept
 	} {
 		if !strings.Contains(r.Text, w) {
 			t.Fatalf("falta %q em %q", w, r.Text)
@@ -346,7 +346,7 @@ func TestFakeEngineMarkersFooterAndHyphen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "[página 1]\n" + long + " contrato e Rio-\nSão e 10 -\nmais e a-\n\nb e fim-\n\n" +
+	want := "[página 1]\n" + long + " con-\ntrato e Rio-\nSão e 10 -\nmais e a-\n\nb e fim-\n\n" +
 		"[página 2]\n\n[página 3]\ncurto\n\n[página 4]\n" + long
 	// the trailing "fim-\n" is trimmed by TrimSpace (page end), so it keeps the hyphen only
 	want = strings.Replace(want, "fim-\n\n[página 2]", "fim-\n\n[página 2]", 1)
@@ -445,34 +445,35 @@ func TestFakeEngineContextBetweenPages(t *testing.T) {
 	}
 }
 
-func TestJoinHyphenation(t *testing.T) {
-	cases := map[string]string{
-		"con-\nto":         "conto",
-		"con-\nTo":         "con-\nTo",
-		"10 -\nmais":       "10 -\nmais",
-		"-\nabc":           "-\nabc",
-		"abc-":             "abc-",
-		"abc-\n":           "abc-\n",
-		"co-\nação":        "coação",
-		"co-\n\nabc":       "co-\n\nabc",
-		"a-\nb-\nc":        "abc",
-		"sem hifen\nlinha": "sem hifen\nlinha",
+// A literal "-" at the end of a line (from an engine that does not mark it) is
+// never joined nor dropped: the text keeps the hyphen and the line break.
+func TestPlainHyphenAtLineEndIsKept(t *testing.T) {
+	long := "texto suficientemente longo para a pagina"
+	useFakePDF(t, []string{long + " obriga-\nse e con-\nto e ex-\nempregado"})
+	r, err := Extract(context.Background(), FormatPDF, nil, Limits{})
+	if err != nil {
+		t.Fatal(err)
 	}
-	for in, want := range cases {
-		if got := joinHyphenation(in); got != want {
-			t.Errorf("joinHyphenation(%q) = %q, queria %q", in, got, want)
-		}
+	if !strings.Contains(r.Text, "obriga-\nse e con-\nto e ex-\nempregado") {
+		t.Fatalf("hífen ou quebra alterados: %q", r.Text)
 	}
 }
 
+// B6 (owner decision after 7.7a): the U+0002 of PDFium is the same for a real
+// hyphen and a syllable break, so the hyphen always stays; the line is joined
+// only before a lowercase letter.
 func TestPDFiumSoftHyphens(t *testing.T) {
 	cases := map[string]string{
-		"con\x02trato":      "contrato",
-		"Rio\x02São":        "Rio-\nSão",
-		"ab\x021990":        "ab-\n1990",
-		"fim\x02":           "fim-\n",
-		"co\x02ação x\x02y": "coação xy",
-		"sem marca":         "sem marca",
+		"obriga\x02se":        "obriga-se",
+		"compromete\x02se":    "compromete-se",
+		"ex\x02empregado":     "ex-empregado",
+		"con\x02trato":        "con-trato",
+		"Rio\x02São":          "Rio-\nSão",
+		"ab\x021990":          "ab-\n1990",
+		"fim\x02":             "fim-\n",
+		"co\x02ação x\x02y":   "co-ação x-y",
+		"prazo de 30\x02dias": "prazo de 30-dias",
+		"sem marca":           "sem marca",
 	}
 	for in, want := range cases {
 		if got := pdfiumSoftHyphens(in); got != want {

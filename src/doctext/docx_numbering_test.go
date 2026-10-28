@@ -186,11 +186,23 @@ func TestNumberingUnknownAndMissing(t *testing.T) {
 	num := nbAbs("0", nbLvl(0, "decimal", "%1.", nbSuff("space"))) + nbNum("1", "0", "")
 	body := nbP("0", 0, "zero") + nbP("99", 0, "indefinido") + nbP("1", 3, "nivel ausente") + nbP("1", 0, "ok")
 	dxWant(t, nbDocx(t, num, "", body), "zero\nindefinido\n- nivel ausente\n1. ok\n")
-	// No numbering.xml: numPr is ignored, nothing is prefixed, nothing fails.
-	dxWant(t, nbDocx(t, "", "", nbP("1", 0, "sem lista")), "sem lista\n")
-	// Garbage numbering.xml: ignored too.
+	// No numbering.xml: numPr is ignored, nothing is prefixed, nothing fails,
+	// and nothing is missing.
+	none := nbDocx(t, "", "", nbP("1", 0, "sem lista"))
+	dxWant(t, none, "sem lista\n")
+	if dxExtract(t, none).NumberingUnavailable {
+		t.Error("sem numbering.xml não falta numeração")
+	}
+	// Garbage numbering.xml: the text goes out without numbers, and the result
+	// says the numbering is unavailable (footer numeracao=indisponivel).
 	bad := dxBuild(t, nbP("1", 0, "x"), entry{name: "word/numbering.xml", data: []byte(`<w:numbering`)})
 	dxWant(t, bad, "x\n")
+	if !dxExtract(t, bad).NumberingUnavailable {
+		t.Error("numbering.xml quebrado deve marcar NumberingUnavailable")
+	}
+	if dxExtract(t, nbDocx(t, num, "", body)).NumberingUnavailable {
+		t.Error("numeração válida não é indisponível")
+	}
 }
 
 func TestNumberingStyleCycleDoesNotHang(t *testing.T) {
@@ -218,5 +230,39 @@ func TestNumberingNotAppliedToHeaderParagraphsAndDeterminism(t *testing.T) {
 		if got := dxExtract(t, data).Text; got != first {
 			t.Fatalf("extração %d: %q != %q", i, got, first)
 		}
+	}
+}
+
+// 7.7a M3: a valid numbering.xml with 50 000 w:num (documents pasted together
+// many times) keeps its numbers; one over the item ceiling goes out without
+// numbers and says so (NumberingUnavailable), never in silence.
+func TestNumberingLargeAndOverTheCeiling(t *testing.T) {
+	build := func(nums int) []byte {
+		var sb strings.Builder
+		sb.WriteString(nbAbs("0", nbLvl(0, "decimal", "%1.", "")) + nbNum("1", "0", ""))
+		for i := 2; i <= nums; i++ {
+			sb.WriteString(`<w:num w:numId="` + strconv.Itoa(i) + `"><w:abstractNumId w:val="0"/></w:num>`)
+		}
+		return nbDocx(t, sb.String(), "", nbP("1", 0, "Do objeto"))
+	}
+	var r *Result
+	peak, _ := peakHeap(func() { r = dxExtract(t, build(50005)) })
+	if r.Text != "1.\tDo objeto\n" || r.NumberingUnavailable {
+		t.Errorf("50 000 w:num: %q unavailable=%v", r.Text, r.NumberingUnavailable)
+	}
+	if peak > 128<<20 {
+		t.Errorf("pico de heap %d MiB", peak>>20)
+	}
+	r = dxExtract(t, build(maxNumberingItems/2+10))
+	if r.Text != "Do objeto\n" || !r.NumberingUnavailable {
+		t.Errorf("acima do teto: %q unavailable=%v", r.Text, r.NumberingUnavailable)
+	}
+	// a broken styles.xml loses the numbering inherited from styles: flagged
+	num := nbAbs("0", nbLvl(0, "decimal", "%1.", "")) + nbNum("1", "0", "")
+	data := dxBuild(t, nbP("1", 0, "direta"),
+		entry{name: "word/numbering.xml", data: dxPartXML("numbering", num)},
+		entry{name: "word/styles.xml", data: []byte(`<w:styles`)})
+	if r := dxExtract(t, data); r.Text != "1.\tdireta\n" || !r.NumberingUnavailable {
+		t.Errorf("styles.xml quebrado: %q unavailable=%v", r.Text, r.NumberingUnavailable)
 	}
 }

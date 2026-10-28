@@ -40,9 +40,27 @@ type paragraphNumberer interface {
 	Prefix(styleID, numID, ilvl string) string
 }
 
-// numbererLoader builds the numberer of a package; nil when numbering is not
-// available. docx_numbering.go installs it in init().
-var numbererLoader func(pkg *Package, lim Limits) paragraphNumberer
+// numbererLoader builds the numberer of a package; nil when the package has no
+// numbering. unavailable is true when the package HAS numbering that could not
+// be read (broken or over the limit): the text then goes out without list
+// numbers and the footer says so. docx_numbering.go installs it in init().
+var numbererLoader func(pkg *Package, lim Limits) (num paragraphNumberer, unavailable bool)
+
+// docxDoc is the state shared by every part of one document, and by the DOCX
+// imported through w:altChunk (depth 1).
+type docxDoc struct {
+	ctx    context.Context
+	pkg    *Package
+	lim    Limits
+	total  *int
+	styles *docxHiddenStyles // nil: no styles.xml, or it could not be read
+	depth  int               // 0: the document; 1: a DOCX imported by w:altChunk
+	rels   map[string]map[string]Relationship
+
+	imported, unread, hidden bool
+	// flags of an imported DOCX that the parts of this one do not carry
+	importPending, importNumUnavailable bool
+}
 
 // isWNS reports whether space is a WordprocessingML namespace (either dialect).
 func isWNS(space string) bool { return inNS(space, NSWordprocessing, NSWordprocessingStrict) }
@@ -69,10 +87,18 @@ var docxRevisionContent = map[string]bool{
 
 type docxPara struct {
 	buf                  strings.Builder
+	hid                  strings.Builder // hidden text (w:vanish) not yet written
+	inHid                bool            // the text being gathered is hidden
 	styleID, numID, ilvl string
 	prefix               string
 	prefixDone           bool
 	emitted              bool
+}
+
+// docxRun is the run property state that decides whether its text is hidden.
+type docxRun struct {
+	vanish *bool  // direct w:rPr/w:vanish, nil when absent
+	style  string // w:rStyle
 }
 
 type docxCell struct {
@@ -96,11 +122,16 @@ type docxPart struct {
 }
 
 type docxWalker struct {
+	doc      *docxDoc
+	part     string // name of the part being walked (its .rels resolve w:altChunk)
 	dec      *Decoder
 	total    *int // runes written so far, shared by every part of the document
 	maxRunes int
 	num      paragraphNumberer
 	notes    bool // notes/comments part: w:footnote, w:endnote, w:comment are blocks
+
+	runs    []docxRun // open w:r, innermost last
+	inRunPr bool      // inside the w:rPr of a run
 
 	out       strings.Builder
 	lastBlank bool
@@ -138,9 +169,82 @@ func (h *docxWalker) appendText(s string) {
 	if h.code > 0 {
 		return
 	}
-	if p := h.cur(); p != nil {
-		p.buf.WriteString(s)
+	p := h.cur()
+	if p == nil {
+		return
 	}
+	if h.runHidden(p) {
+		if !p.inHid {
+			h.flushPara(p, false) // the visible text before it keeps its place
+			p.inHid = true
+		}
+		p.hid.WriteString(s)
+		return
+	}
+	if p.inHid {
+		h.flushHidden(p)
+	}
+	p.buf.WriteString(s)
+}
+
+// runHidden reports whether the innermost open run is hidden: its direct
+// w:vanish, else its character style, else the paragraph style, else the
+// document defaults (styles follow w:basedOn).
+func (h *docxWalker) runHidden(p *docxPara) bool {
+	if len(h.runs) == 0 {
+		return false
+	}
+	r := h.runs[len(h.runs)-1]
+	if r.vanish != nil {
+		return *r.vanish
+	}
+	st := h.doc.styles
+	if st == nil {
+		return false
+	}
+	if r.style != "" {
+		if v, ok := st.vanish(r.style); ok {
+			return v
+		}
+	}
+	if p.styleID != "" {
+		if v, ok := st.vanish(p.styleID); ok {
+			return v
+		}
+	}
+	return st.def
+}
+
+// flushHidden writes the hidden text gathered so far as "[oculto] ..." lines,
+// one per line of the text. A numbered paragraph whose text is all hidden
+// carries its number on the hidden line.
+func (h *docxWalker) flushHidden(p *docxPara) {
+	text := strings.TrimSpace(p.hid.String())
+	p.hid.Reset()
+	p.inHid = false
+	if text == "" {
+		return
+	}
+	if p.prefix != "" && !p.prefixDone && !p.emitted {
+		text = p.prefix + text
+		p.prefixDone = true
+	}
+	for _, l := range strings.Split(text, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			h.emit(labelHidden + " " + l)
+		}
+	}
+	p.emitted = true
+	h.doc.hidden = true
+}
+
+// flushAll ends what a paragraph gathered: hidden text first (it always comes
+// after the visible text already written), then the visible text.
+func (h *docxWalker) flushAll(p *docxPara, final bool) {
+	if p.inHid {
+		h.flushHidden(p)
+	}
+	h.flushPara(p, final)
 }
 
 // emit writes one line to the innermost sink: a table cell (or note block)
@@ -182,6 +286,11 @@ func (h *docxWalker) emit(s string) {
 // then an empty paragraph becomes an empty line (unless it already wrote one).
 func (h *docxWalker) flushPara(p *docxPara, final bool) {
 	text := strings.TrimRight(p.buf.String(), " \t\n")
+	if p.emitted {
+		// a continuation line (after hidden text, a page break or a text
+		// box) does not start with the space that separated it
+		text = strings.TrimLeft(text, " ")
+	}
 	p.buf.Reset()
 	if p.prefix != "" && !p.prefixDone && (text != "" || final) {
 		text = strings.TrimRight(p.prefix+text, " \t")
@@ -202,7 +311,7 @@ func (h *docxWalker) flushPara(p *docxPara, final bool) {
 // the marker is its own line, and the rest of the paragraph follows.
 func (h *docxWalker) pageBreak() {
 	if p := h.cur(); p != nil {
-		h.flushPara(p, false)
+		h.flushAll(p, false)
 		p.emitted = true
 	}
 	h.emit(labelPageDiv)
@@ -279,6 +388,26 @@ func (h *docxWalker) startW(se xml.StartElement) {
 		}
 	case "r":
 		h.inRun++
+		h.runs = append(h.runs, docxRun{})
+	case "rPr":
+		if h.inRun > 0 && h.inPPr == 0 {
+			h.inRunPr = true
+		}
+	case "vanish":
+		if h.inRunPr && len(h.runs) > 0 {
+			v := onOff(se)
+			h.runs[len(h.runs)-1].vanish = &v
+		}
+	case "rStyle":
+		if h.inRunPr && len(h.runs) > 0 {
+			h.runs[len(h.runs)-1].style, _ = AttrW(se, "val")
+		}
+	case "altChunk":
+		if id, ok := AttrR(se, "id"); ok {
+			h.altChunk(id)
+		} else {
+			h.doc.unread = true
+		}
 	case "t":
 		h.inT = true
 	case "tab", "ptab":
@@ -330,7 +459,7 @@ func (h *docxWalker) startW(se xml.StartElement) {
 		// Keep the reading order: the host paragraph's text so far comes
 		// before the text box.
 		if p := h.cur(); p != nil {
-			h.flushPara(p, false)
+			h.flushAll(p, false)
 			p.emitted = true // a host holding only a box must not add a blank line
 		}
 	case "tbl":
@@ -409,8 +538,10 @@ func (h *docxWalker) endW(local string) {
 		if k := len(h.paras); k > 0 {
 			p := h.paras[k-1]
 			h.paras = h.paras[:k-1]
-			h.flushPara(p, true)
+			h.flushAll(p, true)
 		}
+	case "rPr":
+		h.inRunPr = false
 	case "pPr":
 		if h.inPPr > 0 {
 			h.inPPr--
@@ -425,6 +556,9 @@ func (h *docxWalker) endW(local string) {
 	case "r":
 		if h.inRun > 0 {
 			h.inRun--
+		}
+		if k := len(h.runs); k > 0 {
+			h.runs = h.runs[:k-1]
 		}
 	case "t":
 		h.inT = false
@@ -498,25 +632,27 @@ func cleanInline(s string, max int) string {
 	return s
 }
 
-// parseDocxPart walks one XML part of the package.
-func parseDocxPart(ctx context.Context, pkg *Package, name string, lim Limits, total *int, num paragraphNumberer, notes bool) (*docxPart, error) {
-	if err := ctxErr(ctx); err != nil {
+// parseDocxPart walks one XML part of the document.
+func parseDocxPart(doc *docxDoc, name string, num paragraphNumberer, notes bool) (*docxPart, error) {
+	if err := ctxErr(doc.ctx); err != nil {
 		return nil, err
 	}
-	data, err := pkg.Read(name)
+	data, err := doc.pkg.Read(name)
 	if err != nil {
 		return nil, err
 	}
 	h := &docxWalker{
-		dec:      NewDecoder(bytes.NewReader(data), lim),
-		total:    total,
-		maxRunes: lim.MaxTextRunes,
+		doc:      doc,
+		part:     name,
+		dec:      NewDecoder(bytes.NewReader(data), doc.lim),
+		total:    doc.total,
+		maxRunes: doc.lim.MaxTextRunes,
 		num:      num,
 		notes:    notes,
 	}
 	for tick := 1; ; tick++ {
 		if tick&0x3ff == 0 {
-			if err := ctxErr(ctx); err != nil {
+			if err := ctxErr(doc.ctx); err != nil {
 				return nil, err
 			}
 		}
@@ -579,6 +715,8 @@ func collapseBlankLines(s string) string {
 // notesParts are read once, after the body, as their own blocks.
 var notesParts = map[string]bool{"word/footnotes.xml": true, "word/endnotes.xml": true, "word/comments.xml": true}
 
+const docxDocPart = "word/document.xml"
+
 // extractDOCX extracts the text of a .docx. Output order: headers (each one
 // once), body, footers, footnotes, endnotes, comments.
 func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) {
@@ -587,16 +725,26 @@ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) 
 	if err != nil {
 		return nil, err
 	}
-	const docPart = "word/document.xml"
-	if !pkg.Has(docPart) {
+	total := 0
+	doc := &docxDoc{ctx: ctx, pkg: pkg, lim: lim, total: &total}
+	return extractDOCXDoc(doc)
+}
+
+// extractDOCXDoc runs the extraction over an open package. A DOCX imported by
+// w:altChunk (doc.depth 1) goes through it too, without headers and footers
+// (Word imports the content, not the page setup).
+func extractDOCXDoc(doc *docxDoc) (*Result, error) {
+	pkg := doc.pkg
+	if !pkg.Has(docxDocPart) {
 		return nil, refuse(ReasonMalformed)
 	}
-	total := 0
+	doc.styles = loadHiddenStyles(pkg, doc.lim)
 	var num paragraphNumberer
+	numUnavailable := false
 	if numbererLoader != nil {
-		num = numbererLoader(pkg, lim)
+		num, numUnavailable = numbererLoader(pkg, doc.lim)
 	}
-	body, err := parseDocxPart(ctx, pkg, docPart, lim, &total, num, false)
+	body, err := parseDocxPart(doc, docxDocPart, num, false)
 	if err != nil {
 		return nil, err
 	}
@@ -604,8 +752,8 @@ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) 
 
 	// Headers and footers really used by a section, once each (by target).
 	var headers, footers []string
-	if len(body.headerIDs) > 0 || len(body.footerIDs) > 0 {
-		rels, err := pkg.Relationships(docPart)
+	if doc.depth == 0 && (len(body.headerIDs) > 0 || len(body.footerIDs) > 0) {
+		rels, err := pkg.Relationships(docxDocPart)
 		if err != nil {
 			return nil, err
 		}
@@ -621,11 +769,11 @@ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) 
 				key := strings.ToLower(target)
 				// Never a part that is read elsewhere (the body or the notes):
 				// a rel pointing there would duplicate it as a header/footer.
-				if !ok || seen[key] || !pkg.Has(target) || key == docPart || notesParts[key] {
+				if !ok || seen[key] || !pkg.Has(target) || key == docxDocPart || notesParts[key] {
 					continue
 				}
 				seen[key] = true
-				part, err := parseDocxPart(ctx, pkg, target, lim, &total, nil, false)
+				part, err := parseDocxPart(doc, target, nil, false)
 				if err != nil {
 					return nil, err
 				}
@@ -654,7 +802,7 @@ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) 
 		if !pkg.Has(n) {
 			continue
 		}
-		part, err := parseDocxPart(ctx, pkg, n, lim, &total, nil, true)
+		part, err := parseDocxPart(doc, n, nil, true)
 		if err != nil {
 			return nil, err
 		}
@@ -675,5 +823,12 @@ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) 
 			sb.WriteByte('\n')
 		}
 	}
-	return &Result{Text: collapseBlankLines(sb.String()), PendingRevisions: pending}, nil
+	return &Result{
+		Text:                 collapseBlankLines(sb.String()),
+		PendingRevisions:     pending || doc.importPending,
+		ImportedContent:      doc.imported,
+		UnreadContent:        doc.unread,
+		NumberingUnavailable: numUnavailable || doc.importNumUnavailable,
+		HiddenText:           doc.hidden,
+	}, nil
 }

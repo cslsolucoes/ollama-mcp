@@ -211,3 +211,64 @@ Arquivos em `E:\MCPOllam\.workspace\reports\MCPOllam2026-10-28-161147-revisao-ad
 2. **Fortemente recomendado:** M1 (só recusa, sem decisão) e B1, B2, B3, B4, B5 (baratos e já provados).
 3. **Decisão do owner** (usar AskUserQuestion): M2 (recusar `altChunk` ou extrair), M3 (recusar ou rodapé `numeracao=indisponivel`), B6 (manter o hífen de enclíticos e prefixos), e se texto invisível/oculto deve ir para o modelo (Info).
 4. Depois de aplicar, repetir o roteiro: copiar `…fase7.testes\<pacote>\*.go` de volta para `src\<pacote>\`, rodar `go test -count=1 -v -run TestAdv ./doctext ./files ./mcpollama-mcp` (e a bomba com `MCPO_ADV_BOMB=1`) e conferir 0 SILENCIOSO e 0 ESCAPOU. Depois, retirar os arquivos de novo.
+
+## 9. Correções aplicadas (passos 1 e 2)
+
+Aplicadas na árvore real, conforme as decisões do owner, em 2 passos. O passo 1 foi commitado pelo coordenador em `0f105ef`. O passo 2 **não foi commitado**.
+
+### 9.1 Passo 1 (`0f105ef`): A1, A2, M1, B1–B5 e P7.7-3
+
+- **A1:** `w:lvlText` com mais de 128 runas vira `- `, e o texto de célula ou nota conta no teto ao entrar (`cellRunes`). Pico de heap: 286–293 MiB caiu para 0,4–6 MiB.
+- **A2:** teto de memória do WASM de 8192 páginas (512 MiB), `WithCloseOnContextDone` e `Kill` da instância quando o contexto acaba. A bomba de 33 KB agora para em 2,0 s, com +223 a +332 MiB.
+- **Calibração do teto no corpus real** (só ids e números, `…fase7.testes\passo1-calibracao-teto-pdf.csv`):
+  - 40 PDFs (c01–c35, o05–o09), rodados com 4 tetos: 4 GiB, 512, 256 e 128 MiB.
+  - **0 divergências**: 30 ok, 3 recusados por senha e 7 por falta de texto em todos os tetos.
+  - A maior memória de WASM foi **25,4 MiB** (o09); o o05, livro de 550 páginas, usou 18,1 MiB em ~14 s.
+  - O teto de 512 MiB fica com margem de ~20x.
+- **M1:** um campo ainda na parte de código no fim da parte é recusado (`ReasonMalformed`).
+- **B1–B5:** busca de parte sem diferenciar maiúsculas, nenhum alvo de cabeçalho no corpo ou nas notas, `r:id` repetido recusado, Fallback sem Choice lido e timeout tipado no PPTX.
+- **P7.7-3:** `w:ins`/`w:del`/`w:moveFrom`/`w:moveTo` só marcam revisão pendente quando têm run ou texto; as mudanças de propriedade continuam marcando.
+- **Regressão:** 7 testes em `src/doctext/hardening_test.go`; os 7 falham no código anterior.
+
+### 9.2 Passo 2 (não commitado): M2, M3, B6, texto oculto e rodapé
+
+| Item | O que mudou | Arquivos |
+| --- | --- | --- |
+| **M2 `altChunk`** | O texto é extraído no lugar do chunk quando ele é TXT (UTF-8), HTML (`.htm`/`.html`/`.xhtml`) ou DOCX. O DOCX importado é extraído com profundidade 1, sem cabeçalhos e rodapés, mas com as notas, e divide os orçamentos do documento: `MaxTotalBytes` restante (`Package.remaining`/`charge`) e `MaxTextRunes` restante. O HTML passa por um varredor plano: sem árvore, sem DTD (o `<!DOCTYPE>` é pulado, nunca lido), só a tabela fixa de `html.UnescapeString`, `script`/`style`/`head`/`title` pulados de forma linear, saída nunca maior que a entrada (teste). Um tipo não suportado (MHT, RTF, HTML que não está em UTF-8, alvo ausente, DOCX quebrado, DOCX dentro de DOCX importado) vira `UnreadContent`. Os sinais são `ImportedContent` e `UnreadContent`. | `doctext/docx_import.go` (novo), `docx.go`, `zipsafe.go`, `doctext.go` |
+| **M3** | Um `numbering.xml` quebrado ou acima do teto gera texto sem números, com `NumberingUnavailable` (rodapé `numeracao=indisponivel`). Um `styles.xml` quebrado perde a numeração herdada de estilo e também marca o sinal. O teto de itens subiu de 100.000 para **300.000** (`maxNumberingItems`): o caso válido de 50.005 `w:num` volta a ter números, com pico de heap abaixo de 128 MiB (teste). `TestNumberingUnknownAndMissing` foi ajustado. | `docx_numbering.go`, `docx.go`, `docx_numbering_test.go` |
+| **B6** | O hífen **sempre fica**. Medição: o PDFium devolve o mesmo U+0002 para o hífen real (U+002D) e para o soft hyphen (U+00AD), tanto no `GetPageText` quanto no `FPDFText_GetUnicode` (os dois casos foram testados com PDFs gerados). Por isso não há como "juntar só o soft hyphen". A regra aplicada: com U+0002 antes de minúscula, a linha é juntada e o hífen fica ("obriga-se", "compromete-se", "ex-empregado"); antes de qualquer outro caractere, o hífen e a quebra voltam. `joinHyphenation` saiu: um `-` literal no fim da linha fica como está. **Custo:** a quebra silábica também mantém o hífen ("con-trato"). Os testes de hifenização foram atualizados. | `pdf.go`, `pdf_test.go` |
+| **Texto oculto** | **DOCX:** `w:vanish` direto, do estilo de caractere, do estilo de parágrafo, por `basedOn` ou dos `docDefaults`, sai em linha própria `[oculto] <texto>`. A precedência é direto > caractere > parágrafo > padrões; `w:val="0"` vence. A marca de parágrafo oculta não esconde o texto. Um parágrafo numerado todo oculto leva o número para a linha `[oculto]`. **PPTX:** forma, grupo ou quadro de tabela com `hidden="1"` saem como `[oculto] …` (a linha da tabela é rotulada uma vez); os slides ocultos já vinham rotulados. Sinal: `HiddenText`. **PDF: não implementado (limitação registrada, §9.4).** | `doctext/docx_hidden.go` (novo), `docx.go`, `pptx.go` |
+| **Rodapé** | Os campos novos passam de `Result` para `files.Extracted`/`files.File` e daí para `docFooter`, só quando se aplicam: ` numeracao=indisponivel`, ` conteudo_importado=sim`, ` texto_oculto=sim`. Com `UnreadContent`, a linha `[aviso] parte do conteúdo não pôde ser lida` vem logo depois do rodapé. Descrições das tools sem mudança: o `TOOLS.md` não muda, `TestCatalogInSync` passa e o budget fica em 4.400/7.800. | `files/guard.go`, `mcpollama-mcp/docs.go`, `tools/filetools.go` |
+
+**Testes de regressão do passo 2:**
+
+- `doctext/docx_import_test.go`: 6 testes, entre eles HTML com script, style, comentário e DOCTYPE; TXT em célula; DOCX importado com nota e revisão; 9 casos não suportados; limites compartilhados e bomba aninhada; saída do HTML nunca maior que a entrada.
+- `doctext/hidden_text_test.go`: 4 testes.
+- `docx_numbering_test.go`: `TestNumberingLargeAndOverTheCeiling` e o ajuste de `TestNumberingUnknownAndMissing`.
+- `pdf_test.go`: `TestPlainHyphenAtLineEndIsKept` e `TestPDFiumSoftHyphens` ampliado.
+- `tools/filetools_flags_test.go`: rodapé e aviso de ponta a ponta na tool.
+- `mcpollama-mcp/docs_flags_test.go`: o adaptador carrega os 4 sinais.
+
+Os testes de B6 **falham no código do passo 1** (rodados sobre `git archive HEAD`). Os outros nem compilam nele, porque usam os campos novos.
+
+### 9.3 Gate e roteiros (passo 2)
+
+Pacotes do gate: `go list ./... | grep -v /ocr` (ver §9.4, item 4).
+
+| Item | Resultado | Evidência |
+| --- | --- | --- |
+| `gofmt -l` (cmd, doctext, files, mcp, mcpollama-mcp, ollama, redact, tools) | vazio | — |
+| `go vet` | exit 0 | — |
+| `go test -count=1` | todos os pacotes `ok` (o `TestCatalogInSync` confirma o `TOOLS.md` sem mudança, e o budget do `tools/list` não mudou) | `passo2-gate-test.log` |
+| `-race` (gcc de `deps`; variáveis só no comando) | todos `ok`, **0 DATA RACE** (doctext em 357 s) | `passo2-gate-race.log` |
+| Roteiro de ataques da Fase 7 (copiado para `src`, rodado com `MCPO_ADV_BOMB=1` e removido) | **158 vetores: 74 BLOQUEADO, 43 FIEL, 41 INFO, 0 ACHADO, 0 SILENCIOSO, 0 ESCAPOU**. `altchunk`, os dois de `numbering`, `hifen-encliticos`, `texto-oculto-vanish` e `forma-oculta` passaram a FIEL. A bomba de PDF parou em 2,0 s, com pico de +273 a +404 MiB. | `passo2-ataques-fase7.log` |
+| Roteiro de ataques da Fase 4 (mesmo procedimento) | 245 linhas `VEC`; tirando as 18 `doc/` da suíte existente, **227 vetores: 223 BLOQUEADO, 2 ACHADO e 2 INFO** (os de política já aceitos pelo owner), **0 ESCAPOU** | `passo2-ataques-fase4.log` |
+
+Os vetores reavaliados no roteiro da Fase 7 (`.testes\doctext\*.go`) passaram a medir o comportamento decidido pelo owner. Exemplos: `texto-oculto-vanish` exige o rótulo `[oculto]`, e `numbering-xml-malformado` só é SILENCIOSO se faltar o sinal `NumberingUnavailable`.
+
+### 9.4 Limitações registradas
+
+1. **PDF, texto invisível (modo de renderização 3): não rotulado.** O PDFium expõe o modo (`FPDFText_GetTextObject` + `FPDFTextObj_GetTextRenderMode`), mas só por objeto. Para rotular o trecho no texto seria preciso uma chamada WASM por caractere. Além disso, o modo 3 é **a camada padrão de OCR de PDFs digitalizados**: o texto invisível é o mesmo que aparece na imagem da página. Rotulá-lo como `[oculto]` erraria justamente no caso mais comum. O vetor `pdf/texto-invisivel` continua como INFO.
+2. **`w:vanish` é uma propriedade alternante no Word.** A alternância entre estilos aninhados não é calculada: estilo oculto sobre estilo oculto conta como oculto. A formatação direta sempre vence.
+3. **B6:** "con-trato" mantém o hífen (o PDFium não distingue os dois casos; ver acima).
+4. **Fora do meu trabalho:** `src/ocr/` (não rastreado) e as mudanças em `src/go.mod`/`src/go.sum` (`golang.org/x/image`, `golang.org/x/sys` direto) são de outro agente, que trabalha na mesma árvore. Ficaram fora do gate deste passo (`go list ./... | grep -v /ocr`), e o commit precisa juntar os arquivos por caminho.

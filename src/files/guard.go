@@ -36,6 +36,14 @@ type Extracted struct {
 	Slides           int    // PPTX
 	PagesWithoutText int    // PDF
 	PendingRevisions bool   // DOCX
+	// ImportedContent: text imported by a DOCX w:altChunk is in Text.
+	ImportedContent bool
+	// UnreadContent: part of the content could not be read and is not in Text.
+	UnreadContent bool
+	// NumberingUnavailable: the list numbering exists but could not be read.
+	NumberingUnavailable bool
+	// HiddenText: Text has lines labelled "[oculto]" (not shown nor printed).
+	HiddenText bool
 }
 
 // DocExtractor turns office documents into text. It is injected by the
@@ -73,6 +81,11 @@ type File struct {
 	Slides           int    // PPTX
 	PagesWithoutText int    // PDF
 	PendingRevisions bool   // DOCX
+	// The four flags below mirror Extracted (documents only).
+	ImportedContent      bool
+	UnreadContent        bool
+	NumberingUnavailable bool
+	HiddenText           bool
 }
 
 // NewGuard validates the roots (each must exist and be a directory; the
@@ -434,6 +447,8 @@ func (g *Guard) extract(ctx context.Context, name string, data []byte) (*File, e
 	return &File{
 		Name: name, Bytes: len(data), Text: text, Format: ex.Format,
 		Pages: ex.Pages, Slides: ex.Slides, PagesWithoutText: ex.PagesWithoutText, PendingRevisions: ex.PendingRevisions,
+		ImportedContent: ex.ImportedContent, UnreadContent: ex.UnreadContent,
+		NumberingUnavailable: ex.NumberingUnavailable, HiddenText: ex.HiddenText,
 	}, nil
 }
 

@@ -184,6 +184,14 @@ func (p *Package) Read(name string) ([]byte, error) {
 	return buf, nil
 }
 
+// remaining is what is left of the MaxTotalBytes budget of the package. A
+// package opened from one of its parts (a DOCX imported by w:altChunk) gets
+// this as its own budget, and charge adds what that package read.
+func (p *Package) remaining() int64 { return p.lim.MaxTotalBytes - p.total }
+
+// charge adds bytes read through a nested package to this one's budget.
+func (p *Package) charge(n int64) { p.total += n }
+
 // errTooBig is returned by readBounded when more than max bytes arrive.
 var errTooBig = errors.New("doctext: part over the limit")
 

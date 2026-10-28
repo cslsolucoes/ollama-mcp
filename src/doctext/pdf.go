@@ -191,7 +191,7 @@ func extractPDF(ctx context.Context, data []byte, lim Limits) (res *Result, err 
 			}
 			return nil, refuse(ReasonMalformed)
 		}
-		text := joinHyphenation(strings.TrimSpace(unifyNewlines(raw)))
+		text := strings.TrimSpace(unifyNewlines(raw))
 		if countNonBlank(text) < pdfMinPageRunes {
 			blank++
 		}
@@ -242,52 +242,34 @@ func countNonBlank(s string) int {
 	return n
 }
 
-// joinHyphenation removes "-\n" when a line ends with a hyphen that follows a
-// letter and the next line starts with a lowercase letter ("contra-\nto" ->
-// "contrato"). Conservative on purpose: "R$ 10 -\nmais", a capitalized next
-// line ("Rio-\nSão Paulo") and a lone "-" keep the line break and the hyphen.
-// Paragraphs are not rebuilt. The input has LF endings only.
-func joinHyphenation(s string) string {
-	if !strings.Contains(s, "-\n") {
-		return s
-	}
-	var b strings.Builder
-	b.Grow(len(s))
-	for i := 0; i < len(s); i++ {
-		if s[i] == '-' && i+1 < len(s) && s[i+1] == '\n' && i > 0 && i+2 < len(s) {
-			prev, _ := utf8.DecodeLastRuneInString(s[:i])
-			next, _ := utf8.DecodeRuneInString(s[i+2:])
-			if unicode.IsLetter(prev) && unicode.IsLower(next) {
-				i++ // skip the hyphen and the newline
-				continue
-			}
-		}
-		b.WriteByte(s[i])
-	}
-	return b.String()
-}
-
 // pdfiumSoftHyphens undoes a quirk of PDFium's text extraction. When a line ends
 // with a hyphen that follows a letter or digit, PDFium swallows the line break
-// and emits U+0002 in place of the hyphen, whatever the next character is
-// ("Rio-" then "São" comes out as "Rio<U+0002>São"). The rule of this package
-// is the conservative one: the line is joined only when the next character is a
-// lowercase letter ("con<U+0002>trato" becomes "contrato"); otherwise the
-// hyphen and the line break are put back ("Rio-", newline, "São"), so no real
-// hyphen is ever lost.
+// and emits U+0002 in place of the hyphen, whatever the next character is.
+//
+// The hyphen is NEVER dropped (owner decision after 7.7a B6): PDFium emits the
+// same U+0002 for a syllable break ("con-" / "trato") and for a real hyphen
+// that fell at the end of a line ("obriga-" / "se", "ex-" / "empregado"); it
+// was measured that neither its text nor FPDFText_GetUnicode tell U+002D from
+// a soft hyphen U+00AD apart. Dropping it turned "obriga-se" into "obrigase".
+// So the hyphen always stays: before a lowercase letter the line is joined
+// ("obriga-se", and also "con-trato"); otherwise the line break is put back
+// ("Rio-", newline, "São"). A "-" at the end of a line that PDFium did not
+// mark (after a space, "R$ 10 -") is left as it is, with its line break.
 func pdfiumSoftHyphens(s string) string {
 	if !strings.Contains(s, "\x02") {
 		return s
 	}
 	var b strings.Builder
-	b.Grow(len(s))
+	b.Grow(len(s) + 8)
 	for i := 0; i < len(s); i++ {
 		if s[i] != 0x02 {
 			b.WriteByte(s[i])
 			continue
 		}
 		next, _ := utf8.DecodeRuneInString(s[i+1:])
-		if !unicode.IsLower(next) {
+		if unicode.IsLower(next) {
+			b.WriteByte('-')
+		} else {
 			b.WriteString("-\n")
 		}
 	}

@@ -102,7 +102,24 @@ type Result struct {
 	Slides           int  // PPTX
 	PagesWithoutText int  // PDF
 	PendingRevisions bool // DOCX
+	// ImportedContent: text of a w:altChunk (imported TXT, HTML or DOCX) is in
+	// Text, at the place of the chunk (DOCX).
+	ImportedContent bool
+	// UnreadContent: some content Word shows could not be read (an altChunk
+	// of an unsupported type or a broken one) and is NOT in Text (DOCX).
+	UnreadContent bool
+	// NumberingUnavailable: word/numbering.xml (or the numbering of
+	// word/styles.xml) exists but could not be read: the text has no list
+	// numbers, so clause numbers are missing (DOCX).
+	NumberingUnavailable bool
+	// HiddenText: Text has lines labelled "[oculto]" (text the document holds
+	// but does not show or print: Word w:vanish, hidden PowerPoint shapes).
+	HiddenText bool
 }
+
+// labelHidden starts a line of hidden text (Word w:vanish, a hidden
+// PowerPoint shape): the reader must know it does not show or print.
+const labelHidden = "[oculto]"
 
 // Reason classifies a refusal so callers and tests can tell the cases apart
 // without parsing the (Portuguese) message.

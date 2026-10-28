@@ -204,10 +204,15 @@ func TestAdvPDF(t *testing.T) {
 			vec(t, "pdf", "hifen-encliticos", "ACHADO", reasonStr(err))
 		} else {
 			flat := strings.ReplaceAll(r.Text, "\n", " ")
-			vec(t, "pdf", "hifen-encliticos", "ACHADO", fmt.Sprintf("obriga-se->obrigase=%v compromete-se->comprometese=%v ex-empregado->exempregado=%v pre-contrato->precontrato=%v",
-				strings.Contains(flat, "obrigase"), strings.Contains(flat, "comprometese"), strings.Contains(flat, "exempregado"), strings.Contains(flat, "precontrato")))
+			lost := strings.Contains(flat, "obrigase") || strings.Contains(flat, "comprometese") || strings.Contains(flat, "exempregado") || strings.Contains(flat, "precontrato")
+			kept := strings.Contains(flat, "obriga-se") && strings.Contains(flat, "compromete-se") && strings.Contains(flat, "ex-empregado") && strings.Contains(flat, "pre-contrato")
+			res := "ACHADO"
+			if !lost && kept {
+				res = "FIEL" // passo 2 (B6): o hifen sempre fica
+			}
+			vec(t, "pdf", "hifen-encliticos", res, fmt.Sprintf("hifen_perdido=%v hifens_mantidos=%v", lost, kept))
 		}
-		vec(t, "pdf", "hifen-apos-digito-softhyphen", "INFO", fmt.Sprintf("pdfiumSoftHyphens(\"prazo 30\\x02dias\")=%q (junta apos digito; joinHyphenation exige letra)", pdfiumSoftHyphens("prazo 30\x02dias")))
+		vec(t, "pdf", "hifen-apos-digito-softhyphen", "INFO", fmt.Sprintf("pdfiumSoftHyphens(\"prazo 30\\x02dias\")=%q (o hifen fica; a linha so e juntada)", pdfiumSoftHyphens("prazo 30\x02dias")))
 	}
 	// 8. lixo antes do cabecalho (Detect aceita ate 1 KiB).
 	{

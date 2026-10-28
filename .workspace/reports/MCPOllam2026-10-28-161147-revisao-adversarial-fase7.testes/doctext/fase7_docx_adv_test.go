@@ -185,7 +185,12 @@ func TestAdvDOCXIntegrity(t *testing.T) {
 	// 14. texto oculto (w:vanish) e altChunk.
 	{
 		txt, _ := advDocx(dxBuild(t, `<w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t>TEXTO-OCULTO-VANISH</w:t></w:r></w:p>`+dxP("VISIVEL")))
-		vec(t, "docx", "texto-oculto-vanish", "INFO", fmt.Sprintf("oculto_extraido=%v (texto invisivel no Word chega ao modelo; brief nao decide)", strings.Contains(txt, "TEXTO-OCULTO-VANISH")))
+		// passo 2 (decisao do owner): o texto oculto entra rotulado "[oculto]"
+		res := "SILENCIOSO"
+		if strings.Contains(txt, "[oculto] TEXTO-OCULTO-VANISH") {
+			res = "FIEL"
+		}
+		vec(t, "docx", "texto-oculto-vanish", res, fmt.Sprintf("rotulado=%v", res == "FIEL"))
 	}
 	{
 		data := dxBuild(t, dxP("ANTES-ALTCHUNK")+`<w:altChunk r:id="rIdAlt"/>`+dxP("DEPOIS-ALTCHUNK"),
@@ -280,9 +285,14 @@ func TestAdvDOCXNumbering(t *testing.T) {
 	{
 		data := dxBuild(t, nbP("1", 0, "CLAUSULA-COM-NUMERO"), entry{name: "word/numbering.xml", data: []byte(`<?xml version="1.0"?><w:numbering xmlns:w="` + NSWordprocessing + `">` + num + `<w:abstractNum>`)})
 		r, err := Extract(context.Background(), FormatDOCX, data, Limits{})
-		if err == nil && !strings.Contains(r.Text, "1.") {
-			vec(t, "num", "numbering-xml-malformado", "SILENCIOSO", fmt.Sprintf("documento extraido sem os numeros das clausulas e sem sinal (rodape so tem revisoes_pendentes); saida=%q", r.Text))
-		} else {
+		// passo 2 (decisao do owner): sem numeros, mas com o sinal NumberingUnavailable
+		// (rodape numeracao=indisponivel); silencioso so se o sinal faltar
+		switch {
+		case err == nil && !strings.Contains(r.Text, "1.") && !r.NumberingUnavailable:
+			vec(t, "num", "numbering-xml-malformado", "SILENCIOSO", fmt.Sprintf("documento extraido sem os numeros das clausulas e sem sinal; saida=%q", r.Text))
+		case err == nil && r.NumberingUnavailable:
+			vec(t, "num", "numbering-xml-malformado", "FIEL", fmt.Sprintf("texto preservado (%q) e NumberingUnavailable=true (rodape numeracao=indisponivel)", r.Text))
+		default:
 			vec(t, "num", "numbering-xml-malformado", "FIEL", reasonStr(err))
 		}
 	}

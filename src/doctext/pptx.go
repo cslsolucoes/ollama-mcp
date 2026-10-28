@@ -50,6 +50,7 @@ func extractPPTX(ctx context.Context, data []byte, lim Limits) (res *Result, err
 
 	var blocks []string
 	total := 0
+	anyHidden := false
 	for i, rid := range rids {
 		if err := ctxErr(ctx); err != nil {
 			return nil, err
@@ -63,10 +64,11 @@ func extractPPTX(ctx context.Context, data []byte, lim Limits) (res *Result, err
 		if err != nil {
 			return nil, err
 		}
-		lines, hidden, err := parsePPTXPart(xmlData, lim, false)
+		lines, hidden, hiddenShapes, err := parsePPTXPart(xmlData, lim, false)
 		if err != nil {
 			return nil, err
 		}
+		anyHidden = anyHidden || hidden || hiddenShapes
 		var b strings.Builder
 		b.WriteString("[slide " + strconv.Itoa(n))
 		if hidden {
@@ -88,10 +90,11 @@ func extractPPTX(ctx context.Context, data []byte, lim Limits) (res *Result, err
 			if err != nil {
 				return nil, err
 			}
-			nl, _, err := parsePPTXPart(nd, lim, true)
+			nl, _, nh, err := parsePPTXPart(nd, lim, true)
 			if err != nil {
 				return nil, err
 			}
+			anyHidden = anyHidden || nh
 			if len(nl) > 0 {
 				b.WriteString("\n\n[notas do slide " + strconv.Itoa(n) + "]")
 				for _, l := range nl {
@@ -114,7 +117,7 @@ func extractPPTX(ctx context.Context, data []byte, lim Limits) (res *Result, err
 	if utf8.RuneCountInString(text) > lim.MaxTextRunes {
 		return nil, refuse(ReasonTooLong)
 	}
-	return &Result{Text: text, Format: FormatPPTX, Slides: len(rids)}, nil
+	return &Result{Text: text, Format: FormatPPTX, Slides: len(rids), HiddenText: anyHidden}, nil
 }
 
 // slideRIDs returns the r:id of each p:sldId, in presentation order.
@@ -173,8 +176,10 @@ func (s *lineSink) merge(o *lineSink) {
 type acState struct{ choiceSeen bool }
 
 // parsePPTXPart reads one slide (notes=false) or notes slide (notes=true) and
-// returns its text lines. For notes only the body placeholder is kept.
-func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden bool, err error) {
+// returns its text lines. For notes only the body placeholder is kept. hidden
+// is a slide with show="0"; hiddenShapes says some line came from a shape (or
+// group, or table frame) with hidden="1": those lines start with "[oculto]".
+func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden, hiddenShapes bool, err error) {
 	dec := NewDecoder(bytes.NewReader(data), lim)
 	main := &lineSink{}
 	var shape *lineSink // current p:sp (notes mode only)
@@ -191,7 +196,8 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 	var cellParas []string
 
 	var acs []*acState
-	skipTo := -1 // when >= 0: ignoring tokens until an EndElement leaves depth skipTo
+	skipTo := -1   // when >= 0: ignoring tokens until an EndElement leaves depth skipTo
+	hidDepth := -1 // when >= 0: depth of the hidden shape whose text is being read
 
 	sink := func() *lineSink {
 		if shape != nil {
@@ -206,7 +212,7 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 			break
 		}
 		if e != nil {
-			return nil, false, e
+			return nil, false, false, e
 		}
 		if skipTo >= 0 {
 			switch tok.(type) {
@@ -236,6 +242,12 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 				// an AlternateContent with only a Fallback keeps its text.
 				if len(acs) == 0 || acs[len(acs)-1].choiceSeen {
 					skipTo = dec.Depth() - 1
+				}
+			case IsP(n, "cNvPr"):
+				// p:sp/p:nvSpPr/p:cNvPr (likewise p:grpSp, p:graphicFrame...):
+				// the shape is the grandparent of cNvPr.
+				if v, ok := AttrPlain(t, "hidden"); ok && (v == "1" || v == "true") && hidDepth < 0 {
+					hidDepth = dec.Depth() - 2
 				}
 			case IsP(n, "sld"):
 				if v, ok := AttrPlain(t, "show"); ok && (v == "0" || v == "false") {
@@ -287,6 +299,9 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 			}
 		case xml.EndElement:
 			n := t.Name
+			if hidDepth >= 0 && dec.Depth() < hidDepth {
+				hidDepth = -1 // the hidden shape ended
+			}
 			switch {
 			case IsMC(n, "AlternateContent"):
 				if len(acs) > 0 {
@@ -299,6 +314,10 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 				txt := strings.TrimRight(para.String(), " \t\r\n")
 				if strings.TrimSpace(txt) == "" {
 					break
+				}
+				if hidDepth >= 0 && !inCell { // a table row is labelled once, below
+					txt = labelHidden + " " + txt
+					hiddenShapes = true
 				}
 				if inCell {
 					cellParas = append(cellParas, strings.Join(strings.Fields(txt), " "))
@@ -333,7 +352,12 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 						for len(r) > 0 && r[len(r)-1] == "" {
 							r = r[:len(r)-1]
 						}
-						s.add(strings.Join(r, " | "))
+						line := strings.Join(r, " | ")
+						if hidDepth >= 0 {
+							line = labelHidden + " " + line
+							hiddenShapes = true
+						}
+						s.add(line)
 					}
 					s.blank()
 				}
@@ -353,5 +377,5 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 			}
 		}
 	}
-	return main.lines, hidden, nil
+	return main.lines, hidden, hiddenShapes, nil
 }

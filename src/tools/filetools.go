@@ -464,6 +464,9 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 	}
 	body += fmt.Sprintf("\n\n[arquivo] nome=%s bytes=%d caracteres=%d partes=%d chamadas=%d omitidas=%d",
 		f.Name, f.Bytes, runes(f.Text), n, j.calls, omitted) + docFooter(f)
+	if f.UnreadContent {
+		body += "\n" + unreadNotice
+	}
 	if task.docNotice != "" && f.Format != "" && f.Format != "txt" {
 		body += "\n" + task.docNotice
 	}
@@ -473,10 +476,15 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 	return textResult(body, u), nil
 }
 
+// unreadNotice follows the footer when part of a document could not be read
+// (a DOCX w:altChunk of an unsupported type): the answer may miss something.
+const unreadNotice = "[aviso] parte do conteúdo não pôde ser lida"
+
 // docFooter is the tail of the [arquivo] line: the format always, then only
 // the fields that apply to it (pages and pages without text for a PDF, slides
-// for a PPTX, pending revisions for a DOCX). They tell the caller how far to
-// trust the answer.
+// for a PPTX, pending revisions for a DOCX), and the flags only when set
+// (numeracao=indisponivel, conteudo_importado=sim, texto_oculto=sim). They tell
+// the caller how far to trust the answer.
 func docFooter(f *files.File) string {
 	format := f.Format
 	if format == "" {
@@ -494,6 +502,15 @@ func docFooter(f *files.File) string {
 		} else {
 			out += " revisoes_pendentes=nao"
 		}
+	}
+	if f.NumberingUnavailable {
+		out += " numeracao=indisponivel"
+	}
+	if f.ImportedContent {
+		out += " conteudo_importado=sim"
+	}
+	if f.HiddenText {
+		out += " texto_oculto=sim"
 	}
 	return out
 }

@@ -89,6 +89,11 @@ func (e *docExtractor) Extract(ctx context.Context, name string, data []byte) (*
 		Slides:           res.Slides,
 		PagesWithoutText: res.PagesWithoutText,
 		PendingRevisions: res.PendingRevisions,
+
+		ImportedContent:      res.ImportedContent,
+		UnreadContent:        res.UnreadContent,
+		NumberingUnavailable: res.NumberingUnavailable,
+		HiddenText:           res.HiddenText,
 	}, nil
 }
 
