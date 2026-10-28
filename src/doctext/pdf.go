@@ -48,6 +48,11 @@ import (
 // than this counts as "without text" (a scanned page, a lone page number).
 const pdfMinPageRunes = 20
 
+// pdfMaxWasmPages caps the linear memory of the PDFium module (64 KiB pages):
+// without it wazero allows 4 GiB, and a 33 KB PDF with a 16 MiB Flate content
+// stream took the process to +5 GiB. A document that needs more is refused.
+const pdfMaxWasmPages = 8192 // 512 MiB
+
 // PDFOptions configures the PDF engine. The zero value means "no cache".
 type PDFOptions struct {
 	// CacheDir is the directory of the wazero compilation cache. Empty means
@@ -301,7 +306,11 @@ type pdfiumEngine struct {
 func newPDFiumEngine(opts PDFOptions) (*pdfiumEngine, error) {
 	// The bundled module lowers setjmp/longjmp to WebAssembly exception
 	// handling, which wazero needs enabled explicitly.
-	rc := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling)
+	rc := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling).
+		WithMemoryLimitPages(pdfMaxWasmPages).
+		// Kill (in open) cancels the worker context; this makes wazero abort
+		// the WebAssembly call in flight instead of letting the page run on.
+		WithCloseOnContextDone(true)
 	e := &pdfiumEngine{}
 	if opts.CacheDir != "" {
 		c, err := wazero.NewCompilationCacheWithDir(opts.CacheDir)
@@ -345,9 +354,13 @@ func (e *pdfiumEngine) open(ctx context.Context, data []byte) (pdfDoc, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The deadline must cut a single long call (one hostile page took 17 s
+	// with a 2 s timeout): when ctx ends, the instance is killed.
+	stop := context.AfterFunc(ctx, func() { _ = inst.Kill() })
 	empty := "" // permission-only protection has an empty user password
 	d, err := inst.OpenDocument(&requests.OpenDocument{File: &data, Password: &empty})
 	if err != nil {
+		stop()
 		_ = inst.Close()
 		if errors.Is(err, pdferrors.ErrPassword) {
 			return nil, errPDFPassword
@@ -356,16 +369,18 @@ func (e *pdfiumEngine) open(ctx context.Context, data []byte) (pdfDoc, error) {
 	}
 	pc, err := inst.FPDF_GetPageCount(&requests.FPDF_GetPageCount{Document: d.Document})
 	if err != nil {
+		stop()
 		_ = inst.Close()
 		return nil, err
 	}
-	return &pdfiumDoc{inst: inst, ref: d.Document, n: pc.PageCount}, nil
+	return &pdfiumDoc{inst: inst, ref: d.Document, n: pc.PageCount, stop: stop}, nil
 }
 
 type pdfiumDoc struct {
 	inst pdfium.Pdfium
 	ref  references.FPDF_DOCUMENT
 	n    int
+	stop func() bool // releases the ctx watchdog of open
 }
 
 func (d *pdfiumDoc) pages() int { return d.n }
@@ -411,6 +426,9 @@ func (d *pdfiumDoc) renderGray(ctx context.Context, i int, dpi int) (*image.Gray
 
 func (d *pdfiumDoc) close() {
 	defer func() { _ = recover() }()
+	if d.stop != nil {
+		d.stop()
+	}
 	_, _ = d.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: d.ref})
 	_ = d.inst.Close()
 }

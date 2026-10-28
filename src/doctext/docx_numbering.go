@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // DOCX list numbering (brief sections 1.3 and 4.1). The number of a clause is
@@ -27,6 +28,10 @@ import (
 func init() { numbererLoader = loadNumbering }
 
 const maxStyleHops = 32
+
+// maxLvlTextRunes bounds w:lvlText. Word's own dialog accepts far less; with
+// at most 9 "%n" of at most 64 runes each, a prefix stays under ~700 runes.
+const maxLvlTextRunes = 128
 
 type numLevel struct {
 	start       int
@@ -188,7 +193,15 @@ func parseNumbering(data []byte, lim Limits, nb *docxNumbering) error {
 				}
 			case "lvlText":
 				if curLvl != nil {
-					curLvl.text = wVal(t)
+					// The prefix is copied into EVERY numbered paragraph, so its
+					// size is an amplification factor: a level text longer than
+					// any real one ("CLÁUSULA %1ª", "%1.%2.%3.") is not drawn
+					// and the paragraph gets the bullet fallback.
+					if v := wVal(t); utf8.RuneCountInString(v) <= maxLvlTextRunes {
+						curLvl.text = v
+					} else {
+						curLvl.text, curLvl.format = "", "bullet"
+					}
 				}
 			case "suff":
 				if curLvl != nil {

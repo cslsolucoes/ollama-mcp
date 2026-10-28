@@ -1,0 +1,8 @@
+﻿ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.112s
+ok  	github.com/cslsoftwares/mcpollama/doctext	68.628s
+ok  	github.com/cslsoftwares/mcpollama/files	1.520s
+?   	github.com/cslsoftwares/mcpollama/mcp	[no test files]
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.680s
+ok  	github.com/cslsoftwares/mcpollama/ollama	1.067s
+ok  	github.com/cslsoftwares/mcpollama/redact	0.054s
+ok  	github.com/cslsoftwares/mcpollama/tools	2.596s

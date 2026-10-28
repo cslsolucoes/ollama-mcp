@@ -22,7 +22,7 @@ func extractPPTX(ctx context.Context, data []byte, lim Limits) (res *Result, err
 		}
 	}()
 	lim = lim.withDefaults()
-	if err := ctx.Err(); err != nil {
+	if err := ctxErr(ctx); err != nil {
 		return nil, err
 	}
 	pkg, err := OpenPackage(data, lim)
@@ -51,7 +51,7 @@ func extractPPTX(ctx context.Context, data []byte, lim Limits) (res *Result, err
 	var blocks []string
 	total := 0
 	for i, rid := range rids {
-		if err := ctx.Err(); err != nil {
+		if err := ctxErr(ctx); err != nil {
 			return nil, err
 		}
 		n := i + 1
@@ -125,6 +125,7 @@ func slideRIDs(pkg *Package, part string, lim Limits) ([]string, error) {
 	}
 	dec := NewDecoder(bytes.NewReader(data), lim)
 	var out []string
+	seen := map[string]bool{}
 	for {
 		tok, err := dec.Next()
 		if err == io.EOF {
@@ -135,9 +136,12 @@ func slideRIDs(pkg *Package, part string, lim Limits) ([]string, error) {
 		}
 		if se, ok := tok.(xml.StartElement); ok && IsP(se.Name, "sldId") {
 			rid, ok := AttrR(se, "id")
-			if !ok {
+			// The same slide listed twice would come out twice, numbered as two
+			// slides: PowerPoint repairs such a file, the extraction refuses it.
+			if !ok || seen[rid] {
 				return nil, refuse(ReasonMalformed)
 			}
+			seen[rid] = true
 			out = append(out, rid)
 		}
 	}
@@ -228,7 +232,11 @@ func parsePPTXPart(data []byte, lim Limits, notes bool) (lines []string, hidden 
 					a.choiceSeen = true
 				}
 			case IsMC(n, "Fallback"):
-				skipTo = dec.Depth() - 1
+				// Read only when no Choice was taken (as the DOCX walker does):
+				// an AlternateContent with only a Fallback keeps its text.
+				if len(acs) == 0 || acs[len(acs)-1].choiceSeen {
+					skipTo = dec.Depth() - 1
+				}
 			case IsP(n, "sld"):
 				if v, ok := AttrPlain(t, "show"); ok && (v == "0" || v == "false") {
 					hidden = true

@@ -49,13 +49,22 @@ func isWNS(space string) bool { return inNS(space, NSWordprocessing, NSWordproce
 
 // docxRevisionSkip are the revision elements whose whole subtree is dropped
 // (the "accepted" state keeps insertions and drops deletions and old
-// properties). Every element here also marks the document as having pending
-// revisions.
+// properties). Every element here marks the document as having pending
+// revisions, except w:del and w:moveFrom, which do so only when they hold
+// content (see docxRevisionContent).
 var docxRevisionSkip = map[string]bool{
 	"del": true, "moveFrom": true,
 	"pPrChange": true, "rPrChange": true, "sectPrChange": true, "tblPrChange": true,
 	"tblPrExChange": true, "trPrChange": true, "tcPrChange": true, "tblGridChange": true,
 	"numberingChange": true, "cellDel": true, "cellIns": true, "cellMerge": true,
+}
+
+// docxRevisionContent are the elements that make a w:ins, w:del, w:moveFrom
+// or w:moveTo a real revision (runs or text). An empty marker, such as the
+// <w:ins/> Word leaves inside w:numPr of a template paragraph, is not counted:
+// Word itself reports 0 revisions for it (P7.7-3).
+var docxRevisionContent = map[string]bool{
+	"r": true, "t": true, "delText": true, "instrText": true, "delInstrText": true,
 }
 
 type docxPara struct {
@@ -96,15 +105,18 @@ type docxWalker struct {
 	out       strings.Builder
 	lastBlank bool
 	wrote     bool
+	cellRunes int // runes held by open cells/notes, already charged against maxRunes
 
-	skip   int   // >0 while inside a dropped subtree (counts open elements)
-	ac     []int // per open mc:AlternateContent: branches already taken
-	fields []bool
-	code   int // fields currently in their code part
-	paras  []*docxPara
-	cells  []*docxCell
-	tables []*docxTable
-	note   *docxNote
+	skip    int   // >0 while inside a dropped subtree (counts open elements)
+	skipRev bool  // the dropped subtree is a w:del/w:moveFrom: content in it is a pending revision
+	ins     int   // open w:ins/w:moveTo: content in them is a pending revision
+	ac      []int // per open mc:AlternateContent: branches already taken
+	fields  []bool
+	code    int // fields currently in their code part
+	paras   []*docxPara
+	cells   []*docxCell
+	tables  []*docxTable
+	note    *docxNote
 
 	inPPr, inRun int
 	inNumPr      bool
@@ -136,6 +148,13 @@ func (h *docxWalker) appendText(s string) {
 func (h *docxWalker) emit(s string) {
 	if n := len(h.cells); n > 0 {
 		if f := strings.Join(strings.Fields(s), " "); f != "" {
+			// A cell (or a note block) only reaches the text when its row
+			// ends: charge it now, or a single row could grow without bound.
+			h.cellRunes += utf8.RuneCountInString(f) + 1
+			if *h.total+h.cellRunes > h.maxRunes {
+				h.err = refuse(ReasonTooLong)
+				return
+			}
 			c := h.cells[n-1]
 			c.parts = append(c.parts, f)
 		}
@@ -144,7 +163,11 @@ func (h *docxWalker) emit(s string) {
 	if h.err != nil {
 		return
 	}
-	*h.total += utf8.RuneCountInString(s) + 1
+	// What the cells already charged is part of this line.
+	if d := utf8.RuneCountInString(s) + 1 - h.cellRunes; d > 0 {
+		*h.total += d
+	}
+	h.cellRunes = 0
 	if *h.total > h.maxRunes {
 		h.err = refuse(ReasonTooLong)
 		return
@@ -187,6 +210,9 @@ func (h *docxWalker) pageBreak() {
 
 func (h *docxWalker) start(se xml.StartElement) {
 	if h.skip > 0 {
+		if h.skipRev && isWNS(se.Name.Space) && docxRevisionContent[se.Name.Local] {
+			h.pending = true // a deletion or move-from that removes real content
+		}
 		h.skip++
 		return
 	}
@@ -217,13 +243,20 @@ func (h *docxWalker) start(se xml.StartElement) {
 func (h *docxWalker) startW(se xml.StartElement) {
 	local := se.Name.Local
 	if docxRevisionSkip[local] {
-		h.pending = true
+		if local == "del" || local == "moveFrom" {
+			h.skipRev = true // pending only if the subtree holds content
+		} else {
+			h.pending = true // property changes count as they are
+		}
 		h.skip = 1
 		return
 	}
+	if h.ins > 0 && docxRevisionContent[local] {
+		h.pending = true // an insertion or move-to that adds real content
+	}
 	switch local {
 	case "ins", "moveTo":
-		h.pending = true
+		h.ins++
 	case "p":
 		h.paras = append(h.paras, &docxPara{})
 	case "pPr":
@@ -348,6 +381,9 @@ func (h *docxWalker) startW(se xml.StartElement) {
 func (h *docxWalker) end(ee xml.EndElement) {
 	if h.skip > 0 {
 		h.skip--
+		if h.skip == 0 {
+			h.skipRev = false
+		}
 		return
 	}
 	n := ee.Name
@@ -365,6 +401,10 @@ func (h *docxWalker) end(ee xml.EndElement) {
 
 func (h *docxWalker) endW(local string) {
 	switch local {
+	case "ins", "moveTo":
+		if h.ins > 0 {
+			h.ins--
+		}
 	case "p":
 		if k := len(h.paras); k > 0 {
 			p := h.paras[k-1]
@@ -501,6 +541,12 @@ func parseDocxPart(ctx context.Context, pkg *Package, name string, lim Limits, t
 			return nil, h.err
 		}
 	}
+	// A field still in its code part at the end of the part hid everything
+	// after its begin (fldChar begin without separate/end, or with them inside
+	// a deleted run): refuse instead of returning a silently truncated text.
+	if h.code > 0 {
+		return nil, refuse(ReasonMalformed)
+	}
 	return &docxPart{text: h.out.String(), pending: h.pending, headerIDs: h.headerIDs, footerIDs: h.footerIDs}, nil
 }
 
@@ -529,6 +575,9 @@ func collapseBlankLines(s string) string {
 	}
 	return text
 }
+
+// notesParts are read once, after the body, as their own blocks.
+var notesParts = map[string]bool{"word/footnotes.xml": true, "word/endnotes.xml": true, "word/comments.xml": true}
 
 // extractDOCX extracts the text of a .docx. Output order: headers (each one
 // once), body, footers, footnotes, endnotes, comments.
@@ -569,10 +618,13 @@ func extractDOCX(ctx context.Context, data []byte, lim Limits) (*Result, error) 
 			var blocks []string
 			for _, id := range ids {
 				target, ok := byID[id]
-				if !ok || seen[target] || !pkg.Has(target) {
+				key := strings.ToLower(target)
+				// Never a part that is read elsewhere (the body or the notes):
+				// a rel pointing there would duplicate it as a header/footer.
+				if !ok || seen[key] || !pkg.Has(target) || key == docPart || notesParts[key] {
 					continue
 				}
-				seen[target] = true
+				seen[key] = true
 				part, err := parseDocxPart(ctx, pkg, target, lim, &total, nil, false)
 				if err != nil {
 					return nil, err

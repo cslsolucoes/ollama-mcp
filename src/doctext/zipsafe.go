@@ -20,6 +20,7 @@ import (
 type Package struct {
 	lim   Limits
 	files map[string]*zip.File // normalized name -> entry
+	lower map[string]string    // lower-case normalized name -> normalized name
 	total int64                // real decompressed bytes read so far
 }
 
@@ -40,7 +41,7 @@ func OpenPackage(data []byte, lim Limits) (*Package, error) {
 	if len(zr.File) > lim.MaxEntries {
 		return nil, refuse(ReasonMalformed)
 	}
-	p := &Package{lim: lim, files: make(map[string]*zip.File, len(zr.File))}
+	p := &Package{lim: lim, files: make(map[string]*zip.File, len(zr.File)), lower: make(map[string]string, len(zr.File))}
 	seen := make(map[string]struct{}, len(zr.File))
 	for _, f := range zr.File {
 		if testHookEntry != nil {
@@ -67,6 +68,7 @@ func OpenPackage(data []byte, lim Limits) (*Package, error) {
 			continue
 		}
 		p.files[name] = f
+		p.lower[key] = name
 	}
 	return p, nil
 }
@@ -110,8 +112,21 @@ func (p *Package) Has(name string) bool {
 	if !ok {
 		return false
 	}
-	_, found := p.files[n]
+	_, found := p.lookup(n)
 	return found
+}
+
+// lookup finds a part by its normalized name, case-insensitively as OPC
+// requires (a .rels may say "Header1.xml" for the entry "word/header1.xml").
+// Duplicates that differ only by case were already refused by OpenPackage.
+func (p *Package) lookup(n string) (*zip.File, bool) {
+	if f, ok := p.files[n]; ok {
+		return f, true
+	}
+	if real, ok := p.lower[strings.ToLower(n)]; ok {
+		return p.files[real], true
+	}
+	return nil, false
 }
 
 // Read returns the decompressed bytes of one part. A missing part, a
@@ -132,7 +147,7 @@ func (p *Package) Read(name string) ([]byte, error) {
 	if !ok {
 		return nil, refuse(ReasonMalformed)
 	}
-	f, found := p.files[n]
+	f, found := p.lookup(n)
 	if !found {
 		return nil, refuse(ReasonMalformed)
 	}

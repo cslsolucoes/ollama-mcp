@@ -40,14 +40,16 @@ A suíte inteira fica verde na cópia, com 1 teste existente ajustado (ver §6).
 
 | Execução | Vetores (`VEC`) | BLOQUEADO | FIEL | INFO | ACHADO | SILENCIOSO | ESCAPOU | Suíte |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Código atual + testes de ataque (`go test -count=1 -v ./...`) | 170 | 92 | 30 | 31 | 7 | 10 | **0** | todos os testes existentes PASS; 3 FAIL, só de ataque (`TestAdvDOCXIntegrity`, `TestAdvDOCXNumbering`, `TestAdvPPTX`); 2 SKIP (`TestAdvPDFContentBomb`, opt-in; `TestDenylistWindowsShortName`, D: sem 8dot3, como na Fase 4) |
+| Código atual + testes de ataque (`go test -count=1 -v ./...`) | 152 | 74 | 30 | 31 | 7 | 10 | **0** | todos os testes existentes PASS; 3 FAIL, só de ataque (`TestAdvDOCXIntegrity`, `TestAdvDOCXNumbering`, `TestAdvPPTX`); 2 SKIP (`TestAdvPDFContentBomb`, opt-in; `TestDenylistWindowsShortName`, D: sem 8dot3, como na Fase 4) |
 | Bomba de conteúdo PDF (rodada explícita, `MCPO_ADV_BOMB=1`, 2 vezes) | 6 | 0 | 0 | 3 | 3 | 0 | 0 | — |
-| **Total do código atual** | **176** | **92** | **30** | **34** | **10** | **10** | **0** | — |
-| Cópia com todas as correções + os mesmos testes de ataque (`go test -count=1 -v ./...`) | 170 | 92 | 40 | 37 | 1 (`pdf/hifen-encliticos`, rotulado ACHADO sempre; os 3 enclíticos passam a sair corretos) | **0** | **0** | **todos os pacotes `ok`, inclusive os testes de ataque**, com 1 teste existente ajustado (§6); 2 SKIP como acima (`gate-copia-corrigida.log`) |
+| **Total do código atual** | **158** | **74** | **30** | **34** | **10** | **10** | **0** | — |
+| Cópia com todas as correções + os mesmos testes de ataque (`go test -count=1 -v ./...`) | 152 | 74 | 40 | 37 | 1 (`pdf/hifen-encliticos`, rotulado ACHADO sempre; os 3 enclíticos passam a sair corretos) | **0** | **0** | **todos os pacotes `ok`, inclusive os testes de ataque**, com 1 teste existente ajustado (§6); 2 SKIP como acima (`gate-copia-corrigida.log`) |
 | Bomba de PDF na cópia corrigida (rodada explícita) | 6 | 0 | 0 | 6 | 0 | 0 | 0 | timeout respeitado em 2,0 s; +223–440 MiB |
 | Árvore final, sem os testes de ataque (`go vet` + `go test -count=1 ./...`) | — | — | — | — | — | — | — | **vet 0, todos os pacotes `ok`** (`gate-sem-testes.log`) |
 
 Evidência bruta: `…fase7.testes\gate-com-testes.log`, `…fase7.testes\gate-sem-testes.log` e `…fase7.testes\gate-copia-corrigida.log`.
+
+**Errata (2026-10-28, passo 1 da aplicação):** a 1ª versão deste report somava 18 linhas `VEC|doc/…` (todas BLOQUEADO) que **não são desta revisão**. Elas vêm do teste existente `tools/filetools_docs_test.go` (Fase 7.6) e entraram na contagem porque o gate usou `-v ./...`. Os totais corretos dos vetores desta revisão são **158** (74 BLOQUEADO, 30 FIEL, 34 INFO, 10 ACHADO, 10 SILENCIOSO, 0 ESCAPOU) no código atual e **152** sem a bomba na cópia corrigida. A 1ª versão dizia 176 e 92 BLOQUEADO. Os achados e as severidades não mudam.
 
 ## 3. Método
 

@@ -1331,7 +1331,7 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
 
 ### 2026-10-28 16:30 — 7.7a concluída: revisão adversarial (Opus) + decisões do owner sobre as correções
 - **Report e testes de ataque:** `.workspace/reports/MCPOllam2026-10-28-161147-revisao-adversarial-fase7.report.md` + `.testes/` (testes de ataque, 7 diffs de correção + `fase7-todas.diff`, logs de gate). Commit `e7b05be`; `src/` ficou limpo (conferido).
-- **176 vetores:** 92 BLOQUEADO, 30 FIEL, 34 INFO, 10 ACHADO, **10 SILENCIOSO**, **0 ESCAPOU**. Nada vazou; o servidor ficou de pé em todos.
+- **158 vetores** (errata do agente, 17:04: o 1º total, de 176 com 92 BLOQUEADO, incluía 18 linhas `VEC|doc/` do teste existente `filetools_docs_test.go`): 74 BLOQUEADO, 30 FIEL, 34 INFO, 10 ACHADO, **10 SILENCIOSO**, **0 ESCAPOU**. Nada vazou; o servidor ficou de pé em todos.
 - **Achados:**
   - **Altos:**
     - **A1:** DOCX de 1,2 KB → ~1 GiB alocado (pico de 293 MiB). O `lvlText` é copiado em cada parágrafo numerado e, dentro de tabela, não conta no teto;
@@ -1356,3 +1356,24 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   3. **M3:** avisar no rodapé (`numeracao=indisponivel`);
   4. **B6:** manter sempre o hífen real (só juntar o soft-hyphen `\x02` do PDFium); **texto oculto entra rotulado `[oculto]`**.
 - **Execução:** o agente Opus da revisão foi retomado para aplicar em `src/` em 2 passos (1: correções provadas + calibração; 2: M2, M3, B6 e texto oculto), com commit e gate do loop principal entre os passos.
+
+### 2026-10-28 17:08 — correções da revisão adversarial, passo 1 (agente Opus + prova e commit do loop principal)
+- **Aplicado em `src/doctext`:**
+  - `docx.go`: **A1** (célula conta no teto ao entrar), **M1** (campo aberto no fim da parte → recusa), **B1**, **B2** e **P7.7-3** (`ins`/`del`/`moveFrom`/`moveTo` só contam como revisão pendente se tiverem conteúdo);
+  - `docx_numbering.go`: **A1** (`lvlText` com mais de 128 runas vira `- `);
+  - `pdf.go`: **A2** (teto do WASM de **8192 páginas = 512 MiB**, interrupção pelo `ctx`, `Kill` da instância no timeout);
+  - `pptx.go`: **B3** (`r:id` repetido → recusa), **B4** (`Fallback` sem `Choice` passa a ser lido), **B5** (timeout tipado);
+  - `zipsafe.go`: **B1** (busca de parte sem diferenciar maiúsculas);
+  - `hardening_test.go`: 7 testes de regressão.
+- **Calibração do teto do PDF no corpus real** (40 PDFs, c01–c35 e o05–o09, só ids e números; CSV em `.testes/passo1-calibracao-teto-pdf.csv`, conferido sem nomes):
+  - tetos de 4 GiB, 512, 256 e 128 MiB → **0 divergências** (30 extraem iguais; 3 senhas e 7 sem texto recusados nos 4);
+  - maior uso do WASM: **25,4 MiB**; livro de 550 páginas: 18,1 MiB em ~14 s;
+  - teto escolhido: 512 MiB (~20× o maior uso).
+- **Prova do loop principal:**
+  - gate na árvore: `gofmt` vazio, `vet` OK, `go test -count=1 ./...` verde;
+  - **os 7 testes de regressão FALHAM no código antigo** (worktree no HEAD anterior + o arquivo de teste) **e PASSAM no novo** (7/7 nos dois sentidos).
+- **Agente:**
+  - `-race` em todos os pacotes: 0 data race;
+  - ataques da Fase 7 (158 vetores): **0 ESCAPOU**. Restam só os 3 SILENCIOSO e o 1 ACHADO que são M2, M3 e B6 (passo 2). A bomba de PDF agora para em 2,0 s (+223 a 332 MiB; antes até +5,4 GiB);
+  - Fase 4: 227 vetores, 0 ESCAPOU, 2 ACHADO de política já aceitos.
+- **Errata:** o report 7.7a e o brief foram corrigidos pelo agente para 158 vetores; o número deste plano também foi corrigido acima.
