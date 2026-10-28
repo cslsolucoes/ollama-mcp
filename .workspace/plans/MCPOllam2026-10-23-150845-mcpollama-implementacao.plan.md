@@ -1044,3 +1044,63 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7.1-3:** `Has("word/document.xml")` e `Has("ppt/presentation.xml")` entram nas etapas 7.2 e 7.4;
   - **P7.1-4:** o teto de texto somando as partes, com `ReasonTooLong`, fica com o `Extract`.
 - **Observação:** há arquivos de outras frentes no working tree, que **não** entraram no commit: o report de integração alterado e 2 evidências novas, o brief ainda não versionado e um `MCPOllam.rar` na raiz.
+
+### 2026-10-28 14:30 — 7.0 spike do motor de PDF (1ª rodada) + decisões do owner
+- **Report:** `.workspace/reports/MCPOllam2026-10-28-142444-spike-motor-pdf.report.md` (agente Sonnet). Só métricas: o loop principal conferiu 0 CPF, CNPJ ou "R$" e nenhum caminho de cliente. Corpus em `.workspace/spike-pdf/` (ignorado), renomeado `c01`…`c15`.
+- **Resultado (15 PDFs: 8 com texto, 6 só imagem, 1 não abriu em nenhum motor):**
+  - A (go-pdfium v1.21.4 WASM, wazero v1.12.0):
+    - 52.288 runas extraídas;
+    - 21,5 acentos por 1000 runas; **0 U+FFFD**;
+    - 23 ms por PDF; 0 panic; determinístico em 15/15;
+    - **renderiza** (300 dpi, cinza, de 0,23 a 1,28 s por página).
+  - B (ledongthuc): 36.861 runas; 17,4 acentos por 1000; **13,2 U+FFFD por 1000**; 9,7 ms por PDF; não renderiza.
+  - Concordância de ordem de leitura: LCS 0,955.
+  - Custos de A:
+    - **~317 MB de working set** por processo;
+    - **inicialização de 4,6 a 10,8 s sem cache** (0,14 a 0,19 s com o cache de compilação do wazero, 21,6 MB em disco);
+    - binário mínimo de 12,4 MB (o aumento no servidor é estimado em ~+10 MB, não medido).
+  - Fragilidades do corpus: só 33 páginas com texto; sem referência `pdftotext`; tabelas não avaliadas; causa da falha do c01 não confirmada.
+- **Achado:** a toolchain instalada é **go1.27.0** (`GOTOOLCHAIN=auto`); o `CLAUDE.md` diz 1.26.5. O `go.mod` (`go 1.26`) é compatível. Corrigir a documentação na 7.8 (**P7.0-3**).
+- **Decisões do owner (AskUserQuestion, 14:29):**
+  - **D-1: ampliar o spike antes de fixar** (mais 20 PDFs com texto, incluindo tabelas e multipágina; investigar o c01; medir o working set com cache e a reabertura).
+  - **D-14 (nova): cache de compilação só por flag** `--pdf-cache-dir`. Sem a flag, não há cache (a regra "não grava em disco sem flag" fica mantida). Nos `.mcp.json`, usar `D:\MCP\cache\pdfium`.
+  - **D-15 (nova): liberar o motor WASM depois de 10 min ocioso** (flag `--pdf-idle`; 0 = nunca libera).
+- **Estado:** 7.0 em andamento (ampliação); 7.2/7.3 (DOCX) e 7.4 (PPTX) em andamento em paralelo.
+
+### 2026-10-28 14:45 — 7.2, 7.3 e 7.4 concluídas (agentes Sonnet em paralelo + gate e commits do loop principal)
+- **Commits:**
+  - `feb5561` — 7.4, PPTX: `pptx.go`, `pptx_test.go` (15 testes), `pptx_testdata_test.go`, `fuzz_pptx_test.go`;
+  - `d3476a8` — 7.2, DOCX: `Extract` em `doctext.go` (dispatcher com `recover` e `ctx`), `docx.go`, `docx_test.go`, `pdf_stub.go` (stub temporário até a 7.5);
+  - `9914cad` — 7.3, numeração: `docx_numbering.go`, `docx_numbering_test.go`, mais o `FuzzDOCX` em `fuzz_test.go`.
+- **Gate do loop principal:**
+  - com tudo junto e cache limpo: `gofmt` vazio, `vet` OK, `go test -count=1 ./...` verde, `-race ./doctext` OK (6,0 s);
+  - **cada commit verificado sozinho num worktree limpo** (`go vet ./...` + `go test ./...`): os 3 verdes.
+- **Erro de processo (meu), corrigido antes de qualquer push:**
+  - na 1ª sequência, o commit da 7.2 (`aee916a`) **não compilava sozinho**: o `FuzzDOCX` do `fuzz_test.go` usa o helper `nbAbs`, que fica no teste da 7.3. O agente tinha afirmado o contrário, e eu commitei sem verificar;
+  - a verificação em worktree pegou o erro;
+  - **solução:** `git reset --soft feb5561` e nova sequência, com o `fuzz_test.go` no commit da 7.3;
+  - **lição:** verificar cada commit intermediário num worktree **antes**, não depois.
+- **Desvios dos agentes, aceitos e registrados:**
+  - **DOCX:**
+    1. notas de fim saem como `[nota de fim N]`, com referência `[fim N]` no corpo, porque os ids colidem com os das notas de rodapé;
+    2. notas e comentários saem numa linha só, com o rótulo;
+    3. célula de continuação de `vMerge` fica vazia (mantém as colunas); `gridSpan` sai uma vez só;
+    4. `PendingRevisions` também liga com `pPrChange`, `rPrChange` e similares;
+    5. em `AlternateContent`, a 1ª ramificação (`Choice`; ou `Fallback` se não houver `Choice`);
+    6. o texto da caixa de texto sai antes do resto do parágrafo que a contém;
+    7. extra: `m:t` (texto matemático) e `w:ptab`;
+    8. a numeração trata também `pStyle` do nível, `numStyleLink`/`styleLink`, `isLgl` e o `lvl` dentro de `lvlOverride`;
+    9. `w:start` ausente vale 0, como na especificação.
+  - **PPTX:**
+    1. nota com rel inexistente é ignorada (slide ausente recusa);
+    2. `sldNum`, `dt` e `ftr` dentro do slide não são filtrados (o brief só manda ignorar o `sldNum` nas notas);
+    3. `Slides` = número de entradas no `sldIdLst`; `hMerge` omitido; `vMerge` vira célula vazia.
+- **Problema aberto (crítico para o critério do §7.5 do brief):**
+  - nos fuzz `FuzzOpenPackage` e `FuzzPPTX`, o contador fica em **0 execuções/s** depois de 20 a 50 s; no `FuzzDOCX`, ~15 s em 0/s; o `FuzzXMLSafe` roda normal;
+  - a entrada não foi capturada. Pode ser laço ou alocação no caminho do ZIP (DoS) ou artefato do motor de fuzz no Windows;
+  - **delegado a um agente Opus** (14:43) para isolar a causa com dados antes de corrigir.
+- **Pendências:**
+  - **P7.2-1:** apagar o `pdf_stub.go` quando a 7.5 entrar;
+  - **P7.2-2:** o teste do `recover` usa o hook `testHookExtract`, porque não há ponto natural de panic;
+  - **P7.4-1:** avaliar se `dt`/`ftr`/`sldNum` dentro do slide devem ser filtrados (ruído);
+  - **P7.x-1:** travamento do fuzz (em investigação).
