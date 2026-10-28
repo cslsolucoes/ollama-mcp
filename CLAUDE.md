@@ -16,12 +16,18 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-23: **Fases 1 a 4 concluídas** (tools base `list_models`, `generate`,
+Estado em 2026-10-28: **Fases 1 a 4 e 7 concluídas** (tools base `list_models`, `generate`,
 `chat` e `embed`; tools de arquivo `summarize_file`, `extract` e `translate`, que só existem
 com `--allow-root` e passam pelo guard de `src/files/`; catálogo em `TOOLS.md`, gerado por
 `src/cmd/dumptools`). Qualquer mudança em `src/files/` exige rodar de novo os testes de
 ataque da revisão adversarial
-(`.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.*`). O protocolo
+(`.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.*`).
+**Fase 7 (documentos):** as tools de arquivo leem também `.docx`, `.pptx` e `.pdf` com camada de
+texto (`src/doctext/`; PDF por go-pdfium em WASM/wazero, sem cgo). Qualquer mudança em
+`src/doctext/` exige rodar de novo os testes de ataque da revisão adversarial da Fase 7
+(`.workspace/reports/MCPOllam2026-10-28-161147-revisao-adversarial-fase7.testes/`), do mesmo jeito
+que `src/files/` com a da Fase 4. O **OCR (7.9, `src/ocr/`) está em andamento**: PDF digitalizado
+continua recusado até ele entrar. O protocolo
 está em `src/` (`mcp/types.go`, `mcpollama-mcp/`); o cliente Ollama em `src/ollama/` (stream
 interno, TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao
 vivo ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama` ou `./tools`,
@@ -91,7 +97,7 @@ D:\MCP\mcpollama-mcp.exe --version
 Plano de implementação (fases, estado e changelog): `.workspace/plans/MCPOllam*-mcpollama-implementacao.plan.md`.
 Atualizar o plano **a cada fase**.
 
-Toolchain local: Go 1.26.5 (`C:\Program Files\Go\bin\go`).
+Toolchain local: go1.27.0 instalado (`C:\Program Files\Go\bin\go`); o `go.mod` declara `go 1.26.0`.
 
 ---
 
@@ -106,6 +112,8 @@ src/mcpollama-mcp/main.go   entrypoint stdio: parse de flags → fallback env �
 src/mcp/types.go            tipos JSON-RPC 2.0 + MCP escritos à mão (sem SDK MCP externo)
 src/ollama/                 cliente HTTP do Ollama (API nativa /api/*)
 src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao lado
+src/doctext/                extração de .docx, .pptx e .pdf (Fase 7)
+src/ocr/                    OCR de PDF digitalizado e imagens (7.9, em andamento)
 ```
 
 - **Configuração:** flags com fallback para variável de ambiente, como em `TruenasMcp`/`mcpvmware-mcp`:
@@ -118,7 +126,10 @@ src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao
   recusado na partida e por chamada, sem chegar ao Ollama),
   `--timeout`/`OLLAMA_TIMEOUT` (default 120 s, decisão P-7; o Claude Code aceita tools de ~87 s ou mais),
   `--max-prompt-chars`/`MCPOLLAMA_MAX_PROMPT_CHARS` (default 128000),
-  `--max-file-bytes`/`MCPOLLAMA_MAX_FILE_BYTES`, `--max-line-bytes`/`MCPOLLAMA_MAX_LINE_BYTES`,
+  `--max-file-bytes`/`MCPOLLAMA_MAX_FILE_BYTES`,
+  `--max-doc-bytes`/`MCPOLLAMA_MAX_DOC_BYTES` (default 32 MiB, só `.docx/.pptx/.pdf`),
+  `--pdf-cache-dir`/`MCPOLLAMA_PDF_CACHE_DIR` (absoluto; cache de compilação do motor de PDF, sem ele nada é gravado em disco),
+  `--max-line-bytes`/`MCPOLLAMA_MAX_LINE_BYTES`,
   `--tools-verbosity`/`MCPOLLAMA_TOOLS_VERBOSITY` (`full|compact`; o tamanho do `tools/list`
   também custa tokens), `--debug`/`MCPOLLAMA_DEBUG`, `--version`. A fonte da verdade é
   `src/mcpollama-mcp/config.go`.

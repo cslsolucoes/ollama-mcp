@@ -5,9 +5,10 @@
 > **orquestrador**: decide, planeja e verifica. O trabalho mecânico em volume é
 > **delegado ao modelo local**, que custa **zero** da cota Anthropic.
 >
-> Estado (2026-10-26): **Fases 1 a 6 concluídas** (7 tools implementadas e validadas no
-> Claude Code; economia medida na Fase 6). Os fontes ficam em `src/`; o catálogo das tools
-> está em `TOOLS.md`.
+> Estado (2026-10-28): **Fases 1 a 6 concluídas** (7 tools implementadas e validadas no
+> Claude Code; economia medida na Fase 6) e **Fase 7 (documentos `.docx`, `.pptx` e `.pdf`)
+> concluída**; o OCR de PDF digitalizado e de imagens (etapa 7.9) está **em andamento**. Os
+> fontes ficam em `src/`; o catálogo das tools está em `TOOLS.md`.
 
 ---
 
@@ -30,6 +31,9 @@ Vem principalmente de o **servidor ler os arquivos do lado dele** e devolver ao 
 apenas o resultado compacto (resumo ou extração). O conteúdo bruto nunca entra no
 contexto do Claude. Uma tool que só recebe um prompt já montado pelo Claude economiza
 pouco, porque o Claude teria de ler o arquivo antes.
+
+As tools de arquivo leem texto, **`.docx`, `.pptx` e `.pdf` com camada de texto** (Fase 7; ver
+a seção "Documentos" no §3). PDF digitalizado (sem texto) é recusado até o OCR entrar.
 
 Este servidor é a evolução, via protocolo MCP, do nível **`local`** que hoje é chamado
 por script (`%USERPROFILE%\.claude\scripts\ia-local.ps1`, via OpenClaude headless):
@@ -110,6 +114,8 @@ src/
 | `--timeout` | `OLLAMA_TIMEOUT` | `120s` (decisão P-7; gerações longas com modelo frio podem estourar e recebem erro claro) |
 | `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` (~48k tokens) |
 | `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |
+| `--max-doc-bytes` | `MCPOLLAMA_MAX_DOC_BYTES` | `33554432` (32 MiB; teto em bytes de `.docx`, `.pptx` e `.pdf`, em vez do `--max-file-bytes`) |
+| `--pdf-cache-dir` | `MCPOLLAMA_PDF_CACHE_DIR` | — (diretório **absoluto**, criado se não existir, para o cache de compilação do motor de PDF; sem ele nada é gravado em disco e o 1º PDF demora alguns segundos a mais) |
 | `--max-line-bytes` | `MCPOLLAMA_MAX_LINE_BYTES` | `8388608` (linha de stdin; sem o teto de 64 KB do `bufio.Scanner`) |
 | `--allow-root` | `MCPOLLAMA_ALLOW_ROOT` | — (sem ele, as tools de arquivo não existem) |
 | `--max-chunks` | `MCPOLLAMA_MAX_CHUNKS` | `40` (teto de chamadas do map-reduce por arquivo) |
@@ -128,6 +134,48 @@ src/
   Arquivo acima do teto vira map-reduce automático (`--max-chunks`). Nada é gravado em disco.
 - **Contadores de uso:** todo resultado termina com uma linha `[uso] modelo=… prompt_eval_count=… eval_count=… total_ms=… load_ms=… queue_ms=…`, também presente em `_meta`.
 - **Sem tools administrativas.** O nginx devolve **403** em `/api/pull|push|create|delete|copy|blobs`.
+
+**Documentos (Fase 7).** `summarize_file`, `extract` e `translate` também aceitam `.docx`, `.pptx` e `.pdf` com camada de texto. O formato é decidido por extensão **e** assinatura do arquivo. O texto sai com marcadores que dizem de onde veio cada trecho:
+
+- **PDF:** `[página N]`.
+- **PPTX:** `[slide N]`, `[slide N — oculto]` e `[notas do slide N]`.
+- **DOCX:** `[cabeçalho]`, `[rodapé]`, `[nota de rodapé N]`, `[nota de fim N]`, `[comentário]` e `[quebra de página]`.
+- **DOCX e PPTX:** `[oculto]` precede o texto marcado como oculto.
+
+A numeração automática de cláusulas do Word (1., 1.1, a), I.) sai preservada no texto. Revisões pendentes entram já aceitas.
+
+**Rodapé técnico.** Além do `[arquivo]` comum, a linha termina com campos que dizem o quanto confiar na resposta:
+
+| Campo | Significado |
+| --- | --- |
+| `formato=` | `docx`, `pptx`, `pdf` ou `txt` (sempre presente) |
+| `paginas=` e `paginas_sem_texto=` | só PDF: total de páginas e quantas não tinham camada de texto |
+| `slides=` | só PPTX: total de slides |
+| `revisoes_pendentes=` | só DOCX: `sim` se o arquivo tem alterações controladas não resolvidas, `nao` caso contrário |
+| `numeracao=indisponivel` | só aparece quando a numeração automática não pôde ser carregada |
+| `conteudo_importado=sim` | só aparece quando o DOCX importa conteúdo externo (`altChunk`) |
+| `texto_oculto=sim` | só aparece quando há texto oculto (DOCX/PPTX), rotulado `[oculto]` |
+
+Quando parte do conteúdo não pôde ser lida, vem logo depois a linha `[aviso] parte do conteúdo não pôde ser lida`. O `translate` com documento devolve a tradução **como texto** (nada é gravado) e avisa com `[aviso] tradução devolvida como texto; nenhum documento foi gravado`.
+
+**Recusas (sem chamar o modelo):**
+
+- `.doc`, `.ppt` e `.xls` (formato 97-2003: salvar como `.docx`/`.pptx`);
+- documento protegido por senha de abertura;
+- PDF sem camada de texto (digitalizado), até o OCR (7.9);
+- documento acima de `--max-doc-bytes`, ou vazio.
+
+**Limites.** 32 MiB por documento (`--max-doc-bytes`). O teto de texto continua sendo `--max-prompt-chars` × `--max-chunks` (map-reduce, como nos demais arquivos). O motor de PDF tem teto próprio de memória de **512 MiB**.
+
+**Motor de PDF.** go-pdfium **v1.21.4** (licença MIT) em WebAssembly sobre o wazero **v1.12.0** (Apache-2.0), **sem cgo**. DOCX e PPTX usam só a biblioteca padrão do Go. O cache de compilação do WASM só existe com `--pdf-cache-dir`: o 1º PDF do processo leva ~0,6 s com o cache preenchido e ~8 s sem ele. O binário passou de ~10,9 MB para ~22,5 MB.
+
+**Limitações conhecidas:**
+
+- tabelas de PDF não têm garantia de fidelidade;
+- texto invisível de PDF não é rotulado como oculto;
+- o hífen de quebra silábica é mantido ("con-trato");
+- o `.pptx` foi validado com 2 apresentações reais;
+- a denylist casa por prefixo ou sufixo do nome inteiro (`prod.env.pdf` e `chave.pem.docx` não são barrados); política aceita pelo owner.
 
 ## 4. Servidor Ollama (alvo)
 
