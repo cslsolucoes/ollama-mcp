@@ -15,7 +15,7 @@ import (
 // toolsListBudget is the byte budget of the full tools/list payload (TOK-006).
 // Measured at 4 tools: see TestToolsListBudget for the figure it protects.
 const (
-	toolsListBudget     = 4700 // the four base tools, no --allow-root (owner D-13, 2026-10-28: 4400 -> 4700)
+	toolsListBudget     = 4400 // the four base tools, no --allow-root (unchanged by phase 7: 4390 measured; owner D-13 revised 2026-10-28)
 	toolsListBudgetFull = 7800 // with the three file tools (--allow-root); 7600 before the document extensions in the descriptions (7548 -> 7728 measured)
 )
 
