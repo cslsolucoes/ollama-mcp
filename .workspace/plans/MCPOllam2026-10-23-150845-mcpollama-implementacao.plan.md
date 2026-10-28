@@ -1015,3 +1015,32 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
 - **Pendências:**
   - **P7.0-1:** spike do motor de PDF (corpus de 15 PDFs fora do git) e report só com métricas;
   - **P7.0-2:** compilar o Tesseract 5.5.2, se o owner quiser (opcional, D-8).
+
+### 2026-10-28 14:25 — 7.1 concluída: base do pacote `src/doctext/` (agente Sonnet + gate do loop principal)
+- **Feito (só stdlib, sem I/O; nenhum arquivo fora de `src/doctext/`):**
+  - `doctext.go`: `Format`, `Limits` + `DefaultLimits()`, `Result`, `Reason`, `Error`, `ReasonOf` e `Detect` (extensão **e** assinatura; OLE → senha ou 97-2003).
+  - `zipsafe.go`: `OpenPackage` em memória, com limites de entradas, de bytes por entrada e de bytes totais reais. Recusa nomes com `..`, `\`, absolutos ou duplicados (sem diferenciar maiúsculas), entrada cifrada e método não suportado. Resolvedor de `.rels`; `External` é ignorado.
+  - `xmlsafe.go`: decoder em streaming com limite de profundidade e de runas; recusa qualquer diretiva (DTD); helpers de namespace por URI (transicional e Strict).
+  - `normalize.go`: `NormalizeText` (CRLF, BOM, controle, regra de 1% de U+FFFD).
+  - Testes: `detect_test.go`, `security_test.go`, `normalize_test.go` e `fuzz_test.go`; fixtures geradas em código.
+- **Gate (rodado pelo loop principal, cache limpo):**
+  - `gofmt` vazio; `go vet ./...` OK; `go build ./...` OK; `go test -count=1 ./...` verde nos 8 pacotes.
+  - Relato do agente: `-race ./doctext` OK; `FuzzOpenPackage` 60 s, 499.571 execuções; `FuzzXMLSafe` 60 s, 3.746.797 execuções; os dois PASS.
+- **Medido no teste:**
+  - zip bomb de 100 MiB com o limite de entrada padrão (64 MiB): **recusada**, mas o pico de heap chegou a **156 MiB** (`io.ReadAll` dobra o buffer);
+  - com limite de 1 MiB, ou com cabeçalho mentiroso: pico menor que 1 MiB.
+- **Desvios do brief, aceitos e registrados:**
+  1. recusa **qualquer** `xml.Directive`, não só `DOCTYPE`;
+  2. duplicata de nome detectada sem diferenciar maiúsculas;
+  3. o pacote inteiro é recusado se **qualquer** entrada for cifrada ou usar método não suportado;
+  4. `ReasonLegacyExcel` com mensagem própria para `.xls`;
+  5. `.doc`, `.ppt` e `.xls` sem assinatura OLE seguem como texto;
+  6. `MaxTextRunes` padrão de 16 Mi runas, aplicado por parte XML;
+  7. não há `Format` para OLE (o `Detect` devolve erro);
+  8. em `.rels`, `%2F` é decodificado; alvo com esquema ou unidade de disco recusa o pacote.
+- **Pendências:**
+  - **P7.1-1:** o pico de 156 MiB com o limite de 64 MiB fica dentro do critério do brief (menos de 512 MiB), mas avaliar na 7.7 baixar `MaxEntryBytes` ou ler sem dobrar o buffer;
+  - **P7.1-2:** a mensagem de U+FFFD é de PDF; para DOCX e PPTX ficaria imprecisa (ajustar na 7.6);
+  - **P7.1-3:** `Has("word/document.xml")` e `Has("ppt/presentation.xml")` entram nas etapas 7.2 e 7.4;
+  - **P7.1-4:** o teto de texto somando as partes, com `ReasonTooLong`, fica com o `Extract`.
+- **Observação:** há arquivos de outras frentes no working tree, que **não** entraram no commit: o report de integração alterado e 2 evidências novas, o brief ainda não versionado e um `MCPOllam.rar` na raiz.
