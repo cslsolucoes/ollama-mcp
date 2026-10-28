@@ -109,3 +109,122 @@ parágrafo numerado foi comparado automaticamente (alinhamento pelo texto do par
 Driver `acceptdrv` e binário temporário no scratchpad da sessão; `.workspace/spike-pdf/docx/d01.docx`, `d02.docx`, `mapa-docx.txt`,
 `numchk/` (programa Go, texto extraído e JSON do Word com conteúdo de cliente; apagar quando não forem mais necessários).
 Nada gravado em `D:\MCP\`; sem commit; `src/` não foi alterado por esta execução.
+
+## Rodada 2 — documentos do owner (o01…)
+
+Pedido do owner: fechar a lacuna de PPTX real com arquivos de `D:\Users\claiton.linhares\Documents` (somente leitura; **a pasta
+não foi usada como `--allow-root`**; só os 9 arquivos abaixo foram copiados, por caminho explícito, para
+`.workspace/spike-pdf/owner-docs/`, ignorado pelo git — `git check-ignore` confirmado; mapa só em `mapa-owner.txt`).
+Sigilo igual ao da rodada 1: só métricas, identificadores neutros, nenhum trecho nem nome de arquivo original.
+
+| id | formato | bytes | observação do arquivo |
+| -- | ------- | ----- | --------------------- |
+| o01 | pptx | 1.276.664 | apresentação pequena |
+| o02 | pptx | 43.100.197 | acima do teto de 32 MiB do servidor |
+| o03 | docx | 44.144 | especificação, com numeração automática |
+| o04 | docx | 35.520 | documento sem texto algum |
+| o05 | pdf | 3.618.342 | livro, 550 páginas |
+| o06 | pdf | 2.944.455 | tabelas, 338 páginas |
+| o07 | pdf | 208.828 | 15 páginas |
+| o08 | pdf | 11.298.580 | digitalizado |
+| o09 | pdf | 4.480.069 | 14 páginas (acrescentado para ter um 4º PDF de texto de origem distinta, já que o08 é digitalizado) |
+
+### R2.1 Extração direta (`doctext.Extract`, 2 execuções por arquivo, mesmo SHA-256)
+
+Programa Go temporário fora do git (`.workspace/spike-pdf/extall/`). Cache de compilação do PDF preenchido.
+
+| id | formato | slides | páginas | sem texto | rev. pendentes | runas | t1 ms | t2 ms | determinismo (2 SHA iguais) |
+| -- | ------- | ------ | ------- | --------- | -------------- | ----- | ----- | ----- | --------------------------- |
+| o01 | pptx | 9 | - | - | - | 1.965 | 7 | 10 | sim |
+| o02 | pptx | 150 | - | - | - | 351.221 | 1.541 | 1.439 | sim |
+| o03 | docx | - | - | - | **sim** | 17.285 | 37 | 36 | sim |
+| o04 | docx | - | - | - | não | 0 | 0 | 0 | sim |
+| o05 | pdf | - | 550 | 1 | - | 1.147.970 | 4.909 | 4.264 | sim |
+| o06 | pdf | - | 338 | 0 | - | 348.279 | 4.644 | 5.369 | sim |
+| o07 | pdf | - | 15 | 0 | - | 30.583 | 152 | 158 | sim |
+| o08 | pdf | - | recusado | - | - | - | - | - | recusa "sem camada de texto" (digitalizado, 12 páginas pelo PyMuPDF) |
+| o09 | pdf | - | 14 | 0 | - | 18.013 | 1.887 | 1.414 | sim |
+
+Determinismo: 8 de 8 extrações bem-sucedidas com SHA-256 igual nas duas execuções. O extrator direto não aplica o teto de 32 MiB
+(do servidor): o02 extraiu normalmente (150 slides, 1,5 s).
+
+### R2.2 PPTX — 2ª via independente (PowerPoint COM, somente leitura, janela oculta)
+
+`Presentations.Open(path, ReadOnly=true, WithWindow=false)`; por slide: `SlideShowTransition.Hidden`, notas (placeholder de corpo da
+página de notas) e contagem de palavras das formas, inclusive tabelas (todas as células) e grupos (recursivo).
+
+| Critério | o01 | o02 |
+| -------- | --- | --- |
+| `Slides.Count` x nosso `slides=` | 9 = 9 | 150 = 150 |
+| blocos `[slide N]` nossos | 9 | 150 |
+| slides ocultos PowerPoint x marcadores `[slide N — oculto]` | 0 = 0 | 1 = 1 (mesmo slide) |
+| slides com notas não vazias x `[notas do slide N]` | 0 = 0 | 144 = 144 (mesmo conjunto) |
+| palavras por slide, razão nossa/PowerPoint | média 1,000; 9 de 9 slides com razão 1,00 | média 1,000; 146 slides com texto, todos 1,00 (mín 1,00, máx 1,00); 4 slides vazios nos dois |
+| slides fora de ±10% | 0 | 0 |
+| total de palavras (PowerPoint) | 292 | 10.883 |
+
+Resultado PPTX real: **passou, sem divergência** (inclusive oculto e notas). Observação: o PowerPoint deixou o processo POWERPNT vivo
+após `Quit`; encerrei com `Stop-Process` só o processo aberto por mim (nenhum existia antes; 0 restantes). Abertura do o02 (43 MB) levou ~71 s no PowerPoint.
+
+### R2.3 DOCX — 2ª via independente (Word COM, somente leitura)
+
+| Critério | o03 | o04 |
+| -------- | --- | --- |
+| parágrafos no Word | 449 | 1 |
+| palavras (`ComputeStatistics(0)`) x nossas (split por espaço) | 2.449 x 2.539 (razão 1,037) | 0 x 0 |
+| numeração: números (não marcador) com texto | **22 de 22** conferem (sequência do corpo idêntica à do Word) | - |
+| marcadores emitidos como `- ` | 3 de 3 | - |
+| numerados sem texto | 3 (parágrafos vazios, só rótulo) | - |
+| revisões: Word `Revisions.Count` x nosso `revisoes_pendentes` | 0 x **sim** (divergência) | 0 x não |
+
+- Razão de palavras 1,037: nossa saída inclui marcadores de bloco e rodapé; coerente.
+- Numeração: um primeiro alinhamento ingênuo por texto deu 4 "divergências" (1.1 x 1.2 …). Eram artefato do método: o documento tem um bloco
+  tipo sumário (linhas curtas, texto digitado com resultado de campo, 39 linhas) cujos números digitados (ex.: 1.2) diferem da
+  numeração viva da lista; o extrator preserva fielmente o resultado de campo, como o Brief §1.6 manda. Comparando a **sequência de rótulos
+  do corpo** (a partir do fim do bloco tipo sumário) com a sequência de `ListString` do Word: **22 = 22, listas idênticas.**
+- **Divergência real (menor): `revisoes_pendentes=sim` em o03, mas o Word informa 0 revisões.** Causa (sem conteúdo): existe um único elemento
+  `<w:ins .../>` vazio dentro de `<w:numPr>` de um parágrafo do título (marcador legado de alteração de numeração de um modelo da Microsoft,
+  autor "ms", data de 1999). O Word não o conta como revisão; o extrator o conta como revisão pendente (a causa exata no código não foi investigada). Efeito: falso positivo do sinal
+  "contrato não fechado" do Brief §1.5, em documento sem revisão real. Severidade baixa (erra para o lado conservador); sugestão: não sinalizar
+  `w:ins`/`w:del` que sejam filhos de `w:numPr`/`w:rPr` sem conteúdo (marca de parágrafo) ou só sinalizar `w:ins` que contenha `w:r`.
+  Não alterei código (`src/` intocado).
+- o04: documento vazio (1 parágrafo vazio no Word, 0 palavras; extrator devolve 0 runas) e o servidor recusa com "o arquivo está vazio; nada a processar".
+
+### R2.4 PDF — 2ª via (PyMuPDF `page_count`)
+
+| id | nosso `paginas=` | PyMuPDF | sem texto (nosso x PyMuPDF) |
+| -- | ---------------- | ------- | --------------------------- |
+| o05 | 550 | 550 | 1 x 1 |
+| o06 | 338 | 338 | 0 x 0 |
+| o07 | 15 | 15 | 0 x 0 |
+| o09 | 14 | 14 | 0 x 0 |
+| o08 | recusado | 12 (12 sem texto) | coerente com a recusa |
+
+4 de 4 PDFs de texto conferem em páginas e em páginas sem texto; o digitalizado foi recusado corretamente.
+
+### R2.5 Ao vivo (servidor com `--allow-root` só da pasta `owner-docs`, uma chamada por vez, ~1,2 s entre elas)
+
+Mesmas ressalvas de ambiente da rodada 1 (fuzz em paralelo). `load_ms` 0 em todas (16 ms na maior).
+
+| id | tool | formato | bytes | caracteres | partes / chamadas / omitidas | slides / páginas / sem texto / rev. | P | E | T ms | parede ms |
+| -- | ---- | ------- | ----- | ---------- | ---------------------------- | ----------------------------------- | - | - | ---- | --------- |
+| o01 | summarize_file | pptx | 1.276.664 | 1.965 | 1 / 1 / 0 | slides=9 | 820 | 268 | 3.443 | 3.571 |
+| o03 | summarize_file | docx | 44.144 | 17.285 | 1 / 1 / 0 | revisoes_pendentes=sim | 5.313 | 449 | 7.008 | 7.074 |
+| o07 | summarize_file | pdf | 208.828 | 30.583 | 1 / 1 / 0 | paginas=15, sem texto 0 | 8.417 | 610 | 13.646 | 14.143 |
+| o05 | summarize_file | pdf (livro) | 3.618.342 | 1.147.970 | **10 / 11 / 0** | paginas=550, sem texto 1 | 255.690 | 5.449 | 187.542 | 192.815 |
+| o02 | summarize_file | pptx | 43.100.197 | - | - | recusa por tamanho (teto 33.554.432 B, `--max-doc-bytes`) | - | - | - | 2 |
+| o04 | summarize_file | docx | 35.520 | - | - | recusa "o arquivo está vazio; nada a processar" | - | - | - | 1 |
+
+- O livro de 550 páginas (1,15 M de caracteres) foi resumido em map-reduce, 10 partes, 11 chamadas ao modelo, 0 omitidas (teto de 40 chunks), 192,8 s
+  de parede, sem estourar o `--timeout` padrão de 120 s (que vale por chamada ao Ollama, não pela tool inteira).
+- Extra de extração local (parede - T) para o05: 5,3 s (inclui 550 páginas de PDF); o01: 128 ms; o03: 66 ms; o07: 497 ms.
+- Rodapé `[arquivo]` do PPTX traz `formato=pptx slides=9` (sem `revisoes_pendentes`), como no brief.
+
+### R2.6 Resumo da rodada 2
+
+- PPTX real: **passou** (slides 9=9 e 150=150; oculto 1=1; notas 144=144; razão de palavras 1,000 em todos os slides com texto).
+- DOCX: numeração 22 de 22 no corpo; **1 divergência real menor** (`revisoes_pendentes=sim` com Word 0 revisões, causa: `w:ins` vazio em `w:numPr`).
+- PDF: 4 de 4 páginas conferem; digitalizado recusado; livro de 550 páginas resumido ao vivo.
+- Determinismo: 8 de 8. Recusas ao vivo corretas: tamanho (o02) e vazio (o04).
+- Artefatos locais com conteúdo (fora do git): `.workspace/spike-pdf/owner-docs/`, `owner-out/`, `extall/`, `mapa-owner.txt` (apagar quando não forem mais necessários).
+  Sem commit; `src/` intocado; nada em `D:\MCP\`.
