@@ -1226,3 +1226,19 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7.6-1:** smoke com PDF real pelo binário (vai para a 7.7);
   - **P7.6-2:** decisão sobre os tetos de budget (D-13);
   - **P7.6-3:** decisão sobre a denylist em nomes compostos.
+
+### 2026-10-28 15:40 — decisões do owner pós-7.6 + início da 7.7
+- **Decisões (AskUserQuestion):**
+  - **D-13 revista:** `toolsListBudgetFull` fica em 7.800 (tools de arquivo, 7.728 medido) e `toolsListBudget` (base) **volta a 4.400** (4.390 medido, inalterado). Commit `3d98ed2`; testes de budget e catálogo verdes.
+  - **Denylist:** **mantida** a política atual (casa por prefixo ou sufixo do nome inteiro; `prod.env.pdf` e `chave.pem.docx` não são barrados; faltam `.npmrc` e similares). Registrada como pendência conhecida **P7.6-3 (aceita)**.
+  - **7.7:** tudo, em sequência segura.
+- **7.7 em execução (3 frentes paralelas):**
+  1. **Fuzz de 30 min por alvo** (`FuzzDOCX`, `FuzzPPTX`, `FuzzPDF`), num **worktree isolado** em `3d98ed2` (scratchpad `wt-fuzz`), com `-fuzzminimizetime 5s -parallel 8 -timeout 45m`; logs em `scratchpad\fuzz30-<alvo>.log`.
+  2. **Revisão adversarial** (agente Opus):
+     - ataques de integridade (texto que some ou duplica em silêncio), parser (variantes de zip bomb, `.rels`, XML, PDF hostil, FS e stdout do WASM), guard + teto por extensão, vazamento, determinismo e memória;
+     - testes `*_adv_test.go` movidos para `…revisao-adversarial-fase7.testes/` ao fim; correções só como proposta.
+  3. **Ao vivo e aceite** (agente Sonnet):
+     - binário do HEAD num caminho temporário (não `D:\MCP`), uma chamada por vez, com o corpus do spike e 2 `.docx` copiados para a pasta ignorada;
+     - aceite com `--allow-root "A:\Monitor\CSL Telecom\Contratos"` (unidade de rede: se o guard recusar, para e registra);
+     - **numeração conferida por 2ª via no Word via COM** (`ListFormat.ListString`), só contando acertos, sem conteúdo.
+- **Regra do owner mantida:** cada agente acrescenta a sua linha no §12 do brief (`7.7a`, `7.7b`) ao concluir.
