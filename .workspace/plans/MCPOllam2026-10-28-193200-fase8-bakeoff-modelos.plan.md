@@ -1,6 +1,6 @@
 # Plano — Fase 8: comparativo (bake-off) de modelos locais para a finalidade do mcpollama
 
-> **Estado:** PLANEJADO. Nada foi executado; o servidor não foi alterado.
+> **Estado:** EM EXECUÇÃO desde 2026-10-28 19:34 (owner: "faça o teste com todos para o objeto do MCP"; pull dos 4 candidatos AUTORIZADO; troca de modelo, apagar modelos e mudar clientes NÃO autorizados).
 > **Origem:** conversa com o owner em 2026-10-28 (19:10–19:32), depois da Fase 7.
 > **Decisões do owner (AskUserQuestion, 19:32):**
 > - candidatos: **`gemma4:12b`, `qwen3.5:9b`, `granite4.2:8b`, `qwen3:14b`**, contra o atual `qwen3-ia`;
@@ -122,3 +122,4 @@ um modo por suíte, `--model` e `--allowed-models` por execução.
 ## 8. Changelog
 
 - 2026-10-28 19:33 — plano criado (estado: planejado). Nenhuma execução.
+- 2026-10-28 19:34 — **owner autorizou a execução** (aça o teste com todos para o objeto do MCP): D8-1 = pull autorizado agora; D8-2 = só documentos do owner (padrão). Execução delegada a um agente Opus (8.0–8.5). Escopo vedado: troca de modelo padrão, Modelfiles/warm/drop-in/power cap, .mcp.json dos clientes, ollama rm.
