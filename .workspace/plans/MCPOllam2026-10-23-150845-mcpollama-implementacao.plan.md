@@ -1492,3 +1492,19 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **Fase 8a:** paralelismo (`--max-parallel` + `OLLAMA_NUM_PARALLEL=2` + `burst` no nginx + stress paralelo);
   - **Fase 8b:** pista de transbordo na CPU do servidor (medir antes; a fonte é o limite);
   - **Fase 8c:** worker Linux com jobs assíncronos e leitura somente leitura do `WN-DC03`.
+
+### 2026-10-28 19:33 — consultas do owner pós-Fase 7 + plano da Fase 8 (bake-off de modelos)
+- **Consultas respondidas (só resposta, nada executado):**
+  - **paralelismo:** a fila real está no Ollama (`NUM_PARALLEL=1`). Com 2 vagas, viável (~2 GB de KV extra, depois de stress paralelo); **10 vagas não são viáveis** (VRAM, energia, PCIe);
+  - **CPU/RAM:** pista de transbordo na CPU do servidor é possível para chamadas pequenas (medir antes; a fonte é o limite); a CPU das estações já é usada pelo OCR.
+- **Modelos locais** (páginas do Ollama consultadas: `qwen3`, populares, `gemma`, `mistral`, `granite`, `llama`):
+  - o owner fixou o teto em **12B + 20%** e **só locais**, com foco na **finalidade**;
+  - **candidatos escolhidos:** `gemma4:12b`, `qwen3.5:9b`, `granite4.2:8b`, `qwen3:14b`, contra o `qwen3-ia`;
+  - execução: **"só preparar o plano"**.
+- **Plano criado:** `.workspace/plans/MCPOllam2026-10-28-193200-fase8-bakeoff-modelos.plan.md`:
+  - finalidade e requisitos;
+  - candidatos e topologia (≤ 9B = 1 GPU por instância);
+  - riscos (allowlist, `MAX_LOADED_MODELS`, hardware, sigilo);
+  - suítes S1–S6, reaproveitando os drivers;
+  - critério de decisão (fidelidade primeiro);
+  - etapas 8.0–8.7 e decisões D8-1..D8-5.
