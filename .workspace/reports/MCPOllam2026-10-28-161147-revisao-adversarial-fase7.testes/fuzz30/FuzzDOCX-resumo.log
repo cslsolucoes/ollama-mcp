@@ -1,0 +1,11 @@
+﻿=== FuzzDOCX inicio=15:38:53
+fuzz: elapsed: 5m0s, execs: 1452883 (12711/sec), new interesting: 331 (total: 343)
+fuzz: elapsed: 10m0s, execs: 6216282 (18967/sec), new interesting: 418 (total: 430)
+fuzz: elapsed: 15m0s, execs: 10327050 (4877/sec), new interesting: 546 (total: 558)
+fuzz: elapsed: 20m0s, execs: 16255127 (14275/sec), new interesting: 593 (total: 605)
+fuzz: elapsed: 25m0s, execs: 21836632 (20257/sec), new interesting: 617 (total: 629)
+fuzz: elapsed: 30m0s, execs: 28299843 (24946/sec), new interesting: 636 (total: 648)
+fuzz: elapsed: 30m0s, execs: 28299843 (0/sec), new interesting: 636 (total: 648)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/doctext	1800.234s
+=== FuzzDOCX fim=16:08:56 exit=0 dur_min=30.1

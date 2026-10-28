@@ -1377,3 +1377,14 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - ataques da Fase 7 (158 vetores): **0 ESCAPOU**. Restam só os 3 SILENCIOSO e o 1 ACHADO que são M2, M3 e B6 (passo 2). A bomba de PDF agora para em 2,0 s (+223 a 332 MiB; antes até +5,4 GiB);
   - Fase 4: 227 vetores, 0 ESCAPOU, 2 ACHADO de política já aceitos.
 - **Errata:** o report 7.7a e o brief foram corrigidos pelo agente para 158 vetores; o número deste plano também foi corrigido acima.
+
+### 2026-10-28 17:10 — fuzz de 30 min por alvo concluído
+- **Execução:** worktree isolado em `3d98ed2` (código **anterior** às correções da revisão), `-fuzzminimizetime 5s -parallel 8`.
+  - **`FuzzDOCX`:** 30,1 min, **28.299.843** execuções, 648 entradas no corpus, **PASS**.
+  - **`FuzzPPTX`:** 30 min, **40.984.381** execuções, 438 no corpus, **PASS**.
+  - **`FuzzPDF`:** 30 min, **615.504** execuções (o WASM é lento e a cobertura do Go não o enxerga), 168 no corpus, **PASS**.
+  - **0 entradas de falha salvas** (sem `testdata/fuzz`).
+- **Resumos** (marcos de 5 min) versionados em `.workspace/reports/MCPOllam2026-10-28-161147-revisao-adversarial-fase7.testes/fuzz30/`. O worktree `wt-fuzz` foi removido.
+- **Leitura honesta:** o fuzz guiado por cobertura **não** encontrou A1 (amplificação de `lvlText`) nem A2 (PDF lento com memória sem teto), que a revisão adversarial achou com vetores construídos. O critério do brief §7.5 (30 min por alvo sem panic e sem travar) foi cumprido, mas fuzz verde não substitui a revisão.
+- **Pendência:**
+  - **P7.7-5 (opcional):** repetir o `FuzzDOCX` e o `FuzzPDF` no código já corrigido, em fase futura.

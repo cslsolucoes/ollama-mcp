@@ -1,0 +1,11 @@
+﻿=== FuzzPDF inicio=16:38:58
+fuzz: elapsed: 5m0s, execs: 84988 (515/sec), new interesting: 127 (total: 138)
+fuzz: elapsed: 10m0s, execs: 224518 (489/sec), new interesting: 143 (total: 154)
+fuzz: elapsed: 15m0s, execs: 362652 (408/sec), new interesting: 151 (total: 162)
+fuzz: elapsed: 20m0s, execs: 481198 (378/sec), new interesting: 156 (total: 167)
+fuzz: elapsed: 25m0s, execs: 541437 (291/sec), new interesting: 156 (total: 167)
+fuzz: elapsed: 30m0s, execs: 615504 (256/sec), new interesting: 157 (total: 168)
+fuzz: elapsed: 30m0s, execs: 615504 (0/sec), new interesting: 157 (total: 168)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/doctext	1800.475s
+=== FuzzPDF fim=17:09:00 exit=0 dur_min=30

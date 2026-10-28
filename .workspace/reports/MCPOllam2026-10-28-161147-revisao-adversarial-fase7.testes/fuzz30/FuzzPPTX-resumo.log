@@ -1,0 +1,11 @@
+﻿=== FuzzPPTX inicio=16:08:56
+fuzz: elapsed: 5m0s, execs: 2384254 (29097/sec), new interesting: 293 (total: 318)
+fuzz: elapsed: 10m0s, execs: 10058735 (25874/sec), new interesting: 346 (total: 371)
+fuzz: elapsed: 15m0s, execs: 17791427 (24860/sec), new interesting: 375 (total: 400)
+fuzz: elapsed: 20m0s, execs: 25565681 (30406/sec), new interesting: 397 (total: 422)
+fuzz: elapsed: 25m0s, execs: 33426676 (22181/sec), new interesting: 403 (total: 428)
+fuzz: elapsed: 30m0s, execs: 40984381 (24243/sec), new interesting: 413 (total: 438)
+fuzz: elapsed: 30m0s, execs: 40984381 (0/sec), new interesting: 413 (total: 438)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/doctext	1800.235s
+=== FuzzPPTX fim=16:38:58 exit=0 dur_min=30
