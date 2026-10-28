@@ -26,8 +26,11 @@ ataque da revisão adversarial
 texto (`src/doctext/`; PDF por go-pdfium em WASM/wazero, sem cgo). Qualquer mudança em
 `src/doctext/` exige rodar de novo os testes de ataque da revisão adversarial da Fase 7
 (`.workspace/reports/MCPOllam2026-10-28-161147-revisao-adversarial-fase7.testes/`), do mesmo jeito
-que `src/files/` com a da Fase 4. O **OCR (7.9, `src/ocr/`) está em andamento**: PDF digitalizado
-continua recusado até ele entrar. O protocolo
+que `src/files/` com a da Fase 4. O **OCR (7.9, `src/ocr/`) está concluído no código** (opt-in por
+`--ocr-lib` + `--ocr-lib-sha256`; Tesseract 5.3.3 em processos filhos isolados; PDF digitalizado e
+`.png`/`.jpg`; sem as flags o PDF digitalizado segue recusado). Mudanças em `src/ocr/` exigem rodar
+os testes de tag `ocr` com a DLL real (`go test -tags ocr ./...` com `MCPOLLAMA_TEST_OCR_LIB` e
+`MCPOLLAMA_TEST_OCR_TESSDATA`). O protocolo
 está em `src/` (`mcp/types.go`, `mcpollama-mcp/`); o cliente Ollama em `src/ollama/` (stream
 interno, TLS `SystemCertPool`+CA, mapa de erros, redação do token via `src/redact/`). Testes ao
 vivo ficam atrás da build tag `live` (`go test -tags live -run TestLiveN ./ollama` ou `./tools`,
@@ -113,7 +116,7 @@ src/mcp/types.go            tipos JSON-RPC 2.0 + MCP escritos à mão (sem SDK M
 src/ollama/                 cliente HTTP do Ollama (API nativa /api/*)
 src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao lado
 src/doctext/                extração de .docx, .pptx e .pdf (Fase 7)
-src/ocr/                    OCR de PDF digitalizado e imagens (7.9, em andamento)
+src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído no código)
 ```
 
 - **Configuração:** flags com fallback para variável de ambiente, como em `TruenasMcp`/`mcpvmware-mcp`:
@@ -130,6 +133,15 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, em andamento
   `--max-doc-bytes`/`MCPOLLAMA_MAX_DOC_BYTES` (default 32 MiB, só `.docx/.pptx/.pdf`),
   `--pdf-cache-dir`/`MCPOLLAMA_PDF_CACHE_DIR` (absoluto; cache de compilação do motor de PDF, sem ele nada é gravado em disco),
   `--max-line-bytes`/`MCPOLLAMA_MAX_LINE_BYTES`,
+  `--ocr-lib`/`MCPOLLAMA_OCR_LIB` (absoluto; liga o OCR, só Windows),
+  `--ocr-lib-sha256`/`MCPOLLAMA_OCR_LIB_SHA256` (obrigatório com `--ocr-lib`),
+  `--ocr-tessdata`/`MCPOLLAMA_OCR_TESSDATA` (default `<pasta da DLL>\tessdata\best`),
+  `--ocr-workers`/`MCPOLLAMA_OCR_WORKERS` (default `min(CPUs/2, 4)`),
+  `--ocr-page-timeout`/`MCPOLLAMA_OCR_PAGE_TIMEOUT` (default 1m0s),
+  `--ocr-max-pages`/`MCPOLLAMA_OCR_MAX_PAGES` (default 30),
+  `--ocr-max-mem`/`MCPOLLAMA_OCR_MAX_MEM` (default 1073741824),
+  `--ocr-max-megapixels`/`MCPOLLAMA_OCR_MAX_MEGAPIXELS` (default 40),
+  `--ocr-dpi`/`MCPOLLAMA_OCR_DPI` (default 300),
   `--tools-verbosity`/`MCPOLLAMA_TOOLS_VERBOSITY` (`full|compact`; o tamanho do `tools/list`
   também custa tokens), `--debug`/`MCPOLLAMA_DEBUG`, `--version`. A fonte da verdade é
   `src/mcpollama-mcp/config.go`.

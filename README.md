@@ -7,7 +7,8 @@
 >
 > Estado (2026-10-28): **Fases 1 a 6 concluídas** (7 tools implementadas e validadas no
 > Claude Code; economia medida na Fase 6) e **Fase 7 (documentos `.docx`, `.pptx` e `.pdf`)
-> concluída**; o OCR de PDF digitalizado e de imagens (etapa 7.9) está **em andamento**. Os
+> concluída**, com o OCR de PDF digitalizado e de imagens (etapa 7.9) **concluído no código**
+> (opt-in; o binário e a configuração nos clientes seguem com o loop principal). Os
 > fontes ficam em `src/`; o catálogo das tools está em `TOOLS.md`.
 
 ---
@@ -33,7 +34,8 @@ contexto do Claude. Uma tool que só recebe um prompt já montado pelo Claude ec
 pouco, porque o Claude teria de ler o arquivo antes.
 
 As tools de arquivo leem texto, **`.docx`, `.pptx` e `.pdf` com camada de texto** (Fase 7; ver
-a seção "Documentos" no §3). PDF digitalizado (sem texto) é recusado até o OCR entrar.
+a seção "Documentos" no §3). PDF digitalizado (sem texto) e imagens `.png`/`.jpg` só são lidos com o OCR ligado
+(seção "OCR" no §3); sem ele, são recusados.
 
 Este servidor é a evolução, via protocolo MCP, do nível **`local`** que hoje é chamado
 por script (`%USERPROFILE%\.claude\scripts\ia-local.ps1`, via OpenClaude headless):
@@ -117,6 +119,15 @@ src/
 | `--max-doc-bytes` | `MCPOLLAMA_MAX_DOC_BYTES` | `33554432` (32 MiB; teto em bytes de `.docx`, `.pptx` e `.pdf`, em vez do `--max-file-bytes`) |
 | `--pdf-cache-dir` | `MCPOLLAMA_PDF_CACHE_DIR` | — (diretório **absoluto**, criado se não existir, para o cache de compilação do motor de PDF; sem ele nada é gravado em disco e o 1º PDF demora alguns segundos a mais) |
 | `--max-line-bytes` | `MCPOLLAMA_MAX_LINE_BYTES` | `8388608` (linha de stdin; sem o teto de 64 KB do `bufio.Scanner`) |
+| `--ocr-lib` | `MCPOLLAMA_OCR_LIB` | — (caminho **absoluto** de `libtesseract64.dll`; liga o OCR de páginas de PDF sem texto e de imagens `.png`/`.jpg`, só Windows; sem ele não há OCR e nada muda) |
+| `--ocr-lib-sha256` | `MCPOLLAMA_OCR_LIB_SHA256` | — (obrigatório com `--ocr-lib`: SHA-256 da DLL; qualquer problema de OCR na partida deixa o servidor subir sem OCR, com WARNING no stderr) |
+| `--ocr-tessdata` | `MCPOLLAMA_OCR_TESSDATA` | `<pasta da DLL>\tessdata\best` (diretório **absoluto** dos modelos) |
+| `--ocr-workers` | `MCPOLLAMA_OCR_WORKERS` | `min(CPUs/2, 4)` (processos de OCR; 1 a 16) |
+| `--ocr-page-timeout` | `MCPOLLAMA_OCR_PAGE_TIMEOUT` | `1m0s` (por página) |
+| `--ocr-max-pages` | `MCPOLLAMA_OCR_MAX_PAGES` | `30` (páginas enviadas ao OCR por chamada) |
+| `--ocr-max-mem` | `MCPOLLAMA_OCR_MAX_MEM` | `1073741824` (1 GiB por processo de OCR, via Job Object do Windows) |
+| `--ocr-max-megapixels` | `MCPOLLAMA_OCR_MAX_MEGAPIXELS` | `40` (pixels por página; o dpi é reduzido até caber) |
+| `--ocr-dpi` | `MCPOLLAMA_OCR_DPI` | `300` (resolução de renderização da página) |
 | `--allow-root` | `MCPOLLAMA_ALLOW_ROOT` | — (sem ele, as tools de arquivo não existem) |
 | `--max-chunks` | `MCPOLLAMA_MAX_CHUNKS` | `40` (teto de chamadas do map-reduce por arquivo) |
 | `--tools-verbosity` | `MCPOLLAMA_TOOLS_VERBOSITY` | `full` (`compact` reduz o custo do `tools/list`) |
@@ -148,13 +159,15 @@ A numeração automática de cláusulas do Word (1., 1.1, a), I.) sai preservada
 
 | Campo | Significado |
 | --- | --- |
-| `formato=` | `docx`, `pptx`, `pdf` ou `txt` (sempre presente) |
+| `formato=` | `docx`, `pptx`, `pdf`, `png`, `jpg` ou `txt` (sempre presente) |
 | `paginas=` e `paginas_sem_texto=` | só PDF: total de páginas e quantas não tinham camada de texto |
 | `slides=` | só PPTX: total de slides |
 | `revisoes_pendentes=` | só DOCX: `sim` se o arquivo tem alterações controladas não resolvidas, `nao` caso contrário |
 | `numeracao=indisponivel` | só aparece quando a numeração automática não pôde ser carregada |
 | `conteudo_importado=sim` | só aparece quando o DOCX importa conteúdo externo (`altChunk`) |
 | `texto_oculto=sim` | só aparece quando há texto oculto (DOCX/PPTX), rotulado `[oculto]` |
+| `paginas_ocr=`, `conf_ocr_media=` e `paginas_ocr_falhas=` | só quando o OCR rodou: páginas (ou 1 imagem) lidas por OCR, confiança média (0 a 100) e páginas cujo OCR falhou |
+| `paginas_ocr_nao_processadas=` | só quando o tempo acabou antes de todas as páginas (valor maior que 0) |
 
 Quando parte do conteúdo não pôde ser lida, vem logo depois a linha `[aviso] parte do conteúdo não pôde ser lida`. O `translate` com documento devolve a tradução **como texto** (nada é gravado) e avisa com `[aviso] tradução devolvida como texto; nenhum documento foi gravado`.
 
@@ -162,7 +175,7 @@ Quando parte do conteúdo não pôde ser lida, vem logo depois a linha `[aviso] 
 
 - `.doc`, `.ppt` e `.xls` (formato 97-2003: salvar como `.docx`/`.pptx`);
 - documento protegido por senha de abertura;
-- PDF sem camada de texto (digitalizado), até o OCR (7.9);
+- PDF sem camada de texto (digitalizado) e imagens `.png`/`.jpg`, quando o OCR não está ligado (`--ocr-lib`);
 - documento acima de `--max-doc-bytes`, ou vazio.
 
 **Limites.** 32 MiB por documento (`--max-doc-bytes`). O teto de texto continua sendo `--max-prompt-chars` × `--max-chunks` (map-reduce, como nos demais arquivos). O motor de PDF tem teto próprio de memória de **512 MiB**.
@@ -176,6 +189,32 @@ Quando parte do conteúdo não pôde ser lida, vem logo depois a linha `[aviso] 
 - o hífen de quebra silábica é mantido ("con-trato");
 - o `.pptx` foi validado com 2 apresentações reais;
 - a denylist casa por prefixo ou sufixo do nome inteiro (`prod.env.pdf` e `chave.pem.docx` não são barrados); política aceita pelo owner.
+
+**OCR (PDF digitalizado e imagens).** Etapa 7.9, concluída no código.
+
+- **Opt-in.** Só liga com `--ocr-lib` **e** `--ocr-lib-sha256`. Sem as flags, o PDF digitalizado é recusado como antes e `.png`/`.jpg` também. Se as flags estiverem erradas (caminho relativo, hash divergente, DLL ou modelos ausentes, DLL que não carrega), o servidor sobe sem OCR e escreve `WARNING: OCR disabled: ...` no stderr.
+- **Motor.** Tesseract 5.3.3 (DLL `D:\MCP\libtesseract64.dll`, carregada sem cgo) e modelos em `D:\MCP\tessdata\{best,fast}`; o `best` é o padrão (`--ocr-tessdata` troca). Idioma `por`.
+- **Isolamento.** O OCR roda em processos filhos do próprio executável (modo interno `--ocr-worker`, fora do `--help`), cada um num Job Object com limite de memória (`--ocr-max-mem`). O worker não recebe o token nem `--api-key`; o servidor segue de pé se um filho morrer.
+- **O que passa por OCR.** Só as páginas de PDF **sem texto** (menos de 20 caracteres); páginas com texto não mudam. Imagens: `.png` e `.jpg`/`.jpeg` (extensão e assinatura), convertidas para cinza (transparência vira branco). Páginas em branco não vão ao motor.
+- **Marcadores.**
+
+  | Marcador | Quando |
+  | --- | --- |
+  | `[página N — OCR conf=93]` | página lida por OCR |
+  | `[página N — OCR baixa confiança conf=41]` | confiança abaixo de 60 |
+  | `... girada=180]` no fim | a 2ª passada a 180° rendeu mais |
+  | `[página N — OCR falhou]` | falha naquela página; o documento segue |
+  | `[página N — OCR não processado: tempo esgotado]` | o orçamento de tempo acabou |
+  | `[imagem — OCR conf=93]` | imagem (mesmas variantes de baixa confiança e girada) |
+
+- **Rodapé e aviso.** O rodapé ganha `paginas_ocr=`, `conf_ocr_media=` e `paginas_ocr_falhas=` (e `paginas_ocr_nao_processadas=` se maior que 0). Logo depois dele vem sempre `[aviso] texto obtido por OCR: números, datas, nomes e CPF/CNPJ podem conter erros de reconhecimento; confira os valores críticos no original`.
+- **Limites.** `--ocr-max-pages` (30): acima disso o documento é recusado ("divida o documento"; páginas em branco não contam). `--ocr-max-megapixels` (40): página grande tem o dpi reduzido até caber; imagem acima de 2 vezes esse teto de pixels, ou de ~256 MiB estimados de decodificação, é recusada. `--ocr-max-mem` (1 GiB por processo). `--ocr-page-timeout` (1 min por página). O orçamento total vem do `--timeout` da chamada: ao acabar, as páginas restantes ganham o marcador de tempo esgotado. Se nada for reconhecido, a chamada é recusada.
+- **Desempenho medido.** Com `best`, ~4,5 a 6,7 s por página na geração de teste (1 worker, A4 a 300 dpi). No documento real de 12 páginas, com 4 workers, ~1,6 s por página (18,8 s no total, confiança média 90). Fora o OCR, o 1º PDF do processo ainda paga a inicialização do PDFium (~7 a 8 s sem `--pdf-cache-dir`).
+- **Limitações.**
+  - Não há detecção de orientação: só existe uma 2ª passada a 180°; páginas giradas a 90° ou 270° não são corrigidas.
+  - Linhas de tabela sobre fundo sombreado podem sumir (medido: 4 de 11 linhas numa tabela de preços, incluindo o total).
+  - Números, valores, datas, nomes e CPF/CNPJ precisam de conferência no original (por isso o `[aviso]`).
+  - Só Windows. Sem cache de OCR em disco.
 
 ## 4. Servidor Ollama (alvo)
 
