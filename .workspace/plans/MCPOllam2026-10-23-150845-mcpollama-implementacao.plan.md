@@ -1192,3 +1192,37 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7.x-1 FECHADA** (artefato de ambiente);
   - **P7.1-1 FECHADA** (o pico de memória foi resolvido);
   - **P7.7-1:** no fuzz longo de 30 min da 7.7, usar `-fuzzminimizetime 5s` ou sementes menores, para a contagem não se perder.
+
+### 2026-10-28 15:35 — 7.6 concluída: integração (agente Sonnet + 2ª via e commit do loop principal)
+- **Commit `a1930e8`** (18 arquivos):
+  - **guard** (`src/files`): `DocExtractor` + `Extracted` + `SetExtractor` + `ReadContext` + `MaxDocBytes` + `ErrNotDocument`/`ReasonDocument`.
+    - `files` não importa `doctext`; sem extrator, o documento continua recusado como binário;
+    - o teto é escolhido pela extensão do nome resolvido, antes de abrir;
+    - os passos 1 a 10 do guard não mudaram, e o extrator é o último passo.
+  - **adaptador `docs.go`** (`mcpollama-mcp`): `ConfigurePDF` na partida, sem iniciar o motor, e `ClosePDF` no encerramento.
+  - **flags:** `--max-doc-bytes`/`MCPOLLAMA_MAX_DOC_BYTES` (32 MiB) e `--pdf-cache-dir`/`MCPOLLAMA_PDF_CACHE_DIR` (caminho absoluto, criado se não existir).
+  - **rodapé `[arquivo]`:** ganha `formato=`, `paginas=`, `paginas_sem_texto=`, `slides=` e `revisoes_pendentes=`; o `translate` com documento acrescenta `[aviso] tradução devolvida como texto…`.
+  - **descrições mínimas** e `TOOLS.md` regerado.
+  - **`doctext`:** a mensagem de U+FFFD passa a depender do formato (fecha a P7.1-2).
+- **Números (agente; o binário foi conferido pelo loop principal):**
+  - `tools/list` full: 7.582 → 7.762 B; compact: 4.291 → 4.381 B;
+  - payload do teste com as tools de arquivo: 7.548 → 7.728 B; payload das 4 tools base: inalterado (4.390 B);
+  - **binário: ~10,9 MB → 22,5 MB** (22.510.592 B no worktree), com o WASM do PDFium;
+  - partida (`initialize` + `tools/list`): 21–25 ms (250 ms a frio). Com `--pdf-cache-dir`, o diretório é criado vazio, ou seja, o motor não inicia na partida.
+- **Segurança:**
+  - roteiro de ataques da Fase 4 + 18 vetores de documento (agente): 0 escapou; `-race` sem data race;
+  - **2ª via independente do loop principal:** 247 vetores, **241 bloqueados, 0 ESCAPOU, 0 FAIL**, 2 ACHADO **já conhecidos da Fase 4**:
+    - denylist sem `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, `.htpasswd`, `putty.ppk`;
+    - `--allow-root C:\` aceito (decisão SEC-M-02 de 23/10: aceitar com aviso).
+- **Gate do commit (worktree, loop principal):** `vet` OK; `go test -count=1 ./...` verde; `dumptools -check` in sync.
+- **Desvios e observações do agente:**
+  1. **budget:** o teto que estourava era o `toolsListBudgetFull` (7.600, das tools de arquivo), que subiu para **7.800**; o `toolsListBudget` (4 tools base, 4.390 B, inalterado) também subiu para 4.700, como a D-13 mandava. **Levar ao owner;**
+  2. `.doc`/`.ppt`/`.xls` com conteúdo que não é OLE voltam ao caminho de texto;
+  3. **denylist casa por prefixo ou sufixo do nome inteiro:** `prod.env.pdf` e `chave.pem.docx` **não** são barrados (política pré-existente). **Levar ao owner;**
+  4. os campos novos do rodapé vão no fim da linha `[arquivo]`;
+  5. `MaxTextRunes` = `MaxPromptChars × MaxChunks` (5.120.000), com teto de 16 Mi; o `--timeout` é aplicado dentro do adaptador;
+  6. `splitChunks` inalterado; o teste prova que nenhum marcador é cortado em 9 tamanhos de parte.
+- **Pendências:**
+  - **P7.6-1:** smoke com PDF real pelo binário (vai para a 7.7);
+  - **P7.6-2:** decisão sobre os tetos de budget (D-13);
+  - **P7.6-3:** decisão sobre a denylist em nomes compostos.
