@@ -26,3 +26,6 @@ referencias/*
 /deps/
 /sdk/
 /ZLibSource/
+# Fase 7: corpus do spike de PDF (documentos de clientes, NUNCA versionar) e build do OCR
+/.workspace/spike-pdf/
+/.workspace/build-ocr/

@@ -974,3 +974,44 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P11-1:** reiniciar os clientes para carregarem o 0.5.2 e depois apagar o `.exe~`;
   - **P11-2:** o próximo texto em qualquer tool exige rever `toolsListBudget`;
   - R4.2 (cofre / CLAUDE.md do GestorERP) e P9-1 (PCIe) continuam.
+
+---
+
+## Fase 7 — Extração de documentos (`.docx`, `.pptx`, `.pdf`) + OCR
+
+- **Brief:** `.workspace/plans/MCPOllam2026-10-28-132000-extracao-docx-pdf-pptx.brief.md`. Ele é a SSOT dos requisitos; este plano registra as decisões, a execução e as pendências.
+- **Estado:** em andamento (7.0).
+
+### 2026-10-28 14:15 — decisões do owner (AskUserQuestion) e instalação das DLLs
+- **Decisões:**
+  - **D-1/D-2:** go-pdfium em modo WebAssembly (wazero), **condicionado ao spike 7.0**. É a 1ª dependência externa do `go.mod`, só para PDF, com versão fixada e licenças a confirmar. DOCX e PPTX ficam só com a stdlib.
+  - **D-3:** flag nova `--max-doc-bytes` / `MCPOLLAMA_MAX_DOC_BYTES`, default 32 MiB (33554432), só para `.docx`, `.pptx` e `.pdf`.
+  - **D-4:** OCR na etapa 7.9; até lá, PDF sem texto é recusado com mensagem clara.
+  - **D-5:** notas do apresentador e comentários do Word são incluídos, sempre rotulados.
+  - **D-6:** versão 0.6.0 (e 0.7.0 com OCR).
+  - **D-13:** teto do `TestToolsListBudget` sobe para 4.700 bytes; descrições com o acréscimo mínimo ("text (UTF-8), .docx, .pptx or .pdf file"); orientações e avisos vão na resposta da tool.
+  - **D-8:** usar a `libtesseract64.dll` **5.3.3 pronta**. Compilar a 5.5.2 vira pendência opcional.
+  - **D-11:** copiar os modelos `best` e `fast`; o padrão sai da medição (§11.6 do brief), com escolha pela flag `--ocr-tessdata`.
+  - **D-9/D-10:** OCR em processo filho (`--ocr-worker` + Job Object), **só no Windows**; no Linux, "OCR indisponível".
+  - **D-12:** **sim**, `.png` e `.jpg` também entram na 7.9 (stdlib, `DecodeConfig` antes de decodificar, teto de megapixels); `.tif` fica de fora.
+  - **D-7** (ligar OCR, opt-in por `--ocr-lib`): implícita na escolha da D-8; confirmar na 7.9.
+- **Instalação (ordem do owner: "coloque as DLLs necessárias no mesmo local do .exe"):**
+  - `D:\MCP\libtesseract64.dll`:
+    - 5.965.824 bytes;
+    - SHA-256 `964B0972348F6283B1721F9131DA59721CE46FB4F7A4E294399B1169C7E71669`;
+    - procedência: `referencias/tessract-group/libtesseract64.dll`, binário de repositório Delphi de terceiro;
+    - conferido com `objdump -p` (deps MinGW): PE32+ x64; importa **só** `KERNEL32.dll` e `msvcrt.dll`; exporta `TessVersion`, `TessBaseAPIInit3`, `SetImage`, `GetUTF8Text`, `MeanTextConf`…
+  - `D:\MCP\tessdata\best\por.traineddata`: 8.159.939 bytes, `711DE9DB…ADB04`.
+  - `D:\MCP\tessdata\best\osd.traineddata`: 10.562.727 bytes, `9CF5D576…96B00FF`.
+  - `D:\MCP\tessdata\fast\por.traineddata`: 1.982.756 bytes, `C4932B93…ED58B7DEB`.
+  - `D:\MCP\tessdata\fast\osd.traineddata`: 10.562.727 bytes, `9CF5D576…96B00FF` (o mesmo `osd` nas duas variantes).
+  - Todas as cópias têm hash igual ao da origem.
+  - **Desvio do brief:** o §11.5 sugeria `D:\MCP\ocr\`. Por ordem do owner, a DLL fica na raiz `D:\MCP\`, ao lado do `.exe`, e os modelos em `D:\MCP\tessdata\{best,fast}\`. O caminho é passado por `--ocr-lib` (absoluto) e `--ocr-tessdata`.
+  - O go-pdfium em WASM **não** precisa de DLL: o `.wasm` vai embutido no binário.
+- **Licenças:**
+  - Tesseract: Apache-2.0 (`tesseract/LICENSE`);
+  - Leptonica: licença própria, tipo BSD (`leptonica/leptonica-license.txt`, "Copyright (C) 2001-2020 Leptonica");
+  - tessdata: Apache-2.0 (a confirmar no report da fase).
+- **Pendências:**
+  - **P7.0-1:** spike do motor de PDF (corpus de 15 PDFs fora do git) e report só com métricas;
+  - **P7.0-2:** compilar o Tesseract 5.5.2, se o owner quiser (opcional, D-8).
