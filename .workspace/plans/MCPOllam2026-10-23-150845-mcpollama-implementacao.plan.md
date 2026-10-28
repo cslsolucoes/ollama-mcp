@@ -1412,3 +1412,30 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - Fase 4: 227 vetores, 0 ESCAPOU;
   - **loop principal:** a árvore staged (sem o `src/ocr/` e o `go.mod` do agente do OCR, que estão em andamento) foi verificada num worktree limpo: `gofmt` vazio, `vet` OK, todos os pacotes `ok`.
 - **Observação:** o `src/ocr/` e as mudanças em `go.mod`/`go.sum` (`x/image`, `x/sys` direto) são da 7.9a, ainda em execução, e ficaram fora deste commit.
+
+### 2026-10-28 17:50 — 7.8 concluída: binário 0.6.0, cache nos clientes, validação real + 7.9a commitada
+- **Binário:**
+  - **`0.6.0-4538523`**, gerado num worktree limpo no `4538523` (`CGO_ENABLED=0`, `-trimpath`), para não incluir o OCR em andamento;
+  - 22.608.384 B; smoke de partida + `tools/list`: 44 ms, descrições novas presentes;
+  - instalado em `D:\MCP\mcpollama-mcp.exe`. O em uso virou `.exe~` (o `.exe~` antigo 0.5.1 foi apagado); hash igual ao gerado.
+- **Clientes** (decisão do owner): `--pdf-cache-dir D:\MCP\cache\pdfium` inserido antes do `--api-key` nos `.mcp.json` do **MCPOllam** e do **GestorERP**.
+  - Inserção de texto, sem exibir o token; backup no scratchpad, porque contém o token;
+  - JSON válido, 10 args; o do MCPOllam segue ignorado pelo git;
+  - `D:\MCP\cache\pdfium` foi criado e preenchido (22 MB) na 1ª chamada de PDF.
+- **Validação real pelo Claude Code** (`claude -p --model haiku --mcp-config <projeto> --strict-mcp-config`, documentos do owner `o01`/`o03`/`o07`/`o05`):
+  - MCPOllam DOCX: `formato=docx revisoes_pendentes=nao`, OK;
+  - GestorERP PDF: `formato=pdf paginas=15 paginas_sem_texto=0`, OK;
+  - MCPOllam PPTX: `formato=pptx slides=9`, OK;
+  - **tool longa (P7.7-4 FECHADA):** livro de 550 páginas, 10 partes, 11 chamadas, `total_ms=170302`, parede de 206,6 s, **OK**. O Claude Code aceita uma tool de ~3,5 min.
+- **Docs** (agente Sonnet, conferido pelo loop principal; commit `2899b7d`):
+  - **README:** estado, tools com documentos, flags, seção "Documentos" com marcadores, rodapé, recusas, limites, motor e licenças, cache, binário e limitações;
+  - **`CLAUDE.md`:** estado, regra de repetir os testes de ataque da Fase 7 em mudanças no `doctext`, flags, **toolchain go1.27.0** (P7.0-3 fechada) e layout;
+  - 0 segredos.
+- **7.9a commitada (`9b86439`):** pacote `src/ocr/` (agente Opus).
+  - Worker isolado: o filho nasce **suspenso**, entra no Job Object (teto de memória, kill-on-close) e só então roda.
+  - Hash conferido no pai e no worker, com o arquivo da DLL travado contra troca; caminho UNC recusado.
+  - Ambiente do filho sem segredos; stdout do worker limpo (até `puts` do msvcrt); `FuzzOCRFrame` 120 s, 1,46 M execuções, PASS.
+  - **Medido (A4 a 300 dpi):** best 4,6 a 6,0 s por página, conf 95, 12/12 palavras-chave; fast 1,6 a 1,7 s, conf 95; working set do worker com pico de 82 MiB.
+  - **Desvio:** a DLL 5.3.3 não exporta OSD. Com conf < 60, faz uma 2ª passada girada 180° (cabeça para baixo recuperada; 90° já é lido direto).
+  - **Verificação do loop principal no worktree:** suíte verde, `CGO_ENABLED=0 go build ./...` OK, `GOOS=linux` (`ocr` e `main`) OK, `go mod tidy -diff` vazio.
+- **Em execução:** 7.9b (integração do OCR, agente Opus).
