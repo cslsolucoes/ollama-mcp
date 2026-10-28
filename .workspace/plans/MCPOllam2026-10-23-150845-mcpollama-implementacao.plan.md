@@ -1273,3 +1273,17 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **`.workspace/spike-pdf/numchk/`, com texto extraído e JSON do Word, ou seja, conteúdo de cliente.**
 - **Pendência:**
   - **P7.7-2:** apagar `numchk/` (e, ao fim da fase, decidir se o corpus `spike-pdf/` fica ou sai).
+
+### 2026-10-28 16:09 — consulta do owner: compartilhamento Samba/FTP no servidor de IA e módulo Linux (só resposta, nada executado)
+- **Pergunta:** montar uma pasta Samba ou FTP no servidor para colocar os dados, ou um módulo Linux para upload de arquivos maiores.
+- **Resposta (aceita pelo owner, "ok, entendido"):** **não agora.**
+  - O arquivo não vai ao servidor: a estação extrai e envia **só o texto**. O limite real é o contexto do modelo, contornado pelo map-reduce, e não o tamanho do arquivo.
+  - Os dados já estão no `\\WN-DC03\Financeiro` (`A:`), aceito pelo guard; copiar para o servidor de IA criaria mais uma cópia de documento de cliente.
+  - O host de IA está exposto pelo Cloudflare Tunnel e hoje é instável (PCIe/PSU).
+  - FTP é texto puro.
+- **Candidata a Fase 8 (se a triagem em volume virar rotina):**
+  - **worker Linux** do próprio mcpollama numa máquina da LAN, **não** a da GPU;
+  - leitura **somente leitura** do compartilhamento do `WN-DC03`;
+  - **jobs assíncronos** (padrão `tasks/` do `TruenasMcp`);
+  - OCR com a `libtesseract64.so` (reabre a D-10);
+  - junta-se à pendência "tool de inventariar pasta" (brief §9). Exige revisão de segurança própria.
