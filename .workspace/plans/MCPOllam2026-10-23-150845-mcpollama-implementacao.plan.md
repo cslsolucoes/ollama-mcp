@@ -1130,3 +1130,35 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7.0-5:** filtrar caracteres de controle na saída do A (`c30`: 7,7 por 1000) — o `NormalizeText` já faz;
   - **P7.0-6:** não prometer fidelidade de tabela em PDF sem referência.
 - **Erro meu de processo:** os cabeçalhos "14:42" e "14:46" das minhas mensagens anteriores foram **estimados**, não lidos (o horário real conferido era 14:41:50). A regra é usar só o hook ou o `Get-Date`.
+
+### 2026-10-28 15:03 — 7.5 concluída: extração de PDF (agente Sonnet + commit e verificação do loop principal)
+- **Commit `c216351`:**
+  - novos: `pdf.go`, `pdf_test.go`, `pdf_testdata_test.go` (gera os PDFs em código, inclusive os cifrados RC4 40/128 bits), `fuzz_pdf_test.go`;
+  - apagado: `pdf_stub.go`;
+  - **`go.mod`/`go.sum`:** 1ª dependência externa: go-pdfium v1.21.4 (MIT), wazero v1.12.0 (Apache-2.0); transitivas go-commons-pool/v2 v2.1.2 (Apache-2.0), google/uuid v1.6.0 (BSD-3), x/sys v0.48.0 e x/text v0.43.0 (BSD-3). O `go 1.26` virou `go 1.26.0`, como o go-pdfium exige.
+- **API:**
+  - `PDFOptions{CacheDir}`;
+  - `ConfigurePDF(opts)`: antes do 1º uso; depois que o motor iniciou, devolve erro;
+  - `ClosePDF()`: idempotente.
+  - Motor residente e preguiçoso, com semáforo de 1 vaga que respeita o `ctx`. Cada extração usa uma instância nova do pool, então nenhum estado passa entre documentos.
+- **Endurecimento achado pelo agente:** o go-pdfium, por padrão, **monta o volume inteiro** no WASM e **escreve no `os.Stdout`**, o que corromperia o JSON-RPC. Foi configurado com `FSConfig` vazio e stdout/stderr descartados.
+- **Verificação do loop principal (worktree limpo no commit):**
+  - `gofmt` vazio; `vet` OK; `go test -count=1 ./...` verde (doctext 15,9 s);
+  - `go list -deps ./mcpollama-mcp` confirma que o main ainda não importa doctext, pdfium nem wazero, então o binário não muda até a 7.6.
+  - Relato do agente: `-race ./doctext` OK (180 s); `FuzzPDF` 60 s, 8.879 execuções sem falha, mas a cobertura do Go não enxerga dentro do WASM (fuzz pouco guiado).
+- **Medições (agente):**
+  - init **sem cache 6,0 a 6,75 s**; **com cache 123 ms**;
+  - 1,15 ms por página em texto sintético (não comparável aos ~7 ms por página dos PDFs reais do spike);
+  - render: 72 dpi dá 612×792; 144 dpi dá 1224×1584.
+- **Desvios:**
+  1. o PDFium troca o `-` de fim de linha por `\x02`. Foi tratado em `pdfiumSoftHyphens`: só junta se a próxima letra for minúscula; senão vira `-\n`. Hífen literal depois de um não-letra nunca junta;
+  2. uma página que falha em `pageText` torna o documento `ReasonMalformed` (nunca perde texto em silêncio);
+  3. um PDF truncado no meio pode ser recuperado pelo PDFium; o teste aceita texto ou recusa tipada, nunca panic.
+- **Pendências:**
+  - **P7.5-1:** o `ctx` só é checado entre páginas; uma página hostil e lenta não é interrompível, e o `--timeout` do servidor continua sendo a rede de proteção (avaliar na 7.7);
+  - **P7.5-2:** sem teto de memória do WASM (~320 MB sem cache; 68 a 81 MB com cache, segundo o spike);
+  - **P7.5-3:** `pdfRenderPage` valida só dpi entre 1 e 1200; a 7.9 precisa de teto de megapixels;
+  - **P7.5-4:** na 7.6, chamar `ConfigurePDF` antes do 1º PDF e `ClosePDF` no encerramento;
+  - **P7.0-4:** versão do PDFium dentro do `.wasm` (5,8 MB) ainda não identificada;
+  - **P7.5-5:** estratégia de fuzz para o WASM, que a cobertura não guia.
+- **Ordem do owner (15:02):** "coloque o agente para ir dando atualização para o plano origem conforme for concluindo". O brief ganhou o **§12 "Estado da execução"** (tabela por etapa) e o checklist do §10 foi marcado (6 itens). Todo agente novo recebe a instrução de atualizar o §12 ao concluir; o agente Opus em execução foi avisado por mensagem.
