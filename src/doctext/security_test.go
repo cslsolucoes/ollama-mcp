@@ -100,7 +100,10 @@ func TestZipBomb(t *testing.T) {
 	honest := zeros(t, "word/document.xml", 100) // 100 MiB of zeros, ~100 KiB compressed
 	t.Logf("pacote de %d bytes comprimidos; descompactado real: 100 MiB", len(honest))
 
-	// Case 1: the header is honest, so only OUR counting stops it.
+	// Case 1: the header is honest (100 MiB > 64 MiB), so the part is refused
+	// before anything is decompressed: archive/zip could never deliver a size
+	// other than the declared one. (Our own byte count, for a reader that
+	// breaks that contract, is TestReadBoundedOwnCount.)
 	p, err := OpenPackage(honest, Limits{})
 	if err != nil {
 		t.Fatal(err)
@@ -110,11 +113,11 @@ func TestZipBomb(t *testing.T) {
 	wantReason(t, rerr, ReasonMalformed)
 	t.Logf("MEMORIA zip bomb 100 MiB (limite de entrada 64 MiB): pico de heap acima da base = %d MiB; total alocado = %d MiB",
 		peak>>20, total>>20)
-	if peak > 400<<20 {
-		t.Fatalf("pico de memória alto demais: %d MiB", peak>>20)
+	if total > 1<<20 {
+		t.Fatalf("a recusa pelo tamanho declarado alocou %d bytes (deveria recusar antes de descompactar)", total)
 	}
-	if peak < 32<<20 {
-		t.Fatalf("pico de %d MiB sugere que a leitura não chegou ao limite (teste não exercitou a defesa)", peak>>20)
+	if p.total <= DefaultLimits().MaxEntryBytes {
+		t.Fatalf("a recusa deveria cobrar o orçamento como uma leitura que estourou o limite (total=%d)", p.total)
 	}
 
 	// Case 2: small cap, honest header.
@@ -167,6 +170,79 @@ func TestMaxTotalBytesAcrossEntries(t *testing.T) {
 		t.Fatal("o orçamento total deveria continuar estourado")
 	}
 }
+
+// A part right at the default per-entry limit (64 MiB) is read with a single
+// allocation of its size. io.ReadAll allocated ~157 MiB and peaked at ~156 MiB
+// for the same part (growing chunks plus the final copy).
+func TestReadPresizedAtDefaultLimit(t *testing.T) {
+	unit := []byte("<w:t>abcdefgh</w:t>")
+	part := bytes.Repeat(unit, (64<<20)/len(unit)+1)[:64<<20]
+	for _, m := range []uint16{0, store} {
+		data := buildZip(t, entry{name: "word/document.xml", data: part, method: m})
+		p, err := OpenPackage(data, Limits{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []byte
+		var rerr error
+		start := time.Now()
+		peak, total := peakHeap(func() { out, rerr = p.Read("word/document.xml") })
+		el := time.Since(start)
+		if rerr != nil || !bytes.Equal(out, part) {
+			t.Fatalf("método %d: a parte de 64 MiB, no limite, deveria ser lida: %v (len %d)", m, rerr, len(out))
+		}
+		t.Logf("MEMORIA parte de 64 MiB (método %d): pico = %d MiB, total alocado = %d MiB, tempo = %v", m, peak>>20, total>>20, el)
+		if total > 80<<20 {
+			t.Fatalf("método %d: alocou %d MiB para ler 64 MiB (esperado ~64)", m, total>>20)
+		}
+		if el > 5*time.Second {
+			t.Fatalf("método %d: leitura levou %v", m, el)
+		}
+		out = nil
+	}
+}
+
+// A header that lies UPWARD (declares 1 MiB, holds 1 KiB) makes Read pre-size
+// for nothing; the allocation is charged to MaxTotalBytes, so repeated reads of
+// lying parts cannot allocate without bound.
+func TestReadLyingUpwardChargesBudget(t *testing.T) {
+	data := buildZip(t, entry{name: "a.xml", data: bytes.Repeat([]byte("a"), 1024)}, entry{name: "b.xml", data: []byte("b")})
+	patchCentral(t, data, 0, 24, le32(1<<20))
+	p, err := OpenPackage(data, Limits{MaxEntryBytes: 1 << 20, MaxTotalBytes: 3 << 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		_, err := p.Read("a.xml")
+		wantReason(t, err, ReasonMalformed)
+	}
+	if _, err := p.Read("b.xml"); err == nil {
+		t.Fatal("as pré-alocações dos cabeçalhos mentirosos deveriam ter gasto o orçamento")
+	}
+}
+
+// readBounded keeps its own count: a reader that ignores any declared size
+// (archive/zip's contract broken) still cannot go far past max.
+func TestReadBoundedOwnCount(t *testing.T) {
+	buf, err := readBounded(io.LimitReader(endlessZeros{}, 10<<20), 1024, 1<<20)
+	if err != errTooBig {
+		t.Fatalf("err = %v, esperado errTooBig", err)
+	}
+	if len(buf) > 2<<20 {
+		t.Fatalf("leu %d bytes, bem além do teto de 1 MiB", len(buf))
+	}
+	// Control: exactly max bytes pass, with an exact hint and with none.
+	for _, hint := range []int64{1 << 20, 0} {
+		buf, err = readBounded(io.LimitReader(endlessZeros{}, 1<<20), hint, 1<<20)
+		if err != nil || len(buf) != 1<<20 {
+			t.Fatalf("hint %d: %d bytes, err %v; esperado 1 MiB sem erro", hint, len(buf), err)
+		}
+	}
+}
+
+type endlessZeros struct{}
+
+func (endlessZeros) Read(b []byte) (int, error) { clear(b); return len(b), nil }
 
 func TestTenThousandEntriesRefusedBeforeIterating(t *testing.T) {
 	entries := make([]entry, 10000)

@@ -692,7 +692,7 @@ Licenças a registrar no report: Tesseract Apache-2.0, Leptonica BSD-2-Clause, t
 | 7.3 numeração DOCX | concluída | `9914cad` | `numbering.xml`, herança de estilo, reinícios, `startOverride`, decimal/letras/romanos/ordinal/bullet |
 | 7.4 PPTX | concluída | `feb5561` | ordem pelo `sldIdLst`, grupos, tabelas, notas, ocultos, layouts/masters ignorados |
 | 7.5 PDF | concluída | `c216351` | marcadores `[página N]`, páginas sem texto, senha de abertura recusada e de permissão aberta, hifenização conservadora, `recover`/`ctx`/limites, renderização em cinza pronta para o OCR; FS e stdout do WASM bloqueados |
-| fuzz do caminho ZIP | em investigação (Opus) | — | contador em 0 exec/s após 20–50 s no `FuzzOpenPackage`/`FuzzPPTX`; isolar a causa antes de corrigir |
+| fuzz do caminho ZIP | artefato de ambiente | — | sem defeito: os períodos em 0 exec/s coincidem com a minimização do motor de fuzz (as execuções só são somadas no fim; até 60 s por entrada, e a cortada pelo tempo perde a contagem); instrumentado com `-parallel 1`, ~2,1 M execuções e pior caso de 29 ms por entrada (com 16 workers, 48 entradas de 0,2–2 s rodam em ≤ 1,05 ms isoladas: contenção). À parte, `Package.Read` passou a pré-dimensionar pelo tamanho declarado (64 MiB: pico 156 → 64 MiB) e recusa antes de descompactar o que declara mais que o limite |
 | 7.6 integração | pendente | — | guard + `--max-doc-bytes` + `--pdf-cache-dir` + rodapé + descrições + `TOOLS.md` |
 | 7.7 fuzz 30 min, revisão adversarial, ao vivo, aceite | pendente | — | atenção: `A:` é unidade de rede (`\\WN-DC03\Financeiro`) |
 | 7.8 docs + binário 0.6.0 | pendente | — | inclui corrigir no `CLAUDE.md` a toolchain (instalada: go1.27.0) |

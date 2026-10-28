@@ -114,9 +114,19 @@ func (p *Package) Has(name string) bool {
 	return found
 }
 
-// Read returns the decompressed bytes of one part. It never trusts the sizes
-// in the headers: it reads through a limit and sums the bytes really produced.
-// A missing part, a decompression error or a limit exceeded is ReasonMalformed.
+// Read returns the decompressed bytes of one part. A missing part, a
+// decompression error or a limit exceeded is ReasonMalformed.
+//
+// The declared (central directory) size is used only in ways a lie cannot
+// exploit. archive/zip fails a read that yields more bytes than declared
+// (ErrFormat) or fewer (ErrUnexpectedEOF), so a part that declares more than
+// the limit can never be read successfully: it is refused before anything is
+// decompressed. Otherwise the buffer is pre-sized to the declared size, which
+// keeps the peak at about one copy of the part (io.ReadAll held ~2.4x: growing
+// chunks plus the final copy). A header that lies upward only buys an
+// allocation no larger than the limit, and that allocation is charged to
+// MaxTotalBytes like real bytes. The bytes really produced are still counted
+// against the limit, independently of archive/zip.
 func (p *Package) Read(name string) ([]byte, error) {
 	n, ok := normalizeEntryName(name)
 	if !ok {
@@ -134,22 +144,57 @@ func (p *Package) Read(name string) ([]byte, error) {
 	if remaining < max {
 		max = remaining
 	}
+	if f.UncompressedSize64 > uint64(max) {
+		// Over the per-entry cap or over what is left of the total budget.
+		// Charged as if max+1 bytes had been read, so the budget ends in the
+		// same state as when the limit is hit while reading.
+		p.total += max + 1
+		return nil, refuse(ReasonMalformed)
+	}
+	hint := int64(f.UncompressedSize64)
 	rc, err := f.Open()
 	if err != nil {
 		return nil, refuse(ReasonMalformed)
 	}
 	defer rc.Close()
-	buf, err := io.ReadAll(io.LimitReader(rc, max+1))
+	buf, err := readBounded(rc, hint, max)
+	charged := int64(len(buf))
+	if charged < hint {
+		charged = hint // the pre-sized allocation counts even if unused
+	}
+	p.total += charged
 	if err != nil {
 		return nil, refuse(ReasonMalformed)
 	}
-	if int64(len(buf)) > max {
-		// Over the per-entry cap or over what is left of the total budget.
-		p.total += int64(len(buf))
-		return nil, refuse(ReasonMalformed)
-	}
-	p.total += int64(len(buf))
 	return buf, nil
+}
+
+// errTooBig is returned by readBounded when more than max bytes arrive.
+var errTooBig = errors.New("doctext: part over the limit")
+
+// readBounded reads r to EOF into a buffer pre-sized to hint (0 <= hint <=
+// max) and fails with errTooBig as soon as more than max bytes have arrived.
+// The +1 of capacity lets an exact hint reach EOF without growing. Past the
+// hint the buffer grows like append, still checked against max after every
+// Read, so a reader that ignores its declared size cannot go far past max.
+func readBounded(r io.Reader, hint, max int64) ([]byte, error) {
+	buf := make([]byte, 0, hint+1)
+	for {
+		if len(buf) == cap(buf) {
+			buf = append(buf, 0)[:len(buf)]
+		}
+		n, err := r.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+n]
+		if int64(len(buf)) > max {
+			return buf, errTooBig
+		}
+		if err == io.EOF {
+			return buf, nil
+		}
+		if err != nil {
+			return buf, err
+		}
+	}
 }
 
 // Relationship is one internal entry of a .rels part. Target is already
