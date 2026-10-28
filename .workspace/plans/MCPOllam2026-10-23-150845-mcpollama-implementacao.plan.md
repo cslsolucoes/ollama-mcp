@@ -1162,3 +1162,33 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7.0-4:** versão do PDFium dentro do `.wasm` (5,8 MB) ainda não identificada;
   - **P7.5-5:** estratégia de fuzz para o WASM, que a cobertura não guia.
 - **Ordem do owner (15:02):** "coloque o agente para ir dando atualização para o plano origem conforme for concluindo". O brief ganhou o **§12 "Estado da execução"** (tabela por etapa) e o checklist do §10 foi marcado (6 itens). Todo agente novo recebe a instrução de atualizar o §12 ao concluir; o agente Opus em execução foi avisado por mensagem.
+
+### 2026-10-28 15:12 — "travamento" do fuzz: artefato do motor de fuzz + melhoria de memória no `zipsafe` (agente Opus)
+- **Diagnóstico com evidência:**
+  - o alvo de fuzz foi instrumentado temporariamente (watchdog de 5 s com stack, registro acima de 200 ms, estatísticas por worker) e rodado com `GODEBUG=fuzzdebug=1`;
+  - **(b) confirmada:** todo período em 0 exec/s coincide com uma **minimização** no log:
+    - `FuzzOpenPackage`: minimizações de 29,6 e 32,8 s, e o contador pula de 24 para 346.867 ao fim delas;
+    - `FuzzDOCX`: 54,8, 13,6 e 27,3 s;
+    - `FuzzPPTX`: a semente de 9.714 bytes estoura o `-fuzzminimizetime` padrão de 60 s.
+  - O motor (`internal/fuzz/worker.go:238-276`) só soma as execuções no fim da minimização. Se ela estoura o tempo, o worker é encerrado e a contagem se perde;
+  - **(a) refutada:** ~2,1 M execuções instrumentadas, pior caso de **29,4 ms**; o watchdog de 5 s nunca disparou. Com 16 workers houve chamadas de 0,2 a 2 s, mas reexecutadas isoladas levaram no máximo 1,05 ms (contenção de CPU);
+  - **(c) refutada como causa:** os alvos usam `MaxEntryBytes` de 1 MiB.
+- **Melhoria aplicada mesmo assim (commit `b9e8fcc`):**
+  - `Package.Read` recusa **antes** de descompactar uma parte que declara tamanho acima do limite;
+  - lê com buffer **pré-dimensionado** (`readBounded`), contando os bytes reais;
+  - um cabeçalho que mente para cima cobra o orçamento `MaxTotalBytes`.
+  - Isso se apoia no `archive/zip`, que dá `ErrFormat` ou `ErrUnexpectedEOF` quando o tamanho real diverge do declarado (conferido no fonte da stdlib).
+- **Números (verificados pelo loop principal em worktree limpo):**
+  - zip bomb de 100 MiB: pico **156 → 0 MiB** (recusa antecipada);
+  - parte de 64 MiB: **157 → 64 MiB** alocados, e de 81 ms para 22 a 30 ms.
+- **Testes novos:**
+  - `TestReadPresizedAtDefaultLimit`, `TestReadLyingUpwardChargesBudget`, `TestReadBoundedOwnCount`;
+  - `TestZipBomb` passa a exigir recusa sem alocar.
+- **Gate do commit `b9e8fcc` (worktree):**
+  - loop principal: `gofmt` vazio, `vet` OK, `go test -count=1 ./...` verde;
+  - agente: `-race ./doctext` OK (183 s); os 4 fuzz, 120 s com `-parallel 1`, PASS (1.228.149 / 410.750 / 717.011 / 1.391 execuções).
+- **Mudança de comportamento aceita:** um `styles.xml` ou `numbering.xml` com cabeçalho que mente para cima agora gasta 64 MiB dos 256 MiB do orçamento (o documento já está corrompido nesse caso).
+- **Pendências:**
+  - **P7.x-1 FECHADA** (artefato de ambiente);
+  - **P7.1-1 FECHADA** (o pico de memória foi resolvido);
+  - **P7.7-1:** no fuzz longo de 30 min da 7.7, usar `-fuzzminimizetime 5s` ou sementes menores, para a contagem não se perder.
