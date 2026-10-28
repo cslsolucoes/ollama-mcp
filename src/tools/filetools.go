@@ -71,7 +71,7 @@ func (d Deps) summarizeFileTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "summarize_file",
 			Title: "Summarize a file with the local model",
-			Description: "Summarizes a text (UTF-8), .docx, .pptx or .pdf file read on the server; the file text never enters your context. " +
+			Description: "Summarizes a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file read on the server; the file text never enters your context. " +
 				"Large files are split and combined automatically. The answer ends with a [uso] line.",
 			InputSchema: objectSchema([]string{"path"}, schemaMap{
 				"path":      nonEmptyStringProp(pathDesc),
@@ -91,7 +91,7 @@ func (d Deps) extractTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "extract",
 			Title: "Extract information from a file with the local model",
-			Description: "Extracts what the instruction asks from a text (UTF-8), .docx, .pptx or .pdf file read on the server, in the requested format. " +
+			Description: "Extracts what the instruction asks from a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file read on the server, in the requested format. " +
 				"The file text never enters your context. Large files are split and merged automatically. The answer ends with a [uso] line.",
 			InputSchema: objectSchema([]string{"path", "instruction"}, schemaMap{
 				"path":        nonEmptyStringProp(pathDesc),
@@ -110,7 +110,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 		Def: mcp.Tool{
 			Name:  "translate",
 			Title: "Translate a file with the local model",
-			Description: "Translates a text (UTF-8), .docx, .pptx or .pdf file read on the server; the file text never enters your context. " +
+			Description: "Translates a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file read on the server; the file text never enters your context. " +
 				"Large files are translated part by part. The answer ends with a [uso] line.",
 			InputSchema: objectSchema([]string{"path", "target_language"}, schemaMap{
 				"path":            nonEmptyStringProp(pathDesc),
@@ -123,7 +123,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 	}
 }
 
-const pathDesc = "Absolute path of a text (UTF-8), .docx, .pptx or .pdf file inside an allowed root; relative only when the server has a single root."
+const pathDesc = "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root."
 
 func (d Deps) summarizeFile(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
 	a, err := parseArgs(raw, "path", "focus", "language", "max_words", "model")
@@ -464,6 +464,9 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 	}
 	body += fmt.Sprintf("\n\n[arquivo] nome=%s bytes=%d caracteres=%d partes=%d chamadas=%d omitidas=%d",
 		f.Name, f.Bytes, runes(f.Text), n, j.calls, omitted) + docFooter(f)
+	if ocrRead(f) {
+		body += "\n" + ocrNotice
+	}
 	if f.UnreadContent {
 		body += "\n" + unreadNotice
 	}
@@ -480,10 +483,22 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 // (a DOCX w:altChunk of an unsupported type): the answer may miss something.
 const unreadNotice = "[aviso] parte do conteúdo não pôde ser lida"
 
+// ocrNotice follows the footer whenever part of the text came from the OCR:
+// a digit, a date or a CPF/CNPJ misread is the costliest error in a contract
+// (brief 11.7), and the caller must be reminded exactly then.
+const ocrNotice = "[aviso] texto obtido por OCR: números, datas, nomes e CPF/CNPJ podem conter erros de reconhecimento; confira os valores críticos no original"
+
+// ocrRead reports whether some of the text of f came from the OCR.
+func ocrRead(f *files.File) bool {
+	return f.OCR.Pages > 0 || f.Format == "png" || f.Format == "jpg"
+}
+
 // docFooter is the tail of the [arquivo] line: the format always, then only
 // the fields that apply to it (pages and pages without text for a PDF, slides
 // for a PPTX, pending revisions for a DOCX), and the flags only when set
-// (numeracao=indisponivel, conteudo_importado=sim, texto_oculto=sim). They tell
+// (numeracao=indisponivel, conteudo_importado=sim, texto_oculto=sim). When the
+// OCR ran: paginas_ocr, conf_ocr_media and paginas_ocr_falhas, plus
+// paginas_ocr_nao_processadas when the time budget left pages out. They tell
 // the caller how far to trust the answer.
 func docFooter(f *files.File) string {
 	format := f.Format
@@ -511,6 +526,12 @@ func docFooter(f *files.File) string {
 	}
 	if f.HiddenText {
 		out += " texto_oculto=sim"
+	}
+	if f.OCR.Used {
+		out += fmt.Sprintf(" paginas_ocr=%d conf_ocr_media=%d paginas_ocr_falhas=%d", f.OCR.Pages, f.OCR.ConfMean, f.OCR.Failed)
+		if f.OCR.NotProcessed > 0 {
+			out += fmt.Sprintf(" paginas_ocr_nao_processadas=%d", f.OCR.NotProcessed)
+		}
 	}
 	return out
 }

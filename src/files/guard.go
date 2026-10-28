@@ -31,7 +31,7 @@ type Guard struct {
 // contract: UTF-8 without BOM, LF line endings.
 type Extracted struct {
 	Text             string
-	Format           string // "docx", "pptx" or "pdf"
+	Format           string // "docx", "pptx", "pdf", "png" or "jpg"
 	Pages            int    // PDF
 	Slides           int    // PPTX
 	PagesWithoutText int    // PDF
@@ -44,10 +44,24 @@ type Extracted struct {
 	NumberingUnavailable bool
 	// HiddenText: Text has lines labelled "[oculto]" (not shown nor printed).
 	HiddenText bool
+	// OCR: text recognized from PDF pages without text or from an image.
+	OCR OCRInfo
 }
 
-// DocExtractor turns office documents into text. It is injected by the
-// binary, so package files stays pure and testable.
+// OCRInfo describes the OCR of one extraction (zero value: no OCR ran).
+type OCRInfo struct {
+	Used         bool // some page (or the image) went to the OCR
+	Pages        int  // pages recognized
+	ConfMean     int  // mean confidence of those pages, 0-100
+	Failed       int  // pages whose recognition failed
+	NotProcessed int  // pages left out when the time budget ran out
+}
+
+// DocExtractor turns office documents (and, with OCR, images) into text. It
+// is injected by the binary, so package files stays pure and testable. The
+// guard has no list of extensions of its own: an image (.png, .jpg) is a
+// document only because the extractor claims it, and every path defence runs
+// before the extractor sees its bytes.
 //
 // IsDocument decides from the NAME alone (the extension of the resolved file)
 // whether the document ceiling and the extractor apply. It must be true for
@@ -76,7 +90,7 @@ type File struct {
 	Bytes int    // size on disk
 	Text  string
 
-	Format           string // "txt", "docx", "pptx" or "pdf"
+	Format           string // "txt", "docx", "pptx", "pdf", "png" or "jpg"
 	Pages            int    // PDF
 	Slides           int    // PPTX
 	PagesWithoutText int    // PDF
@@ -86,6 +100,7 @@ type File struct {
 	UnreadContent        bool
 	NumberingUnavailable bool
 	HiddenText           bool
+	OCR                  OCRInfo
 }
 
 // NewGuard validates the roots (each must exist and be a directory; the
@@ -449,6 +464,7 @@ func (g *Guard) extract(ctx context.Context, name string, data []byte) (*File, e
 		Pages: ex.Pages, Slides: ex.Slides, PagesWithoutText: ex.PagesWithoutText, PendingRevisions: ex.PendingRevisions,
 		ImportedContent: ex.ImportedContent, UnreadContent: ex.UnreadContent,
 		NumberingUnavailable: ex.NumberingUnavailable, HiddenText: ex.HiddenText,
+		OCR: ex.OCR,
 	}, nil
 }
 

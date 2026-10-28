@@ -176,7 +176,7 @@ func (s *server) logStartup() {
 		s.log.logf("WARNING: --trace-file and --audit-log-path take effect in a later phase; nothing is written")
 	}
 	if roots := files.SplitRoots(s.cfg.AllowRoot); len(roots) > 0 {
-		s.log.logf("file tools enabled: %d allowed root(s), max_file_bytes=%d, max_doc_bytes=%d (.docx/.pptx/.pdf), max_chunks=%d; the text of files under the roots is sent to the Ollama server", len(roots), s.cfg.MaxFileBytes, s.cfg.MaxDocBytes, s.cfg.MaxChunks)
+		s.log.logf("file tools enabled: %d allowed root(s), max_file_bytes=%d, max_doc_bytes=%d (.docx/.pptx/.pdf/.png/.jpg), max_chunks=%d; the text of files under the roots is sent to the Ollama server", len(roots), s.cfg.MaxFileBytes, s.cfg.MaxDocBytes, s.cfg.MaxChunks)
 		if g, err := s.cfg.guard(); err == nil {
 			for _, r := range g.BroadRoots(broadDirs()) {
 				s.log.logf("WARNING: --allow-root %q is a volume root, your home directory or a system directory: ALL content of that tree (except the fixed denylist) can be read and sent to the remote Ollama server", r)

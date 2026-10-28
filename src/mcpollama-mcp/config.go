@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/doctext"
 	"github.com/cslsoftwares/mcpollama/files"
+	"github.com/cslsoftwares/mcpollama/ocr"
 	"github.com/cslsoftwares/mcpollama/ollama"
 	"github.com/cslsoftwares/mcpollama/tools"
 )
@@ -54,9 +56,41 @@ type Config struct {
 	TraceFile      string
 	AuditLogPath   string
 	ShowVersion    bool
+	OCR            OCRFlags // --ocr-*: off unless OCR.Lib is set
 
 	// Version is filled by the caller (main.Version); it feeds serverInfo.
 	Version string
+
+	// ocrRT is the running OCR (set by realMain after setupOCR); nil means no
+	// OCR. Not a flag: the document extractor reads it.
+	ocrRT *ocrRuntime
+}
+
+// OCRFlags are the --ocr-* settings (step 7.9). OCR is opt-in: without Lib
+// nothing changes. A problem with them (a relative path, a hash mismatch, a
+// DLL that does not load) never stops the start: OCR stays off with a WARNING.
+type OCRFlags struct {
+	Lib           string        // absolute path of libtesseract64.dll
+	LibSHA256     string        // required with Lib
+	Tessdata      string        // absolute model directory; empty means <dir of Lib>\tessdata\best (D-11)
+	Workers       int           // OCR child processes
+	PageTimeout   time.Duration // per page
+	MaxPages      int           // PDF pages sent to the OCR per call
+	MaxMem        int64         // bytes per OCR process (Windows Job Object)
+	MaxMegapixels int           // per page image; the dpi is lowered to fit
+	DPI           int           // render resolution
+}
+
+// defaultOCRFlags are the OCR defaults (brief 11.6).
+func defaultOCRFlags() OCRFlags {
+	return OCRFlags{
+		Workers:       ocr.DefaultWorkers(),
+		PageTimeout:   ocr.DefaultPageTimeout,
+		MaxPages:      doctext.DefaultOCRMaxPages,
+		MaxMem:        ocr.DefaultMaxMem,
+		MaxMegapixels: ocr.DefaultMaxMegapixels,
+		DPI:           ocr.DefaultDPI,
+	}
 }
 
 // parseBool is the single boolean rule for environment variables: "", "0",
@@ -96,6 +130,18 @@ Every flag falls back to its environment variable; the flag wins.
                           summarize_file, extract and translate do not exist (MCPOLLAMA_ALLOW_ROOT)
   --max-chunks N          model calls per file request, default 40 (MCPOLLAMA_MAX_CHUNKS)
   --max-line-bytes N      stdin line ceiling, default 8388608      (MCPOLLAMA_MAX_LINE_BYTES)
+  --ocr-lib FILE          absolute path of libtesseract64.dll: OCR of PDF pages without
+                          text and of .png/.jpg images (Windows); without it no OCR (MCPOLLAMA_OCR_LIB)
+  --ocr-lib-sha256 HEX    required with --ocr-lib: SHA-256 of the DLL; on any OCR problem
+                          the server starts without OCR and logs a WARNING (MCPOLLAMA_OCR_LIB_SHA256)
+  --ocr-tessdata DIR      absolute directory of the models, default <DLL dir>\tessdata\best
+                                                                   (MCPOLLAMA_OCR_TESSDATA)
+  --ocr-workers N         OCR processes, default min(CPUs/2, 4)    (MCPOLLAMA_OCR_WORKERS)
+  --ocr-page-timeout D    per page, default 1m0s                   (MCPOLLAMA_OCR_PAGE_TIMEOUT)
+  --ocr-max-pages N       pages sent to OCR per call, default 30   (MCPOLLAMA_OCR_MAX_PAGES)
+  --ocr-max-mem N         bytes per OCR process, default 1073741824 (MCPOLLAMA_OCR_MAX_MEM)
+  --ocr-max-megapixels N  pixels per page, default 40 (dpi lowered to fit) (MCPOLLAMA_OCR_MAX_MEGAPIXELS)
+  --ocr-dpi N             page render resolution, default 300      (MCPOLLAMA_OCR_DPI)
   --tools-verbosity MODE  full|compact tools/list size             (MCPOLLAMA_TOOLS_VERBOSITY)
   --trace-file FILE       opt-in trace file (later phase)          (MCPOLLAMA_TRACE)
   --audit-log-path FILE   opt-in audit log (later phase)           (MCPOLLAMA_AUDIT_LOG)
@@ -132,6 +178,16 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fAudit    = fs.String("audit-log-path", "", "")
 		fDebug    = fs.Bool("debug", false, "")
 		fVersion  = fs.Bool("version", false, "")
+
+		fOCRLib      = fs.String("ocr-lib", "", "")
+		fOCRSHA      = fs.String("ocr-lib-sha256", "", "")
+		fOCRTessdata = fs.String("ocr-tessdata", "", "")
+		fOCRWorkers  = fs.Int("ocr-workers", 0, "")
+		fOCRTimeout  = fs.Duration("ocr-page-timeout", 0, "")
+		fOCRPages    = fs.Int("ocr-max-pages", 0, "")
+		fOCRMem      = fs.Int64("ocr-max-mem", 0, "")
+		fOCRMP       = fs.Int("ocr-max-megapixels", 0, "")
+		fOCRDPI      = fs.Int("ocr-dpi", 0, "")
 	)
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
@@ -203,6 +259,39 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 			cfgErr = errors.New("OLLAMA_TIMEOUT: invalid duration")
 		}
 		cfg.Timeout = d
+	}
+
+	od := defaultOCRFlags()
+	cfg.OCR = OCRFlags{
+		Lib:           str("ocr-lib", "MCPOLLAMA_OCR_LIB", "", fOCRLib),
+		LibSHA256:     str("ocr-lib-sha256", "MCPOLLAMA_OCR_LIB_SHA256", "", fOCRSHA),
+		Tessdata:      str("ocr-tessdata", "MCPOLLAMA_OCR_TESSDATA", "", fOCRTessdata),
+		Workers:       integer("ocr-workers", "MCPOLLAMA_OCR_WORKERS", od.Workers, fOCRWorkers),
+		PageTimeout:   od.PageTimeout,
+		MaxPages:      integer("ocr-max-pages", "MCPOLLAMA_OCR_MAX_PAGES", od.MaxPages, fOCRPages),
+		MaxMem:        od.MaxMem,
+		MaxMegapixels: integer("ocr-max-megapixels", "MCPOLLAMA_OCR_MAX_MEGAPIXELS", od.MaxMegapixels, fOCRMP),
+		DPI:           integer("ocr-dpi", "MCPOLLAMA_OCR_DPI", od.DPI, fOCRDPI),
+	}
+	switch {
+	case set["ocr-page-timeout"]:
+		cfg.OCR.PageTimeout = *fOCRTimeout
+	case getenv("MCPOLLAMA_OCR_PAGE_TIMEOUT") != "":
+		d, err := time.ParseDuration(strings.TrimSpace(getenv("MCPOLLAMA_OCR_PAGE_TIMEOUT")))
+		if err != nil && cfgErr == nil {
+			cfgErr = errors.New("MCPOLLAMA_OCR_PAGE_TIMEOUT: invalid duration")
+		}
+		cfg.OCR.PageTimeout = d
+	}
+	switch {
+	case set["ocr-max-mem"]:
+		cfg.OCR.MaxMem = *fOCRMem
+	case getenv("MCPOLLAMA_OCR_MAX_MEM") != "":
+		n, err := strconv.ParseInt(strings.TrimSpace(getenv("MCPOLLAMA_OCR_MAX_MEM")), 10, 64)
+		if err != nil && cfgErr == nil {
+			cfgErr = errors.New("MCPOLLAMA_OCR_MAX_MEM: invalid integer")
+		}
+		cfg.OCR.MaxMem = n
 	}
 	return cfg, cfgErr
 }

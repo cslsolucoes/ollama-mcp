@@ -1,0 +1,828 @@
+﻿=== RUN   TestAttackDebugRootJunction
+    debug_junction_attack_test.go:18: EvalSymlinks(jroot\a.txt) = "" err=O sistema não pode encontrar o caminho especificado.
+    debug_junction_attack_test.go:20: EvalSymlinks(jroot) = "D:\\Users\\claiton.linhares\\AppData\\Local\\Temp\\gd1110125414\\jroot" err=<nil>
+    debug_junction_attack_test.go:22: Lstat(jroot) mode=?rw-rw-rw- err=<nil>
+    debug_junction_attack_test.go:24: OpenRoot(jroot) err=<nil>
+    debug_junction_attack_test.go:27: rt.Stat(a.txt) err=<nil>
+    debug_junction_attack_test.go:36: NewGuard(jparent\root) err=--allow-root "D:\\Users\\claiton.linhares\\AppData\\Local\\Temp\\advrev-jparent\\root": o diretório não existe ou não pode ser resolvido roots=[]
+--- PASS: TestAttackDebugRootJunction (0.15s)
+=== RUN   TestAttackDenylistGaps
+    files_attack_extra_test.go:28: VEC|deny/gaps|ACHADO|nao cobertos pela denylist fixa: .npmrc .pypirc .netrc _netrc .pgpass .htpasswd putty.ppk release.jks app.keystore vault.kdbx client.ovpn terraform.tfstate kubeconfig .kube\config .docker\config.json .ssh\config .ssh\known_hosts .ssh\github .aws\config token.txt apikey.txt passwords.txt web.config appsettings.json .claude.json
+--- PASS: TestAttackDenylistGaps (0.00s)
+=== RUN   TestAttackCaseSensitiveDir
+    files_attack_extra_test.go:64: VEC|case-sensitive-dir/sibling-Root|BLOQUEADO|sem vazamento; pedido de case\Root\f.txt devolveu "INSIDE" (arquivo da raiz real: confusao de nome, nao fuga)
+--- PASS: TestAttackCaseSensitiveDir (0.06s)
+=== RUN   TestAttackTraversal
+    files_attack_test.go:80: CTRL|controle-relativo|OK
+    files_attack_test.go:116: VEC|trav/dotdot-dot-seg|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-mixed|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-space-dot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/urlenc-backslash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/double-urlenc|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/envvar-ps|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:116: VEC|trav/rooted-no-drive|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/drive-relative-dotdot|BLOQUEADO|reason=3 caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    files_attack_test.go:116: VEC|trav/dotdot-slash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-dot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-nbsp|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/unicode-fwslash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/envvar-percent|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-backslash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/unicode-fullstop|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/trailing-sep|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/drive-relative|BLOQUEADO|reason=3 caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    files_attack_test.go:116: VEC|trav/three-dots|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-deep|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/four-dots-slash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/tab|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-many|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-space|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dotdot-2space|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/dot-dotdot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/urlenc-slash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/tilde|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/rooted-no-drive-slash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/four-dots-back|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/urlenc-dotdot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:116: VEC|trav/leading-space|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-other-drive-fwd|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-dotdot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-root-dot-trailing|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-root-space-trailing|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-winini-dotdot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-other-drive|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-dotdot-slash|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-outside|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-sibling|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-sibling-upper|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:133: VEC|trav/abs-root-dotdot-space|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAttackTraversal (0.03s)
+=== RUN   TestAttackWindowsSpecial
+    files_attack_test.go:182: VEC|win/wildcard-quote|BLOQUEADO|reason=3 caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    files_attack_test.go:182: VEC|win/long-prefix-unc|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/device-prefix-fwd|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (//servidor/compartilhamento) e os prefixos //?/ e //./ são recusados
+    files_attack_test.go:182: VEC|win/wildcard-q|BLOQUEADO|reason=3 caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    files_attack_test.go:182: VEC|win/long-prefix-fwd|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (//servidor/compartilhamento) e os prefixos //?/ e //./ são recusados
+    files_attack_test.go:182: VEC|win/globalroot|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/ads-named-data|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:182: VEC|win/nul-only|BLOQUEADO|reason=3 caminho não permitido: o caminho contém um caractere nulo
+    files_attack_test.go:182: VEC|win/unc-fwd|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (//servidor/compartilhamento) e os prefixos //?/ e //./ são recusados
+    files_attack_test.go:182: VEC|win/device-prefix|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/ads-abs|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:182: VEC|win/ads-name|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:182: VEC|win/ads-on-dir-dotdot|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:182: VEC|win/wildcard-star|BLOQUEADO|reason=3 caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    files_attack_test.go:182: VEC|win/wildcard-lt|BLOQUEADO|reason=3 caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    files_attack_test.go:182: VEC|win/empty|BLOQUEADO|reason=4 informe o caminho do arquivo
+    files_attack_test.go:182: VEC|win/unc-localhost-admin|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/long-prefix|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/nt-prefix|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC e com prefixo de dispositivo são recusados
+    files_attack_test.go:182: VEC|win/wildcard-gt|BLOQUEADO|reason=3 caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    files_attack_test.go:182: VEC|win/ctrl-chars|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:182: VEC|win/unc-mixed2|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC e com prefixo de dispositivo são recusados
+    files_attack_test.go:182: VEC|win/lanman|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/ads-data|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:182: VEC|win/pipe|BLOQUEADO|reason=3 caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    files_attack_test.go:182: VEC|win/nul-byte|BLOQUEADO|reason=3 caminho não permitido: o caminho contém um caractere nulo
+    files_attack_test.go:182: VEC|win/unc-mixed|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC e com prefixo de dispositivo são recusados
+    files_attack_test.go:182: VEC|win/ads-dir-index|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:182: VEC|win/spaces|BLOQUEADO|reason=4 informe o caminho do arquivo
+    files_attack_test.go:182: VEC|win/unc-127|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:182: VEC|win/nt-prefix-fwd|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC e com prefixo de dispositivo são recusados
+    files_attack_test.go:186: VEC|win/ads-real-stream|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:187: VEC|win/ads-real-stream-data|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+--- PASS: TestAttackWindowsSpecial (0.01s)
+=== RUN   TestAttackDeviceNames
+    files_attack_test.go:202: VEC|dev/con|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/CON|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/CON.txt|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/con .txt|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/CON.|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/CON |BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/nul.tar.gz|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/NUL|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/prn|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/aux.c|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/COM1|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/com9.log|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/COM¹|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/com²|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/LPT³.txt|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/lpt1|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/conin$|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/CONOUT$|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/CLOCK$|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/sub\aux\x.txt|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/sub\con|BLOQUEADO|reason=3 caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    files_attack_test.go:202: VEC|dev/COM0|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:202: VEC|dev/LPT0|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:202: VEC|dev/COM10|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAttackDeviceNames (0.01s)
+=== RUN   TestAttackDenylistAliases
+    files_attack_test.go:233: VEC|deny/.ENV|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.Env|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.\.env|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/sub\..\.env|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.env.|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.env..|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.env |BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.env. . .|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.env  .|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/SECRET.TXT|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/secret.txt.|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/secret.txt |BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/Secret.Txt...|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/ſecret.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:233: VEC|deny/credentıals.json|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:233: VEC|deny/CREDENTIALS.JSON|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/ıd_rsa|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:233: VEC|deny/id_rſa|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:233: VEC|deny/ID_RSA|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/id_rsa.|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/server.KEY|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/server.key.|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/my.PEM |BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.MCP.JSON|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.mcp.json.|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/SETTINGS.LOCAL.JSON|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.git\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.GIT\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.git.\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.git \config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.git\.\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/.g\u0131t\config|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:233: VEC|deny/secrets\a.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/SECRETS\a.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/secrets.\a.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:233: VEC|deny/\u017fecrets\a.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:233: VEC|deny/.env::$DATA|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:233: VEC|deny/.env:$DATA|BLOQUEADO|reason=3 caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    files_attack_test.go:236: VEC|deny/abs-upper|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:237: VEC|deny/abs-dotdot|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+--- PASS: TestAttackDenylistAliases (0.01s)
+=== RUN   TestAttackSymlinks
+    files_attack_test.go:284: CTRL|symlink-dentro|OK
+    files_attack_test.go:287: VEC|sym/f-out.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/f-out-rel.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/f-out-long.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/f-env.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:287: VEC|sym/f-env-rel.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:287: VEC|sym/f-gitcfg.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:287: VEC|sym/d-out\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/d-git\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:287: VEC|sym/d-secrets\a.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:287: VEC|sym/chain1.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/loop1.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/d-up\outside\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:287: VEC|sym/d-up\root\.env|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:287: VEC|sym/f-unc.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAttackSymlinks (0.21s)
+=== RUN   TestAttackJunctions
+    files_attack_test.go:305: VEC|junc/j-out\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/j-in\in.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/j-git\config|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/real\j-deep\outside\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/real\j-deep\root\.env|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_test.go:305: VEC|junc/D:\Users\claiton.linhares\AppData\Local\Temp\gd1690211509\root\j-out\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/J-OUT\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/j-out.\x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:305: VEC|junc/j-out \x.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:307: CTRL|junction-caminho-real|OK
+--- PASS: TestAttackJunctions (0.30s)
+=== RUN   TestAttackRootIsJunction
+    files_attack_test.go:322: CTRL|root-junction|RECUSADO-NA-PARTIDA|--allow-root "D:\\Users\\claiton.linhares\\AppData\\Local\\Temp\\gd125522941\\jroot": a raiz é uma junction ou ponto de reanálise, não suportada; use o caminho real do diretório
+--- PASS: TestAttackRootIsJunction (0.07s)
+=== RUN   TestAttackHardlinks
+    files_attack_test.go:346: VEC|hard/hl-outside.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:346: VEC|hard/hl-env.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:346: VEC|hard/hl-gitcfg.txt|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAttackHardlinks (0.04s)
+=== RUN   TestAttackTOCTOUFileSwap
+    files_attack_test.go:416: VEC|toctou/file->symlink-.env-dentro|BLOQUEADO|2067 leituras, 81 ok (benignas), 0 vazamentos
+    files_attack_test.go:419: toctou/file->symlink-.env-dentro: 4910 swaps
+    files_attack_test.go:416: VEC|toctou/file->symlink-fora|BLOQUEADO|2215 leituras, 73 ok (benignas), 0 vazamentos
+    files_attack_test.go:419: toctou/file->symlink-fora: 5061 swaps
+--- PASS: TestAttackTOCTOUFileSwap (8.02s)
+=== RUN   TestAttackTOCTOUDirSwap
+    files_attack_test.go:451: VEC|toctou/dir->symlink-fora|BLOQUEADO|2487 leituras, 0 ok (benignas), 0 vazamentos
+--- PASS: TestAttackTOCTOUDirSwap (4.01s)
+=== RUN   TestAttackGrowingFile
+    files_attack_test.go:489: VEC|size/growing|BLOQUEADO|nenhuma leitura acima do teto
+--- PASS: TestAttackGrowingFile (2.01s)
+=== RUN   TestAttackSizesAndEncodings
+    files_attack_test.go:499: VEC|size/one-over|BLOQUEADO|reason=6 arquivo grande demais: 1001 bytes, o teto é 1000 (--max-file-bytes); divida o arquivo ou aumente o teto
+    files_attack_test.go:507: VEC|size/sparse-1TiB|BLOQUEADO|reason=6 arquivo grande demais: 1099511627776 bytes, o teto é 1000 (--max-file-bytes); divida o arquivo ou aumente o teto
+    files_attack_test.go:523: VEC|enc/utf16le-nobom|BLOQUEADO|reason=7 arquivo binário recusado (contém bytes nulos); só texto UTF-8 é lido
+    files_attack_test.go:523: VEC|enc/utf32le-bom|BLOQUEADO|reason=8 arquivo em UTF-16 não é suportado; converta para UTF-8
+    files_attack_test.go:523: VEC|enc/cesu-surrogate|BLOQUEADO|reason=8 o arquivo não é UTF-8 válido (talvez ANSI/Windows-1252); converta para UTF-8 antes de usar
+    files_attack_test.go:523: VEC|enc/overlong-slash|BLOQUEADO|reason=8 o arquivo não é UTF-8 válido (talvez ANSI/Windows-1252); converta para UTF-8 antes de usar
+    files_attack_test.go:523: VEC|enc/latin1|BLOQUEADO|reason=8 o arquivo não é UTF-8 válido (talvez ANSI/Windows-1252); converta para UTF-8 antes de usar
+    files_attack_test.go:523: VEC|enc/utf16le-bom|BLOQUEADO|reason=8 arquivo em UTF-16 não é suportado; converta para UTF-8
+    files_attack_test.go:523: VEC|enc/utf16be-bom|BLOQUEADO|reason=8 arquivo em UTF-16 não é suportado; converta para UTF-8
+    files_attack_test.go:527: CTRL|bom-crlf-sem-lf-final|OK
+--- PASS: TestAttackSizesAndEncodings (0.05s)
+=== RUN   TestAttackLongPaths
+    files_attack_test.go:541: CTRL|caminho>260-legitimo|OK
+    files_attack_test.go:545: VEC|long/40k-name|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:546: VEC|long/40k-dotdot|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    files_attack_test.go:547: VEC|long/100k-seps|BLOQUEADO|reason=3 caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:548: VEC|long/1M|BLOQUEADO|reason=1 arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAttackLongPaths (0.11s)
+=== RUN   TestAttackAllowRootConfig
+    files_attack_test.go:559: SplitRoots("<base>\\Cliente, Inc") = ["D:\\Users\\claiton.linhares\\AppData\\Local\\Temp\\gd3884747914\\Cliente, Inc"]
+    files_attack_test.go:580: VEC|cfg/drive-root|ACHADO|--allow-root C:\ aceito; leitura de C:\Windows\win.ini err=<nil>
+    files_attack_test.go:586: VEC|cfg/root-"\\\\?\\C:\\Windows"|BLOQUEADO|--allow-root "\\\\?\\C:\\Windows": caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:586: VEC|cfg/root-"\\\\localhost\\c$"|BLOQUEADO|--allow-root "\\\\localhost\\c$": caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    files_attack_test.go:586: VEC|cfg/root-"C:"|BLOQUEADO|--allow-root "C:": caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    files_attack_test.go:586: VEC|cfg/root-"C:Windows"|BLOQUEADO|--allow-root "C:Windows": caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    files_attack_test.go:586: VEC|cfg/root-"C:\\Windows\\win.ini"|BLOQUEADO|--allow-root "C:\\Windows\\win.ini": não é um diretório
+    files_attack_test.go:586: VEC|cfg/root-"C:\\Windows::$INDEX_ALLOCATION"|BLOQUEADO|--allow-root "C:\\Windows::$INDEX_ALLOCATION": caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+--- PASS: TestAttackAllowRootConfig (0.01s)
+=== RUN   TestAttackNestedRootsOrder
+    files_attack_test.go:606: VEC|cfg/nested-roots|INFO|ordem [raiz, raiz/.git/hooks] err=arquivo não encontrado ou fora das raízes permitidas (--allow-root) ; ordem inversa err=arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestAttackNestedRootsOrder (0.01s)
+=== RUN   TestAttackNoWrites
+    files_attack_test.go:626: VEC|nowrite|BLOQUEADO|nenhuma mudanca na arvore
+--- PASS: TestAttackNoWrites (0.03s)
+=== RUN   TestAttackDenylistShortNamesOnC
+    files_attack_windows_test.go:60: short name of .env.production.local = ENVPRO~1.LOC
+    files_attack_windows_test.go:61: VEC|short/abs/.env.production.local|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/.env.production.local|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of credentials.json = CREDEN~1.JSO
+    files_attack_windows_test.go:61: VEC|short/abs/credentials.json|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/credentials.json|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of mysecretfile.txt = MYSECR~1.TXT
+    files_attack_windows_test.go:61: VEC|short/abs/mysecretfile.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/mysecretfile.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of id_ed25519_github = ID_ED2~1
+    files_attack_windows_test.go:61: VEC|short/abs/id_ed25519_github|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/id_ed25519_github|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of .git\config = GIT~1\config
+    files_attack_windows_test.go:61: VEC|short/abs/.git\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/.git\config|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of secretsdir\plain.txt = SECRET~1\plain.txt
+    files_attack_windows_test.go:61: VEC|short/abs/secretsdir\plain.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/secretsdir\plain.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of credentialstore\plain.txt = CREDEN~1\plain.txt
+    files_attack_windows_test.go:61: VEC|short/abs/credentialstore\plain.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/credentialstore\plain.txt|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of settings.local.json = SETTIN~1.JSO
+    files_attack_windows_test.go:61: VEC|short/abs/settings.local.json|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/settings.local.json|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:60: short name of certificate.pem = CERTIF~1.PEM
+    files_attack_windows_test.go:61: VEC|short/abs/certificate.pem|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    files_attack_windows_test.go:62: VEC|short/rel/certificate.pem|BLOQUEADO|reason=2 acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+--- PASS: TestAttackDenylistShortNamesOnC (0.03s)
+=== RUN   TestSetExtractorValidates
+--- PASS: TestSetExtractorValidates (0.00s)
+=== RUN   TestDocWithoutExtractorFailsClosed
+--- PASS: TestDocWithoutExtractorFailsClosed (0.02s)
+=== RUN   TestDocExtractedFieldsAndBytes
+--- PASS: TestDocExtractedFieldsAndBytes (0.01s)
+=== RUN   TestDocCeilingByExtension
+--- PASS: TestDocCeilingByExtension (0.01s)
+=== RUN   TestDocCeilingRealDefaults
+--- PASS: TestDocCeilingRealDefaults (0.14s)
+=== RUN   TestDocDenylistBeforeRead
+--- PASS: TestDocDenylistBeforeRead (0.01s)
+=== RUN   TestDocSymlinkAndHardlink
+--- PASS: TestDocSymlinkAndHardlink (0.01s)
+=== RUN   TestDocJunction
+--- PASS: TestDocJunction (0.05s)
+=== RUN   TestDocExtractorRefusal
+--- PASS: TestDocExtractorRefusal (0.01s)
+=== RUN   TestDocClaimedButText
+--- PASS: TestDocClaimedButText (0.01s)
+=== RUN   TestDocContext
+--- PASS: TestDocContext (0.01s)
+=== RUN   TestDocTrailingDotName
+--- PASS: TestDocTrailingDotName (0.01s)
+=== RUN   TestDocSpecialPaths
+--- PASS: TestDocSpecialPaths (0.01s)
+=== RUN   TestImagesAreDocumentsOnlyWhenClaimed
+--- PASS: TestImagesAreDocumentsOnlyWhenClaimed (0.02s)
+=== RUN   TestZeroGuardRefusesEverything
+--- PASS: TestZeroGuardRefusesEverything (0.00s)
+=== RUN   TestNewGuardValidatesRoots
+--- PASS: TestNewGuardValidatesRoots (0.00s)
+=== RUN   TestSplitRoots
+--- PASS: TestSplitRoots (0.00s)
+=== RUN   TestReadOKAbsoluteRelativeAndNormalisation
+--- PASS: TestReadOKAbsoluteRelativeAndNormalisation (0.01s)
+=== RUN   TestRelativeNeedsExactlyOneRoot
+--- PASS: TestRelativeNeedsExactlyOneRoot (0.01s)
+=== RUN   TestTraversalAndOutside
+--- PASS: TestTraversalAndOutside (0.01s)
+=== RUN   TestWithin
+--- PASS: TestWithin (0.00s)
+=== RUN   TestRootWithSamePrefixName
+--- PASS: TestRootWithSamePrefixName (0.01s)
+=== RUN   TestDenylist
+--- PASS: TestDenylist (0.04s)
+=== RUN   TestRootNameDoesNotTripDenylist
+--- PASS: TestRootNameDoesNotTripDenylist (0.01s)
+=== RUN   TestDenylistUnit
+--- PASS: TestDenylistUnit (0.00s)
+=== RUN   TestDenylistWindowsTrailingDotBypass
+--- PASS: TestDenylistWindowsTrailingDotBypass (0.01s)
+=== RUN   TestHardlinksAreRefused
+--- PASS: TestHardlinksAreRefused (0.02s)
+=== RUN   TestSymlinks
+--- PASS: TestSymlinks (0.02s)
+=== RUN   TestRootThroughSymlink
+--- PASS: TestRootThroughSymlink (0.01s)
+=== RUN   TestJunctionToOutsideIsRefused
+--- PASS: TestJunctionToOutsideIsRefused (0.06s)
+=== RUN   TestJunctionInsideIsAlsoRefused
+--- PASS: TestJunctionInsideIsAlsoRefused (0.06s)
+=== RUN   TestWindowsSyntaxTable
+--- PASS: TestWindowsSyntaxTable (0.00s)
+=== RUN   TestWindowsSpecialPathsThroughRead
+--- PASS: TestWindowsSpecialPathsThroughRead (0.01s)
+=== RUN   TestDirectoryAndSpecialFiles
+--- PASS: TestDirectoryAndSpecialFiles (0.01s)
+=== RUN   TestSizeLimit
+--- PASS: TestSizeLimit (0.01s)
+=== RUN   TestBinaryAndEncoding
+--- PASS: TestBinaryAndEncoding (0.02s)
+=== RUN   TestNothingIsWritten
+--- PASS: TestNothingIsWritten (0.01s)
+=== RUN   TestSplitRootsCommaIsAValidNameCharacter
+--- PASS: TestSplitRootsCommaIsAValidNameCharacter (0.01s)
+=== RUN   TestNewGuardRefusesRelativeRoots
+--- PASS: TestNewGuardRefusesRelativeRoots (0.00s)
+=== RUN   TestNewGuardRefusesNestedRoots
+--- PASS: TestNewGuardRefusesNestedRoots (0.01s)
+=== RUN   TestBroadRoots
+--- PASS: TestBroadRoots (0.01s)
+=== RUN   TestNewGuardRefusesJunctionRoot
+--- PASS: TestNewGuardRefusesJunctionRoot (0.05s)
+=== RUN   TestBroadRootsRealHomeAndWindowsDir
+--- PASS: TestBroadRootsRealHomeAndWindowsDir (0.00s)
+=== RUN   TestDenylistWindowsShortName
+    guard_windows_test.go:29: 8.3 name generation is disabled on this volume
+--- SKIP: TestDenylistWindowsShortName (0.00s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/files	15.933s
+=== RUN   TestModelAllowedLatestAndCase
+--- PASS: TestModelAllowedLatestAndCase (0.00s)
+=== RUN   TestSplitModels
+--- PASS: TestSplitModels (0.00s)
+=== RUN   TestDisallowedModelNeverCallsOllama
+--- PASS: TestDisallowedModelNeverCallsOllama (0.01s)
+=== RUN   TestAllowedModelPassesThroughWithLatest
+--- PASS: TestAllowedModelPassesThroughWithLatest (0.00s)
+=== RUN   TestExplicitAllowlist
+--- PASS: TestExplicitAllowlist (0.00s)
+=== RUN   TestListModelsFiltersAndShowsOutsideVRAM
+--- PASS: TestListModelsFiltersAndShowsOutsideVRAM (0.00s)
+=== RUN   TestArgsStrings
+--- PASS: TestArgsStrings (0.00s)
+=== RUN   TestArgsNumbers
+--- PASS: TestArgsNumbers (0.00s)
+=== RUN   TestArgsBoolListAndUnknown
+--- PASS: TestArgsBoolListAndUnknown (0.00s)
+=== RUN   TestEmbedSummaryByDefault
+--- PASS: TestEmbedSummaryByDefault (0.00s)
+=== RUN   TestEmbedStringInputAndVectors
+--- PASS: TestEmbedStringInputAndVectors (0.00s)
+=== RUN   TestEmbedValidation
+--- PASS: TestEmbedValidation (0.00s)
+=== RUN   TestEmbedOllamaErrors
+--- PASS: TestEmbedOllamaErrors (0.00s)
+=== RUN   TestListModels
+--- PASS: TestListModels (0.00s)
+=== RUN   TestListModelsPSFailureIsPartialTagsFailureIsError
+--- PASS: TestListModelsPSFailureIsPartialTagsFailureIsError (0.00s)
+=== RUN   TestListModelsBypassesTheGPUQueue
+--- PASS: TestListModelsBypassesTheGPUQueue (0.00s)
+=== RUN   TestSummarizeDocxPromptAndFooter
+--- PASS: TestSummarizeDocxPromptAndFooter (0.01s)
+=== RUN   TestSummarizeDocxNoPendingRevisions
+--- PASS: TestSummarizeDocxNoPendingRevisions (0.01s)
+=== RUN   TestSummarizePPTXFooter
+--- PASS: TestSummarizePPTXFooter (0.01s)
+=== RUN   TestSummarizePDFFooter
+--- PASS: TestSummarizePDFFooter (0.28s)
+=== RUN   TestTranslateDocumentNotice
+--- PASS: TestTranslateDocumentNotice (0.02s)
+=== RUN   TestTextFooterHasFormatTxtOnly
+--- PASS: TestTextFooterHasFormatTxtOnly (0.01s)
+=== RUN   TestDocumentRefusalsThroughTool
+--- PASS: TestDocumentRefusalsThroughTool (0.02s)
+=== RUN   TestDocxEmptyIsRefused
+--- PASS: TestDocxEmptyIsRefused (0.01s)
+=== RUN   TestDocContextCancelled
+--- PASS: TestDocContextCancelled (0.01s)
+=== RUN   TestSplitChunksNeverCutsPositionMarkers
+--- PASS: TestSplitChunksNeverCutsPositionMarkers (0.04s)
+=== RUN   TestDocDescriptionsMinimal
+--- PASS: TestDocDescriptionsMinimal (0.00s)
+=== RUN   TestDocumentAttacksWithRealExtractor
+    filetools_docs_test.go:540: VEC|doc/device-pdf|BLOQUEADO|caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    filetools_docs_test.go:540: VEC|doc/trailing-dot-secret|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/trailing-sp-secret|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/junction-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/outside-abs|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/dotdot|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/ads-abs|BLOQUEADO|caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    filetools_docs_test.go:540: VEC|doc/env-docx|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/credentials-docx|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/ads-pdf|BLOQUEADO|caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    filetools_docs_test.go:540: VEC|doc/device-docx|BLOQUEADO|caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    filetools_docs_test.go:540: VEC|doc/drive-relative-pdf|BLOQUEADO|caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    filetools_docs_test.go:540: VEC|doc/wildcard-pdf|BLOQUEADO|caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    filetools_docs_test.go:540: VEC|doc/hardlink-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/unc-pdf|BLOQUEADO|caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    filetools_docs_test.go:540: VEC|doc/secrets-dir|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/verbatim-prefix|BLOQUEADO|caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    filetools_docs_test.go:540: VEC|doc/symlink-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+--- PASS: TestDocumentAttacksWithRealExtractor (0.10s)
+=== RUN   TestFooterFlags
+--- PASS: TestFooterFlags (0.02s)
+=== RUN   TestDocFooterFlagsOnlyWhenTheyApply
+--- PASS: TestDocFooterFlagsOnlyWhenTheyApply (0.00s)
+=== RUN   TestReduceInRounds
+--- PASS: TestReduceInRounds (0.02s)
+=== RUN   TestReduceThatDoesNotShrinkStops
+--- PASS: TestReduceThatDoesNotShrinkStops (0.01s)
+=== RUN   TestExtractMapReduce
+--- PASS: TestExtractMapReduce (0.01s)
+=== RUN   TestTranslateMapConcatenates
+--- PASS: TestTranslateMapConcatenates (0.01s)
+=== RUN   TestTranslateStopsAtOutputCeilingAndSaysSo
+--- PASS: TestTranslateStopsAtOutputCeilingAndSaysSo (0.01s)
+=== RUN   TestMaxChunksRefusesBeforeCalling
+--- PASS: TestMaxChunksRefusesBeforeCalling (0.02s)
+=== RUN   TestMaxPromptCharsTooLowForTheInstruction
+--- PASS: TestMaxPromptCharsTooLowForTheInstruction (0.01s)
+=== RUN   TestFailureOnAMiddlePartNamesIt
+--- PASS: TestFailureOnAMiddlePartNamesIt (0.01s)
+=== RUN   TestCancellationStopsTheMapReduce
+--- PASS: TestCancellationStopsTheMapReduce (0.01s)
+=== RUN   TestPartsGoThroughTheGPUQueue
+--- PASS: TestPartsGoThroughTheGPUQueue (0.02s)
+=== RUN   TestRefusalsNeverReachTheModel
+--- PASS: TestRefusalsNeverReachTheModel (0.03s)
+=== RUN   TestEmptyFileIsRefused
+--- PASS: TestEmptyFileIsRefused (0.01s)
+=== RUN   TestHandlerWithoutRootsRefuses
+--- PASS: TestHandlerWithoutRootsRefuses (0.00s)
+=== RUN   TestFileToolArguments
+--- PASS: TestFileToolArguments (0.01s)
+=== RUN   TestFileToolSchemasTakeAPathNotText
+--- PASS: TestFileToolSchemasTakeAPathNotText (0.00s)
+=== RUN   TestFileToolsWriteNothing
+--- PASS: TestFileToolsWriteNothing (0.06s)
+=== RUN   TestOCRFooterAndNotice
+=== RUN   TestOCRFooterAndNotice/pdf_with_OCR
+=== RUN   TestOCRFooterAndNotice/pdf_with_pages_left_out
+=== RUN   TestOCRFooterAndNotice/pdf_whose_OCR_pages_all_failed
+=== RUN   TestOCRFooterAndNotice/png
+=== RUN   TestOCRFooterAndNotice/jpg
+=== RUN   TestOCRFooterAndNotice/pdf_without_OCR
+--- PASS: TestOCRFooterAndNotice (0.10s)
+    --- PASS: TestOCRFooterAndNotice/pdf_with_OCR (0.02s)
+    --- PASS: TestOCRFooterAndNotice/pdf_with_pages_left_out (0.02s)
+    --- PASS: TestOCRFooterAndNotice/pdf_whose_OCR_pages_all_failed (0.02s)
+    --- PASS: TestOCRFooterAndNotice/png (0.02s)
+    --- PASS: TestOCRFooterAndNotice/jpg (0.02s)
+    --- PASS: TestOCRFooterAndNotice/pdf_without_OCR (0.02s)
+=== RUN   TestImageThroughToolWithDoctext
+--- PASS: TestImageThroughToolWithDoctext (0.02s)
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/http500
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/http400
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/http401
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/stream-error
+--- PASS: TestFileToolErrorDoesNotEchoUpstreamBody (0.05s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/http500 (0.01s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/http400 (0.01s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/http401 (0.01s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/stream-error (0.02s)
+=== RUN   TestSanitizeUpstreamKeepsLocalErrors
+--- PASS: TestSanitizeUpstreamKeepsLocalErrors (0.00s)
+=== RUN   TestReduceUsesFreshNonce
+--- PASS: TestReduceUsesFreshNonce (0.02s)
+=== RUN   TestSplitChunks
+--- PASS: TestSplitChunks (0.00s)
+=== RUN   TestSplitChunksLongLineAndUnicode
+--- PASS: TestSplitChunksLongLineAndUnicode (0.00s)
+=== RUN   TestSummarizeFileSinglePart
+--- PASS: TestSummarizeFileSinglePart (0.01s)
+=== RUN   TestPromptDelimitsFileContentAgainstInjection
+--- PASS: TestPromptDelimitsFileContentAgainstInjection (0.02s)
+=== RUN   TestExtractPromptCarriesInstructionAndFormat
+--- PASS: TestExtractPromptCarriesInstructionAndFormat (0.02s)
+=== RUN   TestTranslatePromptAndOutput
+--- PASS: TestTranslatePromptAndOutput (0.01s)
+=== RUN   TestSummarizeMapReduce
+    filetools_test.go:235: map-reduce: 7 calls = 6 parts + 1 combine, ceiling 2600
+--- PASS: TestSummarizeMapReduce (0.01s)
+=== RUN   TestGenerateSuccessUsageLineAndNoThinking
+--- PASS: TestGenerateSuccessUsageLineAndNoThinking (0.00s)
+=== RUN   TestGenerateModelPerCall
+--- PASS: TestGenerateModelPerCall (0.00s)
+=== RUN   TestGenerateBadArgumentsNeverReachOllama
+--- PASS: TestGenerateBadArgumentsNeverReachOllama (0.00s)
+=== RUN   TestGenerateOllamaErrors
+=== RUN   TestGenerateOllamaErrors/401
+=== RUN   TestGenerateOllamaErrors/403
+=== RUN   TestGenerateOllamaErrors/404
+=== RUN   TestGenerateOllamaErrors/500
+=== RUN   TestGenerateOllamaErrors/503
+--- PASS: TestGenerateOllamaErrors (0.01s)
+    --- PASS: TestGenerateOllamaErrors/401 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/403 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/404 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/500 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/503 (0.00s)
+=== RUN   TestGenerateConnectionDropped
+--- PASS: TestGenerateConnectionDropped (0.00s)
+=== RUN   TestGenerateMidStreamFailureKeepsPartialText
+--- PASS: TestGenerateMidStreamFailureKeepsPartialText (0.00s)
+=== RUN   TestPromptCeilingAppliesToEveryTool
+--- PASS: TestPromptCeilingAppliesToEveryTool (0.00s)
+=== RUN   TestLongAnswerIsCappedAndUsageLineSurvives
+--- PASS: TestLongAnswerIsCappedAndUsageLineSurvives (0.00s)
+=== RUN   TestColdLoadIsReportedAndTimeoutNamesIt
+--- PASS: TestColdLoadIsReportedAndTimeoutNamesIt (0.40s)
+=== RUN   TestChatSuccessStatelessWithSystem
+--- PASS: TestChatSuccessStatelessWithSystem (0.00s)
+=== RUN   TestChatValidation
+--- PASS: TestChatValidation (0.00s)
+=== RUN   TestChatOllamaErrorAndPartial
+--- PASS: TestChatOllamaErrorAndPartial (0.01s)
+=== RUN   TestQueueNilNeverBlocks
+--- PASS: TestQueueNilNeverBlocks (0.00s)
+=== RUN   TestQueueSlotsAndMinimum
+--- PASS: TestQueueSlotsAndMinimum (0.05s)
+=== RUN   TestGPUQueueSerialisesCalls
+--- PASS: TestGPUQueueSerialisesCalls (0.40s)
+=== RUN   TestCancelWhileWaitingFreesTheLine
+--- PASS: TestCancelWhileWaitingFreesTheLine (0.11s)
+=== RUN   TestCancelDuringGenerationFreesTheQueue
+--- PASS: TestCancelDuringGenerationFreesTheQueue (0.00s)
+=== RUN   TestExactToolSet
+--- PASS: TestExactToolSet (0.00s)
+=== RUN   TestQualifiedNameLimit
+    registry_test.go:49: longest qualified name: 23 of 60
+--- PASS: TestQualifiedNameLimit (0.00s)
+=== RUN   TestAnnotationsAreExplicit
+--- PASS: TestAnnotationsAreExplicit (0.00s)
+=== RUN   TestSchemaConformance
+--- PASS: TestSchemaConformance (0.00s)
+=== RUN   TestDescriptionsShortAndStatic
+--- PASS: TestDescriptionsShortAndStatic (0.00s)
+=== RUN   TestToolsListBudget
+    registry_test.go:145: full tools/list payload: 4390 bytes (budget 4400)
+--- PASS: TestToolsListBudget (0.00s)
+=== RUN   TestToolsListBudgetWithFileTools
+    registry_test.go:157: full tools/list payload with file tools: 7800 bytes (budget 7800)
+--- PASS: TestToolsListBudgetWithFileTools (0.00s)
+=== RUN   TestCatalogInSync
+--- PASS: TestCatalogInSync (0.00s)
+=== RUN   TestCatalogIsDeterministicAndSorted
+--- PASS: TestCatalogIsDeterministicAndSorted (0.00s)
+=== RUN   TestNoAdminEndpointsInSource
+--- PASS: TestNoAdminEndpointsInSource (0.00s)
+=== RUN   TestArgumentHelpersLiveInOneFile
+--- PASS: TestArgumentHelpersLiveInOneFile (0.00s)
+=== RUN   TestSentinelNeverReachesResultsErrorsOrLogs
+--- PASS: TestSentinelNeverReachesResultsErrorsOrLogs (0.01s)
+=== RUN   TestClientLogCarriesNoContent
+--- PASS: TestClientLogCarriesNoContent (0.00s)
+=== RUN   TestToolsWriteNothingToDisk
+--- PASS: TestToolsWriteNothingToDisk (0.01s)
+=== RUN   TestRegistryConstructionIsLazy
+--- PASS: TestRegistryConstructionIsLazy (0.00s)
+=== RUN   TestAttackCeilingMatrix
+    tools_attack_test.go:161: VEC|ceiling-matrix|BLOQUEADO|1350 execucoes, 0 violacoes, 0 defesas-internas acionadas
+--- PASS: TestAttackCeilingMatrix (6.71s)
+=== RUN   TestAttackMaxChunksPrecheck
+    tools_attack_test.go:184: VEC|precheck/summarize_file|BLOQUEADO|0 chamadas: o arquivo (132000 caracteres) exigiria 135 chamadas ao modelo, acima do teto --max-chunks (5); reduza o arquivo ou aumente o teto
+    tools_attack_test.go:184: VEC|precheck/extract|BLOQUEADO|0 chamadas: o arquivo (132000 caracteres) exigiria 126 chamadas ao modelo, acima do teto --max-chunks (5); reduza o arquivo ou aumente o teto
+    tools_attack_test.go:184: VEC|precheck/translate|BLOQUEADO|0 chamadas: o arquivo (132000 caracteres) exigiria 134 chamadas ao modelo, acima do teto --max-chunks (5); reduza o arquivo ou aumente o teto
+--- PASS: TestAttackMaxChunksPrecheck (0.02s)
+=== RUN   TestAttackReduceRoundsAfterPrecheck
+    tools_attack_test.go:197: VEC|reduce-rounds|INFO|err=falha ao combinar as 14 partes: o processamento passaria de 20 chamadas ao modelo (--max-chunks); reduza o arquivo ou aumente o teto chamadas=20 (teto 20)
+--- PASS: TestAttackReduceRoundsAfterPrecheck (0.01s)
+=== RUN   TestAttackReduceTermination
+    tools_attack_test.go:223: VEC|reduce-term/grow|BLOQUEADO|4ms chamadas=52 max=2436 err=falha ao combinar as 9 partes: a combinação dos parciais não reduziu o texto; processamento interrompido
+    tools_attack_test.go:223: VEC|reduce-term/shrink-by-1|BLOQUEADO|3ms chamadas=18 max=2403 err=<nil>
+    tools_attack_test.go:223: VEC|reduce-term/empty|BLOQUEADO|2ms chamadas=10 max=2403 err=<nil>
+    tools_attack_test.go:223: VEC|reduce-term/huge|BLOQUEADO|677ms chamadas=400 max=2436 err=falha ao combinar as 9 partes: o processamento passaria de 400 chamadas ao modelo (--max-chunks); reduza o arquivo ou aumente o teto
+    tools_attack_test.go:223: VEC|reduce-term/same-size|BLOQUEADO|3ms chamadas=33 max=2436 err=falha ao combinar as 9 partes: a combinação dos parciais não reduziu o texto; processamento interrompido
+--- PASS: TestAttackReduceTermination (0.70s)
+=== RUN   TestAttackNonceForgeryInReduce
+    tools_attack_test.go:258: VEC|inject/nonce-reuse-reduce|BLOQUEADO|closers=1
+--- PASS: TestAttackNonceForgeryInReduce (0.01s)
+=== RUN   TestAttackFileForgesMarker
+    tools_attack_test.go:274: VEC|inject/file-forged-marker|BLOQUEADO|nonce aleatorio, 1 marcador de fim valido
+--- PASS: TestAttackFileForgesMarker (0.01s)
+=== RUN   TestAttackErrorEchoLeak
+    tools_attack_test.go:299: VEC|leak/upstream-echo|BLOQUEADO|erro do servidor Ollama; o servidor pode estar reiniciando ou carregando o modelo (carga a frio ~36 s) (HTTP 500)
+--- PASS: TestAttackErrorEchoLeak (0.01s)
+=== RUN   TestAttackRefusalsNeverCallBackend
+    tools_attack_test.go:321: VEC|refusal-no-call|BLOQUEADO|0 chamadas ao backend
+--- PASS: TestAttackRefusalsNeverCallBackend (0.01s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/tools	9.781s
+=== RUN   TestPingAndToolsListAnswerWhileAToolRuns
+--- PASS: TestPingAndToolsListAnswerWhileAToolRuns (0.01s)
+=== RUN   TestCancelledNotificationCancelsContextAndSuppressesResponse
+=== RUN   TestCancelledNotificationCancelsContextAndSuppressesResponse/7
+=== RUN   TestCancelledNotificationCancelsContextAndSuppressesResponse/"abc"
+--- PASS: TestCancelledNotificationCancelsContextAndSuppressesResponse (0.01s)
+    --- PASS: TestCancelledNotificationCancelsContextAndSuppressesResponse/7 (0.01s)
+    --- PASS: TestCancelledNotificationCancelsContextAndSuppressesResponse/"abc" (0.01s)
+=== RUN   TestCancelOfAnotherIDOrUnknownIDIsIgnored
+--- PASS: TestCancelOfAnotherIDOrUnknownIDIsIgnored (0.01s)
+=== RUN   TestDuplicateInflightIDIsRejected
+--- PASS: TestDuplicateInflightIDIsRejected (0.01s)
+=== RUN   TestEOFWaitsForRunningCalls
+--- PASS: TestEOFWaitsForRunningCalls (0.15s)
+=== RUN   TestManyConcurrentCallsAreAllAnsweredIntact
+--- PASS: TestManyConcurrentCallsAreAllAnsweredIntact (0.02s)
+=== RUN   TestToolErrorStillAnswersWhenNotCancelled
+--- PASS: TestToolErrorStillAnswersWhenNotCancelled (0.00s)
+=== RUN   TestCallLogCarriesCountersFromMeta
+--- PASS: TestCallLogCarriesCountersFromMeta (0.00s)
+=== RUN   TestResultTextIsRedactedByTheDispatcher
+--- PASS: TestResultTextIsRedactedByTheDispatcher (0.00s)
+=== RUN   TestDefaults
+--- PASS: TestDefaults (0.00s)
+=== RUN   TestEnvFallback
+--- PASS: TestEnvFallback (0.00s)
+=== RUN   TestFlagBeatsEnv
+--- PASS: TestFlagBeatsEnv (0.00s)
+=== RUN   TestBoolRule
+--- PASS: TestBoolRule (0.00s)
+=== RUN   TestBadEnvValues
+--- PASS: TestBadEnvValues (0.00s)
+=== RUN   TestValidate
+--- PASS: TestValidate (0.00s)
+=== RUN   TestVersionFlag
+--- PASS: TestVersionFlag (0.00s)
+=== RUN   TestExitCodes
+--- PASS: TestExitCodes (0.00s)
+=== RUN   TestRealMainServesAndKeepsStdoutClean
+--- PASS: TestRealMainServesAndKeepsStdoutClean (0.00s)
+=== RUN   TestTokenNotInUsageOrErrors
+--- PASS: TestTokenNotInUsageOrErrors (0.00s)
+=== RUN   TestNoLiteralContextLimits
+--- PASS: TestNoLiteralContextLimits (0.00s)
+=== RUN   TestOllamaOptionsFromConfig
+--- PASS: TestOllamaOptionsFromConfig (0.00s)
+=== RUN   TestAllowedModelsDefaultIsTheTunedSet
+--- PASS: TestAllowedModelsDefaultIsTheTunedSet (0.00s)
+=== RUN   TestAllowedModelsEnvFlagAndSeparators
+--- PASS: TestAllowedModelsEnvFlagAndSeparators (0.00s)
+=== RUN   TestAllowedModelsMustContainDefaults
+--- PASS: TestAllowedModelsMustContainDefaults (0.00s)
+=== RUN   TestDocFlags
+--- PASS: TestDocFlags (0.00s)
+=== RUN   TestDocExtractorCarriesFlags
+--- PASS: TestDocExtractorCarriesFlags (0.00s)
+=== RUN   TestDocExtractorIsDocument
+--- PASS: TestDocExtractorIsDocument (0.00s)
+=== RUN   TestDocExtractorExtractAndRefusals
+--- PASS: TestDocExtractorExtractAndRefusals (0.00s)
+=== RUN   TestUserSafe
+--- PASS: TestUserSafe (0.00s)
+=== RUN   TestDocExtractorTextCeiling
+--- PASS: TestDocExtractorTextCeiling (0.00s)
+=== RUN   TestStartDoesNotInitialisePDFEngine
+    docs_test.go:135: start + initialize + tools/list in 4.9371ms
+--- PASS: TestStartDoesNotInitialisePDFEngine (0.02s)
+=== RUN   TestBadDocFlagsStopTheStart
+--- PASS: TestBadDocFlagsStopTheStart (0.01s)
+=== RUN   TestDocxEndToEndAndDebugLog
+--- PASS: TestDocxEndToEndAndDebugLog (0.02s)
+=== RUN   TestAttackE2ELeaksAndHardlink
+    e2e_attack_test.go:78: VEC|e2e/refusals|BLOQUEADO|12 recusas, stdout/stderr sem conteudo, caminho ou token; 0 chamadas ao Ollama
+    e2e_attack_test.go:98: VEC|e2e/hardlink-.env|BLOQUEADO|isError=true sent=false
+--- PASS: TestAttackE2ELeaksAndHardlink (0.09s)
+=== RUN   TestFileToolsExistOnlyWithAllowRoot
+--- PASS: TestFileToolsExistOnlyWithAllowRoot (0.02s)
+=== RUN   TestBadAllowRootStopsTheStart
+--- PASS: TestBadAllowRootStopsTheStart (0.01s)
+=== RUN   TestFileContentNeverInLogsOrErrors
+--- PASS: TestFileContentNeverInLogsOrErrors (0.02s)
+=== RUN   TestRealToolsListWithAllowRoot
+    files_wiring_test.go:183: full tools/list with --allow-root: 7834 bytes
+    files_wiring_test.go:183: compact tools/list with --allow-root: 4417 bytes
+--- PASS: TestRealToolsListWithAllowRoot (0.01s)
+=== RUN   TestAllowRootConfig
+--- PASS: TestAllowRootConfig (0.00s)
+=== RUN   TestBadRootShapesStopTheStart
+--- PASS: TestBadRootShapesStopTheStart (0.01s)
+=== RUN   TestBroadRootWarning
+--- PASS: TestBroadRootWarning (0.03s)
+=== RUN   TestOCRFlagsDefaultsEnvAndFlags
+--- PASS: TestOCRFlagsDefaultsEnvAndFlags (0.00s)
+=== RUN   TestOCRConfigResolve
+--- PASS: TestOCRConfigResolve (0.00s)
+=== RUN   TestSetupOCRWarnings
+--- PASS: TestSetupOCRWarnings (0.01s)
+=== RUN   TestWrongHashServerStarts
+--- PASS: TestWrongHashServerStarts (0.01s)
+=== RUN   TestProbeFailureTurnsOCROff
+    ocr_test.go:208: partida 242ms; log: WARNING: OCR disabled: ocr: OCR indisponível nesta chamada: ocr: configuração inválida: não foi possível carregar a biblioteca do OCR (%1 não é um aplicativo Win32 válido.); the file tools run without OCR (scanned PDFs and images are refused)
+--- PASS: TestProbeFailureTurnsOCROff (0.25s)
+=== RUN   TestOCRWorkerModeHiddenAndStrict
+--- PASS: TestOCRWorkerModeHiddenAndStrict (0.00s)
+=== RUN   TestDocExtractorWithOCR
+--- PASS: TestDocExtractorWithOCR (0.01s)
+=== RUN   TestInitializeNegotiation
+--- PASS: TestInitializeNegotiation (0.00s)
+=== RUN   TestInitializeBadParams
+--- PASS: TestInitializeBadParams (0.00s)
+=== RUN   TestNotificationsGetNoResponse
+--- PASS: TestNotificationsGetNoResponse (0.00s)
+=== RUN   TestPingReturnsEmptyObject
+--- PASS: TestPingReturnsEmptyObject (0.00s)
+=== RUN   TestToolsListEmptyIsArray
+--- PASS: TestToolsListEmptyIsArray (0.00s)
+=== RUN   TestToolsListSortedDeterministic
+--- PASS: TestToolsListSortedDeterministic (0.00s)
+=== RUN   TestToolsVerbosityCompact
+--- PASS: TestToolsVerbosityCompact (0.00s)
+=== RUN   TestUnknownMethod
+--- PASS: TestUnknownMethod (0.00s)
+=== RUN   TestInvalidJSONParseError
+--- PASS: TestInvalidJSONParseError (0.00s)
+=== RUN   TestValidJSONNotAnObjectIsInvalidRequest
+--- PASS: TestValidJSONNotAnObjectIsInvalidRequest (0.00s)
+=== RUN   TestMissingMethodOrVersion
+--- PASS: TestMissingMethodOrVersion (0.00s)
+=== RUN   TestEmptyLinesIgnored
+--- PASS: TestEmptyLinesIgnored (0.00s)
+=== RUN   TestIDPreserved
+--- PASS: TestIDPreserved (0.00s)
+=== RUN   TestLastLineWithoutNewline
+--- PASS: TestLastLineWithoutNewline (0.00s)
+=== RUN   TestLongLines
+--- PASS: TestLongLines (0.01s)
+=== RUN   TestLineCeilingBoundary
+--- PASS: TestLineCeilingBoundary (0.00s)
+=== RUN   TestHugeLineDoesNotKillServer
+--- PASS: TestHugeLineDoesNotKillServer (0.01s)
+=== RUN   TestToolsCallUnknownTool
+--- PASS: TestToolsCallUnknownTool (0.00s)
+=== RUN   TestToolsCallBadParams
+--- PASS: TestToolsCallBadParams (0.00s)
+=== RUN   TestToolsCallArgumentsDefaultToEmptyObject
+--- PASS: TestToolsCallArgumentsDefaultToEmptyObject (0.00s)
+=== RUN   TestToolsCallSuccessAndIsError
+--- PASS: TestToolsCallSuccessAndIsError (0.00s)
+=== RUN   TestToolPanicRecovered
+--- PASS: TestToolPanicRecovered (0.00s)
+=== RUN   TestStdoutIsOnlyJSONRPC
+--- PASS: TestStdoutIsOnlyJSONRPC (0.00s)
+=== RUN   TestLogsDefaultToMetadataOnly
+--- PASS: TestLogsDefaultToMetadataOnly (0.00s)
+=== RUN   TestLogLineCap
+--- PASS: TestLogLineCap (0.00s)
+=== RUN   TestRedactorIgnoresEmptySecret
+--- PASS: TestRedactorIgnoresEmptySecret (0.00s)
+=== RUN   TestTokenNeverInAnyOutput
+--- PASS: TestTokenNeverInAnyOutput (0.00s)
+=== RUN   TestInsecureWarnings
+--- PASS: TestInsecureWarnings (0.00s)
+=== RUN   TestDuplicateToolRejected
+--- PASS: TestDuplicateToolRejected (0.00s)
+=== RUN   TestFastWithoutBackend
+--- PASS: TestFastWithoutBackend (0.00s)
+=== RUN   TestContextCancelStopsLoop
+--- PASS: TestContextCancelStopsLoop (0.00s)
+=== RUN   TestLeadingBOMTolerated
+--- PASS: TestLeadingBOMTolerated (0.00s)
+=== RUN   TestRealRegistryIsLazy
+--- PASS: TestRealRegistryIsLazy (0.01s)
+=== RUN   TestMissingURLFailsOnlyTheToolCall
+--- PASS: TestMissingURLFailsOnlyTheToolCall (0.00s)
+=== RUN   TestErrorChannelsOnTheRealRegistry
+--- PASS: TestErrorChannelsOnTheRealRegistry (0.00s)
+=== RUN   TestEndToEndGenerateUsageAndNoLeaks
+--- PASS: TestEndToEndGenerateUsageAndNoLeaks (0.00s)
+=== RUN   TestUpstreamEchoingTheTokenIsScrubbed
+--- PASS: TestUpstreamEchoingTheTokenIsScrubbed (0.00s)
+=== RUN   TestDroppedConnectionIsAToolError
+--- PASS: TestDroppedConnectionIsAToolError (0.00s)
+=== RUN   TestPingAndListModelsAnswerWhileGenerating
+--- PASS: TestPingAndListModelsAnswerWhileGenerating (0.01s)
+=== RUN   TestCancelAbortsTheUpstreamCallAndFreesTheQueue
+--- PASS: TestCancelAbortsTheUpstreamCallAndFreesTheQueue (0.01s)
+=== RUN   TestRealToolsListExactSetFullAndCompact
+    tools_wiring_test.go:362: tools/list full: result line = 4424 bytes
+    tools_wiring_test.go:362: tools/list compact: result line = 2527 bytes
+--- PASS: TestRealToolsListExactSetFullAndCompact (0.00s)
+=== RUN   TestRealToolsListIsDeterministic
+--- PASS: TestRealToolsListIsDeterministic (0.00s)
+=== RUN   TestToolsMdMatchesTheRealToolsList
+--- PASS: TestToolsMdMatchesTheRealToolsList (0.01s)
+=== RUN   TestNoFileIsCreated
+--- PASS: TestNoFileIsCreated (0.01s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.852s

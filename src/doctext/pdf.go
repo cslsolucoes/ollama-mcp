@@ -77,6 +77,8 @@ type pdfDoc interface {
 	// renderGray renders page i (zero-based) at the given dpi as an 8-bit
 	// grayscale image. The pixels belong to the caller.
 	renderGray(ctx context.Context, i int, dpi int) (*image.Gray, error)
+	// pageSize returns the size of page i (zero-based) in points (1/72 in).
+	pageSize(i int) (w, h float64, err error)
 	close()
 }
 
@@ -149,8 +151,10 @@ func currentPDFEngine() (pdfEngine, error) {
 }
 
 // extractPDF extracts the text of a PDF: "[página N]" plus the page text, for
-// every page, in order. Extract applies NormalizeText and the final ceiling on
-// top of this.
+// every page, in order. With lim.OCR, a page without text is rendered and
+// recognized instead (ocr.go) and its marker says so ("[página N — OCR
+// conf=93]"). Extract applies NormalizeText and the final ceiling on top of
+// this.
 func extractPDF(ctx context.Context, data []byte, lim Limits) (res *Result, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -178,8 +182,9 @@ func extractPDF(ctx context.Context, data []byte, lim Limits) (res *Result, err 
 	if n <= 0 || n > lim.MaxPDFPages {
 		return nil, refuse(ReasonMalformed)
 	}
-	var b strings.Builder
-	total, blank := 0, 0
+	texts := make([]string, n)
+	var noText []int // pages with fewer than pdfMinPageRunes runes
+	total := 0
 	for i := 0; i < n; i++ {
 		if err := ctxErr(ctx); err != nil {
 			return nil, err
@@ -193,24 +198,70 @@ func extractPDF(ctx context.Context, data []byte, lim Limits) (res *Result, err 
 		}
 		text := strings.TrimSpace(unifyNewlines(raw))
 		if countNonBlank(text) < pdfMinPageRunes {
-			blank++
+			noText = append(noText, i)
 		}
 		total += utf8.RuneCountInString(text)
 		if total > lim.MaxTextRunes {
 			return nil, refuse(ReasonTooLong)
 		}
+		texts[i] = text
+	}
+	blank := len(noText)
+	if blank == n && lim.OCR == nil {
+		return nil, refuse(ReasonNoText)
+	}
+
+	// OCR of the pages without text (step 7.9): only with an engine, only
+	// those pages. A page with a few runes (a page number on a scan) is
+	// replaced by its OCR text, which holds them too.
+	var ocrRes []ocrPage
+	ocrAt := map[int]int{} // page -> index in ocrRes
+	if lim.OCR != nil && blank > 0 {
+		ocrRes, err = ocrPDF(ctx, doc, noText, *lim.OCR)
+		if err != nil {
+			return nil, err
+		}
+		for k, i := range noText {
+			ocrAt[i] = k
+		}
+	}
+
+	var b strings.Builder
+	hasText := blank < n
+	for i := 0; i < n; i++ {
 		if i > 0 {
 			b.WriteString("\n\n")
 		}
-		b.WriteString("[página " + strconv.Itoa(i+1) + "]")
+		label := "página " + strconv.Itoa(i+1)
+		text := texts[i]
+		if k, ok := ocrAt[i]; ok && ocrRes[k].status != ocrBlank {
+			p := ocrRes[k]
+			b.WriteString(ocrMarker(label, p))
+			if p.status == ocrOK && p.text != "" {
+				b.WriteString("\n" + p.text)
+				total += utf8.RuneCountInString(p.text)
+				if total > lim.MaxTextRunes {
+					return nil, refuse(ReasonTooLong)
+				}
+				if countNonBlank(p.text) > 0 {
+					hasText = true
+				}
+			} else if p.status != ocrOK && text != "" {
+				// The few runes of the text layer (a page number) are kept
+				// when the OCR could not replace them.
+				b.WriteString("\n" + text)
+			}
+			continue
+		}
+		b.WriteString("[" + label + "]")
 		if text != "" {
 			b.WriteString("\n" + text)
 		}
 	}
-	if blank == n {
-		return nil, refuse(ReasonNoText)
+	if !hasText {
+		return nil, refuse(ReasonOCRNoText)
 	}
-	return &Result{Text: b.String(), Pages: n, PagesWithoutText: blank}, nil
+	return &Result{Text: b.String(), Pages: n, PagesWithoutText: blank, OCR: ocrStats(ocrRes)}, nil
 }
 
 // pdfOpenError maps an engine failure at open time to a typed refusal.
@@ -406,6 +457,14 @@ func (d *pdfiumDoc) renderGray(ctx context.Context, i int, dpi int) (*image.Gray
 	return out, nil
 }
 
+func (d *pdfiumDoc) pageSize(i int) (float64, float64, error) {
+	r, err := d.inst.GetPageSize(&requests.GetPageSize{Page: d.page(i)})
+	if err != nil {
+		return 0, 0, err
+	}
+	return r.Width, r.Height, nil
+}
+
 func (d *pdfiumDoc) close() {
 	defer func() { _ = recover() }()
 	if d.stop != nil {
@@ -416,8 +475,9 @@ func (d *pdfiumDoc) close() {
 }
 
 // pdfRenderPage renders page i (zero-based) of a PDF as an 8-bit grayscale
-// image at the given dpi. It is the hook for the OCR stage (7.9) and has no
-// caller yet. It goes through the same resident engine and slot as the text
+// image at the given dpi, opening the document on its own. The OCR of
+// extractPDF renders through the document it already holds open; this is
+// for tests and diagnosis. It goes through the same resident engine and slot as the text
 // extraction, and the limits on pages apply.
 func pdfRenderPage(ctx context.Context, data []byte, lim Limits, i, dpi int) (img *image.Gray, err error) {
 	defer func() {

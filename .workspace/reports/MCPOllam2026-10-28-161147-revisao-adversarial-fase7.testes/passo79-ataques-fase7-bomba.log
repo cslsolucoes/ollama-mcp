@@ -1,0 +1,10 @@
+﻿=== RUN   TestAdvPDFContentBomb
+    fase7_pdf_adv_test.go:276: VEC|rec/pdf-bomba-conteudo-caminhos-1M|INFO|pdf=29442 B, conteudo=14 MiB; timeout=2s, durou 2s; reason=10; pico de memoria privada do processo=+222.5 MiB
+    fase7_pdf_adv_test.go:263: VEC|rec/pdf-bomba-residuo-caminhos-1M|INFO|memoria privada apos GC+FreeOSMemory: +0.1 MiB em relacao a antes
+    fase7_pdf_adv_test.go:276: VEC|rec/pdf-bomba-conteudo-caminhos-3M|INFO|pdf=87014 B, conteudo=42 MiB; timeout=2s, durou 2s; reason=10; pico de memoria privada do processo=+312.6 MiB
+    fase7_pdf_adv_test.go:263: VEC|rec/pdf-bomba-residuo-caminhos-3M|INFO|memoria privada apos GC+FreeOSMemory: +0.3 MiB em relacao a antes
+    fase7_pdf_adv_test.go:276: VEC|rec/pdf-bomba-conteudo-texto-1M-tj|INFO|pdf=33563 B, conteudo=16 MiB; timeout=2s, durou 2.001s; reason=10; pico de memoria privada do processo=+331.7 MiB
+    fase7_pdf_adv_test.go:263: VEC|rec/pdf-bomba-residuo-texto-1M-tj|INFO|memoria privada apos GC+FreeOSMemory: -0.1 MiB em relacao a antes
+--- PASS: TestAdvPDFContentBomb (20.00s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/doctext	20.071s

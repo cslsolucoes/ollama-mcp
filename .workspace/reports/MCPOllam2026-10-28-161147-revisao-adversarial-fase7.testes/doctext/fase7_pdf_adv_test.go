@@ -324,6 +324,7 @@ type panicDoc struct{}
 func (panicDoc) pages() int                                       { return 1 }
 func (panicDoc) pageText(context.Context, int) (string, error)    { panic("explodiu com TEXTO-DO-CLIENTE") }
 func (panicDoc) renderGray(context.Context, int, int) (*image.Gray, error) { panic("x") }
+func (panicDoc) pageSize(int) (float64, float64, error)              { panic("x") } // 7.9: pdfDoc ganhou pageSize
 func (panicDoc) close()                                           {}
 
 func TestAdvPDFPanicReleasesSlot(t *testing.T) {

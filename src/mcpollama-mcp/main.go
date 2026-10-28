@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/cslsoftwares/mcpollama/doctext"
+	"github.com/cslsoftwares/mcpollama/ocr"
 	"github.com/cslsoftwares/mcpollama/redact"
 )
 
@@ -22,6 +23,11 @@ var Version = "dev"
 
 func main() {
 	log.SetOutput(os.Stderr)
+	// The internal OCR worker mode is decided before any flag or environment
+	// variable of the server is read: a worker never sees the API key.
+	if len(os.Args) > 1 && os.Args[1] == ocr.WorkerFlag {
+		os.Exit(ocrWorkerMain(os.Args[1:], os.Stderr))
+	}
 	os.Exit(realMain(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
 }
 
@@ -56,6 +62,12 @@ func realMain(args []string, getenv func(string) string, stdin io.Reader, stdout
 	// goroutines; one locked writer keeps the lines whole.
 	errw := &syncWriter{w: stderr}
 	lg := &logger{w: errw, redact: redact.New(cfg.secrets()...), debug: cfg.Debug}
+	// OCR (opt-in): never fatal; the workers start on demand and are stopped
+	// together with the PDF engine on the way out.
+	if rt := setupOCR(cfg, lg); rt != nil {
+		cfg.ocrRT = rt
+		defer rt.Close()
+	}
 	if err := Run(context.Background(), stdin, stdout, errw, cfg, buildTools(cfg, lg)); err != nil {
 		fmt.Fprintln(stderr, "mcpollama-mcp: "+redact.New(cfg.secrets()...)(err.Error()))
 		return 1

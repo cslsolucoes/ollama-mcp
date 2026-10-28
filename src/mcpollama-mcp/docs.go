@@ -30,6 +30,9 @@ type docExtractor struct {
 	// logf receives metadata only (format, pages, bytes, ms); nil disables it.
 	// Never the text, the name, the author or any document metadata.
 	logf func(format string, args ...any)
+	// ocr is the running OCR (nil: none); asked per call, so a probe that
+	// failed after the start turns it off for the next calls.
+	ocr *ocrRuntime
 }
 
 func newDocExtractor(c Config, logf func(string, ...any)) *docExtractor {
@@ -38,18 +41,19 @@ func newDocExtractor(c Config, logf func(string, ...any)) *docExtractor {
 	if n > 0 && n < int64(maxDocTextRunes) {
 		lim.MaxTextRunes = int(n)
 	}
-	return &docExtractor{lim: lim, timeout: c.Timeout, logf: logf}
+	return &docExtractor{lim: lim, timeout: c.Timeout, logf: logf, ocr: c.ocrRT}
 }
 
-// IsDocument claims the document extensions and the legacy ones that doctext
-// only refuses with an explanation (.doc, .ppt, .xls).
+// IsDocument claims the document extensions, the images (.png, .jpg, .jpeg:
+// read by OCR, or refused with "imagem requer OCR" when there is none) and the
+// legacy ones that doctext only refuses with an explanation (.doc, .ppt, .xls).
 func (e *docExtractor) IsDocument(name string) bool {
 	i := strings.LastIndexByte(name, '.')
 	if i < 0 {
 		return false
 	}
 	switch strings.ToLower(name[i:]) {
-	case ".docx", ".pptx", ".pdf", ".doc", ".ppt", ".xls":
+	case ".docx", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".doc", ".ppt", ".xls":
 		return true
 	}
 	return false
@@ -74,13 +78,15 @@ func (e *docExtractor) Extract(ctx context.Context, name string, data []byte) (*
 		defer cancel()
 	}
 	start := time.Now()
-	res, err := doctext.Extract(ctx, format, data, e.lim)
+	lim := e.lim
+	lim.OCR = e.ocr.options()
+	res, err := doctext.Extract(ctx, format, data, lim)
 	if err != nil {
 		return nil, userSafe(err)
 	}
 	if e.logf != nil {
-		e.logf("doc: format=%s bytes=%d pages=%d slides=%d ms=%d",
-			res.Format, len(data), res.Pages, res.Slides, time.Since(start).Milliseconds())
+		e.logf("doc: format=%s bytes=%d pages=%d slides=%d ocr_pages=%d ocr_failed=%d ocr_not_processed=%d ms=%d",
+			res.Format, len(data), res.Pages, res.Slides, res.OCR.Pages, res.OCR.Failed, res.OCR.NotProcessed, time.Since(start).Milliseconds())
 	}
 	return &files.Extracted{
 		Text:             res.Text,
@@ -94,6 +100,14 @@ func (e *docExtractor) Extract(ctx context.Context, name string, data []byte) (*
 		UnreadContent:        res.UnreadContent,
 		NumberingUnavailable: res.NumberingUnavailable,
 		HiddenText:           res.HiddenText,
+
+		OCR: files.OCRInfo{
+			Used:         res.OCR.Used,
+			Pages:        res.OCR.Pages,
+			ConfMean:     res.OCR.ConfMean,
+			Failed:       res.OCR.Failed,
+			NotProcessed: res.OCR.NotProcessed,
+		},
 	}, nil
 }
 

@@ -38,6 +38,19 @@ func TestDetect(t *testing.T) {
 		{".doc not OLE follows the text path", "a.doc", []byte("texto"), FormatText, 0},
 		{"upper case extension", "CONTRATO.DOCX", zipHead, FormatDOCX, 0},
 		{"mixed case pdf", "Doc.PdF", pdfHead, FormatPDF, 0},
+		{"png ok", "scan.png", []byte("\x89PNG\r\n\x1a\nIHDR"), FormatPNG, 0},
+		{"PNG upper case", "SCAN.PNG", []byte("\x89PNG\r\n\x1a\nIHDR"), FormatPNG, 0},
+		{"jpg ok", "foto.jpg", []byte{0xFF, 0xD8, 0xFF, 0xE0}, FormatJPEG, 0},
+		{"jpeg ok", "foto.JPEG", []byte{0xFF, 0xD8, 0xFF, 0xE1}, FormatJPEG, 0},
+		{"png with jpg content", "a.png", []byte{0xFF, 0xD8, 0xFF, 0xE0}, FormatText, ReasonMismatch},
+		{"jpg with png content", "a.jpg", []byte("\x89PNG\r\n\x1a\n"), FormatText, ReasonMismatch},
+		{"png truncated signature", "a.png", []byte("\x89PNG\r\n"), FormatText, ReasonMismatch},
+		{"jpg two bytes only", "a.jpg", []byte{0xFF, 0xD8}, FormatText, ReasonMismatch},
+		{"png empty", "a.png", nil, FormatText, ReasonMismatch},
+		{"png with pdf content", "a.png", pdfHead, FormatText, ReasonMismatch},
+		{"png signature behind a .txt follows the text path", "a.txt", []byte("\x89PNG\r\n\x1a\n"), FormatText, 0},
+		{".gif is not an image format here", "a.gif", []byte("GIF89a"), FormatText, 0},
+		{".tif is out of scope", "a.tif", []byte("II*\x00"), FormatText, 0},
 		{"upper case OLE doc", "A.DOC", oleHead, FormatText, ReasonLegacy},
 		{"no extension with PK", "arquivo", zipHead, FormatText, 0},
 		{"no extension with pdf", "arquivo", pdfHead, FormatText, 0},
@@ -72,15 +85,25 @@ func TestDetect(t *testing.T) {
 // The exact wording of section 6 is part of the contract.
 func TestErrorMessages(t *testing.T) {
 	want := map[Reason]string{
-		ReasonMismatch:    "o conteúdo não corresponde à extensão do arquivo (.docx/.pptx/.pdf); o arquivo pode estar corrompido ou renomeado",
-		ReasonPassworded:  "documento do Office protegido por senha não é suportado; salve uma cópia sem senha",
-		ReasonLegacy:      "formato Word/PowerPoint 97-2003 não é suportado; salve como .docx ou .pptx",
-		ReasonPDFPassword: "PDF protegido por senha não é suportado; gere uma cópia sem senha",
-		ReasonNoText:      "o PDF não tem camada de texto (provavelmente é digitalizado); OCR ainda não é suportado",
-		ReasonMalformed:   "documento corrompido, malformado ou acima dos limites de segurança",
-		ReasonTooLong:     "documento extenso demais: o texto extraído passa do limite; divida o documento",
-		ReasonCorruptText: "o texto extraído do PDF está corrompido (fontes sem mapeamento de caracteres); não é possível resumi-lo com segurança",
-		ReasonTimeout:     "a extração do texto excedeu o tempo limite (--timeout)",
+		ReasonMismatch:        "o conteúdo não corresponde à extensão do arquivo (.docx/.pptx/.pdf/.png/.jpg); o arquivo pode estar corrompido ou renomeado",
+		ReasonPassworded:      "documento do Office protegido por senha não é suportado; salve uma cópia sem senha",
+		ReasonLegacy:          "formato Word/PowerPoint 97-2003 não é suportado; salve como .docx ou .pptx",
+		ReasonPDFPassword:     "PDF protegido por senha não é suportado; gere uma cópia sem senha",
+		ReasonNoText:          "o PDF não tem camada de texto (provavelmente é digitalizado); OCR ainda não é suportado",
+		ReasonMalformed:       "documento corrompido, malformado ou acima dos limites de segurança",
+		ReasonTooLong:         "documento extenso demais: o texto extraído passa do limite; divida o documento",
+		ReasonCorruptText:     "o texto extraído do PDF está corrompido (fontes sem mapeamento de caracteres); não é possível resumi-lo com segurança",
+		ReasonTimeout:         "a extração do texto excedeu o tempo limite (--timeout)",
+		ReasonOCRRequired:     "imagem requer OCR, que não está habilitado no servidor",
+		ReasonOCRTooManyPages: "documento digitalizado extenso demais para OCR nesta chamada (--ocr-max-pages); divida o documento",
+		ReasonOCRUnavailable:  "o OCR ficou indisponível nesta chamada (o processo de OCR terminou inesperadamente); tente de novo",
+		ReasonImageTooLarge:   "imagem grande demais para OCR (resolução acima do limite de segurança); reduza a resolução da imagem",
+		ReasonOCRNoText:       "nenhum texto foi obtido do documento, nem por OCR (páginas em branco, ilegíveis, com falha ou sem tempo para o OCR); confira o original",
+	}
+	for _, f := range []Format{FormatPNG, FormatJPEG} {
+		if m := (&Error{Reason: ReasonCorruptText, Format: f}).Error(); strings.Contains(m, "PDF") {
+			t.Errorf("texto corrompido de imagem com a redação de PDF: %q", m)
+		}
 	}
 	for r, msg := range want {
 		if got := (&Error{Reason: r}).Error(); got != msg {
@@ -93,7 +116,7 @@ func TestErrorMessages(t *testing.T) {
 }
 
 func TestFormatString(t *testing.T) {
-	for f, s := range map[Format]string{FormatText: "txt", FormatDOCX: "docx", FormatPPTX: "pptx", FormatPDF: "pdf"} {
+	for f, s := range map[Format]string{FormatText: "txt", FormatDOCX: "docx", FormatPPTX: "pptx", FormatPDF: "pdf", FormatPNG: "png", FormatJPEG: "jpg"} {
 		if f.String() != s {
 			t.Errorf("%d -> %q", f, f.String())
 		}

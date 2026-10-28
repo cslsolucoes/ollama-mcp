@@ -292,6 +292,8 @@ type fakeDoc struct {
 	panicOn  int // -1: none
 	closed   *int
 	delay    func(i int)
+	render   func(ctx context.Context, i, dpi int) (*image.Gray, error) // OCR tests
+	size     func(i int) (float64, float64, error)                      // OCR tests; default US Letter
 }
 
 func (d *fakeDoc) pages() int { return len(d.texts) }
@@ -307,8 +309,17 @@ func (d *fakeDoc) pageText(_ context.Context, i int) (string, error) {
 	}
 	return d.texts[i], nil
 }
-func (d *fakeDoc) renderGray(context.Context, int, int) (*image.Gray, error) {
+func (d *fakeDoc) renderGray(ctx context.Context, i, dpi int) (*image.Gray, error) {
+	if d.render != nil {
+		return d.render(ctx, i, dpi)
+	}
 	return nil, errors.New("not implemented")
+}
+func (d *fakeDoc) pageSize(i int) (float64, float64, error) {
+	if d.size != nil {
+		return d.size(i)
+	}
+	return 612, 792, nil
 }
 func (d *fakeDoc) close() { *d.closed++ }
 

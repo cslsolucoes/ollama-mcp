@@ -392,3 +392,66 @@ func TestDocSpecialPaths(t *testing.T) {
 		t.Fatal("the extractor ran for a special path")
 	}
 }
+
+// imageExtractor is fakeExtractor that also claims images, as the real
+// adapter does from step 7.9.
+type imageExtractor struct{ fakeExtractor }
+
+func (f *imageExtractor) IsDocument(name string) bool {
+	n := strings.ToLower(name)
+	if strings.HasSuffix(n, ".png") || strings.HasSuffix(n, ".jpg") || strings.HasSuffix(n, ".jpeg") {
+		return true
+	}
+	return f.fakeExtractor.IsDocument(name)
+}
+
+// Images are documents only when the extractor claims them (step 7.9): then
+// they get the document ceiling and the OCR fields come through; otherwise
+// they stay binary under the text ceiling, exactly as before. Every path
+// defence (denylist) runs before the extractor sees a byte.
+func TestImagesAreDocumentsOnlyWhenClaimed(t *testing.T) {
+	w := newWorld(t)
+	png := "\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 3000)
+	write(t, filepath.Join(w.root, "scan.png"), png)
+	write(t, filepath.Join(w.root, "foto.JPEG"), "\xFF\xD8\xFF"+strings.Repeat("\x00", 100))
+
+	// The extractor of phase 7 (no images): binary, text ceiling.
+	g := docGuard(t, w, &fakeExtractor{}, 1000, 5000)
+	_, err := g.Read("scan.png")
+	wantReason(t, err, ReasonTooLarge, "png over the text ceiling when not claimed")
+	if !strings.Contains(err.Error(), "--max-file-bytes") {
+		t.Errorf("message: %v", err)
+	}
+	_, err = g.Read("foto.JPEG")
+	wantReason(t, err, ReasonBinary, "jpeg not claimed")
+
+	// Claimed: the document ceiling and the OCR fields.
+	fx := &imageExtractor{fakeExtractor{res: &Extracted{Text: "[imagem — OCR conf=90]\nx", Format: "png",
+		OCR: OCRInfo{Used: true, Pages: 1, ConfMean: 90}}}}
+	g = docGuard(t, w, fx, 1000, 5000)
+	f, err := g.Read("scan.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Format != "png" || f.OCR != (OCRInfo{Used: true, Pages: 1, ConfMean: 90}) || f.Bytes != len(png) {
+		t.Fatalf("file: %+v", f)
+	}
+	write(t, filepath.Join(w.root, "huge.jpg"), "\xFF\xD8\xFF"+strings.Repeat("\x00", 6000))
+	before := fx.calls.Load()
+	_, err = g.Read("huge.jpg")
+	wantReason(t, err, ReasonTooLarge, "jpg over the document ceiling")
+	if !strings.Contains(err.Error(), "--max-doc-bytes") || fx.calls.Load() != before {
+		t.Fatalf("message %v, extractor calls %d -> %d", err, before, fx.calls.Load())
+	}
+	// A denied name never reaches the extractor, image or not.
+	before = fx.calls.Load()
+	for _, rel := range []string{"id_rsa.png", ".env.jpg", "credentials.jpeg", filepath.Join("secrets", "rg.png"), filepath.Join(".git", "x.jpg")} {
+		write(t, filepath.Join(w.root, rel), png+docSecretContent)
+		_, err := g.Read(rel)
+		wantReason(t, err, ReasonDenylisted, rel)
+		noLeak(t, w, err)
+	}
+	if fx.calls.Load() != before {
+		t.Fatalf("the extractor ran %d times on denylisted images", fx.calls.Load()-before)
+	}
+}

@@ -44,7 +44,7 @@ func TestEnvFallback(t *testing.T) {
 	})
 	want := Config{OllamaURL: "https://h.invalid:8443", APIKey: "k", TLSCA: "ca.pem", Insecure: true, Model: "m",
 		EmbedModel: "e", Timeout: 90 * time.Second, MaxPromptChars: 1000, MaxLineBytes: 2048, MaxFileBytes: 4096, MaxDocBytes: defaultMaxDocBytes, MaxChunks: 40,
-		Debug: true, ToolsVerbosity: "compact", TraceFile: "t.log", AuditLogPath: "a.log"}
+		Debug: true, ToolsVerbosity: "compact", TraceFile: "t.log", AuditLogPath: "a.log", OCR: defaultOCRFlags()}
 	if c != want {
 		t.Fatalf("got  %+v\nwant %+v", c, want)
 	}

@@ -1,5 +1,6 @@
 // Package doctext extracts plain text from office documents (phase 7): DOCX,
-// PPTX and PDF. This file is the common base: formats, limits, results, the
+// PPTX and PDF, plus PNG and JPEG images through an injected OCR (step 7.9,
+// ocr.go and image.go). This file is the common base: formats, limits, results, the
 // typed refusals and the format detection. zipsafe.go opens OOXML packages
 // defensively, xmlsafe.go wraps the XML decoder, normalize.go cleans the text.
 //
@@ -28,6 +29,10 @@ const (
 	FormatDOCX
 	FormatPPTX
 	FormatPDF
+	// FormatPNG and FormatJPEG are images: their only text comes from the OCR
+	// (Limits.OCR); without it they are refused with ReasonOCRRequired.
+	FormatPNG
+	FormatJPEG
 )
 
 // String is the value of the "formato=" field of the technical footer.
@@ -39,6 +44,10 @@ func (f Format) String() string {
 		return "pptx"
 	case FormatPDF:
 		return "pdf"
+	case FormatPNG:
+		return "png"
+	case FormatJPEG:
+		return "jpg"
 	default:
 		return "txt"
 	}
@@ -53,6 +62,10 @@ type Limits struct {
 	MaxXMLDepth   int   // element nesting
 	MaxTextRunes  int   // character data accepted from one XML part (and the extracted text)
 	MaxPDFPages   int   // pages of a PDF
+	// OCR enables the recognition of PDF pages without text and of images.
+	// nil means no OCR: a PDF without any text is refused with ReasonNoText
+	// (as before step 7.9) and an image with ReasonOCRRequired.
+	OCR *OCROptions
 }
 
 // DefaultLimits are the values of brief section 3.2. MaxTextRunes has no fixed
@@ -90,6 +103,10 @@ func (l Limits) withDefaults() Limits {
 	if l.MaxPDFPages > 0 {
 		d.MaxPDFPages = l.MaxPDFPages
 	}
+	if l.OCR != nil && l.OCR.Engine != nil {
+		o := l.OCR.withDefaults()
+		d.OCR = &o
+	}
 	return d
 }
 
@@ -115,6 +132,19 @@ type Result struct {
 	// HiddenText: Text has lines labelled "[oculto]" (text the document holds
 	// but does not show or print: Word w:vanish, hidden PowerPoint shapes).
 	HiddenText bool
+	// OCR describes the recognition (PDF pages without text, images).
+	OCR OCRStats
+}
+
+// OCRStats is the account of the OCR of one extraction. Used is false when no
+// page went to the OCR (no OCR configured, or every page had text).
+type OCRStats struct {
+	Used         bool
+	Pages        int // pages (or the image) recognized
+	ConfMean     int // mean confidence of the recognized pages, 0-100
+	Failed       int // pages whose recognition failed
+	NotProcessed int // pages left out because the time budget ran out
+	Blank        int // pages skipped as blank (no pixel darker than the threshold)
 }
 
 // labelHidden starts a line of hidden text (Word w:vanish, a hidden
@@ -147,6 +177,19 @@ const (
 	ReasonCorruptText
 	// ReasonTimeout: the extraction ran out of time.
 	ReasonTimeout
+	// ReasonOCRRequired: an image, and the server has no OCR.
+	ReasonOCRRequired
+	// ReasonOCRTooManyPages: more pages need OCR than OCROptions.MaxPages.
+	ReasonOCRTooManyPages
+	// ReasonOCRUnavailable: the OCR could not be used in this call (its
+	// worker died twice, or it was closed).
+	ReasonOCRUnavailable
+	// ReasonImageTooLarge: the image declares more pixels than can be decoded
+	// safely (a decompression bomb, or simply too big).
+	ReasonImageTooLarge
+	// ReasonOCRNoText: OCR ran and no text came out of the whole document
+	// (blank, illegible or failed pages, or no time left for them).
+	ReasonOCRNoText
 )
 
 // Error is the typed refusal of this package. Its message is addressed to the
@@ -161,7 +204,7 @@ type Error struct {
 func (e *Error) Error() string {
 	switch e.Reason {
 	case ReasonMismatch:
-		return "o conteúdo não corresponde à extensão do arquivo (.docx/.pptx/.pdf); o arquivo pode estar corrompido ou renomeado"
+		return "o conteúdo não corresponde à extensão do arquivo (.docx/.pptx/.pdf/.png/.jpg); o arquivo pode estar corrompido ou renomeado"
 	case ReasonPassworded:
 		return "documento do Office protegido por senha não é suportado; salve uma cópia sem senha"
 	case ReasonLegacy:
@@ -177,12 +220,22 @@ func (e *Error) Error() string {
 	case ReasonCorruptText:
 		// The brief words this one for PDF (fonts without ToUnicode); DOCX and
 		// PPTX get an equivalent wording, chosen by the format Extract recorded.
-		if e.Format == FormatDOCX || e.Format == FormatPPTX {
+		if e.Format == FormatDOCX || e.Format == FormatPPTX || e.Format == FormatPNG || e.Format == FormatJPEG {
 			return "o texto extraído do documento está corrompido (caracteres inválidos em excesso); não é possível resumi-lo com segurança"
 		}
 		return "o texto extraído do PDF está corrompido (fontes sem mapeamento de caracteres); não é possível resumi-lo com segurança"
 	case ReasonTimeout:
 		return "a extração do texto excedeu o tempo limite (--timeout)"
+	case ReasonOCRRequired:
+		return "imagem requer OCR, que não está habilitado no servidor"
+	case ReasonOCRTooManyPages:
+		return "documento digitalizado extenso demais para OCR nesta chamada (--ocr-max-pages); divida o documento"
+	case ReasonOCRUnavailable:
+		return "o OCR ficou indisponível nesta chamada (o processo de OCR terminou inesperadamente); tente de novo"
+	case ReasonImageTooLarge:
+		return "imagem grande demais para OCR (resolução acima do limite de segurança); reduza a resolução da imagem"
+	case ReasonOCRNoText:
+		return "nenhum texto foi obtido do documento, nem por OCR (páginas em branco, ilegíveis, com falha ou sem tempo para o OCR); confira o original"
 	default:
 		return "documento corrompido, malformado ou acima dos limites de segurança"
 	}
@@ -204,6 +257,8 @@ var (
 	zipMagic = []byte("PK\x03\x04")
 	oleMagic = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
 	pdfMagic = []byte("%PDF-")
+	pngMagic = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'}
+	jpgMagic = []byte{0xFF, 0xD8, 0xFF}
 )
 
 // pdfHeadWindow is how far into the file "%PDF-" may start: some producers
@@ -224,7 +279,8 @@ func extOf(name string) string {
 }
 
 // Detect decides the format from the EXTENSION of the resolved name and from
-// the signature in head (the first bytes of the file); both must agree. It
+// the signature in head (the first bytes of the file); both must agree. .png
+// needs the PNG signature and .jpg/.jpeg the JPEG one (FF D8 FF). It
 // never detects by content alone: any other extension is FormatText, with no
 // error, and the caller follows the plain text path. .docm/.pptm/.dotx/.potx
 // are deliberately FormatText (out of scope, refused as binary as before).
@@ -255,6 +311,16 @@ func Detect(name string, head []byte) (Format, error) {
 			return FormatText, refuse(ReasonMismatch)
 		}
 		return FormatPDF, nil
+	case ".png":
+		if !bytes.HasPrefix(head, pngMagic) {
+			return FormatText, refuse(ReasonMismatch)
+		}
+		return FormatPNG, nil
+	case ".jpg", ".jpeg":
+		if !bytes.HasPrefix(head, jpgMagic) {
+			return FormatText, refuse(ReasonMismatch)
+		}
+		return FormatJPEG, nil
 	case ".doc", ".ppt":
 		if isOLE {
 			return FormatText, refuse(ReasonLegacy)
@@ -316,6 +382,8 @@ func Extract(ctx context.Context, f Format, data []byte, lim Limits) (res *Resul
 		r, err = extractPPTX(ctx, data, lim)
 	case FormatPDF:
 		r, err = extractPDF(ctx, data, lim)
+	case FormatPNG, FormatJPEG:
+		r, err = extractImage(ctx, f, data, lim)
 	default:
 		return nil, errors.New("formato sem extrator de documento: use o caminho de texto")
 	}

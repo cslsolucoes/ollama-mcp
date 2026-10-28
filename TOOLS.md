@@ -128,7 +128,7 @@ Input schema:
 
 **Title:** Extract information from a file with the local model
 
-Extracts what the instruction asks from a text (UTF-8), .docx, .pptx or .pdf file read on the server, in the requested format. The file text never enters your context. Large files are split and merged automatically. The answer ends with a [uso] line.
+Extracts what the instruction asks from a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file read on the server, in the requested format. The file text never enters your context. Large files are split and merged automatically. The answer ends with a [uso] line.
 
 Availability: registered only when the server starts with `--allow-root` (or `MCPOLLAMA_ALLOW_ROOT`); without it the tool does not exist and `tools/call` answers -32602.
 
@@ -154,7 +154,7 @@ Input schema:
       "type": "string"
     },
     "path": {
-      "description": "Absolute path of a text (UTF-8), .docx, .pptx or .pdf file inside an allowed root; relative only when the server has a single root.",
+      "description": "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root.",
       "minLength": 1,
       "type": "string"
     }
@@ -236,7 +236,7 @@ Input schema:
 
 **Title:** Summarize a file with the local model
 
-Summarizes a text (UTF-8), .docx, .pptx or .pdf file read on the server; the file text never enters your context. Large files are split and combined automatically. The answer ends with a [uso] line.
+Summarizes a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file read on the server; the file text never enters your context. Large files are split and combined automatically. The answer ends with a [uso] line.
 
 Availability: registered only when the server starts with `--allow-root` (or `MCPOLLAMA_ALLOW_ROOT`); without it the tool does not exist and `tools/call` answers -32602.
 
@@ -267,7 +267,7 @@ Input schema:
       "type": "string"
     },
     "path": {
-      "description": "Absolute path of a text (UTF-8), .docx, .pptx or .pdf file inside an allowed root; relative only when the server has a single root.",
+      "description": "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root.",
       "minLength": 1,
       "type": "string"
     }
@@ -283,7 +283,7 @@ Input schema:
 
 **Title:** Translate a file with the local model
 
-Translates a text (UTF-8), .docx, .pptx or .pdf file read on the server; the file text never enters your context. Large files are translated part by part. The answer ends with a [uso] line.
+Translates a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file read on the server; the file text never enters your context. Large files are translated part by part. The answer ends with a [uso] line.
 
 Availability: registered only when the server starts with `--allow-root` (or `MCPOLLAMA_ALLOW_ROOT`); without it the tool does not exist and `tools/call` answers -32602.
 
@@ -300,7 +300,7 @@ Input schema:
       "type": "string"
     },
     "path": {
-      "description": "Absolute path of a text (UTF-8), .docx, .pptx or .pdf file inside an allowed root; relative only when the server has a single root.",
+      "description": "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root.",
       "minLength": 1,
       "type": "string"
     },

@@ -443,7 +443,7 @@ func TestSplitChunksNeverCutsPositionMarkers(t *testing.T) {
 
 // D-13: the descriptions grow by the minimum and the old wording is gone.
 func TestDocDescriptionsMinimal(t *testing.T) {
-	const phrase = "text (UTF-8), .docx, .pptx or .pdf file"
+	const phrase = "text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file"
 	for _, e := range New(CatalogDeps()) {
 		switch e.Def.Name {
 		case "summarize_file", "extract", "translate":
