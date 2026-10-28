@@ -1104,3 +1104,29 @@ Para desligar nos clientes, basta remover a entrada do `.mcp.json`/`mcp.json`. O
   - **P7.2-2:** o teste do `recover` usa o hook `testHookExtract`, porque não há ponto natural de panic;
   - **P7.4-1:** avaliar se `dt`/`ftr`/`sldNum` dentro do slide devem ser filtrados (ruído);
   - **P7.x-1:** travamento do fuzz (em investigação).
+
+### 2026-10-28 14:43 — 7.0 concluída: spike ampliado + D-1 fixada
+- **Ampliação** (mesmo report, seções 12 e 13; agente Sonnet):
+  - 20 PDFs novos com texto (`c16`…`c35`); corpus total de 35 PDFs, 26 com texto, 133 páginas;
+  - sigilo conferido pelo loop principal: 0 CPF, CNPJ ou "R$", nenhum caminho nem nome original; `mapa.txt` ignorado pelo git.
+- **Resultado total (35 PDFs):**
+  - **A** (go-pdfium WASM): 255.506 runas; **0 U+FFFD**; nenhuma página perdida; 40,8 ms por PDF;
+  - **B** (ledongthuc): 138.171 runas; 9,5 U+FFFD por 1000; **perdeu texto sem avisar** em 15 páginas de 4 PDFs;
+  - 0 panic e determinístico (35/35) nos dois; `/Count` confere em 18/18;
+  - concordância: LCS 0,961, Jaccard 0,612;
+  - tabelas (6 PDFs): divergência em 4, e sem `pdftotext` não dá para saber qual leitura está certa.
+- **c01:** é senha de **abertura** (RC4 40 bits, R=3; a senha vazia não valida contra o `/U`), ou seja, recusa legítima. O mesmo vale para `c16` e `c17`. **Só 1 PDF da pasta** tem senha apenas de permissão (`c02`), e ele abre.
+- **Cache de compilação do wazero** (21,6 MB em disco):
+  - init: **113 a 150 ms** com cache, contra 4.935 ms sem;
+  - working set: **68 a 81 MB** com o motor aberto e cache, contra ~330 MB sem;
+  - motor fechado: 47 a 51 MB residuais (base do processo: 7,6 MB). **Liberar o motor devolve só ~20 a 30 MB.**
+- **Não medido:** referência `pdftotext` (não existe na estação); PDF do Word com texto (não existe na pasta); memória por PDF.
+- **Decisões do owner (AskUserQuestion, 14:42):**
+  - **D-1 FIXADA:** **go-pdfium v1.21.4 (MIT) + wazero v1.12.0 (Apache-2.0)**, em modo WebAssembly, sem cgo;
+  - **D-15 REVISTA:** **motor residente** (a flag `--pdf-idle` cai). Liberar devolveria só ~25 MB, o que não compensa a complexidade;
+  - continua valendo a D-14: o cache só por `--pdf-cache-dir` (sem a flag, nada em disco).
+- **Pendências:**
+  - **P7.0-4:** identificar a versão do PDFium dentro do `.wasm` e auditar os componentes de terceiros dele (licenças);
+  - **P7.0-5:** filtrar caracteres de controle na saída do A (`c30`: 7,7 por 1000) — o `NormalizeText` já faz;
+  - **P7.0-6:** não prometer fidelidade de tabela em PDF sem referência.
+- **Erro meu de processo:** os cabeçalhos "14:42" e "14:46" das minhas mensagens anteriores foram **estimados**, não lidos (o horário real conferido era 14:41:50). A regra é usar só o hook ou o `Get-Date`.
