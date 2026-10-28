@@ -12,8 +12,10 @@ package doctext
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 )
 
 // Format is the kind of document a name and its first bytes agree on.
@@ -238,4 +240,71 @@ func Detect(name string, head []byte) (Format, error) {
 		}
 	}
 	return FormatText, nil
+}
+
+// testHookExtract is called at the start of Extract, inside its recover scope.
+// Tests use it to inject a panic and prove that it becomes ReasonMalformed.
+var testHookExtract func(f Format)
+
+// ctxErr maps a finished context to the error Extract returns: a deadline is
+// the typed ReasonTimeout; a plain cancellation is returned as is, so callers
+// can still match it with errors.Is(err, context.Canceled).
+func ctxErr(ctx context.Context) error {
+	err := ctx.Err()
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return refuse(ReasonTimeout)
+	}
+	return err
+}
+
+// Extract extracts the text of a document that the caller already read (and
+// already detected with Detect). It is the single entry point of the package:
+// it dispatches by format, recovers any panic of a parser into the opaque
+// ReasonMalformed, honors ctx, applies NormalizeText to the final text and
+// enforces lim.MaxTextRunes over the sum of every part of the document.
+//
+// FormatText is a usage error: the plain text path does not go through here.
+func Extract(ctx context.Context, f Format, data []byte, lim Limits) (res *Result, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			res, err = nil, refuse(ReasonMalformed)
+		}
+	}()
+	if testHookExtract != nil {
+		testHookExtract(f)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	lim = lim.withDefaults()
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
+	var r *Result
+	switch f {
+	case FormatDOCX:
+		r, err = extractDOCX(ctx, data, lim)
+	case FormatPPTX:
+		r, err = extractPPTX(ctx, data, lim)
+	case FormatPDF:
+		r, err = extractPDF(ctx, data, lim)
+	default:
+		return nil, errors.New("formato sem extrator de documento: use o caminho de texto")
+	}
+	if err != nil {
+		return nil, err
+	}
+	text, err := NormalizeText(r.Text)
+	if err != nil {
+		return nil, err
+	}
+	if utf8.RuneCountInString(text) > lim.MaxTextRunes {
+		return nil, refuse(ReasonTooLong)
+	}
+	r.Text = text
+	r.Format = f
+	return r, nil
 }
