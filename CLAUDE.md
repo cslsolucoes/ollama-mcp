@@ -156,16 +156,21 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
 
 ## Servidor Ollama (alvo)
 
-- `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.8 · modelo **`qwen3-ia`** = MoE
-  `qwen3-coder:30b-a3b` (30,5B, Q4_K_M, 100% GPU). Medido em 2026-10-23: ~97 tok/s de geração
-  e ~5.000 tok/s de prefill (15.959 tokens em 3,2 s). Embeddings: `nomic-embed-text` (768
-  dimensões); o `qwen3-ia` não gera embeddings.
-- **Config atual (provisória): 3 GPUs e `num_ctx` 65536.** A GPU 3 está excluída por falha de
-  PCIe, que **reiniciava a máquina** no prefill de prompts grandes (incidente de 2026-10-23,
-  mitigado). A config volta a 4 GPUs e 131072 quando o hardware for reparado. **Não fixar o
-  contexto no código:** usar o teto configurável. Relatórios em `.workspace/reports/`
-  (`...190500-incidente-...` e `...191600-resposta-...`).
-- Carga a frio do `qwen3-ia`: ~32–36 s. Detalhes medidos:
+- `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.8 · modelo **`qwen3-ia`** = **alias do
+  `qwen3.5:9b`** desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M,
+  100% GPU, 13 GB a 64k). Antes, era o MoE `qwen3-coder:30b-a3b`, removido do servidor.
+  - **Raciocina por padrão** (`thinking default true`; não dá para desligar no Modelfile). O
+    mcpollama manda `think:false` (8.8); o `/v1` só desliga com `reasoning_effort: "none"`.
+  - **O Ollama roda essa arquitetura com 1 slot** ("does not support parallel requests"):
+    agentes simultâneos entram na fila. Medido na 8.9 (4 GPUs a 100 W): 10 agentes × 32k com 0
+    erros, ~700–790 tok/s somados (~2.000 com documentos grandes), S2 80–85% e S3 100%.
+  - Report: `.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md`.
+  - Embeddings: `nomic-embed-text` (768 dimensões), residente junto.
+- **Config atual: 4 GPUs a 100 W**, `num_ctx` 65536, `NUM_PARALLEL=1`, `MAX_QUEUE=32`
+  (2026-10-29). A causa dos reboots é a **fonte de 850 W, que não aguenta as 4 placas**
+  (owner, 2026-10-28; não são os risers). Os 100 W valem até a troca da fonte; a VRAM de 32 GB
+  é a prioridade. **Não fixar o contexto no código:** usar o teto configurável.
+- Carga a frio do `qwen3-ia`: ~16–22 s. Detalhes medidos antes da troca:
   `referencias/Brief_Referencias/Servidor-Ollama-CSL/dados/validacao-empirica.md`.
 - Na LAN: `https://ia.cslsolucoes.com.br:8443` (porta explícita). Pela internet: o mesmo host
   sem porta (Cloudflare Tunnel); de dentro da LAN esse caminho dá timeout (DNS split-horizon).
@@ -178,10 +183,14 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
 - O nível `local` atual (`%USERPROFILE%\.claude\scripts\ia-local.ps1`, OpenClaude headless,
   config em `%USERPROFILE%\.openclaude\csl-ollama.env`) é o que este servidor substitui por uma
   tool MCP. Desde 2026-10-26 ele usa o mesmo `qwen3-ia` (decisão do owner: **só modelos
-  otimizados para o hardware**: `qwen3-ia` para geração e `nomic-embed-text` para embeddings;
-  os densos `qwen3.8:27b-*` não cabem inteiros na GPU). Com isso acabou a disputa de VRAM entre
-  os dois níveis. Em teste ao vivo, **uma chamada de cada vez**: as GPUs servem um único modelo
-  residente, e chamadas paralelas entram em fila.
+  otimizados para o hardware**: `qwen3-ia` para geração e `nomic-embed-text` para embeddings).
+  Pelo `/v1`, o `ia-local` raciocina a cada chamada até a fila (gateway, Fase 9) poder desligar o
+  raciocínio. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
+- **Fase 9 (fila + `/monitor`):** código em `src/gateway/` e `src/cmd/mcpollama-gateway/`
+  (9.1–9.5 concluídas e revisadas; ainda **não implantado**). Plano:
+  `.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`. Mudanças em
+  `src/gateway/` exigem rodar de novo os testes de ataque de
+  `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.testes/`.
 
 ---
 
