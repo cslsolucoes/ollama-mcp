@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -166,6 +167,120 @@ func TestRunEndToEnd(t *testing.T) {
 	case code := <-done:
 		if code != 0 {
 			t.Fatalf("exit code %d: %s", code, errb.String())
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("did not shut down")
+	}
+}
+
+// Fase 9.6a: the policy flags, their env fallbacks and the --help text.
+func TestParseConfigPolicyFlags(t *testing.T) {
+	var buf bytes.Buffer
+	c, err := parseConfig(nil, noEnv, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DefaultThink || c.ThinkSuffix != "-think" || c.AllowKeepAlive || c.AllowNumCtx ||
+		strings.Join(c.StripOptions, ",") != "num_gpu,main_gpu,low_vram,use_mmap,use_mlock,numa" {
+		t.Fatalf("defaults: %+v", c)
+	}
+	env := map[string]string{
+		"MCPGW_DEFAULT_THINK": "true", "MCPGW_THINK_SUFFIX": "-raciocina", "MCPGW_ALLOW_CLIENT_KEEPALIVE": "1",
+		"MCPGW_ALLOW_CLIENT_NUM_CTX": "yes", "MCPGW_STRIP_OPTIONS": "num_gpu; seed",
+	}
+	c, err = parseConfig(nil, func(k string) string { return env[k] }, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.DefaultThink || c.ThinkSuffix != "-raciocina" || !c.AllowKeepAlive || !c.AllowNumCtx || strings.Join(c.StripOptions, ",") != "num_gpu,seed" {
+		t.Fatalf("env: %+v", c)
+	}
+	// the flag wins; "none" disables the suffix and the strip list
+	c, err = parseConfig([]string{"--think-suffix", "none", "--strip-options", "none", "--default-think=false"}, func(k string) string { return env[k] }, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ThinkSuffix != "" || c.StripOptions == nil || len(c.StripOptions) != 0 || c.DefaultThink != false {
+		t.Fatalf("flags: %+v", c)
+	}
+	if _, err := parseConfig([]string{"--think-suffix", "a b"}, noEnv, &buf); err == nil {
+		t.Fatal("a suffix with a space must be refused")
+	}
+	for _, f := range []string{"--default-think", "--think-suffix", "--allow-client-keepalive", "--allow-client-num-ctx", "--strip-options",
+		"MCPGW_DEFAULT_THINK", "MCPGW_THINK_SUFFIX", "MCPGW_ALLOW_CLIENT_KEEPALIVE", "MCPGW_ALLOW_CLIENT_NUM_CTX", "MCPGW_STRIP_OPTIONS"} {
+		if !strings.Contains(usageText, f) {
+			t.Errorf("--help does not document %s", f)
+		}
+	}
+}
+
+// Fase 9.6a end to end: the policies run through run(); the Ollama gets the
+// rewritten body, the monitor history shows the reasoning mode.
+func TestRunAppliesPolicies(t *testing.T) {
+	var mu sync.Mutex
+	var got []string
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		got = append(got, string(b))
+		mu.Unlock()
+		io.WriteString(w, `{"response":"ok","done":true,"prompt_eval_count":3,"eval_count":4}`+"\n")
+	}))
+	defer up.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	addr := make(chan string, 1)
+	done := make(chan int, 1)
+	var errb bytes.Buffer
+	go func() {
+		done <- run(ctx, []string{"--listen", "127.0.0.1:0", "--ollama", up.URL, "--db", filepath.Join(t.TempDir(), "gw.db"), "--gpu-interval", "0", "--aer-path", "-",
+			"--allowed-models", "qwen3-ia"},
+			noEnv, strings.NewReader(""), io.Discard, &errb, func(a string) { addr <- a })
+	}()
+	var base string
+	select {
+	case a := <-addr:
+		base = "http://" + a
+	case <-time.After(5 * time.Second):
+		t.Fatalf("did not start: %s", errb.String())
+	}
+	resp, err := http.Post(base+"/api/generate", "application/json", strings.NewReader(`{"model":"qwen3-ia-think","prompt":"x","keep_alive":0,"options":{"num_ctx":1}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	mu.Lock()
+	sent := strings.Join(got, "|")
+	mu.Unlock()
+	if strings.Contains(sent, "keep_alive") || strings.Contains(sent, "num_ctx") || !strings.Contains(sent, `"think":true`) || !strings.Contains(sent, `"model":"qwen3-ia"`) {
+		t.Fatalf("body at the Ollama: %s", sent)
+	}
+	if r, _ := http.Post(base+"/api/generate", "application/json", strings.NewReader(`{"model":`)); r.StatusCode != 400 {
+		t.Fatalf("invalid json: %d", r.StatusCode)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		h, err := http.Get(base + "/monitor/api/history")
+		if err == nil {
+			hb, _ := io.ReadAll(h.Body)
+			h.Body.Close()
+			if strings.Contains(string(hb), `"think":"on"`) {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the reasoning mode never reached the history")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("exit %d: %s", code, errb.String())
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("did not shut down")

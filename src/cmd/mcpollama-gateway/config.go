@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 )
 
 const usageText = `Usage: mcpollama-gateway [flags]
@@ -43,6 +44,20 @@ environment variable; the flag wins.
                                                              (MCPGW_PRIORITY_IPS, default none)
   --allowed-models LIST   models accepted, separated by ; or ,; empty means any
                                                              (MCPGW_ALLOWED_MODELS)
+  --default-think BOOL    reasoning when the client does not say: native API gets "think":BOOL,
+                          /v1 gets "reasoning_effort":"none" when false (an explicit field wins)
+                                                             (MCPGW_DEFAULT_THINK, default false)
+  --think-suffix S        a model named "<model>S" (e.g. qwen3-ia-think) is rewritten to <model>
+                          with reasoning ON; "none" disables         (MCPGW_THINK_SUFFIX, default -think)
+                          The header X-Mcpollama-Think: on|off sets the reasoning when the body does not
+                          (precedence: body > header > suffix > --default-think). The --allowed-models
+                          check uses the base name.
+  --allow-client-keepalive  let the client's top-level keep_alive through; by default it is removed
+                          (a 0 would unload the model for everyone)  (MCPGW_ALLOW_CLIENT_KEEPALIVE, default false)
+  --allow-client-num-ctx  let options.num_ctx through; by default it is removed (any value other than
+                          the resident context reloads the model)    (MCPGW_ALLOW_CLIENT_NUM_CTX, default false)
+  --strip-options LIST    options removed from the body, separated by , or ; ("none" = none)
+                                                             (MCPGW_STRIP_OPTIONS, default num_gpu,main_gpu,low_vram,use_mmap,use_mlock,numa)
   --max-body-bytes N      request body ceiling               (MCPGW_MAX_BODY_BYTES, default 33554432)
   --admin-file FILE       "user:pbkdf2-sha256$..." line, mode 0600; without it the monitor is
                           read only                          (MCPGW_ADMIN_FILE)
@@ -61,32 +76,37 @@ environment variable; the flag wins.
 
 // Config is the resolved configuration.
 type Config struct {
-	Listen        string
-	Ollama        *url.URL
-	DB            string
-	GenSlots      int
-	EmbedSlots    int
-	QueueMax      int
-	PerClient     int
-	PerIP         int
-	LabelsPerIP   int
-	MaxWait       time.Duration
-	RunTimeout    time.Duration
-	MaxReqRows    int
-	AgeAfter      time.Duration
-	StartStagger  time.Duration
-	PriorityNets  []*net.IPNet
-	AllowedModels []string
-	MaxBodyBytes  int64
-	AdminFile     string
-	GPUInterval   time.Duration
-	NvidiaSMI     string
-	AERPath       string
-	RetentionReq  time.Duration
-	RetentionGPU  time.Duration
-	NonLoopback   bool
-	Debug         bool
-	ShowVersion   bool
+	Listen         string
+	Ollama         *url.URL
+	DB             string
+	GenSlots       int
+	EmbedSlots     int
+	QueueMax       int
+	PerClient      int
+	PerIP          int
+	LabelsPerIP    int
+	MaxWait        time.Duration
+	RunTimeout     time.Duration
+	MaxReqRows     int
+	AgeAfter       time.Duration
+	StartStagger   time.Duration
+	PriorityNets   []*net.IPNet
+	AllowedModels  []string
+	DefaultThink   bool
+	ThinkSuffix    string
+	AllowKeepAlive bool
+	AllowNumCtx    bool
+	StripOptions   []string
+	MaxBodyBytes   int64
+	AdminFile      string
+	GPUInterval    time.Duration
+	NvidiaSMI      string
+	AERPath        string
+	RetentionReq   time.Duration
+	RetentionGPU   time.Duration
+	NonLoopback    bool
+	Debug          bool
+	ShowVersion    bool
 }
 
 func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Config, error) {
@@ -110,6 +130,11 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fStagger = fs.Duration("start-stagger", 0, "")
 		fPrio    = fs.String("priority-ips", "", "")
 		fModels  = fs.String("allowed-models", "", "")
+		fThink   = fs.Bool("default-think", false, "")
+		fSuffix  = fs.String("think-suffix", "", "")
+		fKeepAl  = fs.Bool("allow-client-keepalive", false, "")
+		fNumCtx  = fs.Bool("allow-client-num-ctx", false, "")
+		fStrip   = fs.String("strip-options", "", "")
 		fBody    = fs.Int64("max-body-bytes", 0, "")
 		fAdmin   = fs.String("admin-file", "", "")
 		fGPUInt  = fs.Duration("gpu-interval", 0, "")
@@ -202,6 +227,24 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		NonLoopback:  boolean("non-loopback-listen", "MCPGW_NON_LOOPBACK_LISTEN", fNonLoop),
 		Debug:        boolean("debug", "MCPGW_DEBUG", fDebug),
 		ShowVersion:  *fVersion,
+
+		DefaultThink:   boolean("default-think", "MCPGW_DEFAULT_THINK", fThink),
+		AllowKeepAlive: boolean("allow-client-keepalive", "MCPGW_ALLOW_CLIENT_KEEPALIVE", fKeepAl),
+		AllowNumCtx:    boolean("allow-client-num-ctx", "MCPGW_ALLOW_CLIENT_NUM_CTX", fNumCtx),
+	}
+	c.ThinkSuffix = str("think-suffix", "MCPGW_THINK_SUFFIX", "-think", fSuffix)
+	if strings.EqualFold(c.ThinkSuffix, "none") {
+		c.ThinkSuffix = ""
+	}
+	if strings.ContainsAny(c.ThinkSuffix, " \t\r\n\"") {
+		fail("--think-suffix: must not contain spaces or quotes")
+	}
+	if strip := strings.TrimSpace(str("strip-options", "MCPGW_STRIP_OPTIONS", "", fStrip)); strip == "" {
+		c.StripOptions = append([]string(nil), proxy.DefaultStripOptions...)
+	} else if strings.EqualFold(strip, "none") {
+		c.StripOptions = []string{}
+	} else {
+		c.StripOptions = splitList(strip)
 	}
 	// --queue-per-ip defaults to --queue-per-client.
 	c.PerIP = integer("queue-per-ip", "MCPGW_QUEUE_PER_IP", c.PerClient, fPerIP)

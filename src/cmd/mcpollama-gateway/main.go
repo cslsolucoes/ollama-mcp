@@ -123,6 +123,8 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	px, err := proxy.New(proxy.Config{
 		Upstream: cfg.Ollama, Queue: q, PriorityNets: cfg.PriorityNets, AllowedModels: cfg.AllowedModels,
 		MaxBodyBytes: cfg.MaxBodyBytes, RunTimeout: cfg.RunTimeout, Logf: dbg,
+		DefaultThink: cfg.DefaultThink, ThinkSuffix: cfg.ThinkSuffix,
+		AllowClientKeepAlive: cfg.AllowKeepAlive, AllowClientNumCtx: cfg.AllowNumCtx, StripOptions: cfg.StripOptions,
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
@@ -161,8 +163,9 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 
 	logf("mcpollama-gateway %s em %s -> Ollama %s (geracao=%d embed=%d fila=%d por-ip=%d) boot=%s",
 		Version, ln.Addr(), cfg.Ollama.Host, cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerIP, bootID)
-	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s run_timeout=%s max_rows=%d",
-		cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerClient, cfg.PerIP, cfg.LabelsPerIP, cfg.StartStagger, cfg.MaxWait, cfg.RunTimeout, cfg.MaxReqRows))
+	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s run_timeout=%s max_rows=%d default_think=%v think_suffix=%q allow_keepalive=%v allow_num_ctx=%v strip=%s",
+		cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerClient, cfg.PerIP, cfg.LabelsPerIP, cfg.StartStagger, cfg.MaxWait, cfg.RunTimeout, cfg.MaxReqRows,
+		cfg.DefaultThink, cfg.ThinkSuffix, cfg.AllowKeepAlive, cfg.AllowNumCtx, strings.Join(cfg.StripOptions, ",")))
 	if ready != nil {
 		ready(ln.Addr().String())
 	}

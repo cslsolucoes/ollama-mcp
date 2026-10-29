@@ -560,3 +560,34 @@ func TestAdminFilePermissions(t *testing.T) {
 		t.Fatal("missing file accepted")
 	}
 }
+
+// Fase 9.6a: the page has the "Raciocínio" column in the three tables and the
+// state carries the reasoning mode of running requests and of the history.
+func TestThinkColumnInPageAndState(t *testing.T) {
+	f := newFixture(t, false, queue.Config{GenSlots: 1})
+	page := do(f.h, "GET", "/monitor", "", nil).Body.String()
+	if n := strings.Count(page, `"Raciocínio"`); n != 3 {
+		t.Fatalf("the Raciocínio column must be in the 3 tables, found %d", n)
+	}
+	tk, err := f.q.Acquire(context.Background(), queue.Request{Lane: queue.LaneGen, ClientIP: "10.0.0.7", ClientLabel: "h/1", Model: "qwen3-ia", Think: "off"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var st State
+	if err := json.Unmarshal(do(f.h, "GET", "/monitor/api/state", "", nil).Body.Bytes(), &st); err != nil || len(st.Queue.Running) != 1 || st.Queue.Running[0].Think != "off" {
+		t.Fatalf("running think: %v %+v", err, st.Queue.Running)
+	}
+	tk.Release(queue.Result{})
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		f.st.Flush()
+		h := do(f.h, "GET", "/monitor/api/history", "", nil).Body.String()
+		if strings.Contains(h, `"think":"off"`) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("history without think: %s", h)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}

@@ -90,6 +90,7 @@ function table(id, heads, rows, emptyText) {
   });
   t.appendChild(tb);
 }
+function thinkLabel(v) { return v === "on" ? "ligado" : v === "off" ? "desligado" : v === "modelo" ? "padrão do modelo" : "-"; }
 function who(it) { return { text: it.client_label || "", title: (it.client_ip || "") + " " + (it.client_label || "") }; }
 
 function post(path, body) {
@@ -130,11 +131,11 @@ function render(s) {
 
   var q = s.queue, slots = q.slots || {}, inuse = q.in_use || {};
   var runRows = q.running.map(function (it) {
-    var cells = [it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, { text: it.priority, cls: it.priority }, fmtMs(it.running_ms), fmtMs(it.waiting_ms)];
+    var cells = [it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.running_ms), fmtMs(it.waiting_ms)];
     cells.push(loggedIn ? btn("Cancelar", "Cancelar este pedido em execução", "cancel", it.id, "danger") : "");
     return cells;
   });
-  table("running", ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Prioridade", "Rodando há", "Esperou", ""], runRows,
+  table("running", ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Raciocínio", "Prioridade", "Rodando há", "Esperou", ""], runRows,
     "Nada em execução (slots: geração " + (inuse.geracao || 0) + "/" + (slots.geracao || 0) + ", embed " + (inuse.embed || 0) + "/" + (slots.embed || 0) + ").");
 
   var waitRows = q.waiting.map(function (it) {
@@ -142,14 +143,14 @@ function render(s) {
     if (loggedIn) {
       box.appendChild(btn("▲", "Promover", "promote", it.id)); box.appendChild(btn("▼", "Despromover", "demote", it.id)); box.appendChild(btn("✕", "Remover da fila", "remove", it.id, "danger"));
     }
-    return [it.position, it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, { text: it.priority, cls: it.priority }, fmtMs(it.waiting_ms), box];
+    return [it.position, it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.waiting_ms), box];
   });
-  table("waiting", ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Prioridade", "Esperando há", ""], waitRows, "Ninguém esperando.");
+  table("waiting", ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Raciocínio", "Prioridade", "Esperando há", ""], waitRows, "Ninguém esperando.");
 
   var recent = (s.recent || []).map(function (r) {
-    return [fmtTime(r.finished_at), { text: r.status, cls: r.status }, r.http_status, who(r), r.tool, r.model, fmtMs(r.wait_ms), fmtMs(r.run_ms), r.prompt_eval_count + " / " + r.eval_count, r.error_class];
+    return [fmtTime(r.finished_at), { text: r.status, cls: r.status }, r.http_status, who(r), r.tool, r.model, thinkLabel(r.think), fmtMs(r.wait_ms), fmtMs(r.run_ms), r.prompt_eval_count + " / " + r.eval_count, r.error_class];
   });
-  table("recent", ["Fim", "Status", "HTTP", "Cliente", "Tool", "Modelo", "Esperou", "Rodou", "Tokens (prompt / gerados)", "Classe do erro"], recent, "Sem pedidos concluídos ainda.");
+  table("recent", ["Fim", "Status", "HTTP", "Cliente", "Tool", "Modelo", "Raciocínio", "Esperou", "Rodou", "Tokens (prompt / gerados)", "Classe do erro"], recent, "Sem pedidos concluídos ainda.");
 
   var ev = (s.events || []).map(function (e) { return [new Date(e.TS || e.ts).toLocaleString("pt-BR"), e.Kind || e.kind, e.Detail || e.detail]; });
   table("events", ["Quando", "Tipo", "Detalhe"], ev, "Sem eventos.");

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS requests(
   enqueued_at INTEGER, started_at INTEGER, finished_at INTEGER,
   wait_ms INTEGER, run_ms INTEGER,
   status TEXT, http_status INTEGER, error_class TEXT,
-  prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT);
+  prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT, think TEXT);
 CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, ts INTEGER, usuario TEXT, ip TEXT, acao TEXT, request_id TEXT,
   antes TEXT, depois TEXT, motivo TEXT);
@@ -169,11 +169,47 @@ func Open(path string, o Options) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("store: schema: %w", err)
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: migrate: %w", err)
+	}
 	s := &Store{db: db, opts: o, ch: make(chan item, o.BufferSize)}
 	s.noteBoot()
 	s.wg.Add(1)
 	go s.writer()
 	return s, nil
+}
+
+// migrate brings a database created by an older version up to the current
+// schema. Each step checks before it changes, so running it twice is harmless.
+//   - think (Fase 9.6a): reasoning mode of the request.
+func migrate(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(requests)`)
+	if err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		have[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	if !have["think"] {
+		if _, err := db.Exec(`ALTER TABLE requests ADD COLUMN think TEXT`); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) logf(format string, a ...any) {
@@ -366,11 +402,11 @@ func ms(t time.Time) int64 {
 
 func (s *Store) insertRecord(tx *sql.Tx, r queue.Record) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
 		ms(r.EnqueuedAt), ms(r.StartedAt), ms(r.FinishedAt), r.WaitMS, r.RunMS, r.Status, r.HTTPStatus, r.ErrorClass,
-		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID)
+		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think)
 	return err
 }
 
@@ -448,6 +484,7 @@ type Row struct {
 	Eval          int64  `json:"eval_count"`
 	LoadMS        int64  `json:"load_ms"`
 	BootID        string `json:"boot_id"`
+	Think         string `json:"think"` // on, off, modelo or "" (rows before 9.6a)
 }
 
 // HistoryQuery filters the history. Zero fields do not filter.
@@ -459,14 +496,14 @@ type HistoryQuery struct {
 	Offset       int
 }
 
-const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id`
+const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think`
 
 func scanRow(sc interface{ Scan(...any) error }) (Row, error) {
 	var r Row
-	var bootID, ec sql.NullString
+	var bootID, ec, think sql.NullString
 	err := sc.Scan(&r.ID, &r.ClientIP, &r.ClientLabel, &r.Tool, &r.Endpoint, &r.Model, &r.Lane, &r.PriorityIn, &r.PriorityFinal, &r.BytesIn,
-		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID)
-	r.ErrorClass, r.BootID = ec.String, bootID.String
+		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think)
+	r.ErrorClass, r.BootID, r.Think = ec.String, bootID.String, think.String
 	return r, err
 }
 

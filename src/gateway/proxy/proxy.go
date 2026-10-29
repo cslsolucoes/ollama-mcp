@@ -3,9 +3,10 @@
 // on the loopback. Everything else of the Ollama API is either forwarded
 // straight (read-only endpoints) or refused.
 //
-// Privacy: the body is read to find the model name and then forwarded
-// untouched; only counters (never text) are kept from the response, and only
-// from the last chunk.
+// Privacy: the body is read to apply the request policies (policy.go: dangerous
+// options removed, reasoning decided, base model name) and forwarded with
+// those keys changed and everything else as it came; only counters (never
+// text) are kept from the response, and only from the last chunk.
 package proxy
 
 import (
@@ -69,7 +70,15 @@ type Config struct {
 	// the queue MaxWait (the entrypoint flag --run-timeout defaults to
 	// --max-wait, 10 min).
 	RunTimeout time.Duration
-	Logf       func(format string, args ...any)
+
+	// Request policies (Fase 9.6a), applied before queuing. See policy.go.
+	DefaultThink         bool     // reasoning when the client does not say (false = off)
+	ThinkSuffix          string   // virtual name "<model><suffix>" turns reasoning on; "" disables
+	AllowClientKeepAlive bool     // let the client's top-level keep_alive through
+	AllowClientNumCtx    bool     // let the client's options.num_ctx through
+	StripOptions         []string // options removed from "options" (no defaulting here; see DefaultStripOptions)
+
+	Logf func(format string, args ...any)
 }
 
 // ErrRunTimeout is the cause of a request cut by RunTimeout.
@@ -78,6 +87,7 @@ var ErrRunTimeout = errors.New("tempo máximo de execução no servidor esgotado
 // Handler is the gateway front. Safe for concurrent use.
 type Handler struct {
 	cfg   Config
+	pol   policyCfg
 	proxy *httputil.ReverseProxy
 }
 
@@ -128,7 +138,7 @@ func New(cfg Config) (*Handler, error) {
 	if cfg.RunTimeout <= 0 {
 		cfg.RunTimeout = cfg.Queue.Config().MaxWait
 	}
-	h := &Handler{cfg: cfg}
+	h := &Handler{cfg: cfg, pol: newPolicyCfg(cfg)}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.Proxy = nil // the Ollama is on the loopback; never go through an environment proxy
 	tr.MaxIdleConnsPerHost = 16
@@ -139,7 +149,7 @@ func New(cfg Config) (*Handler, error) {
 			pr.SetURL(cfg.Upstream)
 			pr.Out.Host = cfg.Upstream.Host
 			for _, k := range []string{"X-Real-Ip", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
-				"Authorization", "Cookie", HeaderClient, HeaderTool, HeaderPriority, HeaderRequestID} {
+				"Authorization", "Cookie", HeaderClient, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID} {
 				pr.Out.Header.Del(k)
 			}
 		},
@@ -307,20 +317,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return // otherwise the client is gone
 	}
-	var meta struct {
-		Model string `json:"model"`
+	bytesIn := int64(len(body))
+	pol, perr := h.pol.applyPolicy(path, body, r.Header.Get(HeaderThink))
+	if perr != nil {
+		writeJSON(w, perr.status, perr.msg)
+		return
 	}
-	jerr := json.Unmarshal(body, &meta)
-	if len(h.cfg.AllowedModels) > 0 {
-		if jerr != nil {
-			writeJSON(w, http.StatusBadRequest, "corpo JSON inválido")
-			return
-		}
-		if !h.modelAllowed(meta.Model) {
-			writeJSON(w, http.StatusForbidden, fmt.Sprintf("modelo %q não permitido neste servidor", sanitizeForMsg(meta.Model)))
-			return
-		}
+	// The allowlist (D9-9) checks the BASE name, after the "-think" rewrite.
+	if len(h.cfg.AllowedModels) > 0 && !h.modelAllowed(pol.model) {
+		writeJSON(w, http.StatusForbidden, fmt.Sprintf("modelo %q não permitido neste servidor", sanitizeForMsg(pol.model)))
+		return
 	}
+	body = pol.body
 
 	ip := clientIP(r)
 	pin, pfinal := h.priorityFor(ip, r.Header.Get(HeaderPriority))
@@ -328,8 +336,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ID: id, Lane: rt.lane, ClientIP: fairIP(ip),
 		ClientLabel: cleanLabel(r.Header.Get(HeaderClient)),
 		Tool:        cleanTool(r.Header.Get(HeaderTool)),
-		Endpoint:    path, Model: truncate(meta.Model, 96),
-		PriorityIn: pin, PriorityFinal: pfinal, BytesIn: int64(len(body)),
+		Endpoint:    path, Model: truncate(pol.model, 96), Think: pol.think,
+		PriorityIn: pin, PriorityFinal: pfinal, BytesIn: bytesIn,
 	}
 	if qreq.ClientLabel == "" {
 		qreq.ClientLabel = "anonimo"

@@ -163,6 +163,7 @@ type Request struct {
 	PriorityIn    Priority // what the client asked
 	PriorityFinal Priority // what the gateway granted
 	BytesIn       int64
+	Think         string // reasoning mode: on, off, modelo or "" (Fase 9.6a)
 }
 
 // Result is what the proxy reports when the request ends.
@@ -198,6 +199,7 @@ type Record struct {
 	PromptEval    int64
 	Eval          int64
 	LoadMS        int64
+	Think         string // reasoning mode (Fase 9.6a)
 }
 
 type state int
@@ -468,7 +470,7 @@ func (m *Manager) endRecord(t *Ticket, now time.Time, r Result) Record {
 		ID: t.ID, ClientIP: t.req.ClientIP, ClientLabel: t.req.ClientLabel, Tool: t.req.Tool,
 		Endpoint: t.req.Endpoint, Model: t.req.Model, Lane: t.req.Lane,
 		PriorityIn: t.req.PriorityIn, PriorityFinal: t.finalPrio,
-		BytesIn: t.req.BytesIn, EnqueuedAt: t.enqueued, FinishedAt: now,
+		BytesIn: t.req.BytesIn, Think: t.req.Think, EnqueuedAt: t.enqueued, FinishedAt: now,
 		Status: r.Status, HTTPStatus: r.HTTPStatus, ErrorClass: r.ErrorClass,
 		PromptEval: r.PromptEval, Eval: r.Eval, LoadMS: r.LoadMS,
 	}
@@ -863,6 +865,7 @@ type Item struct {
 	WaitingMS   int64     `json:"waiting_ms"`
 	RunningMS   int64     `json:"running_ms"`
 	BytesIn     int64     `json:"bytes_in"`
+	Think       string    `json:"think"` // reasoning mode: on, off, modelo or ""
 }
 
 // Snapshot is a consistent photo of the line.
@@ -919,7 +922,7 @@ func (m *Manager) itemLocked(t *Ticket, now time.Time, pos int) Item {
 		ID: t.ID, Lane: t.req.Lane, ClientIP: t.req.ClientIP, ClientLabel: t.req.ClientLabel,
 		Tool: t.req.Tool, Endpoint: t.req.Endpoint, Model: t.req.Model,
 		PriorityIn: t.req.PriorityIn.String(), Position: pos,
-		EnqueuedAt: t.enqueued, BytesIn: t.req.BytesIn,
+		EnqueuedAt: t.enqueued, BytesIn: t.req.BytesIn, Think: t.req.Think,
 	}
 	if t.st == stRunning {
 		it.Priority = t.finalPrio.String()
