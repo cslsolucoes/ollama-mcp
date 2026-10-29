@@ -30,6 +30,7 @@ func (d Deps) chatTool() mcp.ToolEntry {
 				"model":       stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 				"temperature": numberProp("Sampling temperature, 0 to 2.", 0, 2),
 				"num_predict": intProp("Maximum tokens to generate.", 1, maxGeneratePredict),
+				"think":       thinkProp(),
 			}),
 			Annotations: readOnlyClosed("Chat with the local model", false),
 		},
@@ -83,7 +84,7 @@ func mustJSON(v any) json.RawMessage {
 }
 
 func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "messages", "system", "model", "temperature", "num_predict")
+	a, err := parseArgs(raw, "messages", "system", "model", "temperature", "num_predict", "think")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -113,6 +114,10 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
+	think, err := a.optThink()
+	if err != nil {
+		return mcp.ToolCallResult{}, err
+	}
 
 	be, err := d.backend()
 	if err != nil {
@@ -124,11 +129,14 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 	}
 	defer release()
 
-	resp, err := be.Chat(ctx, ollama.ChatRequest{Model: model, Messages: msgs, Options: opts})
+	resp, err := be.Chat(ctx, ollama.ChatRequest{Model: model, Messages: msgs, Options: opts, Think: think})
 	if err != nil {
 		if resp != nil && resp.Message.Content != "" {
 			return partialFailure(resp.Message.Content, err), nil
 		}
+		return mcp.ToolCallResult{}, err
+	}
+	if err := thinkExhausted(think, resp.Message.Content, resp.DoneReason); err != nil {
 		return mcp.ToolCallResult{}, err
 	}
 	return textResult(capText(resp.Message.Content), usage{
@@ -140,5 +148,6 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 		load:       time.Duration(resp.LoadDuration),
 		queue:      waited + time.Duration(resp.QueueMS)*time.Millisecond,
 		doneReason: resp.DoneReason,
+		think:      think,
 	}), nil
 }

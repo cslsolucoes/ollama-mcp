@@ -66,6 +66,10 @@ Input schema:
       "maximum": 2,
       "minimum": 0,
       "type": "number"
+    },
+    "think": {
+      "description": "Reason first: slower; for hard analysis. Default false.",
+      "type": "boolean"
     }
   },
   "required": [
@@ -157,6 +161,10 @@ Input schema:
       "description": "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root.",
       "minLength": 1,
       "type": "string"
+    },
+    "think": {
+      "description": "Reason first: slower; for hard analysis. Default false.",
+      "type": "boolean"
     }
   },
   "required": [
@@ -205,6 +213,10 @@ Input schema:
       "maximum": 2,
       "minimum": 0,
       "type": "number"
+    },
+    "think": {
+      "description": "Reason first: slower; for hard analysis. Default false.",
+      "type": "boolean"
     }
   },
   "required": [
@@ -270,6 +282,10 @@ Input schema:
       "description": "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root.",
       "minLength": 1,
       "type": "string"
+    },
+    "think": {
+      "description": "Reason first: slower; for hard analysis. Default false.",
+      "type": "boolean"
     }
   },
   "required": [
@@ -308,6 +324,10 @@ Input schema:
       "description": "Language to translate into, e.g. English.",
       "minLength": 1,
       "type": "string"
+    },
+    "think": {
+      "description": "Reason first: slower; for hard analysis. Default false.",
+      "type": "boolean"
     }
   },
   "required": [

@@ -63,11 +63,12 @@ type generateWire struct {
 	System  string        `json:"system,omitempty"`
 	Stream  bool          `json:"stream"`
 	Options *ModelOptions `json:"options,omitempty"`
-	// Think is always sent as false (plan 8.8): models such as gemma4 and
+	// Think is always on the wire (plan 8.8): models such as gemma4 and
 	// qwen3.5 think by default and, with no budget for it, burn the whole
-	// timeout on reasoning and return an empty answer. The project never wants
-	// reasoning (the thinking field is not decoded, OLL-010). A pointer with
-	// omitempty would drop the field; a plain bool keeps "think":false on the wire.
+	// timeout on reasoning and return an empty answer. It is false unless the
+	// caller asks for reasoning per call (plan 8.8b); the thinking field is
+	// not decoded (OLL-010). A pointer with omitempty would drop the field; a
+	// plain bool keeps "think":false on the wire.
 	Think bool `json:"think"`
 }
 
@@ -76,7 +77,7 @@ type chatWire struct {
 	Messages []ChatMessage `json:"messages"`
 	Stream   bool          `json:"stream"`
 	Options  *ModelOptions `json:"options,omitempty"`
-	Think    bool          `json:"think"` // always false, see generateWire.Think
+	Think    bool          `json:"think"` // false unless asked, see generateWire.Think
 }
 
 type embedWire struct {
@@ -113,7 +114,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	wire := generateWire{Model: model, Prompt: req.Prompt, System: req.System, Stream: !c.noStream, Options: req.Options}
+	wire := generateWire{Model: model, Prompt: req.Prompt, System: req.System, Stream: !c.noStream, Options: req.Options, Think: req.Think}
 	var out GenerateResponse
 	if c.noStream {
 		q, err := c.callJSONQ(ctx, http.MethodPost, pathGenerate, wire, &out)
@@ -175,7 +176,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	wire := chatWire{Model: model, Messages: req.Messages, Stream: !c.noStream, Options: req.Options}
+	wire := chatWire{Model: model, Messages: req.Messages, Stream: !c.noStream, Options: req.Options, Think: req.Think}
 	var out ChatResponse
 	if c.noStream {
 		q, err := c.callJSONQ(ctx, http.MethodPost, pathChat, wire, &out)

@@ -15,8 +15,8 @@ import (
 // toolsListBudget is the byte budget of the full tools/list payload (TOK-006).
 // Measured at 4 tools: see TestToolsListBudget for the figure it protects.
 const (
-	toolsListBudget     = 4400 // the four base tools, no --allow-root (unchanged by phase 7: 4390 measured; owner D-13 revised 2026-10-28)
-	toolsListBudgetFull = 7800 // with the three file tools (--allow-root); 7600 before the document extensions in the descriptions (7548 -> 7728 measured); .png/.jpg (7.9b) 7728 -> 7800 measured, no slack left
+	toolsListBudget     = 4620 // the four base tools, no --allow-root; owner 2026-10-29: think por chamada (generate and chat get `think`): 4390 -> 4588 measured, 32 bytes of slack (was 4400; unchanged by phase 7, owner D-13 revised 2026-10-28)
+	toolsListBudgetFull = 8330 // with the three file tools (--allow-root); owner 2026-10-29: think por chamada (5 tools get `think`): 7800 -> 8295 measured, 35 bytes of slack (7800 before: .png/.jpg 7.9b 7728 -> 7800, no slack; 7600 before the document extensions)
 )
 
 // TEST-008 / TOOL-001 / SEC-012: the exact set, not a "contains".

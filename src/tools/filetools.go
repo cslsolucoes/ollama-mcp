@@ -79,6 +79,7 @@ func (d Deps) summarizeFileTool() mcp.ToolEntry {
 				"language":  stringProp("Summary language; default Brazilian Portuguese."),
 				"max_words": intProp("Optional target length in words.", 20, 2000),
 				"model":     stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
+				"think":     thinkProp(),
 			}),
 			Annotations: readOnlyClosed("Summarize a file with the local model", false),
 		},
@@ -98,6 +99,7 @@ func (d Deps) extractTool() mcp.ToolEntry {
 				"instruction": nonEmptyStringProp("What to extract from the file."),
 				"format":      stringProp("Output format, e.g. a JSON array of {name, line} or a markdown table."),
 				"model":       stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
+				"think":       thinkProp(),
 			}),
 			Annotations: readOnlyClosed("Extract information from a file with the local model", false),
 		},
@@ -116,6 +118,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 				"path":            nonEmptyStringProp(pathDesc),
 				"target_language": nonEmptyStringProp("Language to translate into, e.g. English."),
 				"model":           stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
+				"think":           thinkProp(),
 			}),
 			Annotations: readOnlyClosed("Translate a file with the local model", false),
 		},
@@ -126,7 +129,7 @@ func (d Deps) translateTool() mcp.ToolEntry {
 const pathDesc = "Absolute path of a text (UTF-8), .docx, .pptx, .pdf, .png or .jpg file inside an allowed root; relative only when the server has a single root."
 
 func (d Deps) summarizeFile(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "path", "focus", "language", "max_words", "model")
+	a, err := parseArgs(raw, "path", "focus", "language", "max_words", "model", "think")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -153,6 +156,10 @@ func (d Deps) summarizeFile(ctx context.Context, raw json.RawMessage) (mcp.ToolC
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
+	think, err := a.optThink()
+	if err != nil {
+		return mcp.ToolCallResult{}, err
+	}
 
 	extra := ""
 	if strings.TrimSpace(focus) != "" {
@@ -173,11 +180,11 @@ func (d Deps) summarizeFile(ctx context.Context, raw json.RawMessage) (mcp.ToolC
 		reduceTask: "Os blocos abaixo são resumos parciais, em ordem, de um mesmo arquivo. Combine-os em UM resumo coerente em " +
 			lang + ", sem repetições." + extra + length,
 	}
-	return d.runFile(ctx, path, model, task)
+	return d.runFile(ctx, path, model, think, task)
 }
 
 func (d Deps) extract(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "path", "instruction", "format", "model")
+	a, err := parseArgs(raw, "path", "instruction", "format", "model", "think")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -197,6 +204,10 @@ func (d Deps) extract(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRes
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
+	think, err := a.optThink()
+	if err != nil {
+		return mcp.ToolCallResult{}, err
+	}
 	fmtText := ""
 	if strings.TrimSpace(format) != "" {
 		fmtText = " Formato de saída obrigatório: " + format + "."
@@ -213,11 +224,11 @@ func (d Deps) extract(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRes
 		reduceTask: "Os blocos abaixo são resultados parciais, em ordem, da mesma tarefa de extração aplicada a partes de um arquivo. " +
 			"Tarefa original: " + instr + "." + fmtText + " Una os resultados em um só, sem duplicatas, ignorando os parciais \"nada encontrado\".",
 	}
-	return d.runFile(ctx, path, model, task)
+	return d.runFile(ctx, path, model, think, task)
 }
 
 func (d Deps) translate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "path", "target_language", "model")
+	a, err := parseArgs(raw, "path", "target_language", "model", "think")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -233,6 +244,10 @@ func (d Deps) translate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallR
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
+	think, err := a.optThink()
+	if err != nil {
+		return mcp.ToolCallResult{}, err
+	}
 	task := fileTask{
 		concat:    true,
 		docNotice: "[aviso] tradução devolvida como texto; nenhum documento foi gravado",
@@ -245,7 +260,7 @@ func (d Deps) translate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallR
 			return fmt.Sprintf("%s Este é o trecho %d de %d: traduza somente este trecho.", base, i, n)
 		},
 	}
-	return d.runFile(ctx, path, model, task)
+	return d.runFile(ctx, path, model, think, task)
 }
 
 // fileJob is the state of one request: the budget, the call counter and the
@@ -254,6 +269,7 @@ type fileJob struct {
 	d        Deps
 	be       Backend
 	model    string
+	think    bool
 	nonce    string
 	maxCalls int
 	maxChars int
@@ -372,10 +388,13 @@ func (j *fileJob) call(ctx context.Context, prompt string) (string, error) {
 	temp := fileTemperature
 	resp, err := j.be.Generate(ctx, ollama.GenerateRequest{
 		Model: j.model, Prompt: prompt, System: fileSystemPrompt,
-		Options: &ollama.ModelOptions{Temperature: &temp},
+		Options: &ollama.ModelOptions{Temperature: &temp}, Think: j.think,
 	})
 	if err != nil {
 		return "", sanitizeUpstream(err)
+	}
+	if err := thinkExhausted(j.think, resp.Response, resp.DoneReason); err != nil {
+		return "", err
 	}
 	j.waited += waited + time.Duration(resp.QueueMS)*time.Millisecond
 	j.u.model = orStr(resp.Model, orStr(j.u.model, j.model))
@@ -388,7 +407,7 @@ func (j *fileJob) call(ctx context.Context, prompt string) (string, error) {
 	return resp.Response, nil
 }
 
-func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (mcp.ToolCallResult, error) {
+func (d Deps) runFile(ctx context.Context, path, model string, think bool, task fileTask) (mcp.ToolCallResult, error) {
 	if !d.Files.Enabled() {
 		return mcp.ToolCallResult{}, errors.New("leitura de arquivos desabilitada: inicie o servidor com --allow-root")
 	}
@@ -407,7 +426,7 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	j := &fileJob{d: d, be: be, model: model, nonce: nonce, maxCalls: d.maxCalls(), maxChars: d.maxPrompt()}
+	j := &fileJob{d: d, be: be, model: model, think: think, nonce: nonce, maxCalls: d.maxCalls(), maxChars: d.maxPrompt()}
 
 	// Budget: the worst-case task text (largest counters) decides the part size.
 	probe := task.mapTask(d.maxCalls()+1, d.maxCalls()+1)
@@ -474,6 +493,7 @@ func (d Deps) runFile(ctx context.Context, path, model string, task fileTask) (m
 		body += "\n" + task.docNotice
 	}
 	u := j.u
+	u.think = j.think
 	u.queue = j.waited
 	u.parts = n
 	return textResult(body, u), nil

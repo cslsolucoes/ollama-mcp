@@ -394,7 +394,7 @@ func TestDocContextCancelled(t *testing.T) {
 	d := e.docDeps(t, m, 128000, 40)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := d.runFile(ctx, "a.docx", "qwen3-ia", fileTask{mapTask: func(i, n int) string { return "x" }})
+	_, err := d.runFile(ctx, "a.docx", "qwen3-ia", false, fileTask{mapTask: func(i, n int) string { return "x" }})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v", err)
 	}

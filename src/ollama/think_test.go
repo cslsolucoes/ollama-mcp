@@ -54,3 +54,30 @@ func TestEmbedWireHasNoThink(t *testing.T) {
 		t.Fatalf("embed body: %q", b)
 	}
 }
+
+func TestWireCarriesThinkTrueWhenAsked(t *testing.T) {
+	for _, noStream := range []bool{false, true} {
+		got := map[string]string{}
+		srv, _ := newMock(t, func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			got[r.URL.Path] = string(b)
+			if r.URL.Path == "/api/chat" {
+				writeStream(w, `{"message":{"role":"assistant","content":"ok"},"done":true}`)
+				return
+			}
+			writeStream(w, `{"response":"ok","done":true}`)
+		})
+		c := newClient(t, srv, func(o *Options) { o.DisableStream = noStream })
+		if _, err := c.Generate(context.Background(), GenerateRequest{Prompt: "x", Think: true}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.Chat(context.Background(), ChatRequest{Messages: []ChatMessage{{Role: "user", Content: "x"}}, Think: true}); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range []string{"/api/generate", "/api/chat"} {
+			if !strings.Contains(got[p], `"think":true`) {
+				t.Fatalf("noStream=%v %s body lacks \"think\":true: %s", noStream, p, got[p])
+			}
+		}
+	}
+}

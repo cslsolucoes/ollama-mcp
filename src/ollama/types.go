@@ -30,6 +30,8 @@ type GenerateRequest struct {
 	Prompt  string
 	System  string
 	Options *ModelOptions
+	// Think asks the model to reason before answering (plan 8.8b); false by default.
+	Think bool
 }
 
 // GenerateResponse is the aggregated result. Response is the concatenation of
@@ -58,6 +60,8 @@ type ChatRequest struct {
 	Model    string
 	Messages []ChatMessage
 	Options  *ModelOptions
+	// Think asks the model to reason before answering (plan 8.8b); false by default.
+	Think bool
 }
 
 // ChatResponse is the aggregated result; Message.Content is the concatenation

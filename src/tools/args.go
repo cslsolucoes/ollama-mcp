@@ -137,6 +137,9 @@ func (a args) optInt(key string, min, max int) (*int, error) {
 	return &n, nil
 }
 
+// optThink reads the optional `think` flag (default false).
+func (a args) optThink() (bool, error) { return a.optBool("think") }
+
 func (a args) optBool(key string) (bool, error) {
 	v, ok := a.get(key)
 	if !ok {

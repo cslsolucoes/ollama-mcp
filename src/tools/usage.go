@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ type usage struct {
 	queue      time.Duration
 	doneReason string
 	parts      int // file parts of a map-reduce request; 0 for the other tools
+	think      bool
 }
 
 // line is the fixed last line of every result that called the model.
@@ -36,6 +38,9 @@ func (u usage) line() string {
 	}
 	if u.doneReason != "" {
 		fmt.Fprintf(&b, " fim=%s", u.doneReason)
+	}
+	if u.think {
+		b.WriteString(" think=on")
 	}
 	return b.String()
 }
@@ -57,6 +62,9 @@ func (u usage) meta() map[string]any {
 	if u.parts > 0 {
 		m["parts"] = u.parts
 	}
+	if u.think {
+		m["think"] = true
+	}
 	return map[string]any{"mcpollama/usage": m}
 }
 
@@ -76,4 +84,14 @@ func textResult(body string, u usage) mcp.ToolCallResult {
 	res := mcp.TextResult(body+"\n\n"+u.line(), false)
 	res.Meta = u.meta()
 	return res
+}
+
+// thinkExhausted is the error for a call with think on whose reasoning ate
+// the whole num_predict: empty answer and done_reason "length" (plan 8.8b).
+// The thinking text is not decoded (OLL-010), so only that shape is detected.
+func thinkExhausted(think bool, text, doneReason string) error {
+	if think && doneReason == "length" && strings.TrimSpace(text) == "" {
+		return errors.New("o raciocínio (think) consumiu o limite de tokens e a resposta veio vazia; aumente `num_predict` ou use `think=false`")
+	}
+	return nil
 }

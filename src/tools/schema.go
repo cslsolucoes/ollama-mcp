@@ -38,6 +38,11 @@ func boolProp(desc string) schemaMap {
 	return schemaMap{"type": "boolean", "description": desc}
 }
 
+// thinkProp is the optional per-call reasoning switch (plan 8.8b).
+func thinkProp() schemaMap {
+	return boolProp("Reason first: slower; for hard analysis. Default false.")
+}
+
 func arrayProp(desc string, items schemaMap) schemaMap {
 	return schemaMap{"type": "array", "items": items, "description": desc}
 }

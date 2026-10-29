@@ -307,3 +307,51 @@ um modo por suíte, `--model` e `--allowed-models` por execução.
     5. Revalidar a 130–150 W depois da troca da fonte.
     6. Commit das extensões do `bakeoff` (decisão do owner).
     7. Prompt grande de 22–24 mil tokens, se o owner quiser (fatias de ~90 mil caracteres).
+
+- 2026-10-29 15:12 — **8.8b think por chamada: CONCLUÍDA (sem commit).** Decisão do owner (2026-10-29 15:0x): a IA que usa o MCP escolhe, por chamada, se quer raciocínio.
+  - **O que foi feito:**
+    1. Argumento opcional `think` (boolean, padrão false) em `generate`, `chat`, `summarize_file`, `extract` e `translate`; `embed` e `list_models` não têm. Descrição: "Reason first: slower; for hard analysis. Default false."
+    2. `ollama.GenerateRequest.Think` e `ollama.ChatRequest.Think` (novos); `generateWire`/`chatWire` seguem com `Think bool` sem omitempty: sem o argumento vai `"think":false` (como na 8.8), com `think:true` vai `"think":true`. `embedWire` não tem o campo.
+    3. Tools de arquivo: o valor entra em `fileJob.think` e vale para todas as chamadas (partes e combinação do map-reduce). `runFile` ganhou o parâmetro `think`.
+    4. Linha `[uso]`: acrescenta ` think=on` no fim só quando ligado (e `think:true` em `_meta`); desligado, a linha não muda.
+    5. Resposta vazia + `done_reason=length` com think ligado vira erro: "o raciocínio (think) consumiu o limite de tokens e a resposta veio vazia; aumente `num_predict` ou use `think=false`" (`thinkExhausted`, em `usage.go`, usada por generate, chat e `fileJob.call`). O campo thinking continua não decodificado (OLL-010). Sem think, ou com resposta não vazia, o comportamento atual se mantém.
+  - **Arquivos:** `src/ollama/api.go`, `src/ollama/types.go`, `src/tools/args.go` (`optThink`), `src/tools/schema.go` (`thinkProp`), `src/tools/generate.go`, `src/tools/chat.go`, `src/tools/filetools.go`, `src/tools/usage.go`, `src/tools/registry_test.go` (budgets), `src/tools/filetools_docs_test.go` (assinatura de `runFile`), `src/tools/think_test.go` e `src/ollama/think_test.go` (testes novos), `TOOLS.md` (regenerado por `go run ./cmd/dumptools`).
+  - **Budget do `tools/list`:**
+    - `toolsListBudget` (4 tools base): 4400 → **4620** (medido 4390 → **4588**, +198; folga 32 bytes);
+    - `toolsListBudgetFull` (com `--allow-root`): 7800 → **8330** (medido 7800 → **8295**, +495; folga 35 bytes);
+    - comentário das constantes atualizado ("owner 2026-10-29: think por chamada" + antes → depois).
+  - **O que deu certo / o que não deu:**
+    1. Deu certo: tudo no padrão existente (`boolProp`, `args.go`); nenhum arquivo proibido tocado (`src/files`, `doctext`, `ocr`, `gateway`).
+    2. Não deu certo de primeira: com a descrição sugerida pelo owner ("Reason before answering: slower; may help on hard analysis. Default false.") o payload ficou em 4626 / 8390; **solução:** encurtar para "Reason first: slower; for hard analysis. Default false." (-38 / -95 bytes).
+    3. Primeira tentativa de aplicar as edições por script em heredoc falhou por aspas no shell (nada foi alterado); refeita por script em arquivo.
+    4. Quebra de compilação em `filetools_docs_test.go` (chamada direta a `runFile`); corrigido com `false`.
+  - **Testes novos (httptest):** schema (5 com `think` boolean, 2 sem); `think:true` na rede em generate e chat (e no cliente `ollama`, com e sem stream); sem argumento segue `"think":false`; map-reduce com 2+ partes + combinação todas com `think:true` (e todas `false` sem o argumento); `think=on` na `[uso]` e ausência dele quando desligado; tipo inválido (`"sim"`) é recusado antes de chegar ao servidor; vazio + `length` com think em generate, chat e extract dá o erro claro; sem think e com texto parcial não dá erro. `TestSchemaConformance`, `TestDescriptionsShortAndStatic`, os budgets e `TestCatalogInSync` passam.
+  - **Gate (dentro de `src/`):** `go build ./...` e `go vet ./...` limpos; `gofmt -l .` vazio; `go test -count=1 ./...` todos `ok` (nenhuma falha); `go test -race -count=1 ./tools ./ollama ./mcpollama-mcp` → 3 `ok`.
+  - **Ao vivo (3 chamadas, uma por vez, binário em `scratchpad\think2\`, `D:\MCP` intocado, token só por arquivo):**
+    1. `generate` "17*23" sem think: **391** (correto), `eval_count=4`, `total_ms=280`, 0,4 s de parede;
+    2. mesma com `think:true`: **391** (correto), `eval_count=377`, `total_ms=7273`, 7,3 s; `[uso]` com ` think=on` e `fim=stop`. Mesmo acerto, ~94× mais tokens e ~26× mais tempo: para conta simples o think só custa;
+    3. `think:true` + `num_predict:50`: erro `isError` com a mensagem do item 5 (o raciocínio gastou os 50 tokens, resposta vazia + `length`), em 1,2 s.
+  - **Pendências (numeradas):**
+    1. Redeploy do binário em `D:\MCP\mcpollama-mcp.exe` (não feito, proibido nesta etapa) e reiniciar a sessão do Claude Code para a IA ver o argumento.
+    2. Commit (decisão do owner; stage por caminho).
+    3. Orientar no CLAUDE.md global/README quando usar `think` (ex.: análise difícil, com `num_predict` folgado ≥ 1500); hoje só a descrição curta do schema orienta.
+    4. Decidir se o `bakeoff` deve também expor `think` (não alterado).
+- 2026-10-29 15:20 — **D8-3 executada: `qwen3-ia` = `qwen3.5:9b` + 8.7 + 8.8b** (loop principal; detalhe também em `CONEXAO-IA.md` §"2026-10-29").
+  - **Decisão do owner:** adotar o `qwen3.5:9b` (foco multiagente), com alias `qwen3-ia` e limpeza de `gemma4` e `qwen3-coder`.
+  - **Execução:**
+    - merge da Fase 9.1–9.5 (`fa8c95e`; o conflito era só no changelog do plano, com as duas metades mantidas; gate completo verde, build Linux ok);
+    - mcpollama `0.8.0-fa8c95e` em `D:\MCP` (o 0.7.0 virou `.exe~`);
+    - 14:00 `ollama cp qwen3.5:9b qwen3-ia` + restart: os dois residentes a 100% GPU (13 GB a 64k). 2ª via: o binário novo via stdio deu `generate` 0,16 s e `summarize_file` 2,5 s;
+    - 14:05 `ollama rm gemma4:12b qwen3-coder:30b-a3b-q4_K_M` (179 GB livres);
+    - 14:59 `OLLAMA_MAX_QUEUE` 8 → 32 (owner; com 8, o 10º pedido simultâneo recebia 503).
+  - **Raciocínio do `qwen3.5`, testado no loopback:**
+    - na API nativa sem `think`, a resposta vem vazia (400 tokens gastos raciocinando);
+    - `/v1` sem parâmetro raciocina (5,7 s para "pong"); `reasoning_effort:"none"` desliga, `think:false` no `/v1` não desliga;
+    - o Modelfile não aceita `think`.
+    - Consequência: o `ia-local` raciocina até o gateway (9.6) poder desligar.
+  - **8.8b (owner: "que a escolha seja da AI que vai usar o MCP"):** argumento `think` por chamada nas 5 tools de geração (agente sonnet; gate refeito pelo loop principal como 2ª via).
+    - Budget do `tools/list`: 4400→**4620** (medido 4588) e 7800→**8330** (medido 8295).
+  - **Pendências:**
+    1. Reiniciar as sessões do Claude Code (MCPOllam e GestorERP) para pegar o binário novo.
+    2. Autorização do owner para atualizar o `CLAUDE.md` global e o comentário do `ia-local.ps1` (ainda descrevem o MoE antigo).
+    3. Gateway (9.6): desligar o raciocínio no `/v1` por padrão e manter a escolha (nome `qwen3-ia-think` ou header).

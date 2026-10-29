@@ -26,6 +26,7 @@ func (d Deps) generateTool() mcp.ToolEntry {
 				"model":       stringProp("Optional model name; must be one of the allowed models (see list_models); defaults to the server model (--model)."),
 				"temperature": numberProp("Sampling temperature, 0 to 2.", 0, 2),
 				"num_predict": intProp("Maximum tokens to generate.", 1, maxGeneratePredict),
+				"think":       thinkProp(),
 			}),
 			Annotations: readOnlyClosed("Generate text with the local model", false),
 		},
@@ -50,7 +51,7 @@ func samplingOptions(a args) (*ollama.ModelOptions, error) {
 }
 
 func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "prompt", "system", "model", "temperature", "num_predict")
+	a, err := parseArgs(raw, "prompt", "system", "model", "temperature", "num_predict", "think")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
@@ -70,6 +71,10 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
+	think, err := a.optThink()
+	if err != nil {
+		return mcp.ToolCallResult{}, err
+	}
 
 	be, err := d.backend()
 	if err != nil {
@@ -81,11 +86,14 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 	}
 	defer release()
 
-	resp, err := be.Generate(ctx, ollama.GenerateRequest{Model: model, Prompt: prompt, System: system, Options: opts})
+	resp, err := be.Generate(ctx, ollama.GenerateRequest{Model: model, Prompt: prompt, System: system, Options: opts, Think: think})
 	if err != nil {
 		if resp != nil && resp.Response != "" {
 			return partialFailure(resp.Response, err), nil
 		}
+		return mcp.ToolCallResult{}, err
+	}
+	if err := thinkExhausted(think, resp.Response, resp.DoneReason); err != nil {
 		return mcp.ToolCallResult{}, err
 	}
 	return textResult(capText(resp.Response), usage{
@@ -97,6 +105,7 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 		load:       time.Duration(resp.LoadDuration),
 		queue:      waited + time.Duration(resp.QueueMS)*time.Millisecond,
 		doneReason: resp.DoneReason,
+		think:      think,
 	}), nil
 }
 
