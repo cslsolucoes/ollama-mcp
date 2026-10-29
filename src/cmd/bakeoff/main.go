@@ -10,6 +10,8 @@
 //	bakeoff -suites ref                 # reference texts (doctext) of the corpus
 //	bakeoff -suites score -models a,b   # automatic scoring of S1-S4 outputs
 //	bakeoff -suites blind -models a,b   # anonymised S1 packets for the human review
+//	bakeoff -exe X -model m -suites multi -agents 5 -tasks 3 -step 5x32k   # 8.9: N concurrent agents
+//	bakeoff -suites monpeak -mon-file F -from HH:MM:SS -to HH:MM:SS         # 8.9: power/AER of a window
 package main
 
 import (
@@ -37,6 +39,10 @@ type options struct {
 	cpt                                                                           float64
 	s5Gen                                                                         bool
 	timeout, srvTimeout                                                           time.Duration
+	// 8.9 multi-agent load and monitor reading
+	agents, tasks                                int
+	jitter                                       time.Duration
+	bigDocs, step, expectBoot, monFile, from, to string
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
@@ -70,6 +76,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&o.s3Reps, "s3-reps", 2, "repetitions for S3")
 	fs.DurationVar(&o.timeout, "call-timeout", 20*time.Minute, "driver timeout per tool call")
 	fs.DurationVar(&o.srvTimeout, "server-timeout", 300*time.Second, "--timeout of the server")
+	fs.IntVar(&o.agents, "agents", 2, "multi: concurrent agents (one mcpollama process each)")
+	fs.IntVar(&o.tasks, "tasks", 3, "multi: tasks per agent (alternating S2 and S3 JSON)")
+	fs.DurationVar(&o.jitter, "jitter", 2*time.Second, "multi: random delay 0..jitter before each task")
+	fs.StringVar(&o.bigDocs, "big-docs", "", "multi: \"prompt grande\" documents (one summarize_file per agent, doc[i % len])")
+	fs.StringVar(&o.step, "step", "", "multi: step label (output folder), e.g. 5x32k")
+	fs.StringVar(&o.expectBoot, "expect-boot", "", "multi: expected `uptime -s`; any other boot aborts before the load")
+	fs.StringVar(&o.monFile, "mon-file", "", "monpeak: monitor output file")
+	fs.StringVar(&o.from, "from", "", "monpeak: window start HH:MM:SS")
+	fs.StringVar(&o.to, "to", "", "monpeak: window end HH:MM:SS")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -94,6 +109,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runScore(o, logf)
 	case "blind":
 		return runBlind(o, logf)
+	case "monpeak":
+		return runMonPeak(o, logf)
 	}
 	if o.exe == "" || o.model == "" {
 		fmt.Fprintln(stderr, "bakeoff: -exe e -model são obrigatórios")
@@ -123,6 +140,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		"--model", o.model, "--allowed-models", o.allowed, "--timeout", o.srvTimeout.String()}
 	if o.pdfCache != "" {
 		srv = append(srv, "--pdf-cache-dir", o.pdfCache)
+	}
+	if o.suites == "multi" {
+		return runMulti(o, srv, logf)
 	}
 	outDir := filepath.Join(o.out, safeName(o.model))
 	if err := os.MkdirAll(outDir, 0o700); err != nil {

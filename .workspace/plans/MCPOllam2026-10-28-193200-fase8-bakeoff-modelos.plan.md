@@ -247,3 +247,63 @@ um modo por suíte, `--model` e `--allowed-models` por execução.
     - 8.7 parcial executada às 22:35 (`ollama rm granite4.2:8b qwen3:14b`; 154 GB livres);
     - nginx liberado de vez às 22:36 (`limit_conn 12`, `rate=600r/m`, `burst=60`; backup `ollama.conf.nginx-223601`; `nginx -t` OK).
   - **Fase 9** (fila + `/monitor` + SQLite) planejada em `MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`.
+- 2026-10-28 22:53 — **8.9 carga multiagente: INÍCIO (em progresso).** Executor: agente Opus 5.5. Finalistas `gemma4:12b` e `qwen3.5:9b`; degraus 2×32k → 5×32k → 10×32k → 5×64k (sobe só se o anterior passar) + sub-degrau "prompt grande" em 5×32k e 10×32k.
+  - **Ferramenta (deu certo):** `src/cmd/bakeoff/` estendida, sem criar outra: `multi.go` (modo `-suites multi`: N agentes = N processos mcpollama, jitter 0–2 s antes de cada tarefa, K tarefas alternando S2 de b01 e S3 JSON de b01/b02/b03; sub-degrau `-big-docs`; classificação de erro `http429`/`http5xx`/`timeout`/`conexao`/`protocolo`; **o 1º erro de conexão ou de protocolo mata todos os mcpollama do degrau** (código 3); `-expect-boot` + `uptime -s` antes e depois); `monpeak.go` (modo `-suites monpeak`: pico de W somado, VRAM e ΔAER de uma janela do monitor); `multi_test.go` (5 testes). `gofmt -l` vazio, `go vet` e `go test -count=1 ./cmd/bakeoff` verdes às 22:52.
+  - **Binário de teste:** HEAD `ced50f8` (contém o `think:false` do e519221), em `scratchpad\bk89\mcpollama-mcp.exe` (versão `bk89-e519221`); a `variante-nothink.patch` não foi usada; `D:\MCP` intocado.
+  - **Prompt grande:** nenhum documento do corpus dá 20–24 mil tokens sozinho (b03 = 7,8k; b04 e b07 passam de 85k). Solução: 10 fatias de ~80 mil caracteres do texto `doctext` de `b07` (`corpus/b07-g01..g10.txt`, ids neutros, registradas no `mapa.txt`), uma por agente, para não haver prefixo comum entre agentes.
+  - **Servidor antes (22:52, `srv/pre89-out.txt`):** boot 21:10:46; AER `00:1b.4` 133 corrigíveis, não-corrigível 0, Xid 0; 4 GPUs a 100 W; `qwen3-ia` (64k, 23 GB) e `nomic` residentes a 100% GPU; só o `10-performance.conf` (+ `.bak`).
+  - **Monitor** de potência/AER a 1 s (`srv/mon.sh` reaproveitado) desde 22:53:34 → `srv/mon-out-89.txt`. Scripts do degrau e da restauração: `srv/step89.sh` (bootok → para o `ollama-warm` → grava o drop-in com `test -s` + `mv` → `daemon-reload` → restart → 1 chamada curta → `ollama ps`/VRAM/journal → `RESULTADO CABE|NAO-CABE`) e `srv/restore89.sh`.
+- 2026-10-28 22:59 — **8.9 `gemma4:12b` 2×32k: PASSOU** (`srv/step89-gemma4-2x32k.txt`, `out/multi/run-gemma4-2x32k.log`).
+  - **Cabe:** `n_slots=2`, `n_ctx_slot=32768`, `ollama ps` 100% GPU, CONTEXT 32768, VRAM 16,3 GB somados (4,6/3,5/4,1/4,1); carga a frio 14,9 s.
+  - **Carga (2 agentes × 3 tarefas, 22:54:18–22:58:02):** 6/6 ok, 0 erro; S2 66/66 nº+título (100%), JSON 3/3 (com cerca); S3 JSON 3/3 (2 estritos); 108 tok/s somados (prefill 93 + geração 15,2 sobre a janela); latência p50 44 s, p95 143 s (S2 com 1.201 tokens de saída); pico 266 W somados; AER 134 → 137; Xid 0.
+  - **Não esperado (registrado):** o S2 levou 105–143 s com 2 agentes contra 42 s no report 8.5 (1 agente, 150 W). Para separar o efeito da potência do efeito da concorrência, rodei um **controle de 1 agente na mesma config** (22:58:14–22:59:19, `run-gemma4-1x32k-controle.log`): S2 em 58,8 s (1.201 tokens → ~20 tok/s de geração a 100 W, contra ~37 a 150 W) e S3 em 5,6 s; vazão somada 107 tok/s, **igual à de 2 agentes**. Leitura parcial: no `gemma4` a 100 W a vazão agregada **não cresce** com 2 agentes; a fila só divide o mesmo débito.
+- 2026-10-28 23:16 — **8.9 `gemma4:12b` 5×32k: PASSOU nos critérios formais, mas com latência ruim** (`srv/step89-gemma4-5x32k.txt`, `run-gemma4-5x32k.log`, `run-gemma4-5x32k-grande.log`).
+  - **Cabe:** `n_slots=5`, 100% GPU, CONTEXT 32768, VRAM 18,3 GB; carga 14,9 s.
+  - **Carga (5×3, 23:00:07–23:11:56, 709 s):** 15/15 ok, 0 erro; S2 176/176 (100%), S3 JSON 7/7 (2 estritos); **113 tok/s somados** (prefill 99 + geração 14,0), **p50 158 s, p95 413 s** (S2 de 1.201 tokens levou 404–413 s); pico 273 W; AER 140 → 152; Xid 0.
+  - **Diagnóstico (2ª via, monitor):** utilização média por GPU **25%** entre 23:02 e 23:08 com 5 pedidos ativos e potência de ~70–78 W por placa: o `gemma4` nesta versão do Ollama (runner com "speculative decoding context") **não ganha vazão com slots paralelos**; os pedidos dividem o mesmo débito de ~110 tok/s somados. Não é limite de potência nem de VRAM.
+  - **Sub-degrau prompt grande (5 × 1 `summarize_file` de b07-g01..g05, 23:12:19–23:15:33):** 5/5 ok (resumos não cortados); prompt real de **12.661 a 20.418 tokens** (g01 rendeu menos tokens que o estimado; os outros ~20k); p50 183 s, p95 194 s; prefill agregado **476 tok/s** (contra ~1.140 tok/s com 1 pedido no report 8.5): a concorrência **reduz** o prefill agregado; pico 278 W; AER 152 → 153.
+  - **Decisão de execução:** subir para 10×32k (a regra é passar = 0 erro de conexão, qualidade mantida, 100% GPU, sem evento de hardware; latência é medida, não critério de corte). Previsão registrada antes de rodar: S2 acima de 600 s → timeouts do `--timeout 10m`.
+- 2026-10-28 23:35 — **8.9 `gemma4:12b` 10×32k: NÃO PASSOU (2 timeouts); 5×64k só checagem de "cabe".** (`step89-gemma4-10x32k.txt`, `run-gemma4-10x32k.log`, `step89-gemma4-5x64k-so-cabe.txt`)
+  - **Cabe:** `n_slots=10`, 100% GPU, 19,1 GB.
+  - **Carga (10×3, 23:16:23–23:34:46, 1.104 s):** 28/30 ok e **2 timeouts de 600 s**, ambos em S2 da primeira rajada (erro de aplicação, não aborta). S2 286/286 nas 13 concluídas (100%); S3 JSON 15/15; **128 tok/s somados**; p50 245 s, p95 548 s; pico 275 W; AER 153 → 155; utilização média por GPU de 25% (2ª via, monitor).
+  - **Consequência pela regra:** o sub-degrau "prompt grande" de 10×32k e a carga do 5×64k **não foram executados**.
+  - **Acréscimo:** checagem de "cabe" do 5×64k, sem carga: 100% GPU, CONTEXT 65536, `n_slots=5`, 19,0 GB.
+- 2026-10-28 23:48 — **8.9 `qwen3.5:9b` 2×32k → 5×32k → 10×32k → 5×64k: TODOS PASSARAM, com uma surpresa de método.**
+  - **Não deu certo como planejado:** o Ollama **não roda o `qwen3.5` em paralelo**. O journal (`srv/journal89-qwen35-parallel.txt`) registra `msg="model architecture does not currently support parallel requests" architecture=qwen35`, `n_seq_max=1` e `n_slots=1` com qualquer `NUM_PARALLEL`. A S7 do 8.5 (por cálculo) supunha slots paralelos e não vale para este modelo.
+  - **Solução:** rodei os degraus assim mesmo. Eles medem N agentes contra uma fila serial, que é o que os agentes vão encontrar de fato.
+  - **Cabe:** 9,4 GB com 32k e 14,2 GB com 64k, 100% GPU em todos; carga a frio de ~9,7 s.
+  - **Controle, 1 agente:** S2 18/22 em 9,2 s; 479 tok/s.
+
+    | Degrau | Janela | S2 | S3 JSON | tok/s somados | p50 / p95 (s) | Erros | Pico | AER |
+    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+    | 2×32k | 35 s | 84,8% | 3/3 | 636 | 10 / 16 | 0 | 355 W | 156 → 156 |
+    | 5×32k | 93 s | 80,1% (uma em 11/22) | 7/7 | 787 | 25 / 42 | 0 | 357 W | 157 → 158 |
+    | 5×32k prompt grande | 43 s | — | — | 2.061 (5/5; 10,9–19,6k tokens) | 23 / 42 | 0 | 386 W | 158 → 158 |
+    | 10×32k | 203 s | 83,9% | 15/15 | 707 | 63 / 83 | 0 | 359 W | 158 → 159 |
+    | 10×32k prompt grande | 93 s | — | — | 1.989 (10/10; 10,9–19,9k tokens) | 47 / 92 | 0 | 387 W | 159 → 160 |
+    | 5×64k | 100 s | 79,5% (uma em 11/22) | 7/7 | 729 | 29 / 39 | 0 | 349 W | 160 → 160 |
+
+- 2026-10-28 23:50 — **8.9 CONCLUÍDA; restauração provada; report escrito.**
+  - **Restauração (23:48:31–23:49:03, `srv/restore89-out.txt`):**
+    1. `99-bakeoff.conf` removido: `ls` mostra só `10-performance.conf` + `.bak`; `systemctl show` mostra `NUM_PARALLEL=1`, `CONTEXT_LENGTH=65536`, `MAX_QUEUE=8` e `MAX_LOADED_MODELS=2`;
+    2. `daemon-reload` + restart do `ollama` e do `ollama-warm` (os dois `active`);
+    3. embed do `nomic` com `keep_alive:-1`: HTTP 200 em 1,04 s;
+    4. `ollama ps`: `qwen3-ia` 23 GB, 100% GPU, 65536, e `nomic-embed-text` 851 MB, 100% GPU, os dois Forever.
+  - **Saúde do servidor:** boot 21:10:46 do início ao fim; Xid 0; AER `00:1b.4` 133 → 160 corrigíveis; não-corrigível e fatal 0; nenhum `ALERTA`; pico da sessão 387 W.
+  - **Processos:** o monitor parou (`MON-FIM 23:49:03`). Nenhum processo meu ficou rodando (conferido às 23:49). Os 2 `ssh 10.100.2.2` abertos às 21:15 e às 21:56 não são desta etapa e não foram tocados.
+  - **Report:** `.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md`.
+  - **Recomendação:**
+    - nenhum finalista atende "multiagente + qualidade impecável";
+    - o `gemma4` tem qualidade impecável sob carga (S2 25/25, S3 26/26), mas a vazão não escala (~110–130 tok/s somados com 1 a 10 agentes);
+    - o `qwen3.5` tem vazão ~6× maior e 0 erro com 10 agentes, mas S2 de ~80–84%;
+    - pelo critério de "primazia perfeita", fica o `gemma4:12b` com capacidade declarada de ~1 S2 por minuto no total.
+    - **D9-3: `NUM_PARALLEL=1`** (no `qwen3.5` o Ollama ignora valores maiores; no `gemma4` eles não dão vazão) **e `MAX_QUEUE` ≥ 16** (o 8 atual recusaria o 9º pedido em fila).
+  - **Gate do código:** `gofmt -l` vazio, `go vet` e `go test -count=1 ./cmd/bakeoff` e `go build ./...` refeitos às 23:52, todos verdes. Sem commit.
+  - **Pendências (numeradas):**
+    1. D8-3 (owner).
+    2. Medir o `gemma4` sem a decodificação especulativa (`gemma4-assistant`), suspeita da falta de escala.
+    3. Medir o `qwen3-ia` sob a mesma carga multiagente.
+    4. D9-3: `NUM_PARALLEL=1` + `MAX_QUEUE` ≥ 16.
+    5. Revalidar a 130–150 W depois da troca da fonte.
+    6. Commit das extensões do `bakeoff` (decisão do owner).
+    7. Prompt grande de 22–24 mil tokens, se o owner quiser (fatias de ~90 mil caracteres).
