@@ -29,3 +29,5 @@ referencias/*
 # Fase 7: corpus do spike de PDF (documentos de clientes, NUNCA versionar) e build do OCR
 /.workspace/spike-pdf/
 /.workspace/build-ocr/
+# Fase 8: bake-off de modelos (corpus do owner, saidas dos modelos, mapa de ids) - NUNCA versionar
+/.workspace/bakeoff/
