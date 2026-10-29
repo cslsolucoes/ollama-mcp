@@ -11,7 +11,7 @@ import (
 // goroutines at once. Op byte layout: low 4 bits = action, high 4 bits =
 // argument. Invariants are checked while it runs and the system must drain.
 func runOps(t *testing.T, data []byte) {
-	m := New(Config{GenSlots: 2, EmbedSlots: 1, QueueMax: 6, PerClient: 3, MaxWait: 300 * time.Millisecond, AgeAfter: 20 * time.Millisecond})
+	m := New(Config{GenSlots: 2, EmbedSlots: 1, QueueMax: 8, PerClient: 3, PerIP: 4, LabelsPerIP: 3, MaxWait: 300 * time.Millisecond, AgeAfter: 20 * time.Millisecond})
 
 	var (
 		mu      sync.Mutex
@@ -35,8 +35,8 @@ func runOps(t *testing.T, data []byte) {
 		mu.Unlock()
 		r := Request{
 			Lane:        LaneGen,
-			ClientIP:    "10.0.0.1",
-			ClientLabel: string(rune('a' + arg%3)),
+			ClientIP:    []string{"10.0.0.1", "10.0.0.2"}[(arg/2)%2],
+			ClientLabel: string(rune('a' + arg)),
 			PriorityIn:  Priority(1 + arg%3), PriorityFinal: Priority(1 + arg%3),
 		}
 		if arg%5 == 0 {

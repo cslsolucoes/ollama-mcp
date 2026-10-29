@@ -162,7 +162,7 @@ func TestAgingLowBecomesNormal(t *testing.T) {
 }
 
 func TestLimits(t *testing.T) {
-	m := New(Config{GenSlots: 1, QueueMax: 2, PerClient: 1})
+	m := New(Config{GenSlots: 1, QueueMax: 2, PerClient: 1, PerIP: 10})
 	_ = mustGet(t, start(t, m, req("run", Normal)))
 	_ = start(t, m, req("a", Normal))
 	// per-client limit
@@ -448,7 +448,7 @@ func TestSweepKeepsActiveClients(t *testing.T) {
 	tk := mustGet(t, start(t, m, req("a", Normal)))
 	tk.Release(Result{})
 	m.Sweep(time.Hour)
-	if len(m.served) != 1 {
+	if len(m.served) != 2 {
 		t.Fatal("recent client dropped")
 	}
 	time.Sleep(5 * time.Millisecond)

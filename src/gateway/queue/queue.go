@@ -108,7 +108,9 @@ type Config struct {
 	GenSlots     int           // default 1
 	EmbedSlots   int           // default 2
 	QueueMax     int           // total waiting requests, default 64
-	PerClient    int           // waiting requests per client, default 16
+	PerClient    int           // waiting requests per IP+label, default 16
+	PerIP        int           // waiting requests per IP, all labels together; default PerClient
+	LabelsPerIP  int           // distinct labels per IP; more are folded into "<ip>/outros"; default 16
 	MaxWait      time.Duration // default 10 min
 	AgeAfter     time.Duration // baixa -> normal, default 5 min
 	StartStagger time.Duration // minimum gap between two geracao starts; 0 disables
@@ -132,6 +134,12 @@ func (c Config) withDefaults() Config {
 	}
 	if c.PerClient < 1 {
 		c.PerClient = 16
+	}
+	if c.PerIP < 1 {
+		c.PerIP = c.PerClient
+	}
+	if c.LabelsPerIP < 1 {
+		c.LabelsPerIP = 16
 	}
 	if c.MaxWait <= 0 {
 		c.MaxWait = 10 * time.Minute
@@ -235,7 +243,9 @@ type Manager struct {
 	waiting   map[Lane][]*Ticket // arrival order
 	running   map[Lane]map[string]*Ticket
 	byID      map[string]*Ticket
-	perClient map[string]int // waiting requests per client
+	perClient map[string]int            // waiting requests per IP+label
+	perIP     map[string]int            // waiting requests per IP (all labels)
+	labels    map[string]map[string]int // active tickets per IP and label (bounds distinct labels)
 	served    map[string]served
 	seq       int64       // FIFO keys
 	topSeq    int64       // pin counter (decreasing)
@@ -250,6 +260,7 @@ type Manager struct {
 type served struct {
 	seq  uint64
 	last time.Time
+	ip   string
 }
 
 // Totals are counters since the start of the process.
@@ -271,6 +282,8 @@ func New(cfg Config) *Manager {
 		running:   map[Lane]map[string]*Ticket{LaneGen: {}, LaneEmbed: {}},
 		byID:      map[string]*Ticket{},
 		perClient: map[string]int{},
+		perIP:     map[string]int{},
+		labels:    map[string]map[string]int{},
 		served:    map[string]served{},
 	}
 }
@@ -341,7 +354,7 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 	now := time.Now()
 	t := &Ticket{
 		ID: NewID(), m: m, req: req, ready: make(chan struct{}),
-		level: req.PriorityFinal, enqueued: now, key: clientKey(req.ClientIP, req.ClientLabel),
+		level: req.PriorityFinal, enqueued: now,
 	}
 	runCtx, cancel := context.WithCancelCause(ctx)
 	t.Ctx, t.cancel = runCtx, cancel
@@ -355,7 +368,12 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 		cancel(nil)
 		return nil, &FullError{Kind: kind, RetryAfter: retryAfter}
 	}
-	if m.perClient[t.key] >= m.cfg.PerClient {
+	// The IP comes from the proxy (not forgeable by the client); the label is
+	// client-controlled. Limits and fairness anchor on the IP, and the number
+	// of distinct labels per IP is bounded.
+	t.req.ClientLabel = m.normLabelLocked(req.ClientIP, req.ClientLabel)
+	t.key = clientKey(t.req.ClientIP, t.req.ClientLabel)
+	if m.perIP[req.ClientIP] >= m.cfg.PerIP || m.perClient[t.key] >= m.cfg.PerClient {
 		return reject(ErrClientFull)
 	}
 	if m.totalWaitingLocked() >= m.cfg.QueueMax {
@@ -367,6 +385,8 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 	m.waiting[req.Lane] = append(m.waiting[req.Lane], t)
 	m.byID[t.ID] = t
 	m.perClient[t.key]++
+	m.perIP[req.ClientIP]++
+	m.refLabelLocked(t, +1)
 	m.dispatchLocked()
 	if t.st == stRunning {
 		t.Position = 0 // started at once
@@ -490,6 +510,7 @@ func (t *Ticket) FinalPriority() Priority {
 func (m *Manager) finishLocked(t *Ticket, now time.Time, r Result) {
 	delete(m.running[t.req.Lane], t.ID)
 	delete(m.byID, t.ID)
+	m.refLabelLocked(t, -1)
 	t.st = stDone
 	t.recorded = true
 	m.totals.Finished++
@@ -517,9 +538,44 @@ func (m *Manager) removeWaitingLocked(t *Ticket) {
 	}
 	delete(m.byID, t.ID)
 	m.dropPerClientLocked(t)
+	m.refLabelLocked(t, -1)
+}
+
+// normLabelLocked folds a label into "<ip>/outros" when the IP already uses
+// LabelsPerIP distinct labels, so varying the label cannot multiply the
+// client's share. The request is never rejected for this.
+func (m *Manager) normLabelLocked(ip, label string) string {
+	set := m.labels[ip]
+	if _, ok := set[label]; ok || len(set) < m.cfg.LabelsPerIP {
+		return label
+	}
+	return ip + "/outros"
+}
+
+// refLabelLocked counts the active tickets that use a label of an IP.
+func (m *Manager) refLabelLocked(t *Ticket, d int) {
+	ip, l := t.req.ClientIP, t.req.ClientLabel
+	set := m.labels[ip]
+	if set == nil {
+		set = map[string]int{}
+		m.labels[ip] = set
+	}
+	if n := set[l] + d; n > 0 {
+		set[l] = n
+	} else {
+		delete(set, l)
+	}
+	if len(set) == 0 {
+		delete(m.labels, ip)
+	}
 }
 
 func (m *Manager) dropPerClientLocked(t *Ticket) {
+	if n := m.perIP[t.req.ClientIP] - 1; n > 0 {
+		m.perIP[t.req.ClientIP] = n
+	} else {
+		delete(m.perIP, t.req.ClientIP)
+	}
 	if n := m.perClient[t.key] - 1; n > 0 {
 		m.perClient[t.key] = n
 	} else {
@@ -557,22 +613,41 @@ func (m *Manager) pickLocked(w []*Ticket, now time.Time, served map[string]uint6
 	if best >= 0 {
 		return best
 	}
-	// 2) fairness: the client served longest ago, then the oldest request.
-	for i, t := range w {
+	// 2) fairness, two levels: first between IPs (the one served longest ago,
+	// then the one with the oldest request), then between the labels of that
+	// IP, then FIFO. The IP is not forgeable; the label is.
+	oldest := map[string]int64{}
+	for _, t := range w {
 		if m.effectiveLocked(t, now) != top || t.rank != 0 {
 			continue
 		}
-		if best < 0 {
-			best = i
-			continue
-		}
-		b := w[best]
-		sa, sb := served[t.key], served[b.key]
-		if sa < sb || (sa == sb && t.prio < b.prio) {
-			best = i
+		if p, ok := oldest[t.req.ClientIP]; !ok || t.prio < p {
+			oldest[t.req.ClientIP] = t.prio
 		}
 	}
-	if best >= 0 {
+	if len(oldest) > 0 {
+		winIP, winSeen, winPrio := "", uint64(0), int64(0)
+		first := true
+		for ip, p := range oldest {
+			sv := served[ip]
+			if first || sv < winSeen || (sv == winSeen && p < winPrio) {
+				winIP, winSeen, winPrio, first = ip, sv, p, false
+			}
+		}
+		for i, t := range w {
+			if t.req.ClientIP != winIP || m.effectiveLocked(t, now) != top || t.rank != 0 {
+				continue
+			}
+			if best < 0 {
+				best = i
+				continue
+			}
+			b := w[best]
+			sa, sb := served[t.key], served[b.key]
+			if sa < sb || (sa == sb && t.prio < b.prio) {
+				best = i
+			}
+		}
 		return best
 	}
 	// 3) pushed to the bottom: the earliest push goes first.
@@ -613,7 +688,8 @@ func (m *Manager) dispatchLocked() {
 			t.finalPrio = m.effectiveLocked(t, now)
 			m.running[lane][t.ID] = t
 			m.startSeq++
-			m.served[t.key] = served{seq: m.startSeq, last: now}
+			m.served[t.key] = served{seq: m.startSeq, last: now, ip: t.req.ClientIP}
+			m.served[t.req.ClientIP] = served{seq: m.startSeq, last: now, ip: t.req.ClientIP}
 			if lane == LaneGen {
 				m.lastStart = now
 			}
@@ -732,6 +808,7 @@ func (m *Manager) Cancel(id string) (ActionResult, error) {
 	t.adminCx = true
 	delete(m.running[t.req.Lane], t.ID)
 	delete(m.byID, t.ID)
+	m.refLabelLocked(t, -1)
 	t.st = stDone
 	m.totals.Finished++
 	t.cancel(ErrAdminCanceled)
@@ -818,6 +895,7 @@ func (m *Manager) Snapshot() Snapshot {
 			w = append(w[:i:i], w[i+1:]...)
 			clock++
 			sv[t.key] = clock
+			sv[t.req.ClientIP] = clock
 			s.Waiting = append(s.Waiting, m.itemLocked(t, now, pos))
 		}
 	}
@@ -851,7 +929,7 @@ func (m *Manager) Sweep(idle time.Duration) {
 	defer m.mu.Unlock()
 	cut := time.Now().Add(-idle)
 	for k, v := range m.served {
-		if v.last.Before(cut) && m.perClient[k] == 0 {
+		if v.last.Before(cut) && m.perIP[v.ip] == 0 {
 			delete(m.served, k)
 		}
 	}
@@ -892,6 +970,35 @@ func (m *Manager) checkInvariants() string {
 	}
 	if len(m.byID) != nWait+nRun {
 		return fmt.Sprintf("byID %d != waiting %d + running %d", len(m.byID), nWait, nRun)
+	}
+	perIP := map[string]int{}
+	for _, w := range m.waiting {
+		for _, t := range w {
+			perIP[t.req.ClientIP]++
+		}
+	}
+	for ip, v := range perIP {
+		if m.perIP[ip] != v {
+			return "perIP count mismatch"
+		}
+		if v > m.cfg.PerIP {
+			return fmt.Sprintf("ip %s has %d waiting, over PerIP %d", ip, v, m.cfg.PerIP)
+		}
+	}
+	if len(perIP) != len(m.perIP) {
+		return "perIP size mismatch"
+	}
+	active := 0
+	for ip, set := range m.labels {
+		if len(set) > m.cfg.LabelsPerIP+1 {
+			return fmt.Sprintf("ip %s uses %d labels", ip, len(set))
+		}
+		for _, n := range set {
+			active += n
+		}
+	}
+	if active != nWait+nRun {
+		return fmt.Sprintf("label refs %d != active %d", active, nWait+nRun)
 	}
 	if len(perClient) != len(m.perClient) {
 		return "perClient size mismatch"

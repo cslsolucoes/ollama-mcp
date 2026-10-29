@@ -279,3 +279,14 @@ events(ts INTEGER, kind TEXT, detail TEXT);   -- partida/parada do gateway, muda
   - **Gate (números):** `go build ./...` ok; `go vet ./...` ok; `gofmt -l .` vazio; `go test -count=1 ./...` 12 pacotes ok (queue 1,8 s); `-race -count=3 ./gateway/...` ok (6,2 s); build Linux `GOOS=linux CGO_ENABLED=0 go build ./gateway/...` ok. `go.mod`/`go.sum` **não** alterados nesta etapa (o SQLite entra na 9.3).
   - **Estado:** 9.1 concluída.
   - **Pendências (para a 9.5):** (1) `Retry-After` é fixo em 5 s (ajustar por vazão real?); (2) fairness considera só o último início por cliente; avaliar se um cliente com muitos pedidos em execução deveria perder preferência; (3) `Snapshot` é O(n²) por faixa (n ≤ 64, aceitável); (4) rodar o fuzz por 10 min.
+- 2026-10-28 22:58 — **9.1 correção de segurança (alerta MEDIUM do coordenador): limite e justiça ancorados no IP** (commit "fix: Fase 9.1 - limite/justica por IP (label nao falsifica)").
+  - **Achado:** `clientKey = ip+"|"+label`; o label vem do header `X-Mcpollama-Client`, controlado pelo cliente. Variando o label, um IP furava `--queue-per-client` e ganhava mais fatias no rodízio.
+  - **Correção (`src/gateway/queue/queue.go`):**
+    1. rodízio em **dois níveis**: primeiro entre IPs (o servido há mais tempo; empate pelo pedido mais antigo), depois entre os labels do IP vencedor (sub-filas), depois FIFO; o `Snapshot` simula a mesma ordem;
+    2. novo teto **por IP** (`Config.PerIP`, padrão = `PerClient`; flag `--queue-per-ip` no entrypoint, 9.4) somando todos os labels, além do teto por IP+label;
+    3. limite de **labels distintos por IP** (`Config.LabelsPerIP`, padrão 16; flag `--labels-per-ip`): acima disso o label vira `"<ip>/outros"` sem rejeitar o pedido (o registro guarda o label normalizado); a contagem usa referências dos pedidos ativos e é liberada em remoção, término, cancelamento e abandono;
+    4. invariantes novos em `checkInvariants`: `perIP` coerente e ≤ `PerIP`, labels por IP ≤ `LabelsPerIP`+1, referências de label = pedidos ativos.
+  - **Testes de regressão (`ip_test.go`):** 1 IP com 50 labels diferentes → exatamente 5 em espera (teto por IP 5) e 45 rejeições; o teto de um IP não afeta outro; 50 labels com `LabelsPerIP=4` viram 5 labels (46 em `outros`); 1 IP com 20 labels × 1 IP com 1 label: 20 partidas alternam com diferença ≤ 1. O fuzz agora usa 2 IPs, 16 labels, `PerIP=4`, `LabelsPerIP=3` e verifica os invariantes novos.
+  - **Ajustes de teste:** `TestLimits` ganhou `PerIP: 10` e `TestSweep` espera 2 entradas de memória (IP + IP|label).
+  - **Gate:** `go vet`/`gofmt` limpos; `go test -count=1 ./gateway/...` ok; `-race -count=3` ok (6,7 s); fuzz 20 s, 35.408 execuções, sem falha.
+  - **Pendência nova:** o proxy (9.2) e o entrypoint (9.4) devem repassar `--queue-per-ip` e `--labels-per-ip`.
