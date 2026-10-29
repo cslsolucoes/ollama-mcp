@@ -105,7 +105,10 @@ func (c *Credentials) Verify(user, password string) bool {
 		return false
 	}
 	okHash := subtle.ConstantTimeCompare(h, c.hash) == 1
-	okUser := subtle.ConstantTimeCompare([]byte(user), []byte(c.User)) == 1
+	// Compare digests of equal length: ConstantTimeCompare returns at once on
+	// a length mismatch, which would tell the length of the user name.
+	gu, wu := sha256.Sum256([]byte(user)), sha256.Sum256([]byte(c.User))
+	okUser := subtle.ConstantTimeCompare(gu[:], wu[:]) == 1
 	return okHash && okUser
 }
 
@@ -114,12 +117,18 @@ func constEq(a, b string) bool { return subtle.ConstantTimeCompare([]byte(a), []
 // ---- sessions ----------------------------------------------------------------
 
 const (
-	sessionTTL    = 8 * time.Hour
-	maxSessions   = 8
-	cookieName    = "mcpgw_session"
-	loginWindow   = 15 * time.Minute
-	loginMaxIP    = 5
-	loginMaxTotal = 30
+	sessionTTL  = 8 * time.Hour
+	maxSessions = 8
+	cookieName  = "mcpgw_session"
+	loginWindow = 15 * time.Minute
+	loginMaxIP  = 5
+	// Fase 9.5: no global ceiling any more (anonymous failures from many IPs
+	// used to lock the administrator out). Each IP gets loginMaxIP attempts;
+	// after that it is locked out for loginWindow, doubling at each new
+	// lockout (exponential backoff) up to loginMaxLock.
+	loginMaxLock    = 24 * time.Hour
+	loginMaxTracked = 4096 // above this, idle entries are swept
+	verifySlots     = 2    // concurrent PBKDF2 evaluations
 )
 
 type session struct {
@@ -194,10 +203,22 @@ func (s *sessions) drop(token string) {
 
 // ---- login rate limit ----------------------------------------------------------
 
+// ipAttempts is the login record of one client IP.
+type ipAttempts struct {
+	fails   []time.Time // failures inside the window
+	pending int         // attempts being evaluated right now (reserved)
+	until   time.Time   // locked out until
+	strikes int         // lockouts so far (exponential backoff)
+	last    time.Time   // last activity
+}
+
+// limiter bounds login attempts per IP. An attempt is reserved atomically
+// (tryBegin) before the slow password check and counts against the limit while
+// it runs, so parallel requests cannot all slip through before the first
+// failure is recorded (Fase 9.5, M1).
 type limiter struct {
-	mu    sync.Mutex
-	byIP  map[string][]time.Time
-	total []time.Time
+	mu   sync.Mutex
+	byIP map[string]*ipAttempts
 }
 
 func prune(v []time.Time, cut time.Time) []time.Time {
@@ -208,36 +229,89 @@ func prune(v []time.Time, cut time.Time) []time.Time {
 	return v[i:]
 }
 
-// allowed says whether another attempt may be evaluated now.
-func (l *limiter) allowed(ip string, now time.Time) bool {
+// tryBegin reserves one attempt for ip. When it returns false, retry is how
+// long the client should wait.
+func (l *limiter) tryBegin(ip string, now time.Time) (ok bool, retry time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	cut := now.Add(-loginWindow)
-	l.total = prune(l.total, cut)
 	if l.byIP == nil {
-		l.byIP = map[string][]time.Time{}
+		l.byIP = map[string]*ipAttempts{}
 	}
-	f := prune(l.byIP[ip], cut)
-	if len(f) == 0 {
+	if len(l.byIP) > loginMaxTracked {
+		l.sweepLocked(now)
+	}
+	a := l.byIP[ip]
+	if a == nil {
+		a = &ipAttempts{}
+		l.byIP[ip] = a
+	}
+	if now.Sub(a.last) > loginMaxLock {
+		a.strikes = 0 // a quiet day forgives the old lockouts
+	}
+	a.last = now
+	a.fails = prune(a.fails, now.Add(-loginWindow))
+	if now.Before(a.until) {
+		return false, a.until.Sub(now)
+	}
+	if len(a.fails)+a.pending >= loginMaxIP {
+		return false, loginWindow
+	}
+	a.pending++
+	return true, 0
+}
+
+// end closes a reserved attempt. success clears the record of the IP.
+func (l *limiter) end(ip string, now time.Time, success bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	a := l.byIP[ip]
+	if a == nil {
+		return
+	}
+	if a.pending > 0 {
+		a.pending--
+	}
+	a.last = now
+	if success {
 		delete(l.byIP, ip)
-	} else {
-		l.byIP[ip] = f
+		return
 	}
-	return len(f) < loginMaxIP && len(l.total) < loginMaxTotal
+	a.fails = append(prune(a.fails, now.Add(-loginWindow)), now)
+	if len(a.fails) >= loginMaxIP {
+		a.strikes++
+		lock := loginWindow << (a.strikes - 1)
+		if lock > loginMaxLock || lock <= 0 {
+			lock = loginMaxLock
+		}
+		a.until = now.Add(lock)
+		a.fails = nil
+	}
 }
 
-func (l *limiter) fail(ip string, now time.Time) {
+// abort gives a reserved attempt back without counting it (the password was
+// never evaluated).
+func (l *limiter) abort(ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.byIP == nil {
-		l.byIP = map[string][]time.Time{}
+	if a := l.byIP[ip]; a != nil && a.pending > 0 {
+		a.pending--
 	}
-	l.byIP[ip] = append(l.byIP[ip], now)
-	l.total = append(l.total, now)
 }
 
-func (l *limiter) clear(ip string) {
+// sweepLocked drops the entries that carry no state worth keeping.
+func (l *limiter) sweepLocked(now time.Time) {
+	cut := now.Add(-loginWindow)
+	for ip, a := range l.byIP {
+		idle := a.pending == 0 && !now.Before(a.until) && len(prune(a.fails, cut)) == 0
+		if idle && (a.strikes == 0 || now.Sub(a.last) > loginMaxLock) {
+			delete(l.byIP, ip)
+		}
+	}
+}
+
+// tracked is the number of IPs the limiter remembers (tests).
+func (l *limiter) tracked() int {
 	l.mu.Lock()
-	delete(l.byIP, ip)
-	l.mu.Unlock()
+	defer l.mu.Unlock()
+	return len(l.byIP)
 }

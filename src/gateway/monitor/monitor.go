@@ -84,19 +84,34 @@ type Config struct {
 	Admin   *Credentials // nil disables the actions
 	Version string
 	BootID  string
-	MaxSSE  int // concurrent event streams, default 20
-	Logf    func(format string, args ...any)
+	MaxSSE  int // concurrent event streams, default 32
+	// MaxSSEPerIP bounds the streams of one client IP (Fase 9.5, M3), so one
+	// machine cannot take every stream; default 4.
+	MaxSSEPerIP int
+	Logf        func(format string, args ...any)
 }
 
 // Handler serves everything under /monitor.
 type Handler struct {
-	cfg     Config
-	mux     *http.ServeMux
-	sess    sessions
-	lim     limiter
-	started time.Time
-	sse     atomic.Int32
-	csp     string
+	cfg  Config
+	mux  *http.ServeMux
+	sess sessions
+	lim  limiter
+	// verifySem bounds the concurrent password checks.
+	verifySem chan struct{}
+	started   time.Time
+	csp       string
+
+	sseMu    sync.Mutex
+	sseTotal int
+	sseByIP  map[string]int
+
+	statsMu    sync.Mutex
+	statsCache map[string]statsEntry
+	statsN     atomic.Int64
+
+	done      chan struct{} // closed by Close: ends the event streams
+	closeOnce sync.Once
 
 	extraMu  sync.Mutex
 	extraAt  time.Time
@@ -112,7 +127,10 @@ func New(cfg Config) (*Handler, error) {
 		return nil, errors.New("monitor: queue is required")
 	}
 	if cfg.MaxSSE <= 0 {
-		cfg.MaxSSE = 20
+		cfg.MaxSSE = 32
+	}
+	if cfg.MaxSSEPerIP <= 0 {
+		cfg.MaxSSEPerIP = 4
 	}
 	if cfg.Hub == nil {
 		cfg.Hub = NewHub()
@@ -121,7 +139,8 @@ func New(cfg Config) (*Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	h := &Handler{cfg: cfg, mux: http.NewServeMux(), started: time.Now(), csp: csp}
+	h := &Handler{cfg: cfg, mux: http.NewServeMux(), started: time.Now(), csp: csp, verifySem: make(chan struct{}, verifySlots),
+		sseByIP: map[string]int{}, statsCache: map[string]statsEntry{}, done: make(chan struct{})}
 	h.routes()
 	return h, nil
 }
@@ -145,6 +164,11 @@ func buildCSP(page []byte) (string, error) {
 	return "default-src 'none'; script-src " + hash(sc[1]) + "; style-src " + hash(st[1]) +
 		"; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", nil
 }
+
+// Close ends the open event streams. The server's Shutdown does not cancel the
+// request contexts, so without this an open panel held a restart for the whole
+// grace period (Fase 9.5, C5). Register it with http.Server.RegisterOnShutdown.
+func (h *Handler) Close() { h.closeOnce.Do(func() { close(h.done) }) }
 
 func (h *Handler) logf(format string, a ...any) {
 	if h.cfg.Logf != nil {
@@ -297,14 +321,38 @@ func (h *Handler) apiState(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.state(r.Context()))
 }
 
+// sseEnter takes one stream slot for ip; false when the global or the per-IP
+// ceiling is reached.
+func (h *Handler) sseEnter(ip string) bool {
+	h.sseMu.Lock()
+	defer h.sseMu.Unlock()
+	if h.sseTotal >= h.cfg.MaxSSE || h.sseByIP[ip] >= h.cfg.MaxSSEPerIP {
+		return false
+	}
+	h.sseTotal++
+	h.sseByIP[ip]++
+	return true
+}
+
+func (h *Handler) sseLeave(ip string) {
+	h.sseMu.Lock()
+	defer h.sseMu.Unlock()
+	h.sseTotal--
+	if n := h.sseByIP[ip] - 1; n > 0 {
+		h.sseByIP[ip] = n
+	} else {
+		delete(h.sseByIP, ip)
+	}
+}
+
 func (h *Handler) apiStream(w http.ResponseWriter, r *http.Request) {
-	if int(h.sse.Add(1)) > h.cfg.MaxSSE {
-		h.sse.Add(-1)
+	ip := proxy.ClientIP(r)
+	if !h.sseEnter(ip) {
 		w.Header().Set("Retry-After", "5")
 		jsonErr(w, http.StatusServiceUnavailable, "muitos painéis abertos")
 		return
 	}
-	defer h.sse.Add(-1)
+	defer h.sseLeave(ip)
 	fl, ok := w.(http.Flusher)
 	if !ok {
 		jsonErr(w, http.StatusInternalServerError, "streaming não suportado")
@@ -338,6 +386,8 @@ func (h *Handler) apiStream(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-h.done:
 			return
 		case <-ch:
 			if d := time.Since(last); d < 150*time.Millisecond { // debounce bursts
@@ -488,7 +538,7 @@ func (h *Handler) apiStats(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusBadRequest, "janela: 15m, 1h, 24h ou 7d")
 		return
 	}
-	st, err := h.cfg.Store.Stats(r.Context(), d, label)
+	st, err := h.stats(r.Context(), d, label)
 	if err != nil {
 		h.logf("monitor: stats: %v", err)
 		jsonErr(w, http.StatusInternalServerError, "erro ao calcular as estatísticas")
@@ -496,6 +546,35 @@ func (h *Handler) apiStats(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, st)
 }
+
+// statsTTL is how long a computed window is served from memory. GET
+// /monitor/api/stats is open (D9-1) and a 7d window reads up to 200 thousand
+// rows; the cache and the mutex make N parallel requests cost one computation
+// (Fase 9.5, M8).
+const statsTTL = 5 * time.Second
+
+type statsEntry struct {
+	at time.Time
+	st store.Stats
+}
+
+func (h *Handler) stats(ctx context.Context, d time.Duration, label string) (store.Stats, error) {
+	h.statsMu.Lock()
+	defer h.statsMu.Unlock()
+	if e, ok := h.statsCache[label]; ok && time.Since(e.at) < statsTTL {
+		return e.st, nil
+	}
+	h.statsN.Add(1)
+	st, err := h.cfg.Store.Stats(ctx, d, label)
+	if err != nil {
+		return st, err
+	}
+	h.statsCache[label] = statsEntry{at: time.Now(), st: st}
+	return st, nil
+}
+
+// statsComputed counts the real Stats computations (tests).
+func (h *Handler) statsComputed() int64 { return h.statsN.Load() }
 
 func (h *Handler) apiAudit(w http.ResponseWriter, r *http.Request) {
 	if h.cfg.Store == nil {
@@ -583,12 +662,6 @@ func (h *Handler) apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := proxy.ClientIP(r)
-	now := time.Now()
-	if !h.lim.allowed(ip, now) {
-		w.Header().Set("Retry-After", strconv.Itoa(int(loginWindow/time.Second)))
-		jsonErr(w, http.StatusTooManyRequests, "muitas tentativas; aguarde")
-		return
-	}
 	var in struct {
 		User     string `json:"user"`
 		Password string `json:"password"`
@@ -596,13 +669,39 @@ func (h *Handler) apiLogin(w http.ResponseWriter, r *http.Request) {
 	if !readSmallJSON(w, r, &in) {
 		return
 	}
-	if !h.cfg.Admin.Verify(in.User, in.Password) {
-		h.lim.fail(ip, now)
+	// Reserve the attempt before the slow check (Fase 9.5, M1): it counts
+	// against the limit while it runs.
+	ok, retry := h.lim.tryBegin(ip, time.Now())
+	if !ok {
+		secs := int((retry + time.Second - 1) / time.Second)
+		if secs < 1 {
+			secs = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		jsonErr(w, http.StatusTooManyRequests, "muitas tentativas; aguarde")
+		return
+	}
+	// At most verifySlots PBKDF2 evaluations at a time (CPU of the AI server).
+	select {
+	case h.verifySem <- struct{}{}:
+	case <-r.Context().Done():
+		h.lim.abort(ip)
+		return
+	case <-time.After(10 * time.Second):
+		h.lim.abort(ip)
+		w.Header().Set("Retry-After", "5")
+		jsonErr(w, http.StatusServiceUnavailable, "verificação de senha ocupada; tente de novo")
+		return
+	}
+	good := h.cfg.Admin.Verify(in.User, in.Password)
+	<-h.verifySem
+	now := time.Now()
+	h.lim.end(ip, now, good)
+	if !good {
 		h.logf("monitor: login recusado de %s", ip)
 		jsonErr(w, http.StatusUnauthorized, "usuário ou senha inválidos")
 		return
 	}
-	h.lim.clear(ip)
 	token, s := h.sess.create(h.cfg.Admin.User, now)
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: token, Path: "/monitor", MaxAge: int(sessionTTL / time.Second),
