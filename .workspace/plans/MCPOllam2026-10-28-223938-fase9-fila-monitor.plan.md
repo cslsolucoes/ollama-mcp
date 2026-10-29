@@ -1,6 +1,6 @@
 # Plano — Fase 9: fila de espera na retaguarda (gateway) e monitor `/monitor` com SQLite
 
-> **Estado:** **DECIDIDO, desenvolvimento 9.1–9.5 a iniciar** (2026-10-28 22:44). A implantação (9.6) só vem depois da 8.9 da Fase 8.
+> **Estado:** **9.1–9.5 CONCLUÍDAS** (9.5, revisão adversarial, em 2026-10-29 00:15: 12 achados, 0 Alto, todos corrigidos; report `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md`). **Próximo: 9.6 (implantação, com autorização)**, que só vem depois da 8.9 da Fase 8.
 > **Decisões do owner (AskUserQuestion, 22:43):**
 > - **D9-1:** `/monitor` **só na LAN, ver sem login**. As **ações** (promover, despromover, remover, cancelar) **exigem login** do administrador.
 > - **D9-2:** **Ollama só no loopback** (127.0.0.1); todo o tráfego passa pela fila.
@@ -523,3 +523,181 @@ Executada com a produção em horário combinado, **uma coisa por vez**, monitor
     - SQLite (`backend_id`, `failover_rule`, `backend_samples`).
   - Encaixado nas etapas 9.12–9.15. Decisões D9-B1..B5. A D9-B1 (qual máquina é o secundário) é a que destrava o remoto.
   - Nenhuma execução.
+- 2026-10-28 22:55 — **9.1 `src/gateway/queue` CONCLUÍDA** (agente sonnet, worktree isolado; commit "feat: Fase 9.1").
+  - **Arquivos:** `src/gateway/queue/queue.go`, `queue_test.go`, `fuzz_test.go`.
+  - **O que foi feito:**
+    - faixas `geracao`/`embed` com slots independentes; prioridades `alta|normal|baixa`; justiça por cliente (IP + label) por "quem foi servido há mais tempo", FIFO dentro do cliente; envelhecimento `baixa`→`normal` (calculado na hora de escolher, o `priority_final` do registro guarda o nível efetivo na partida);
+    - limites: total (503 `ErrFull`), por cliente (503 `ErrClientFull`), espera máxima (`ErrWaitTimeout`, 504), saída por contexto cancelado (registro `cancelado`);
+    - escalonamento de partida (padrão do entrypoint 300 ms) **só na faixa `geracao`** (embed é leve e curto; atrasá-lo não ajuda a fonte);
+    - ações atômicas sob o lock: `Promote`, `Demote`, `Remove` (o cliente recebe `ErrRemoved`, 409) e `Cancel` em execução (D9-8: cancela o contexto com causa `ErrAdminCanceled` e libera o slot **na hora**; o registro `cancelado_admin` sai no `Release` do proxy, uma única vez);
+    - semântica de promover/despromover: sobe/desce um nível e entra no **fim** do novo nível (não fura quem já esperava); já em `alta`, "topo" (pin com contador decrescente); já em `baixa`, "fim" (contador crescente);
+    - ids de 128 bits (`crypto/rand`, 32 hex); `Snapshot()` consistente com a ordem simulada de saída; ganchos `OnRecord`/`OnChange` chamados **fora do lock**.
+  - **O que deu certo:** primeira compilação limpa; as 24 provas de unidade passam; o fuzz `FuzzConcurrentActions` (4 goroutines, ações aleatórias, invariantes verificados durante a corrida e dreno ao final) rodou 20 s com 77.837 execuções sem falha; `TestRandomActions` (40 rodadas semeadas) roda no gate normal.
+  - **O que não deu certo / ajustes:** a 1ª versão dos arquivos foi recusada pela ferramenta (comando composto); recriados por Write, sem perda. Nenhum bug encontrado nos testes.
+  - **Gate (números):** `go build ./...` ok; `go vet ./...` ok; `gofmt -l .` vazio; `go test -count=1 ./...` 12 pacotes ok (queue 1,8 s); `-race -count=3 ./gateway/...` ok (6,2 s); build Linux `GOOS=linux CGO_ENABLED=0 go build ./gateway/...` ok. `go.mod`/`go.sum` **não** alterados nesta etapa (o SQLite entra na 9.3).
+  - **Estado:** 9.1 concluída.
+  - **Pendências (para a 9.5):** (1) `Retry-After` é fixo em 5 s (ajustar por vazão real?); (2) fairness considera só o último início por cliente; avaliar se um cliente com muitos pedidos em execução deveria perder preferência; (3) `Snapshot` é O(n²) por faixa (n ≤ 64, aceitável); (4) rodar o fuzz por 10 min.
+- 2026-10-28 22:58 — **9.1 correção de segurança (alerta MEDIUM do coordenador): limite e justiça ancorados no IP** (commit "fix: Fase 9.1 - limite/justica por IP (label nao falsifica)").
+  - **Achado:** `clientKey = ip+"|"+label`; o label vem do header `X-Mcpollama-Client`, controlado pelo cliente. Variando o label, um IP furava `--queue-per-client` e ganhava mais fatias no rodízio.
+  - **Correção (`src/gateway/queue/queue.go`):**
+    1. rodízio em **dois níveis**: primeiro entre IPs (o servido há mais tempo; empate pelo pedido mais antigo), depois entre os labels do IP vencedor (sub-filas), depois FIFO; o `Snapshot` simula a mesma ordem;
+    2. novo teto **por IP** (`Config.PerIP`, padrão = `PerClient`; flag `--queue-per-ip` no entrypoint, 9.4) somando todos os labels, além do teto por IP+label;
+    3. limite de **labels distintos por IP** (`Config.LabelsPerIP`, padrão 16; flag `--labels-per-ip`): acima disso o label vira `"<ip>/outros"` sem rejeitar o pedido (o registro guarda o label normalizado); a contagem usa referências dos pedidos ativos e é liberada em remoção, término, cancelamento e abandono;
+    4. invariantes novos em `checkInvariants`: `perIP` coerente e ≤ `PerIP`, labels por IP ≤ `LabelsPerIP`+1, referências de label = pedidos ativos.
+  - **Testes de regressão (`ip_test.go`):** 1 IP com 50 labels diferentes → exatamente 5 em espera (teto por IP 5) e 45 rejeições; o teto de um IP não afeta outro; 50 labels com `LabelsPerIP=4` viram 5 labels (46 em `outros`); 1 IP com 20 labels × 1 IP com 1 label: 20 partidas alternam com diferença ≤ 1. O fuzz agora usa 2 IPs, 16 labels, `PerIP=4`, `LabelsPerIP=3` e verifica os invariantes novos.
+  - **Ajustes de teste:** `TestLimits` ganhou `PerIP: 10` e `TestSweep` espera 2 entradas de memória (IP + IP|label).
+  - **Gate:** `go vet`/`gofmt` limpos; `go test -count=1 ./gateway/...` ok; `-race -count=3` ok (6,7 s); fuzz 20 s, 35.408 execuções, sem falha.
+  - **Pendência nova:** o proxy (9.2) e o entrypoint (9.4) devem repassar `--queue-per-ip` e `--labels-per-ip`.
+- 2026-10-28 23:08 — **9.2 `src/gateway/proxy` CONCLUÍDA** (commit "feat: Fase 9.2").
+  - **Arquivos:** `src/gateway/proxy/proxy.go`, `proxy_test.go`; `queue.Request` ganhou `ID` opcional (o proxy gera o id antes, para que até a rejeição 503 leve `X-Request-Id`).
+  - **O que foi feito:**
+    - `httputil.ReverseProxy` com `Rewrite`, `FlushInterval: -1`, transporte sem proxy de ambiente; o `Rewrite` remove `Authorization`, `Cookie`, `X-Real-IP`, `X-Forwarded-*` e os `X-Mcpollama-*` antes de falar com o Ollama;
+    - `/api/generate`, `/api/chat` → `geracao`; `/api/embed` e `/api/embeddings` → `embed`; `/api/tags|ps|show|version` diretos; `/api/pull|push|create|delete|copy|blobs` → 403 (qualquer método); qualquer outro caminho → 404; método ≠ POST nas rotas da fila → 405;
+    - **extensão consciente:** `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` (fila) e `/v1/models` (direto), porque o OpenClaude (`ia-local`) provavelmente fala o dialeto OpenAI; sem isso ele quebraria com o Ollama só no loopback (D9-2). Os contadores aceitam `prompt_tokens`/`completion_tokens`. **A confirmar na 9.6** se o nginx realmente roteia `/v1/` ao gateway;
+    - contadores só do **último chunk**: o corpo da resposta passa por um `countingBody` que guarda só os últimos 16–32 KiB em memória; na saída, lê só a última linha por regex (aspas escapadas dentro do texto do modelo não casam). Texto nunca é guardado nem logado. Teste com `context` de 140 KB cobre o caso em que a linha final é maior que o buffer;
+    - headers `X-Request-Id` (128 bits), `X-Queue-Ms`, `X-Queue-Position`; `Retry-After` no 503; 504 e 409 mapeados;
+    - IP do cliente: `X-Real-IP` só vale se o par TCP for loopback (nginx local) e se houver exatamente 1 valor válido; senão vale o IP do par;
+    - headers `X-Mcpollama-Client` (`[A-Za-z0-9._:/@+-]{1,64}`, senão vira `invalido`; ausente vira `anonimo`) e `-Tool` (`[a-z0-9_.-]{1,32}`); `-Priority`: `alta` só de IP em `PriorityNets`, de outro vira `normal` em silêncio (`priority_in` x `priority_final`);
+    - allowlist opcional de modelos (aceita `:latest`): 403 sem tocar o Ollama; JSON inválido → 400; corpo acima do teto (padrão 32 MiB) → 413;
+    - **cancelar em execução (D9-8):** antes dos headers do Ollama, o cliente recebe 409 "cancelado pelo administrador"; no meio do stream, o `countingBody` fecha o NDJSON com uma linha `{"error":"cancelado pelo administrador"}`, que o `streamNDJSON` do mcpollama já mostra como "o servidor reportou erro durante a geração";
+    - desconexão do cliente no meio do stream: o `ReverseProxy` aborta (`ErrAbortHandler`), o `defer` do handler faz `Release`, a conexão com o Ollama fecha e o slot volta (registro `cancelado`/`client_gone`).
+  - **O que não deu certo e solução:** (1) o teste `TestAdminCancelBeforeResponseHeaders` travou em `httptest.Server.Close`: um Ollama falso que não lê o corpo nunca vê a desconexão (o servidor Go só inicia a leitura de fundo depois de consumir o corpo). Solução: o falso passa a ler o corpo, como o Ollama real; (2) `go vet` acusou `t.Fatal` em goroutine: criado `postBg` sem `t`.
+  - **Gate (números):** `gofmt -l` vazio; `go build ./...` e `go vet ./...` ok; `go test -count=1 ./...` 12 pacotes ok (proxy 0,7 s, queue 1,9 s); `-race -count=5 ./gateway/...` ok (proxy 4,3 s, queue 10,5 s); build Linux `./gateway/...` ok. 20 testes do proxy + `TestParseCounters` (6 casos).
+  - **Estado:** 9.2 concluída.
+  - **Pendências (9.5):** (1) sem timeout de execução próprio (depende da desconexão do cliente e do nginx); avaliar `--run-timeout`; (2) `X-Queue-Position` é a posição na entrada, não atualizada; (3) 502 do Ollama reinício: o cliente recebe `Ollama indisponível`, sem `Retry-After`; (4) confirmar rotas `/v1/*` na 9.6; (5) smuggling (CL/TE duplicados) hoje depende do `net/http` e do nginx: criar vetor executável.
+- 2026-10-28 23:12 — **9.3 `src/gateway/store` + `src/gateway/gpu` CONCLUÍDA** (commit "feat: Fase 9.3").
+  - **Arquivos:** `src/gateway/store/store.go`, `store_test.go`, `sentinel_test.go`; `src/gateway/gpu/gpu.go`, `gpu_test.go`; `src/go.mod`/`go.sum`.
+  - **Dependência nova (autorizada, D9-5):** `modernc.org/sqlite v1.61.0` (Go puro, sem cgo) com 7 indiretas (`libc`, `mathutil`, `memory`, `go-humanize`, `go-isatty`, `go-strftime`, `bigfft`). O `go get` **subiu `golang.org/x/sys` de v0.48.0 para v0.49.0** (exigência do sqlite); a suíte inteira, inclusive OCR/Windows, passou depois da subida.
+  - **O que foi feito (store):**
+    - banco criado com 0600 antes do SQLite abrir (o `-wal`/`-shm` herdam a permissão); DSN com `busy_timeout(5000)`, `journal_mode(WAL)`, `synchronous(NORMAL)`; esquema do §5 (requests, audit, gpu_samples, events) + `meta` e os índices `requests(enqueued_at)`, `requests(client_label, enqueued_at)`, `gpu_samples(ts)` (+ audit/events por `ts`);
+    - **gravador assíncrono em lote** (canal de 4096, lote de 200 ou 250 ms, uma transação por lote); com o canal cheio o item é descartado e **contado**; a contagem vira o evento `registros_descartados` na próxima transação; `Flush()` é uma barreira (nunca descartada); `Close()` drena;
+    - auditoria **síncrona** (`AddAudit`), por ser rara e não poder se perder;
+    - leituras para o monitor: `History` (filtros cliente/modelo/período, paginação, tudo parametrizado), `Stats` (p50/p95 de espera e execução, totais, por status e classe, vazão/min, tokens/s), `GPUSince`, `Events`, `Audits`;
+    - retenção: `Prune` (requests 90 d, gpu 7 d; audit e events nunca expiram), `Vacuum`, `Maintain` com datas de vencimento em `meta` (sobrevivem a reinício: poda diária, VACUUM semanal) e `RunMaintenance` horário;
+    - `BootID` lê `/proc/sys/kernel/random/boot_id`; na abertura grava `gateway_inicio` e, se o boot id mudou desde a última vez, `boot_novo` (os reboots aparecem no histórico).
+  - **O que foi feito (gpu):** `Collector` com `nvidia-smi --query-gpu=index,pci.bus_id,power.draw,memory.used,utilization.gpu,temperature.gpu --format=csv,noheader,nounits` a cada 5 s (timeout 4 s por chamada), `ParseCSV` (`[N/A]` vira 0), `ReadAER` de `/sys/bus/pci/devices/0000:00:1b.4/aer_dev_correctable` (lê `TOTAL_ERR_COR`, senão soma); `AERPath` configurável (`-` desliga); `Runner` injetável; `Latest()` para o monitor.
+  - **Teste-sentinela (`sentinel_test.go`):** prompt, system, resposta e token com strings únicas passam pelo proxy real; depois de `Flush`, os bytes de `.db`, `-wal` e `-shm` **não** contêm nenhuma delas, nem depois do `Close`. Há **controle positivo**: o label do cliente (metadado gravado) é encontrado em `.db` ou `-wal`, o que prova que a varredura enxerga os dados.
+  - **O que não deu certo / ajustes:** o primeiro desenho do `Stats` misturava rejeitados no cálculo de espera; a espera agora só conta pedidos que chegaram a um slot (`started_at > 0`). Removido um teste de inundação que dependia da velocidade da máquina (o descarte é coberto de forma determinística por `TestDropCounter`, com canal sem consumidor: 5 itens, capacidade 2, 3 descartados).
+  - **Gate (números):** `gofmt -l` vazio; `go build`/`go vet ./...` ok; `go test -count=1 ./...` 14 pacotes ok (store 0,6 s, gpu 0,1 s); `-race -count=2 ./gateway/... ./ollama ./tools` ok (gpu 3,2 s, proxy 2,4 s, queue 5,0 s, store 4,1 s, ollama 2,5 s, tools 6,0 s); build e vet Linux (`GOOS=linux CGO_ENABLED=0`) de `./gateway/...` ok.
+  - **Estado:** 9.3 concluída.
+  - **Pendências (9.5):** (1) `Stats` lê até 200 mil linhas na memória por chamada (ok p/ 90 d de uso modesto; medir); (2) o descarte por buffer cheio só foi provado por teste determinístico, não sob carga real; (3) permissão do `nvidia-smi` sob `ProtectSystem=strict` (9.6); (4) o AER ausente vira `Err` "aer: ..." no `Snapshot` (ruído em máquina sem o dispositivo).
+- 2026-10-28 23:25 — **9.4 `src/gateway/monitor` + `src/cmd/mcpollama-gateway` + mudanças no mcpollama CONCLUÍDA** (commit "feat: Fase 9.4").
+  - **Arquivos novos:** `src/gateway/monitor/{monitor.go,admin.go,index.html,monitor_test.go}`; `src/cmd/mcpollama-gateway/{main.go,config.go,main_test.go}`; `src/tools/gateway_client_test.go`; `src/mcpollama-mcp/client_label_test.go`. **Alterados:** `src/ollama/{api,client,errors,types}.go`, `src/tools/{generate,chat,embed,filetools,registry}.go`, `src/mcpollama-mcp/config.go`. `TOOLS.md` e as descrições das tools **não** mudaram (`TestToolsListBudget*` e `TestCatalogInSync` passam).
+  - **Monitor:**
+    - HTML único embutido (`go:embed`), sem CDN; SSE em `/monitor/api/stream` (reenvia ao mudar a fila, com debounce de 150 ms, e a cada 2 s; limite de 20 painéis → 503) e polling de 2 s como reserva;
+    - quadros do §4.1: cartões, em execução (botão **Cancelar**), fila (**▲ ▼ ✕**), concluídos recentes (50), GPUs + AER + boot id + uptime, 3 gráficos SVG da última hora (fila, vazão, espera média; amostrados a cada 5 s em memória), auditoria e eventos;
+    - API do §4.2 mais `POST /monitor/api/running/{id}/cancel`; `/monitor/api/session`, `/series`, `/login`, `/logout`;
+    - **todo dado vindo de cliente é escapado:** a página monta o DOM só com `textContent` (o teste proíbe `innerHTML`, `eval(`, URLs externas), o JSON sai do `encoding/json` (escapa `<`, `>`, `&`, e as quebras de linha ficam `\n` dentro de um único evento SSE) e há **CSP com hash** do script e do estilo inline (`default-src 'none'`, sem `unsafe-inline`). Teste de XSS com label `<img onerror>`, `</script>` e `\n\ndata: forged` passa;
+    - **GET sem efeito colateral:** teste executa todos os GET (inclusive as URLs de ação, que devem dar 405/404) e confere que fila, auditoria e sessões não mudaram.
+  - **Acesso (D9-1) e a escolha do hash:** GET aberto; todo POST exige sessão do único administrador **e** `X-CSRF-Token`. **Hash: PBKDF2-HMAC-SHA256 da stdlib (`crypto/pbkdf2`, Go 1.24+), 600.000 iterações, em vez de bcrypt**, porque evita mais uma dependência (o SQLite já é uma) e atende bem a um único administrador com senha longa; o formato da linha (`usuario:pbkdf2-sha256$iter$salt$hash`) é autodescritivo, então trocar por bcrypt depois é simples. Arquivo `--admin-file` com permissão de grupo/outros é recusado em Unix; subcomando `mcpollama-gateway hash-password -user admin` (senha lida do **stdin**, nunca da linha de comando; mínimo 8 caracteres). O `Verify` calcula o hash sempre e compara em tempo constante (usuário inexistente e senha errada têm a mesma resposta).
+  - **Sessão e CSRF:** cookie `mcpgw_session` com 32 bytes aleatórios, `HttpOnly; Secure; SameSite=Strict; Path=/monitor`, 8 h; no máximo 8 sessões ativas; o token CSRF é por sessão e só é entregue a quem tem o cookie; camada extra: `Sec-Fetch-Site` diferente de `same-origin/none` ou `Origin` de outro host → 403; login só aceita JSON; **limite de tentativas: 5 falhas por IP (e 30 no total) em 15 min → 429**, mesmo com a senha certa. Cada ação grava na auditoria (usuário, IP, ação, id, antes, depois, motivo ≤ 200 caracteres).
+  - **Entrypoint:** flags → env (`--listen 127.0.0.1:11500`, `--ollama`, `--db`, `--gen-slots`, `--embed-slots`, `--queue-max`, `--queue-per-client`, `--queue-per-ip`, `--labels-per-ip`, `--max-wait`, `--age-after`, `--start-stagger`, `--priority-ips`, `--allowed-models`, `--max-body-bytes`, `--admin-file`, `--gpu-interval`, `--nvidia-smi`, `--aer-path`, `--retention-requests`, `--retention-gpu`, `--version`, `--debug`); `--listen` fora do loopback é recusado (precisa de `--non-loopback-listen`); `GET /healthz`; encerramento por SIGINT/SIGTERM com 30 s de tolerância; grava os eventos `gateway_config`, `gateway_inicio` e `gateway_parada`. **Padrão de `--gen-slots` = 2** (o valor final sai da 8.9/D9-3 e é fixado na unit da 9.6). Build Linux: `GOOS=linux CGO_ENABLED=0`, 18 MB.
+  - **Mudanças no mcpollama (§7):**
+    - envia `X-Mcpollama-Client` (padrão `<hostname>/<pid>`, `--client-label`/`MCPOLLAMA_CLIENT_LABEL`; caracteres fora de `[A-Za-z0-9._:/@+-]` viram `_`, máx. 64) e `X-Mcpollama-Tool` (o nome da tool, via `ollama.WithTool` no registro, sem tocar nas definições);
+    - lê `X-Queue-Ms` (`Usage.QueueMS`, `EmbedResponse.QueueMS`) e soma ao `queue_ms` do `[uso]` (generate, chat, embed e as tools de arquivo);
+    - **503 com `Retry-After`** (só a resposta do gateway; um 503 puro do Ollama não): erro claro "a fila do servidor está cheia; tente de novo em ~N s" e **no máximo 1 nova tentativa**, apenas se sobrar pelo menos o dobro da espera no `--timeout`; **409** do administrador: "o administrador do servidor removeu ou cancelou este pedido…", sem nova tentativa; cancelamento no meio do stream chega como linha `{"error":"cancelado pelo administrador"}` e já aparece como erro do stream.
+  - **O que não deu certo e solução:** (1) a camada de exibição desta sessão reescreveu a sequência de escape unicode do JSON nos arquivos de teste, e a asserção do XSS falhou em falso; solução: montar o texto procurado por bytes (`string([]byte{92,117,48,48,51,99})`), sem a sequência literal; (2) `readSmallJSON` exigia `Content-Type` até em ação sem corpo (415); agora só exige JSON quando há corpo; (3) um teste usava `r.Header.Set("Host")`, que não altera `r.Host`; corrigido no helper; (4) o aviso "eval()" do hook de segurança foi falso positivo (o teste procura `eval(` no HTML para provar que não existe).
+  - **Gate (números):** `gofmt -l .` vazio; `go build ./...` e `go vet ./...` ok; `go test -count=1 ./...` 17 pacotes ok (monitor 0,8 s, gateway-cmd 5,6 s, tools 4,0 s); `-race -count=2` em `./gateway/... ./ollama ./tools ./cmd/mcpollama-gateway` ok (monitor 3,9 s, proxy 2,5 s, queue 4,9 s, store 5,1 s, tools 10,9 s, cmd 12,8 s); build **e** vet Linux do gateway ok; `TestToolsListBudget`, `TestToolsListBudgetWithFileTools` e `TestCatalogInSync` PASS sem regenerar o `TOOLS.md`.
+  - **Estado:** 9.4 concluída; o código de 9.1–9.4 está pronto para a revisão adversarial (9.5).
+  - **Pendências (para a 9.5):**
+    1. o teste de ponta a ponta mcpollama→gateway real não existe (as duas metades têm teste próprio com Ollama/cliente falsos); montar na 9.5/9.7;
+    2. o `Secure` do cookie impede o login por HTTP puro: o `/monitor` só funciona por HTTPS (nginx 8443); decidir se haverá modo de desenvolvimento;
+    3. a página não foi aberta num navegador real (só testada por Go); validar visualmente e com o Chrome DevTools na 9.7;
+    4. SSE: o limite de 20 painéis é global, não por IP;
+    5. `Stats`/`History` de 7 d sobre 200 mil linhas na memória (medir);
+    6. `/v1/*` (dialeto OpenAI) está no proxy; confirmar na 9.6 o `location` do nginx;
+    7. sem `--run-timeout` no gateway; um stream pendurado só termina pela desconexão do cliente;
+    8. o teste de ponta a ponta do entrypoint leva ~5 s para encerrar (a tolerância de desligamento); investigar se é o `Shutdown` esperando conexões ociosas;
+    9. `golang.org/x/sys` foi de v0.48.0 para v0.49.0 (exigência do SQLite): reconferir o OCR no Windows real (`go test -tags ocr`) antes do merge.
+
+- 2026-10-28 23:24 → 2026-10-29 00:15 — **9.5 revisão adversarial CONCLUÍDA** (subagente opus, worktree `agent-a5589ffef1a3fdd1b`; commits `3146afd` e `8814d7a` de correção + o commit "docs: Fase 9.5" do report).
+  - **Report:** `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md`. Ataques, logs e fuzz em `….testes/`, como na Fase 7. As regressões ficam nos pacotes (`fase95_regress_test.go`).
+  - **Método:**
+    - leitura de todo o código da 9.1–9.4;
+    - 30 vetores executáveis (`VEC|id|sev|arquivo:linha|resultado`) em 6 pacotes, rodados no `315f996` (`antes.log`) e no código corrigido (`depois.log`, `s2-depois.log`);
+    - uma regressão por achado; prova de que ela falha antes, numa cópia do `315f996` (`git archive`, sem tocar o repositório principal);
+    - fuzz de 10 min por alvo e gate completo.
+  - **O que deu certo (sem achado, 18 vetores OK):**
+    - `X-Real-IP` só de loopback com 1 valor (8 casos);
+    - smuggling: CL+CL, CL/TE com espaço e CL negativo → 400; `chunked, identity` e TE duplicado → 501; CL+TE → o contrabandeado vira 2º pedido e recebe 403. O Ollama só viu o corpo exato;
+    - 17 variantes de rota bloqueada (`/api/pull/`, `//api/pull`, `/api/%70ull`, `/API/pull`, `/v1/../api/pull`, `OPTIONS`/`HEAD`…): 0 chegou ao Ollama;
+    - contadores não enganados por `"done":true` no texto nem por `tool_call`;
+    - vazamento de slot: 0 nos 3 modos de falha;
+    - inanição de `baixa`: o envelhecimento funciona;
+    - escalonamento: quem desiste sai;
+    - corrida das ações: 1.800 pedidos = 1.800 registros com `-race`;
+    - SQLi no `/history`: parametrizado;
+    - sentinela nos erros: o `error_class` só tem texto fixo;
+    - XSS, CSRF (11 casos), fixação de sessão e exposição de segredo: OK;
+    - `hash-password`: não ecoa em stdout/stderr;
+    - ponta a ponta com `--debug`: token, prompt e resposta fora do log, do `/monitor` e do `.db`;
+    - cliente mcpollama: nova tentativa só em 503 + `Retry-After` inteiro, nunca depois de 409; `TOOLS.md` e descrições intactos.
+  - **O que não deu certo (12 achados, 0 Alto, todos corrigidos):**
+    - **Médios:**
+      - **M1** TOCTOU do login, achado do coordenador: 40 paralelas → 40 PBKDF2;
+      - **M2** bloqueio global, achado do coordenador: 40 IPs travavam o administrador;
+      - **M3** SSE só com teto global (pendência 4 da 9.4);
+      - **P6** sem `--run-timeout`: slot preso para sempre (pendências 9.2-1 e 9.4-7);
+      - **S2** histórico sem teto de linhas: ~864 mil/dia possíveis por 90 d.
+    - **Baixos:**
+      - **P2** rotação IPv6 dentro do /64;
+      - **C1** `--priority-ips ::ffff:a.b.c.d` aceito e sem efeito. A hipótese inicial, "casa com todo IPv4", foi **refutada pelo spike**;
+      - **Q1** registro perdido em Cancel × abandono;
+      - **S1** `Stats` sem índice (48 ms por chamada com 207 mil linhas, 2 vezes a cada 2 s com painel aberto) e truncamento silencioso;
+      - **S3** um evento de descarte por lote, numa tabela que nunca expira;
+      - **M8** `/stats` sem cache;
+      - **C5** SIGTERM com painel aberto esperava 30 s.
+  - **Solução:**
+    - **M1:** reserva atômica `tryBegin`/`end`/`abort` + semáforo de 2 PBKDF2;
+    - **M2:** teto global retirado; 5 por IP + backoff exponencial por IP (15 min → 24 h). Não houve necessidade de `--admin-ips`;
+    - **M3:** 4 streams por IP, 32 no total;
+    - **P6:** `--run-timeout` (`MCPGW_RUN_TIMEOUT`), **padrão = `--max-wait` (10 min)**. O motivo é a simetria: ninguém segura um slot mais do que alguém pode esperar por ele; a folga sobre os 120 s do mcpollama e os ~87 s medidos é grande; só uma geração patológica do contexto inteiro (~11 min) é cortada. Antes dos headers → 504; no stream → linha NDJSON de erro; registro `erro/run_timeout`;
+    - **S2:** `--max-request-rows` (`MCPGW_MAX_REQUEST_ROWS`, 3.000.000), `Store.Cap` por `rowid` a cada `Maintain` (de hora em hora), evento `teto_pedidos`;
+    - **P2:** `fairIP` agrupa o IPv6 por /64;
+    - **C1:** `parseNets` com `net/netip` (o mapeado vira IPv4; < /96 e zona são recusados);
+    - **Q1:** o `abandon` emite o registro;
+    - **S1:** índice `requests(finished_at)` (0,56 ms) + campo `truncated`;
+    - **S3:** no máximo 1 evento por minuto, sem perder a contagem (o `Close` grava o resto);
+    - **M8:** cache de 5 s por janela;
+    - **C5:** `RegisterOnShutdown(mon.Close)` (6 ms);
+    - **endurecimento H1:** o `Verify` compara o SHA-256 do usuário.
+  - **Medida da pendência 9.3-1/9.4-5 (`Stats` com 200 mil linhas, banco sintético de 90 dias, 207 mil linhas):**
+    - antes: 15m 48,2 ms, 7d 70,8 ms (4 MiB), 90d 305,6 ms (49 MiB, truncado);
+    - depois: 15m 0,56 ms, 7d 33,6 ms;
+    - a janela de 90d não é exposta e agora avisa o truncamento.
+  - **Gate (números):**
+    - `go build`/`go vet ./...` exit 0; `gofmt -l .` vazio;
+    - `go test -count=1 ./...`: 16 pacotes `ok`;
+    - `-race -count=1 ./...`: 16 `ok` (doctext 127 s);
+    - **OCR com a DLL real** (SHA-256 conferido, `tessdata\best`): ocr, doctext, tools e mcpollama-mcp `ok`, **385 PASS, 0 SKIP**. O `x/sys` v0.49.0 está validado (pendência 9.4-9);
+    - build Linux do gateway: 18.077.009 bytes; vet Linux ok;
+    - `go mod tidy`: **sem diff** (o `modernc.org/sqlite` já era direto; o aviso do editor estava velho);
+    - os 2 commits de correção foram verificados em exportação limpa (`git archive … src TOOLS.md`): tudo `ok`.
+  - **Fuzz de 10 min por alvo** (23:55:32 → 00:05:36, paralelo, `-parallel 3`), todos PASS:
+    - `FuzzConcurrentActions`: 213.938 execuções;
+    - `FuzzFairIP`: 6.972.864;
+    - `FuzzCountersFromModelText`: 3.282.757;
+    - `FuzzParseNets`: 3.729.010;
+    - `FuzzLoginLimiter`: 3.165.797.
+  - **Erros de processo (corrigidos, detalhe no report §3.2 e §6):**
+    - a 1ª versão do vetor Q4 usava prazo de 0 ms;
+    - a 1ª regressão do Q1 passava no código antigo por causa de um `Release` final; isso foi provado na cópia do `315f996` e corrigido;
+    - a 1ª regressão de SSE travou a suíte por 400 s por causa da ordem `defer` × `Cleanup`;
+    - um caso do O1 foi mal nomeado;
+    - um BOM do PowerShell 5.1 entrou num arquivo de teste;
+    - a 1ª exportação limpa ficou sem o `TOOLS.md`.
+  - **Estado:** 9.5 concluída.
+  - **Pendências (numeradas; detalhe no report §7):**
+    1. `hash-password` ecoa a senha no terminal: documentar `read -rs` na 9.6.
+    2. **Decisão do owner:** o gateway não policia `options` (`num_ctx`, `num_gpu`, `keep_alive:0`), que podem forçar recarga ou descarga e prefill gigante.
+    3. O limite de login e o de SSE usam o IP completo, não o /64. Basta enquanto o `/monitor` for só da LAN IPv4.
+    4. INFO: um cliente que desiste antes de entrar não gera registro.
+    5. 9.6: confirmar `proxy_request_buffering on` (o gateway não tem prazo de leitura do corpo).
+    6. 9.6: confirmar `X-Real-IP` em todo `location`, e não pôr `127.0.0.1` em `--priority-ips`.
+    7. 9.7: validar o teto de 3 milhões de linhas e o `--run-timeout` de 10 min com o volume real.
+    8. Pendência 9.4-8 diagnosticada: o gateway encerra em 5 ms; os ~5 s são do ambiente do worktree (0,35 s em exportação limpa).
+    9. Herdadas e ainda abertas:
+       - 9.1-1 e 9.1-2;
+       - 9.2-2, 9.2-3 e 9.2-4;
+       - 9.3-2, 9.3-3 e 9.3-4;
+       - 9.4-1, 9.4-2 e 9.4-3.

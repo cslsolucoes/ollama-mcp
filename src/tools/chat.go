@@ -138,7 +138,7 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 		hasEval:    true,
 		total:      time.Duration(resp.TotalDuration),
 		load:       time.Duration(resp.LoadDuration),
-		queue:      waited,
+		queue:      waited + time.Duration(resp.QueueMS)*time.Millisecond,
 		doneReason: resp.DoneReason,
 	}), nil
 }

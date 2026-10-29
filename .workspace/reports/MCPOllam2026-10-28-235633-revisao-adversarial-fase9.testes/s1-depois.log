@@ -1,0 +1,14 @@
+=== RUN   TestAdvStatsSynthetic90Days
+    fase9_adv_test.go:87: preenchido: 207000 linhas em 3.9386812s
+    fase9_adv_test.go:98: MEDIDA|stats|15m|linhas=24|tempo=560.7µs|alocado=0.0MiB
+    fase9_adv_test.go:98: MEDIDA|stats|hoje~12h|linhas=1151|tempo=2.2732ms|alocado=0.2MiB
+    fase9_adv_test.go:98: MEDIDA|stats|24h|linhas=2301|tempo=4.4364ms|alocado=0.5MiB
+    fase9_adv_test.go:98: MEDIDA|stats|7d|linhas=16101|tempo=33.6491ms|alocado=3.6MiB
+    fase9_adv_test.go:98: MEDIDA|stats|90d|linhas=200000|tempo=422.5034ms|alocado=49.2MiB
+    fase9_adv_test.go:101: MEDIDA|history50|tempo=535.8µs|alocado=0.1MiB
+    fase9_adv_test.go:103: MEDIDA|history-offset-fim|tempo=348.1541ms
+    fase9_adv_test.go:117: plano: SEARCH requests USING INDEX idx_requests_fin (finished_at>?);
+    fase9_adv_test.go:122: VEC|S1-stats-scan|Baixa|gateway/store/store.go:511|OK: Stats usa indice
+--- PASS: TestAdvStatsSynthetic90Days (4.79s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	4.809s

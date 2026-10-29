@@ -10,6 +10,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/cslsoftwares/mcpollama/files"
@@ -94,6 +95,17 @@ func New(d Deps) []mcp.ToolEntry {
 	}
 	if d.Files != nil {
 		out = append(out, d.summarizeFileTool(), d.extractTool(), d.translateTool())
+	}
+	// Tag every model call with the tool name (X-Mcpollama-Tool, metadata for the
+	// server queue); the definitions are not touched.
+	for i := range out {
+		h, name := out[i].Handler, out[i].Def.Name
+		if h == nil {
+			continue
+		}
+		out[i].Handler = func(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
+			return h(ollama.WithTool(ctx, name), raw)
+		}
 	}
 	return out
 }

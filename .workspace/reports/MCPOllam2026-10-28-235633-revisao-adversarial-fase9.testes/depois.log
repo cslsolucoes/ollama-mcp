@@ -1,0 +1,118 @@
+315f996d045bad02280389285f8a14c08aeb0ea2
+arvore: HEAD + correcoes nao commitadas (ver git diff)
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	0.024s [no tests to run]
+=== RUN   TestAdvStatsNoCache
+    fase9_adv_m8_test.go:44: VEC|M8-stats-sem-cache|Baixa|gateway/monitor/monitor.go:491|OK: 30 GET paralelos -> 1 calculo(s) (6.0994ms)
+--- PASS: TestAdvStatsNoCache (0.16s)
+=== RUN   TestAdvLoginTOCTOU
+    fase9_adv_test.go:68: VEC|M1-login-toctou|Media|gateway/monitor/monitor.go:587|OK: 40 paralelas -> 5 avaliadas; codigos map[401:5 429:35]
+--- PASS: TestAdvLoginTOCTOU (0.18s)
+=== RUN   TestAdvLoginGlobalLockout
+    fase9_adv_test.go:84: VEC|M2-login-bloqueio-global|Media|gateway/monitor/admin.go:226|OK: falhas de outros IPs nao bloqueiam o administrador
+--- PASS: TestAdvLoginGlobalLockout (0.04s)
+=== RUN   TestAdvSSEOneIPExhaustsAll
+    fase9_adv_test.go:127: VEC|M3-sse-por-ip|Media|gateway/monitor/monitor.go:301|OK: 1 IP limitado a 4 streams; outro IP recebe 200
+--- PASS: TestAdvSSEOneIPExhaustsAll (0.09s)
+=== RUN   TestAdvXSSFields
+    fase9_adv_test.go:161: VEC|M4-xss|Alta|gateway/monitor/monitor.go:191|OK: <, > e & escapados no JSON; nosniff; pagina so textContent; CSP sem unsafe-inline
+--- PASS: TestAdvXSSFields (0.05s)
+=== RUN   TestAdvCSRF
+    fase9_adv_test.go:203: VEC|M5-csrf|Alta|gateway/monitor/monitor.go:535|OK: sem token=403; token errado=403; Origin null=403; Origin subdominio=403; Origin sufixo=403; Sec-Fetch-Site same-site=403; Sec-Fetch-Site cross-site=403; form text/plain=415; sem cookie=401; Origin ausente, tudo certo=409; Origin igual=409
+--- PASS: TestAdvCSRF (0.02s)
+=== RUN   TestAdvSessionFixation
+    fase9_adv_test.go:223: VEC|M6-fixacao-sessao|Alta|gateway/monitor/monitor.go:606|OK: login sempre gera token novo de 256 bits; o cookie plantado nao vira sessao; HttpOnly+Secure+SameSite=Strict
+--- PASS: TestAdvSessionFixation (0.02s)
+=== RUN   TestAdvNoSecretsInAPI
+    fase9_adv_test.go:245: VEC|M7-exposicao-api|Alta|gateway/monitor/monitor.go:296|OK: nenhuma rota GET anonima devolve cookie, CSRF ou hash; o proxy nunca passa prompt/token ao queue (ver S5 e o teste-sentinela)
+--- PASS: TestAdvNoSecretsInAPI (0.02s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	0.611s
+=== RUN   TestAdvClientIPForgery
+    fase9_adv_test.go:60: VEC|P1-x-real-ip|Alta|gateway/proxy/proxy.go:175|OK: 8 casos (forjado de fora, duplicado, lista, mapeado, ::1, zona)
+--- PASS: TestAdvClientIPForgery (0.00s)
+=== RUN   TestAdvIPv6RotationBypassesPerIP
+    fase9_adv_test.go:85: VEC|P2-ipv6-rotacao|Baixa|gateway/proxy/proxy.go:309|OK: o /64 conta como 1 IP; 2 em espera
+--- PASS: TestAdvIPv6RotationBypassesPerIP (0.31s)
+=== RUN   TestAdvSmuggling
+    fase9_adv_test.go:147: upstream viu: ["/api/generate {\"model\":\"m\"}"]; respostas: [CL com espaco=[400] TE com espaco=[400] CL negativo=[400] CL+CL=[400] CL+TE=[200 403] TE chunked,identity=[501] TE duplicado=[501]]
+    fase9_adv_test.go:152: VEC|P3-smuggling|Alta|gateway/proxy/proxy.go:286|OK: o Ollama so viu /api/generate com o corpo exato (1 vezes); [CL com espaco=[400] TE com espaco=[400] CL negativo=[400] CL+CL=[400] CL+TE=[200 403] TE chunked,identity=[501] TE duplicado=[501]]
+--- PASS: TestAdvSmuggling (0.06s)
+=== RUN   TestAdvBlockedRouteVariants
+    fase9_adv_test.go:197: VEC|P4-rotas-bloqueadas|Alta|gateway/proxy/proxy.go:261|OK: nenhuma variante chegou ao Ollama; POST /api/pull=403; POST /api/pull/=403; POST //api/pull=404; POST /api/%70ull=403; POST /API/pull=404; POST /v1/../api/pull=307; OPTIONS /api/pull=403; HEAD /api/pull=403; DELETE /api/delete=403; POST /api/blobs/sha256:abc=403; POST /api/tags/../pull=307; POST /api/create%2F=403; OPTIONS /api/generate=405; HEAD /api/generate=405; POST /api/copy?x=1=403; POST /./api/push=307; POST /api/pull%00=404
+--- PASS: TestAdvBlockedRouteVariants (0.00s)
+=== RUN   TestAdvCountersSpoof
+    fase9_adv_test.go:226: VEC|P5-contadores-falsos|Baixa|gateway/proxy/proxy.go:508|OK: so a ultima linha conta; texto e tool_call nao enganam (eval=41 pe=44)
+--- PASS: TestAdvCountersSpoof (0.00s)
+=== RUN   TestAdvEndlessResponseHoldsSlot
+    fase9_adv_test.go:287: VEC|P6-sem-run-timeout|Media|gateway/proxy/proxy.go:340|OK: /api/generate=200 "\"x\",\"done\":false}\n\n{\"error\":\"tempo máximo de execução no servidor esgotado\"}"; /api/chat=504 "{\"error\":\"tempo máximo de execução no servidor esgotado\"}"
+--- PASS: TestAdvEndlessResponseHoldsSlot (0.60s)
+=== RUN   TestAdvSlotLeakFailureModes
+    fase9_adv_test.go:325: VEC|P7-vazamento-slot|Alta|gateway/proxy/proxy.go:328|OK: 0 slots presos; respostas 502/200; registros [erro/upstream_unreachable erro/upstream_dropped cancelado/cancelado]
+--- PASS: TestAdvSlotLeakFailureModes (0.80s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	1.811s
+=== RUN   TestAdvCancelThenAbandonLosesRecord
+    fase9_adv_test.go:48: VEC|Q1-cancel-x-abandono|Baixa|gateway/queue/queue.go:445|OK: 1 registro cancelado_admin
+--- PASS: TestAdvCancelThenAbandonLosesRecord (0.00s)
+=== RUN   TestAdvLowPriorityNotStarved
+    fase9_adv_test.go:95: VEC|Q2-inanicao-baixa|Media|gateway/queue/queue.go:591|OK: baixa envelhecido comecou apesar do fluxo continuo de normal de outro IP
+--- PASS: TestAdvLowPriorityNotStarved (0.25s)
+=== RUN   TestAdvCancelDuringStagger
+    fase9_adv_test.go:131: VEC|Q3-desiste-no-escalonamento|Media|gateway/queue/queue.go:680|OK: saiu da fila; slots 1 -> 0; invariantes ok
+--- PASS: TestAdvCancelDuringStagger (0.48s)
+=== RUN   TestAdvActionsRaceStartEnd
+    fase9_adv_test.go:208: VEC|Q4-acoes-x-inicio-fim|Alta|gateway/queue/queue.go:738|OK: 1800 pedidos, 1800 registros, 0 slots presos
+--- PASS: TestAdvActionsRaceStartEnd (0.88s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	1.646s
+=== RUN   TestAdvStatsSynthetic90Days
+    fase9_adv_test.go:58: preenchido: 207000 linhas em 4.6774574s
+    fase9_adv_test.go:69: MEDIDA|stats|15m|linhas=24|tempo=504.1µs|alocado=0.0MiB
+    fase9_adv_test.go:69: MEDIDA|stats|hoje~12h|linhas=1150|tempo=2.5978ms|alocado=0.2MiB
+    fase9_adv_test.go:69: MEDIDA|stats|24h|linhas=2300|tempo=4.3651ms|alocado=0.5MiB
+    fase9_adv_test.go:69: MEDIDA|stats|7d|linhas=16100|tempo=34.9876ms|alocado=3.6MiB
+    fase9_adv_test.go:69: MEDIDA|stats|90d|linhas=200000|tempo=428.7931ms|alocado=49.2MiB
+    fase9_adv_test.go:72: MEDIDA|history50|tempo=503.8µs|alocado=0.1MiB
+    fase9_adv_test.go:74: MEDIDA|history-offset-fim|tempo=363.9308ms
+    fase9_adv_test.go:88: plano: SEARCH requests USING INDEX idx_requests_fin (finished_at>?);
+    fase9_adv_test.go:93: VEC|S1-stats-scan|Baixa|gateway/store/store.go:511|OK: Stats usa indice
+--- PASS: TestAdvStatsSynthetic90Days (5.56s)
+=== RUN   TestAdvRequestsGrowthWithoutCap
+    fase9_adv_test.go:103: grava milhoes de linhas
+--- SKIP: TestAdvRequestsGrowthWithoutCap (0.00s)
+=== RUN   TestAdvDroppedEventsFlood
+    fase9_adv_test.go:143: VEC|S3-eventos-descarte|Baixa|gateway/store/store.go:321|OK: 1 evento(s) em 20 lotes (agregado)
+--- PASS: TestAdvDroppedEventsFlood (0.02s)
+=== RUN   TestAdvHistorySQLInjection
+    fase9_adv_test.go:168: VEC|S4-sqli-history|Alta|gateway/store/store.go:462|OK: filtros parametrizados; 0 linhas e tabela intacta
+--- PASS: TestAdvHistorySQLInjection (0.02s)
+=== RUN   TestAdvSentinelErrorPaths
+    fase9_adv_test.go:226: error_class gravados: [upstream_500 stream_error upstream_400]
+    fase9_adv_test.go:238: VEC|S5-sentinela-erros|Alta|gateway/proxy/proxy.go:387|OK: 0 ocorrencias em .db/-wal/-shm; error_class=[upstream_500 stream_error upstream_400]
+--- PASS: TestAdvSentinelErrorPaths (0.07s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	5.716s
+=== RUN   TestAdvPriorityIPsMappedV6
+    fase9_adv_test.go:65: VEC|C1-priority-ips-ipv4-mapeado|Baixa|cmd/mcpollama-gateway/config.go:245|OK: formas mapeadas viram o prefixo IPv4 equivalente ou sao recusadas
+--- PASS: TestAdvPriorityIPsMappedV6 (0.00s)
+=== RUN   TestAdvPriorityIPsMalformed
+    fase9_adv_test.go:82: VEC|C2-priority-ips-malformado|Media|cmd/mcpollama-gateway/config.go:237|OK: 9 formas malformadas recusadas (partida falha)
+--- PASS: TestAdvPriorityIPsMalformed (0.00s)
+=== RUN   TestAdvHashPasswordNoLeak
+    fase9_adv_test.go:104: VEC|C3-hash-password|Media|cmd/mcpollama-gateway/main.go:209|OK: senha so pelo stdin; nao aparece em stdout/stderr (sucesso e 2 erros). Risco residual: o terminal ecoa o que se digita (documentar `read -rs`)
+--- PASS: TestAdvHashPasswordNoLeak (0.00s)
+=== RUN   TestAdvEndToEndNoSecretInLogsOrMonitor
+    fase9_adv_test.go:177: VEC|C4-e2e-sem-segredo|Alta|cmd/mcpollama-gateway/main.go:123|OK: token removido antes do Ollama; prompt/resposta/token ausentes do log --debug, do /monitor e do .db/-wal
+--- PASS: TestAdvEndToEndNoSecretInLogsOrMonitor (0.45s)
+=== RUN   TestAdvShutdownWithOpenSSE
+    fase9_adv_test.go:211: VEC|C5-shutdown-sse|Baixa|cmd/mcpollama-gateway/main.go:183|OK: encerrou em 6ms com 1 painel aberto
+--- PASS: TestAdvShutdownWithOpenSSE (0.03s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.523s
+=== RUN   TestAdvRetryOnlyOn503RetryAfter
+    fase9_adv_test.go:65: VEC|O1-retry-503|Media|ollama/api.go:323|OK: tentativas 503 RA=0=1; 503 RA=-3=1; 503 RA=data HTTP=1; 503 RA=1.5=1; 429 RA=1=1; 502 RA=1=1; 409 generico=1; 409 administrador RA=1=1; 503 RA=1 sempre (embed)=2
+--- PASS: TestAdvRetryOnlyOn503RetryAfter (1.01s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/tools	1.062s

@@ -1,0 +1,764 @@
+// Package store keeps the gateway history in SQLite (Fase 9.3): metadata only,
+// never a prompt, a document, an answer or a token (plan section 5).
+//
+// The database is never on the hot path: the queue lives in memory and the
+// producers (Record, GPU, Event) only push into a buffered channel. One
+// goroutine writes the items in batches inside a transaction. When the buffer
+// is full the item is dropped and counted; the count is later written as an
+// event. Audit entries are rare and written synchronously.
+//
+// The driver is modernc.org/sqlite (pure Go, no cgo), decision D9-5.
+package store
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	_ "modernc.org/sqlite" // registers the "sqlite" driver
+
+	"github.com/cslsoftwares/mcpollama/gateway/queue"
+)
+
+const schema = `
+CREATE TABLE IF NOT EXISTS requests(
+  id TEXT PRIMARY KEY, client_ip TEXT, client_label TEXT, tool TEXT, endpoint TEXT, model TEXT,
+  lane TEXT, priority_in TEXT, priority_final TEXT, bytes_in INTEGER,
+  enqueued_at INTEGER, started_at INTEGER, finished_at INTEGER,
+  wait_ms INTEGER, run_ms INTEGER,
+  status TEXT, http_status INTEGER, error_class TEXT,
+  prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT);
+CREATE TABLE IF NOT EXISTS audit(
+  id INTEGER PRIMARY KEY, ts INTEGER, usuario TEXT, ip TEXT, acao TEXT, request_id TEXT,
+  antes TEXT, depois TEXT, motivo TEXT);
+CREATE TABLE IF NOT EXISTS gpu_samples(
+  ts INTEGER, gpu INTEGER, bus_id TEXT, power_w REAL, mem_used_mib INTEGER,
+  util_pct INTEGER, temp_c INTEGER, aer_corr_1b4 INTEGER, boot_id TEXT);
+CREATE TABLE IF NOT EXISTS events(ts INTEGER, kind TEXT, detail TEXT);
+CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
+CREATE INDEX IF NOT EXISTS idx_requests_enq ON requests(enqueued_at);
+CREATE INDEX IF NOT EXISTS idx_requests_client ON requests(client_label, enqueued_at);
+CREATE INDEX IF NOT EXISTS idx_requests_fin ON requests(finished_at);
+CREATE INDEX IF NOT EXISTS idx_gpu_ts ON gpu_samples(ts);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts);
+CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
+`
+
+// Options configures Open.
+type Options struct {
+	BootID      string                           // stamped on requests and GPU rows
+	BufferSize  int                              // channel capacity, default 4096
+	BatchSize   int                              // items per transaction, default 200
+	FlushEvery  time.Duration                    // default 250 ms
+	Logf        func(format string, args ...any) // optional
+	ReqKeep     time.Duration                    // requests retention, default 90 days
+	GPUKeep     time.Duration                    // GPU samples retention, default 7 days
+	VacuumEvery time.Duration                    // default 7 days
+	// MaxRequests caps the requests table (Fase 9.5, S2): the retention is by
+	// age only, and a client in a loop at the rate the nginx allows writes
+	// ~864 thousand rows a day. Maintain deletes the oldest rows above the cap
+	// at every call (hourly). Default DefaultMaxRequests.
+	MaxRequests int64
+}
+
+// DefaultMaxRequests is the default cap of the requests table (~1 GB with the
+// indexes; ~33 thousand requests a day for the 90 days of retention).
+const DefaultMaxRequests = 3_000_000
+
+// dropEventEvery is the shortest gap between two "registros_descartados"
+// events: under a sustained overload every batch would write one, and the
+// events table never expires (Fase 9.5, S3).
+const dropEventEvery = time.Minute
+
+// Store is the SQLite history. Safe for concurrent use.
+type Store struct {
+	db   *sql.DB
+	opts Options
+
+	ch      chan item
+	dropped atomic.Int64
+	written atomic.Int64
+	wg      sync.WaitGroup
+	closed  atomic.Bool
+	closeMu sync.RWMutex
+
+	lastDropEvent time.Time // writer goroutine only
+}
+
+type itemKind int
+
+const (
+	kRecord itemKind = iota
+	kGPU
+	kEvent
+	kBarrier
+)
+
+type item struct {
+	kind itemKind
+	rec  queue.Record
+	gpu  []GPURow
+	ev   Event
+	done chan struct{}
+}
+
+// GPURow is one GPU sample as stored.
+type GPURow struct {
+	TS         time.Time
+	GPU        int
+	BusID      string
+	PowerW     float64
+	MemUsedMiB int
+	UtilPct    int
+	TempC      int
+	AER        int64 // correctable AER counter of the bridge; -1 when unknown
+}
+
+// Event is a row of the events table.
+type Event struct {
+	TS     time.Time
+	Kind   string
+	Detail string
+}
+
+// Open creates (0600) or opens the database, applies the schema and starts
+// the writer. A new boot id (compared with the last one seen) is recorded as
+// an event.
+func Open(path string, o Options) (*Store, error) {
+	if o.BufferSize <= 0 {
+		o.BufferSize = 4096
+	}
+	if o.BatchSize <= 0 {
+		o.BatchSize = 200
+	}
+	if o.FlushEvery <= 0 {
+		o.FlushEvery = 250 * time.Millisecond
+	}
+	if o.ReqKeep <= 0 {
+		o.ReqKeep = 90 * 24 * time.Hour
+	}
+	if o.GPUKeep <= 0 {
+		o.GPUKeep = 7 * 24 * time.Hour
+	}
+	if o.VacuumEvery <= 0 {
+		o.VacuumEvery = 7 * 24 * time.Hour
+	}
+	if o.MaxRequests <= 0 {
+		o.MaxRequests = DefaultMaxRequests
+	}
+	// Create the file with 0600 first: SQLite gives the -wal and -shm files the
+	// same permission bits as the main file.
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("store: cannot create %s: %w", path, err)
+	}
+	f.Close()
+	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(4)
+	if _, err := db.Exec(schema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: schema: %w", err)
+	}
+	s := &Store{db: db, opts: o, ch: make(chan item, o.BufferSize)}
+	s.noteBoot()
+	s.wg.Add(1)
+	go s.writer()
+	return s, nil
+}
+
+func (s *Store) logf(format string, a ...any) {
+	if s.opts.Logf != nil {
+		s.opts.Logf(format, a...)
+	}
+}
+
+// noteBoot records the start of the gateway and, when the boot id changed
+// since the last run, a "boot_novo" event (the machine rebooted).
+func (s *Store) noteBoot() {
+	now := time.Now()
+	var last string
+	_ = s.db.QueryRow(`SELECT v FROM meta WHERE k='boot_id'`).Scan(&last)
+	if s.opts.BootID != "" && last != s.opts.BootID {
+		detail := "boot_id=" + s.opts.BootID
+		if last != "" {
+			detail += " anterior=" + last
+		}
+		s.exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, now.UnixMilli(), "boot_novo", detail)
+		s.exec(`INSERT INTO meta(k,v) VALUES('boot_id',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, s.opts.BootID)
+	}
+	s.exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, now.UnixMilli(), "gateway_inicio", "boot_id="+s.opts.BootID)
+}
+
+func (s *Store) exec(q string, args ...any) {
+	if _, err := s.db.Exec(q, args...); err != nil {
+		s.logf("store: %v", err)
+	}
+}
+
+// Dropped is the number of items lost because the buffer was full or a batch
+// failed.
+func (s *Store) Dropped() int64 { return s.dropped.Load() }
+
+// Written is the number of items written.
+func (s *Store) Written() int64 { return s.written.Load() }
+
+func (s *Store) push(it item) {
+	s.closeMu.RLock()
+	defer s.closeMu.RUnlock()
+	if s.closed.Load() {
+		return
+	}
+	select {
+	case s.ch <- it:
+	default:
+		s.dropped.Add(1)
+	}
+}
+
+// Record queues the metadata of a finished request. Never blocks.
+func (s *Store) Record(r queue.Record) { s.push(item{kind: kRecord, rec: r}) }
+
+// GPU queues one round of GPU samples. Never blocks.
+func (s *Store) GPU(rows []GPURow) {
+	if len(rows) > 0 {
+		s.push(item{kind: kGPU, gpu: rows})
+	}
+}
+
+// Event queues an event row. Never blocks.
+func (s *Store) Event(kind, detail string) {
+	s.push(item{kind: kEvent, ev: Event{TS: time.Now(), Kind: kind, Detail: detail}})
+}
+
+// Flush blocks until everything queued before the call is on disk (tests and
+// shutdown).
+func (s *Store) Flush() {
+	done := make(chan struct{})
+	s.closeMu.RLock()
+	if s.closed.Load() {
+		s.closeMu.RUnlock()
+		return
+	}
+	s.ch <- item{kind: kBarrier, done: done} // may block: a barrier must not be dropped
+	s.closeMu.RUnlock()
+	<-done
+}
+
+// Close flushes, stops the writer and closes the database.
+func (s *Store) Close() error {
+	s.closeMu.Lock()
+	if s.closed.Swap(true) {
+		s.closeMu.Unlock()
+		return nil
+	}
+	close(s.ch)
+	s.closeMu.Unlock()
+	s.wg.Wait()
+	return s.db.Close()
+}
+
+func (s *Store) writer() {
+	defer s.wg.Done()
+	tick := time.NewTicker(s.opts.FlushEvery)
+	defer tick.Stop()
+	batch := make([]item, 0, s.opts.BatchSize)
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		n := s.writeBatch(batch)
+		if n < 0 {
+			s.dropped.Add(int64(len(batch)))
+		}
+		for _, it := range batch {
+			if it.kind == kBarrier {
+				close(it.done)
+			}
+		}
+		batch = batch[:0]
+	}
+	for {
+		select {
+		case it, ok := <-s.ch:
+			if !ok {
+				flush()
+				if s.dropped.Load() > 0 { // the last count must not be lost at shutdown
+					s.lastDropEvent = time.Time{}
+					s.writeBatch(nil)
+				}
+				return
+			}
+			batch = append(batch, it)
+			if it.kind == kBarrier || len(batch) >= s.opts.BatchSize {
+				flush()
+			}
+		case <-tick.C:
+			flush()
+		}
+	}
+}
+
+// writeBatch writes the items in one transaction; -1 means the batch failed.
+func (s *Store) writeBatch(batch []item) int {
+	tx, err := s.db.Begin()
+	if err != nil {
+		s.logf("store: begin: %v", err)
+		return -1
+	}
+	n := 0
+	for _, it := range batch {
+		var err error
+		switch it.kind {
+		case kRecord:
+			err = s.insertRecord(tx, it.rec)
+		case kGPU:
+			for _, g := range it.gpu {
+				_, err = tx.Exec(`INSERT INTO gpu_samples(ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,boot_id) VALUES(?,?,?,?,?,?,?,?,?)`,
+					g.TS.UnixMilli(), g.GPU, g.BusID, g.PowerW, g.MemUsedMiB, g.UtilPct, g.TempC, g.AER, s.opts.BootID)
+				if err != nil {
+					break
+				}
+			}
+		case kEvent:
+			_, err = tx.Exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, it.ev.TS.UnixMilli(), it.ev.Kind, it.ev.Detail)
+		}
+		if err != nil {
+			s.logf("store: insert: %v", err)
+			_ = tx.Rollback()
+			return -1
+		}
+		if it.kind != kBarrier {
+			n++
+		}
+	}
+	// Report items lost earlier in the same transaction, at most once a
+	// minute (the count accumulates in between).
+	if s.dropped.Load() > 0 && time.Since(s.lastDropEvent) >= dropEventEvery {
+		if d := s.dropped.Swap(0); d > 0 {
+			_, _ = tx.Exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, time.Now().UnixMilli(), "registros_descartados", strconv.FormatInt(d, 10))
+			s.lastDropEvent = time.Now()
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		s.logf("store: commit: %v", err)
+		return -1
+	}
+	s.written.Add(int64(n))
+	return n
+}
+
+func ms(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.UnixMilli()
+}
+
+func (s *Store) insertRecord(tx *sql.Tx, r queue.Record) error {
+	_, err := tx.Exec(`INSERT OR REPLACE INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
+		ms(r.EnqueuedAt), ms(r.StartedAt), ms(r.FinishedAt), r.WaitMS, r.RunMS, r.Status, r.HTTPStatus, r.ErrorClass,
+		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID)
+	return err
+}
+
+// ---- audit -------------------------------------------------------------------
+
+// AuditEntry is one administrator action.
+type AuditEntry struct {
+	TS        time.Time `json:"ts"`
+	User      string    `json:"usuario"`
+	IP        string    `json:"ip"`
+	Action    string    `json:"acao"`
+	RequestID string    `json:"request_id"`
+	Before    string    `json:"antes"`
+	After     string    `json:"depois"`
+	Reason    string    `json:"motivo"`
+}
+
+// AddAudit writes an audit entry synchronously (actions are rare, and the
+// trail must not be lost to a full buffer).
+func (s *Store) AddAudit(e AuditEntry) error {
+	if e.TS.IsZero() {
+		e.TS = time.Now()
+	}
+	_, err := s.db.Exec(`INSERT INTO audit(ts,usuario,ip,acao,request_id,antes,depois,motivo) VALUES(?,?,?,?,?,?,?,?)`,
+		e.TS.UnixMilli(), e.User, e.IP, e.Action, e.RequestID, e.Before, e.After, e.Reason)
+	return err
+}
+
+// Audits returns the latest entries, newest first.
+func (s *Store) Audits(ctx context.Context, limit int) ([]AuditEntry, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT ts,usuario,ip,acao,request_id,antes,depois,motivo FROM audit ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []AuditEntry{}
+	for rows.Next() {
+		var e AuditEntry
+		var ts int64
+		if err := rows.Scan(&ts, &e.User, &e.IP, &e.Action, &e.RequestID, &e.Before, &e.After, &e.Reason); err != nil {
+			return nil, err
+		}
+		e.TS = time.UnixMilli(ts)
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// ---- reads ---------------------------------------------------------------------
+
+// Row is a request as the history shows it.
+type Row struct {
+	ID            string `json:"id"`
+	ClientIP      string `json:"client_ip"`
+	ClientLabel   string `json:"client_label"`
+	Tool          string `json:"tool"`
+	Endpoint      string `json:"endpoint"`
+	Model         string `json:"model"`
+	Lane          string `json:"lane"`
+	PriorityIn    string `json:"priority_in"`
+	PriorityFinal string `json:"priority_final"`
+	BytesIn       int64  `json:"bytes_in"`
+	EnqueuedAt    int64  `json:"enqueued_at"`
+	StartedAt     int64  `json:"started_at"`
+	FinishedAt    int64  `json:"finished_at"`
+	WaitMS        int64  `json:"wait_ms"`
+	RunMS         int64  `json:"run_ms"`
+	Status        string `json:"status"`
+	HTTPStatus    int    `json:"http_status"`
+	ErrorClass    string `json:"error_class"`
+	PromptEval    int64  `json:"prompt_eval_count"`
+	Eval          int64  `json:"eval_count"`
+	LoadMS        int64  `json:"load_ms"`
+	BootID        string `json:"boot_id"`
+}
+
+// HistoryQuery filters the history. Zero fields do not filter.
+type HistoryQuery struct {
+	Since, Until time.Time
+	Client       string // client_label
+	Model        string
+	Limit        int // default 100, max 1000
+	Offset       int
+}
+
+const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id`
+
+func scanRow(sc interface{ Scan(...any) error }) (Row, error) {
+	var r Row
+	var bootID, ec sql.NullString
+	err := sc.Scan(&r.ID, &r.ClientIP, &r.ClientLabel, &r.Tool, &r.Endpoint, &r.Model, &r.Lane, &r.PriorityIn, &r.PriorityFinal, &r.BytesIn,
+		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID)
+	r.ErrorClass, r.BootID = ec.String, bootID.String
+	return r, err
+}
+
+// History returns requests newest first.
+func (s *Store) History(ctx context.Context, q HistoryQuery) ([]Row, error) {
+	if q.Limit <= 0 {
+		q.Limit = 100
+	}
+	if q.Limit > 1000 {
+		q.Limit = 1000
+	}
+	where, args := "1=1", []any{}
+	if !q.Since.IsZero() {
+		where += " AND enqueued_at >= ?"
+		args = append(args, q.Since.UnixMilli())
+	}
+	if !q.Until.IsZero() {
+		where += " AND enqueued_at <= ?"
+		args = append(args, q.Until.UnixMilli())
+	}
+	if q.Client != "" {
+		where += " AND client_label = ?"
+		args = append(args, q.Client)
+	}
+	if q.Model != "" {
+		where += " AND model = ?"
+		args = append(args, q.Model)
+	}
+	args = append(args, q.Limit, q.Offset)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+rowCols+` FROM requests WHERE `+where+` ORDER BY enqueued_at DESC, id LIMIT ? OFFSET ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Row{}
+	for rows.Next() {
+		r, err := scanRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// Stats summarises a window.
+type Stats struct {
+	Window       string         `json:"window"`
+	Total        int            `json:"total"`
+	OK           int            `json:"ok"`
+	Errors       int            `json:"errors"`
+	ByStatus     map[string]int `json:"by_status"`
+	ByClass      map[string]int `json:"by_class"`
+	WaitP50      int64          `json:"wait_p50_ms"`
+	WaitP95      int64          `json:"wait_p95_ms"`
+	RunP50       int64          `json:"run_p50_ms"`
+	RunP95       int64          `json:"run_p95_ms"`
+	PerMinute    float64        `json:"per_minute"`
+	PromptTokens int64          `json:"prompt_tokens"`
+	EvalTokens   int64          `json:"eval_tokens"`
+	TokensPerSec float64        `json:"tokens_per_sec"`
+	// Truncated is true when the window had more than maxStatRows requests:
+	// the numbers then cover only the newest maxStatRows (Fase 9.5, S1).
+	Truncated bool `json:"truncated"`
+}
+
+// maxStatRows bounds the rows one Stats call reads (a var for the tests).
+var maxStatRows = 200000
+
+// Stats computes the statistics of the requests that finished in the window.
+func (s *Store) Stats(ctx context.Context, window time.Duration, label string) (Stats, error) {
+	st := Stats{Window: label, ByStatus: map[string]int{}, ByClass: map[string]int{}}
+	since := time.Now().Add(-window).UnixMilli()
+	rows, err := s.db.QueryContext(ctx, `SELECT status,error_class,started_at,wait_ms,run_ms,prompt_eval_count,eval_count FROM requests WHERE finished_at >= ? ORDER BY finished_at DESC LIMIT ?`, since, maxStatRows)
+	if err != nil {
+		return st, err
+	}
+	defer rows.Close()
+	var waits, runs []int64
+	for rows.Next() {
+		var status string
+		var class sql.NullString
+		var started, w, r, pe, e int64
+		if err := rows.Scan(&status, &class, &started, &w, &r, &pe, &e); err != nil {
+			return st, err
+		}
+		st.Total++
+		st.ByStatus[status]++
+		if status == queue.StatusOK {
+			st.OK++
+			runs = append(runs, r)
+		} else if status == queue.StatusError {
+			st.Errors++
+		}
+		if class.String != "" && status != queue.StatusOK {
+			st.ByClass[class.String]++
+		}
+		if started > 0 { // only requests that reached a slot have a meaningful queue wait
+			waits = append(waits, w)
+		}
+		st.PromptTokens += pe
+		st.EvalTokens += e
+	}
+	if err := rows.Err(); err != nil {
+		return st, err
+	}
+	st.Truncated = st.Total >= maxStatRows
+	st.WaitP50, st.WaitP95 = Percentile(waits, 50), Percentile(waits, 95)
+	st.RunP50, st.RunP95 = Percentile(runs, 50), Percentile(runs, 95)
+	secs := window.Seconds()
+	if secs > 0 {
+		st.PerMinute = float64(st.Total) / (secs / 60)
+		st.TokensPerSec = float64(st.EvalTokens) / secs
+	}
+	return st, rows.Err()
+}
+
+// Percentile returns the p-th percentile (nearest rank) of v; 0 for empty.
+func Percentile(v []int64, p int) int64 {
+	if len(v) == 0 {
+		return 0
+	}
+	c := append([]int64(nil), v...)
+	sort.Slice(c, func(i, j int) bool { return c[i] < c[j] })
+	idx := (p*len(c) + 99) / 100
+	if idx < 1 {
+		idx = 1
+	}
+	if idx > len(c) {
+		idx = len(c)
+	}
+	return c[idx-1]
+}
+
+// GPUSince returns GPU samples newer than since, oldest first.
+func (s *Store) GPUSince(ctx context.Context, since time.Time, limit int) ([]GPURow, error) {
+	if limit <= 0 || limit > 100000 {
+		limit = 20000
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4 FROM gpu_samples WHERE ts >= ? ORDER BY ts LIMIT ?`, since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []GPURow{}
+	for rows.Next() {
+		var g GPURow
+		var ts int64
+		if err := rows.Scan(&ts, &g.GPU, &g.BusID, &g.PowerW, &g.MemUsedMiB, &g.UtilPct, &g.TempC, &g.AER); err != nil {
+			return nil, err
+		}
+		g.TS = time.UnixMilli(ts)
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// Events returns the latest events, newest first.
+func (s *Store) Events(ctx context.Context, limit int) ([]Event, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT ts,kind,detail FROM events ORDER BY ts DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Event{}
+	for rows.Next() {
+		var e Event
+		var ts int64
+		if err := rows.Scan(&ts, &e.Kind, &e.Detail); err != nil {
+			return nil, err
+		}
+		e.TS = time.UnixMilli(ts)
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// ---- maintenance -------------------------------------------------------------
+
+// Prune deletes requests and GPU samples older than the retention. audit and
+// events never expire.
+func (s *Store) Prune(ctx context.Context, now time.Time) (reqs, gpus int64, err error) {
+	r, err := s.db.ExecContext(ctx, `DELETE FROM requests WHERE enqueued_at < ?`, now.Add(-s.opts.ReqKeep).UnixMilli())
+	if err != nil {
+		return 0, 0, err
+	}
+	reqs, _ = r.RowsAffected()
+	g, err := s.db.ExecContext(ctx, `DELETE FROM gpu_samples WHERE ts < ?`, now.Add(-s.opts.GPUKeep).UnixMilli())
+	if err != nil {
+		return reqs, 0, err
+	}
+	gpus, _ = g.RowsAffected()
+	return reqs, gpus, nil
+}
+
+// Cap deletes the oldest requests above opts.MaxRequests. The rowid grows with
+// every insert (INSERT OR REPLACE included), so the range delete is cheap and
+// keeps at most MaxRequests rows.
+func (s *Store) Cap(ctx context.Context) (int64, error) {
+	r, err := s.db.ExecContext(ctx, `DELETE FROM requests WHERE rowid <= (SELECT MAX(rowid) FROM requests) - ?`, s.opts.MaxRequests)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := r.RowsAffected()
+	return n, nil
+}
+
+// Vacuum compacts the database.
+func (s *Store) Vacuum(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `VACUUM`)
+	return err
+}
+
+func (s *Store) metaTime(k string) time.Time {
+	var v string
+	if s.db.QueryRow(`SELECT v FROM meta WHERE k=?`, k).Scan(&v) != nil {
+		return time.Time{}
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return time.Time{}
+	}
+	return time.UnixMilli(n)
+}
+
+func (s *Store) setMetaTime(k string, t time.Time) {
+	s.exec(`INSERT INTO meta(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, k, strconv.FormatInt(t.UnixMilli(), 10))
+}
+
+// Maintain runs the daily cleanup and the weekly VACUUM when they are due.
+// Call it from a ticker (hourly is enough); the due dates survive restarts.
+func (s *Store) Maintain(ctx context.Context, now time.Time) error {
+	var errs []error
+	if n, err := s.Cap(ctx); err != nil {
+		errs = append(errs, err)
+	} else if n > 0 {
+		s.logf("store: teto de %d pedidos removeu os %d mais antigos", s.opts.MaxRequests, n)
+		s.exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, now.UnixMilli(), "teto_pedidos", strconv.FormatInt(n, 10))
+	}
+	if now.Sub(s.metaTime("last_prune")) >= 24*time.Hour {
+		reqs, gpus, err := s.Prune(ctx, now)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			s.setMetaTime("last_prune", now)
+			s.logf("store: retenção removeu %d pedidos e %d amostras de GPU", reqs, gpus)
+		}
+	}
+	if now.Sub(s.metaTime("last_vacuum")) >= s.opts.VacuumEvery {
+		if err := s.Vacuum(ctx); err != nil {
+			errs = append(errs, err)
+		} else {
+			s.setMetaTime("last_vacuum", now)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// RunMaintenance calls Maintain every interval until ctx ends.
+func (s *Store) RunMaintenance(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		if err := s.Maintain(ctx, time.Now()); err != nil {
+			s.logf("store: manutenção: %v", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// BootID reads the kernel boot id; "unknown" when it cannot be read (not Linux).
+func BootID(path string) string {
+	if path == "" {
+		path = "/proc/sys/kernel/random/boot_id"
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "unknown"
+	}
+	s := string(b)
+	for len(s) > 0 && (s[len(s)-1] == '\n' || s[len(s)-1] == '\r' || s[len(s)-1] == ' ') {
+		s = s[:len(s)-1]
+	}
+	if s == "" {
+		return "unknown"
+	}
+	return s
+}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -115,9 +116,11 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 	wire := generateWire{Model: model, Prompt: req.Prompt, System: req.System, Stream: !c.noStream, Options: req.Options}
 	var out GenerateResponse
 	if c.noStream {
-		if err := c.callJSON(ctx, http.MethodPost, pathGenerate, wire, &out); err != nil {
+		q, err := c.callJSONQ(ctx, http.MethodPost, pathGenerate, wire, &out)
+		if err != nil {
 			return nil, err
 		}
+		out.QueueMS = q
 		if out.Error != "" {
 			return nil, c.fail(ErrStream, 0, "o servidor reportou erro na geração: %s", c.detail([]byte(out.Error)))
 		}
@@ -125,7 +128,8 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 	}
 
 	var text strings.Builder
-	err = c.streamNDJSON(ctx, pathGenerate, wire, func(line []byte) (bool, error) {
+	var qms int64
+	qms, err = c.streamNDJSON(ctx, pathGenerate, wire, func(line []byte) (bool, error) {
 		var ch GenerateResponse
 		if err := json.Unmarshal(line, &ch); err != nil {
 			return false, c.fail(ErrBadResponse, 0, "linha NDJSON inválida na resposta do servidor")
@@ -141,6 +145,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 		return false, nil
 	})
 	out.Response = text.String()
+	out.QueueMS = qms
 	if err != nil {
 		if text.Len() == 0 {
 			return nil, err
@@ -173,9 +178,11 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	wire := chatWire{Model: model, Messages: req.Messages, Stream: !c.noStream, Options: req.Options}
 	var out ChatResponse
 	if c.noStream {
-		if err := c.callJSON(ctx, http.MethodPost, pathChat, wire, &out); err != nil {
+		q, err := c.callJSONQ(ctx, http.MethodPost, pathChat, wire, &out)
+		if err != nil {
 			return nil, err
 		}
+		out.QueueMS = q
 		if out.Error != "" {
 			return nil, c.fail(ErrStream, 0, "o servidor reportou erro na geração: %s", c.detail([]byte(out.Error)))
 		}
@@ -183,7 +190,8 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	}
 
 	var text strings.Builder
-	err = c.streamNDJSON(ctx, pathChat, wire, func(line []byte) (bool, error) {
+	var qms int64
+	qms, err = c.streamNDJSON(ctx, pathChat, wire, func(line []byte) (bool, error) {
 		var ch ChatResponse
 		if err := json.Unmarshal(line, &ch); err != nil {
 			return false, c.fail(ErrBadResponse, 0, "linha NDJSON inválida na resposta do servidor")
@@ -199,6 +207,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return false, nil
 	})
 	out.Message = ChatMessage{Role: "assistant", Content: text.String()}
+	out.QueueMS = qms
 	if err != nil {
 		if text.Len() == 0 {
 			return nil, err
@@ -229,9 +238,11 @@ func (c *Client) Embed(ctx context.Context, req EmbedRequest) (*EmbedResponse, e
 	defer cancel()
 
 	var out EmbedResponse
-	if err := c.callJSON(ctx, http.MethodPost, pathEmbed, embedWire{Model: model, Input: req.Input}, &out); err != nil {
+	q, err := c.callJSONQ(ctx, http.MethodPost, pathEmbed, embedWire{Model: model, Input: req.Input}, &out)
+	if err != nil {
 		return nil, err
 	}
+	out.QueueMS = q
 	if out.Error != "" {
 		return nil, c.fail(ErrServer, 0, "o servidor reportou erro no embed: %s", c.detail([]byte(out.Error)))
 	}
@@ -264,6 +275,12 @@ func (c *Client) checkPrompt(chars int) error {
 // send performs one exchange. A 2xx response is returned open (the caller
 // closes it); any other status becomes a mapped *Error.
 func (c *Client) send(ctx context.Context, method, path string, in any, start time.Time) (*http.Response, error) {
+	return c.sendOnce(ctx, method, path, in, start, false)
+}
+
+// sendOnce performs one exchange; retried is true on the single retry allowed
+// after a "queue full" answer.
+func (c *Client) sendOnce(ctx context.Context, method, path string, in any, start time.Time, retried bool) (*http.Response, error) {
 	var body io.Reader
 	if in != nil {
 		b, err := json.Marshal(in)
@@ -286,6 +303,12 @@ func (c *Client) send(ctx context.Context, method, path string, in any, start ti
 	if c.key != "" {
 		req.Header.Set("Authorization", "Bearer "+c.key) // the only place the token is used (SEC-002)
 	}
+	if c.label != "" {
+		req.Header.Set("X-Mcpollama-Client", c.label)
+	}
+	if tool := toolFrom(ctx); tool != "" {
+		req.Header.Set("X-Mcpollama-Tool", tool)
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		c.debugf("%s %s failed after %dms", method, path, time.Since(start).Milliseconds())
@@ -295,47 +318,103 @@ func (c *Client) send(ctx context.Context, method, path string, in any, start ti
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		defer resp.Body.Close()
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrBodyBytes))
+		// The server queue (gateway) refused or dropped the request before the
+		// model ran it, so a single retry cannot duplicate work (OLL-014 holds).
+		if wait, ok := queueFullWait(resp); ok {
+			if !retried && retryFits(ctx, wait) {
+				c.debugf("%s %s queue full, one retry in %s", method, path, wait)
+				t := time.NewTimer(wait)
+				select {
+				case <-t.C:
+				case <-ctx.Done():
+					t.Stop()
+					return nil, c.transportErr(ctx, ctx.Err(), start, false, 0)
+				}
+				return c.sendOnce(ctx, method, path, in, start, true)
+			}
+			return nil, c.fail(ErrQueueFull, resp.StatusCode,
+				"a fila do servidor está cheia; tente de novo em ~%d s (HTTP 503 %s %s)", int(wait/time.Second), method, path)
+		}
+		if resp.StatusCode == http.StatusConflict && strings.Contains(strings.ToLower(string(b)), "administrador") {
+			return nil, c.fail(ErrRemoved, resp.StatusCode,
+				"o administrador do servidor removeu ou cancelou este pedido (HTTP 409: %s); a chamada não foi repetida", c.detail(b))
+		}
 		return nil, c.statusError(method, path, resp.StatusCode, b)
 	}
 	return resp, nil
 }
 
+// queueFullWait recognises the gateway's "queue full" answer: 503 with a
+// Retry-After in seconds. A bare 503 (the Ollama itself) is not retried.
+func queueFullWait(resp *http.Response) (time.Duration, bool) {
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(resp.Header.Get("Retry-After")))
+	if err != nil || n < 1 {
+		return 0, false
+	}
+	if n > 60 {
+		n = 60
+	}
+	return time.Duration(n) * time.Second, true
+}
+
+// retryFits tells whether waiting `wait` still leaves room (at least the same
+// time again) before the call deadline.
+func retryFits(ctx context.Context, wait time.Duration) bool {
+	dl, ok := ctx.Deadline()
+	if !ok {
+		return true
+	}
+	return time.Until(dl) > 2*wait
+}
+
 // callJSON is the non-stream path: one bounded body, one JSON document. The
 // per-call deadline is applied here (a shorter caller deadline still wins).
 func (c *Client) callJSON(ctx context.Context, method, path string, in, out any) error {
+	_, err := c.callJSONQ(ctx, method, path, in, out)
+	return err
+}
+
+// callJSONQ is callJSON that also returns the server-side queue wait in ms
+// (X-Queue-Ms, set by the gateway; 0 when there is none).
+func (c *Client) callJSONQ(ctx context.Context, method, path string, in, out any) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	start := time.Now()
 	resp, err := c.send(ctx, method, path, in, start)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
+	qms := queueMS(resp)
 	b, err := io.ReadAll(io.LimitReader(resp.Body, int64(c.maxBody)+1))
 	if err != nil {
-		return c.transportErr(ctx, err, start, true, len(b))
+		return 0, c.transportErr(ctx, err, start, true, len(b))
 	}
 	if len(b) > c.maxBody {
-		return c.fail(ErrBadResponse, 0, "resposta acima do limite de %d bytes", c.maxBody)
+		return 0, c.fail(ErrBadResponse, 0, "resposta acima do limite de %d bytes", c.maxBody)
 	}
 	if err := json.Unmarshal(b, out); err != nil {
-		return c.fail(ErrBadResponse, 0, "resposta inválida do servidor (JSON malformado em %s)", path)
+		return 0, c.fail(ErrBadResponse, 0, "resposta inválida do servidor (JSON malformado em %s)", path)
 	}
-	c.debugf("%s %s done bytes=%d total=%dms", method, path, len(b), time.Since(start).Milliseconds())
-	return nil
+	c.debugf("%s %s done bytes=%d total=%dms queue=%dms", method, path, len(b), time.Since(start).Milliseconds(), qms)
+	return qms, nil
 }
 
 // streamNDJSON sends the request and feeds each NDJSON line to handle until it
 // reports done. It owns the failure modes of a stream: a cut connection
 // (ErrConnectionDropped with the bytes received so far), a line above the
 // buffer (ErrBadResponse) and EOF before done:true (ErrStream).
-func (c *Client) streamNDJSON(ctx context.Context, path string, in any, handle func(line []byte) (bool, error)) error {
+func (c *Client) streamNDJSON(ctx context.Context, path string, in any, handle func(line []byte) (bool, error)) (int64, error) {
 	start := time.Now()
 	resp, err := c.send(ctx, http.MethodPost, path, in, start)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
+	qms := queueMS(resp)
 
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 0, min(64*1024, c.maxLine)), c.maxLine) // cap above max would raise the limit
@@ -348,21 +427,21 @@ func (c *Client) streamNDJSON(ctx context.Context, path string, in any, handle f
 		}
 		done, err := handle(line)
 		if err != nil {
-			return err
+			return qms, err
 		}
 		if done {
 			c.debugf("POST %s stream done bytes=%d total=%dms", path, received, time.Since(start).Milliseconds())
-			return nil
+			return qms, nil
 		}
 	}
 	if err := sc.Err(); err != nil {
 		if errors.Is(err, bufio.ErrTooLong) {
-			return c.fail(ErrBadResponse, 0, "linha NDJSON acima do limite de %d bytes (--max-line-bytes)", c.maxLine)
+			return qms, c.fail(ErrBadResponse, 0, "linha NDJSON acima do limite de %d bytes (--max-line-bytes)", c.maxLine)
 		}
-		return c.transportErr(ctx, err, start, true, received)
+		return qms, c.transportErr(ctx, err, start, true, received)
 	}
 	if ctx.Err() != nil {
-		return c.transportErr(ctx, ctx.Err(), start, true, received)
+		return qms, c.transportErr(ctx, ctx.Err(), start, true, received)
 	}
-	return c.fail(ErrStream, 0, "o stream terminou sem done:true após %d bytes: resposta truncada", received)
+	return qms, c.fail(ErrStream, 0, "o stream terminou sem done:true após %d bytes: resposta truncada", received)
 }

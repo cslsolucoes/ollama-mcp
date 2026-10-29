@@ -1,0 +1,5 @@
+=== RUN   TestAdvRequestsGrowthWithoutCap
+    fase9_adv_test.go:149: VEC|S2-requests-sem-teto|Media|gateway/store/store.go:621|OK: 3000000 linhas apos Maintain (teto 3000000)
+--- PASS: TestAdvRequestsGrowthWithoutCap (138.06s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	138.088s

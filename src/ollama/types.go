@@ -19,6 +19,9 @@ type Usage struct {
 	PromptEvalDuration int64 `json:"prompt_eval_duration"`
 	EvalCount          int   `json:"eval_count"`
 	EvalDuration       int64 `json:"eval_duration"`
+	// QueueMS is the wait in the server-side queue (header X-Queue-Ms set by the
+	// gateway); 0 when there is no gateway. Not part of the Ollama JSON.
+	QueueMS int64 `json:"-"`
 }
 
 // GenerateRequest is the input of Generate. Model empty means the client default.
@@ -83,6 +86,7 @@ type EmbedResponse struct {
 	LoadDuration    int64       `json:"load_duration"`
 	PromptEvalCount int         `json:"prompt_eval_count"`
 	Error           string      `json:"error"`
+	QueueMS         int64       `json:"-"` // see Usage.QueueMS
 }
 
 // ModelDetails is the "details" object shared by tags, ps and show.
