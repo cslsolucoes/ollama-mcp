@@ -377,7 +377,7 @@ func (j *fileJob) call(ctx context.Context, prompt string) (string, error) {
 	if err != nil {
 		return "", sanitizeUpstream(err)
 	}
-	j.waited += waited
+	j.waited += waited + time.Duration(resp.QueueMS)*time.Millisecond
 	j.u.model = orStr(resp.Model, orStr(j.u.model, j.model))
 	j.u.promptEval += resp.PromptEvalCount
 	j.u.eval += resp.EvalCount

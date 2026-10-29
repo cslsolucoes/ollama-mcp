@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fila do servidor de IA</title>
+<style>
+:root{--bg:#f6f7f9;--fg:#1c2330;--mut:#667085;--card:#fff;--line:#d9dee7;--ok:#1a7f4b;--warn:#b26a00;--bad:#b42318;--acc:#2456c7;--chart:#2456c7}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--fg:#e6e9ef;--mut:#98a2b3;--card:#1a2029;--line:#2e3744;--ok:#4cc38a;--warn:#f0a63a;--bad:#ff7a70;--acc:#7aa2ff;--chart:#7aa2ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+h1{font-size:18px;margin:0}
+h2{font-size:14px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+main{padding:16px;display:grid;gap:16px;max-width:1400px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.card,section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+.card .v{font-size:26px;font-weight:600}
+.card .l{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.wrap{overflow-x:auto}
+.empty{color:var(--mut);padding:6px 0}
+.pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:12px;border:1px solid var(--line)}
+.alta{color:var(--bad)}.baixa{color:var(--mut)}.ok{color:var(--ok)}.erro,.cancelado_admin,.removido,.rejeitado,.expirado{color:var(--bad)}.cancelado{color:var(--warn)}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:2px 8px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.danger{color:var(--bad)}
+input{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:3px 6px}
+.gpus{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.gpu b{font-size:16px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+svg{width:100%;height:90px;background:transparent}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .line{fill:none;stroke:var(--chart);stroke-width:1.6}
+svg text{fill:var(--mut);font-size:9px}
+#status{font-size:12px;color:var(--mut)}
+#msg{min-height:1.2em;color:var(--warn)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Fila do servidor de IA</h1><div id="status">conectando...</div></div>
+  <div class="row" id="auth"></div>
+</header>
+<main>
+  <div id="msg" role="status"></div>
+  <div class="cards" id="cards"></div>
+  <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div></section>
+  <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div></section>
+  <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
+  <section><h2>Última hora</h2><div class="charts" id="charts"></div></section>
+  <section><h2>Concluídos recentes</h2><div class="wrap"><table id="recent"></table></div></section>
+  <section><h2>Auditoria (ações do administrador)</h2><div class="wrap"><table id="audit"></table></div></section>
+  <section><h2>Eventos</h2><div class="wrap"><table id="events"></table></div></section>
+</main>
+<script>
+"use strict";
+// Every value that came from a client is shown with textContent, never as HTML.
+var csrf = "", loggedIn = false, adminEnabled = false, lastState = null, es = null, pollTimer = null;
+function $(id) { return document.getElementById(id); }
+function el(tag, text, cls) { var e = document.createElement(tag); if (text !== undefined && text !== null) e.textContent = String(text); if (cls) e.className = cls; return e; }
+function fmtMs(ms) {
+  ms = Number(ms) || 0;
+  if (ms < 1000) return ms + " ms";
+  var s = ms / 1000; if (s < 60) return s.toFixed(1).replace(".", ",") + " s";
+  var m = Math.floor(s / 60); return m + " min " + String(Math.floor(s % 60)).padStart(2, "0") + " s";
+}
+function fmtTime(ms) { if (!ms) return ""; var d = new Date(ms); return d.toLocaleTimeString("pt-BR"); }
+function msg(t) { $("msg").textContent = t || ""; }
+
+function table(id, heads, rows, emptyText) {
+  var t = $(id); t.textContent = "";
+  if (!rows.length) { var p = t.parentNode; t.style.display = "none"; var old = p.querySelector(".empty"); if (old) old.remove(); p.appendChild(el("div", emptyText, "empty")); return; }
+  t.style.display = ""; var oldE = t.parentNode.querySelector(".empty"); if (oldE) oldE.remove();
+  var thead = el("thead"), tr = el("tr");
+  heads.forEach(function (h) { tr.appendChild(el("th", h)); });
+  thead.appendChild(tr); t.appendChild(thead);
+  var tb = el("tbody");
+  rows.forEach(function (cells) {
+    var r = el("tr");
+    cells.forEach(function (c) {
+      var td = el("td");
+      if (c && c.nodeType) td.appendChild(c); else if (c && c.text !== undefined) { td.textContent = c.text; if (c.cls) td.className = c.cls; if (c.title) td.title = c.title; } else td.textContent = c === null || c === undefined ? "" : String(c);
+      r.appendChild(td);
+    });
+    tb.appendChild(r);
+  });
+  t.appendChild(tb);
+}
+function who(it) { return { text: it.client_label || "", title: (it.client_ip || "") + " " + (it.client_label || "") }; }
+
+function post(path, body) {
+  return fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify(body || {}) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, body: j }; }); });
+}
+function act(kind, id) {
+  var path, reason = "";
+  if (kind === "remove") {
+    if (!confirm("Remover este pedido da fila? O cliente receberá um erro 409.")) return;
+    reason = prompt("Motivo (opcional):") || "";
+    path = "/monitor/api/queue/" + id + "/remove";
+  } else if (kind === "cancel") {
+    if (!confirm("Cancelar este pedido em execução? A conexão com o modelo será fechada.")) return;
+    reason = prompt("Motivo (opcional):") || "";
+    path = "/monitor/api/running/" + id + "/cancel";
+  } else path = "/monitor/api/queue/" + id + "/" + kind;
+  post(path, { reason: reason }).then(function (r) {
+    if (r.status === 200) msg(""); else msg((r.body && r.body.error) || ("Erro " + r.status));
+    if (r.status === 401) { loggedIn = false; renderAuth(); }
+    loadAudit(); if (lastState) render(lastState);
+  });
+}
+function btn(label, title, kind, id, cls) {
+  var b = el("button", label, cls); b.title = title; b.type = "button";
+  b.addEventListener("click", function () { act(kind, id); });
+  return b;
+}
+
+function render(s) {
+  lastState = s;
+  $("status").textContent = "versão " + s.version + " · boot " + (s.boot_id || "?").slice(0, 8) + " · ativo há " + fmtMs(s.uptime_s * 1000) + " · atualizado " + new Date(s.now).toLocaleTimeString("pt-BR");
+  var c = s.cards, cards = $("cards"); cards.textContent = "";
+  [["Em execução", c.running], ["Na fila", c.waiting], ["Concluídos hoje", c.done_today], ["Erros hoje", c.errors_today],
+   ["Espera p50 (15 min)", fmtMs(c.wait_p50_ms)], ["Espera p95 (15 min)", fmtMs(c.wait_p95_ms)],
+   ["Tokens/s (15 min)", Number(c.tokens_per_sec || 0).toFixed(1).replace(".", ",")], ["Pedidos/min (15 min)", Number(c.per_minute || 0).toFixed(1).replace(".", ",")]]
+    .forEach(function (x) { var d = el("div", null, "card"); d.appendChild(el("div", x[1], "v")); d.appendChild(el("div", x[0], "l")); cards.appendChild(d); });
+
+  var q = s.queue, slots = q.slots || {}, inuse = q.in_use || {};
+  var runRows = q.running.map(function (it) {
+    var cells = [it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, { text: it.priority, cls: it.priority }, fmtMs(it.running_ms), fmtMs(it.waiting_ms)];
+    cells.push(loggedIn ? btn("Cancelar", "Cancelar este pedido em execução", "cancel", it.id, "danger") : "");
+    return cells;
+  });
+  table("running", ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Prioridade", "Rodando há", "Esperou", ""], runRows,
+    "Nada em execução (slots: geração " + (inuse.geracao || 0) + "/" + (slots.geracao || 0) + ", embed " + (inuse.embed || 0) + "/" + (slots.embed || 0) + ").");
+
+  var waitRows = q.waiting.map(function (it) {
+    var box = el("div", null, "row");
+    if (loggedIn) {
+      box.appendChild(btn("▲", "Promover", "promote", it.id)); box.appendChild(btn("▼", "Despromover", "demote", it.id)); box.appendChild(btn("✕", "Remover da fila", "remove", it.id, "danger"));
+    }
+    return [it.position, it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, { text: it.priority, cls: it.priority }, fmtMs(it.waiting_ms), box];
+  });
+  table("waiting", ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Prioridade", "Esperando há", ""], waitRows, "Ninguém esperando.");
+
+  var recent = (s.recent || []).map(function (r) {
+    return [fmtTime(r.finished_at), { text: r.status, cls: r.status }, r.http_status, who(r), r.tool, r.model, fmtMs(r.wait_ms), fmtMs(r.run_ms), r.prompt_eval_count + " / " + r.eval_count, r.error_class];
+  });
+  table("recent", ["Fim", "Status", "HTTP", "Cliente", "Tool", "Modelo", "Esperou", "Rodou", "Tokens (prompt / gerados)", "Classe do erro"], recent, "Sem pedidos concluídos ainda.");
+
+  var ev = (s.events || []).map(function (e) { return [new Date(e.TS || e.ts).toLocaleString("pt-BR"), e.Kind || e.kind, e.Detail || e.detail]; });
+  table("events", ["Quando", "Tipo", "Detalhe"], ev, "Sem eventos.");
+
+  var g = $("gpus"); g.textContent = "";
+  var gs = s.gpu, meta = $("gpumeta");
+  if (gs && gs.samples && gs.samples.length) {
+    gs.samples.forEach(function (x) {
+      var d = el("div", null, "card gpu");
+      d.appendChild(el("div", "GPU " + x.index + " · " + x.bus_id, "l"));
+      d.appendChild(el("b", Number(x.power_w).toFixed(0) + " W"));
+      d.appendChild(el("div", x.mem_used_mib + " MiB · " + x.util_pct + "% · " + x.temp_c + " °C"));
+      g.appendChild(d);
+    });
+  }
+  var aer = gs ? (gs.aer_corr_1b4 >= 0 ? "AER 00:1b.4 (corrigíveis): " + gs.aer_corr_1b4 : "AER 00:1b.4: indisponível") : "GPU: coletor desligado";
+  meta.textContent = aer + (gs && gs.error ? " · " + gs.error : "") + (s.dropped ? " · registros descartados: " + s.dropped : "");
+}
+
+function chart(title, pts, key, fmt) {
+  var box = el("div"); box.appendChild(el("div", title, "l"));
+  var ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 300 90"); svg.setAttribute("preserveAspectRatio", "none");
+  var vals = pts.map(function (p) { return Number(p[key]) || 0; }), max = Math.max.apply(null, vals.concat([1]));
+  [20, 50, 80].forEach(function (y) { var l = document.createElementNS(ns, "line"); l.setAttribute("x1", 0); l.setAttribute("x2", 300); l.setAttribute("y1", y); l.setAttribute("y2", y); l.setAttribute("class", "grid"); svg.appendChild(l); });
+  if (vals.length > 1) {
+    var d = vals.map(function (v, i) { return (i / (vals.length - 1) * 300).toFixed(1) + "," + (85 - v / max * 70).toFixed(1); }).join(" ");
+    var pl = document.createElementNS(ns, "polyline"); pl.setAttribute("points", d); pl.setAttribute("class", "line"); svg.appendChild(pl);
+  }
+  var t = document.createElementNS(ns, "text"); t.setAttribute("x", 3); t.setAttribute("y", 10); t.textContent = "máx " + fmt(max); svg.appendChild(t);
+  box.appendChild(svg); return box;
+}
+function loadSeries() {
+  fetch("/monitor/api/series", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
+    var pts = j.points || [], c = $("charts"); c.textContent = "";
+    var perMin = pts.map(function (p) { return { v: p.finished * 60 / (j.every_s || 5) }; });
+    c.appendChild(chart("Pedidos na fila", pts, "waiting", function (v) { return String(v); }));
+    c.appendChild(chart("Vazão (pedidos/min)", perMin.map(function (x) { return { f: x.v }; }), "f", function (v) { return v.toFixed(1).replace(".", ","); }));
+    c.appendChild(chart("Espera média (ms)", pts, "wait_avg_ms", fmtMs));
+  }).catch(function () {});
+}
+function loadAudit() {
+  fetch("/monitor/api/audit?limite=20", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
+    var rows = (j.entries || []).map(function (a) { return [new Date(a.ts).toLocaleString("pt-BR"), a.usuario, a.ip, a.acao, (a.request_id || "").slice(0, 8), a.antes, a.depois, { text: a.motivo || "", title: a.motivo || "" }]; });
+    table("audit", ["Quando", "Usuário", "IP", "Ação", "Pedido", "Antes", "Depois", "Motivo"], rows, "Nenhuma ação registrada.");
+  }).catch(function () {});
+}
+
+function renderAuth() {
+  var a = $("auth"); a.textContent = "";
+  if (!adminEnabled) { a.appendChild(el("span", "somente leitura", "pill")); return; }
+  if (loggedIn) {
+    a.appendChild(el("span", "administrador", "pill"));
+    var out = el("button", "Sair"); out.type = "button";
+    out.addEventListener("click", function () { post("/monitor/api/logout").then(function () { loggedIn = false; csrf = ""; renderAuth(); if (lastState) render(lastState); }); });
+    a.appendChild(out);
+  } else {
+    var u = el("input"); u.placeholder = "usuário"; u.autocomplete = "username"; u.size = 10;
+    var p = el("input"); p.type = "password"; p.placeholder = "senha"; p.autocomplete = "current-password"; p.size = 10;
+    var b = el("button", "Entrar"); b.type = "button";
+    function go() {
+      fetch("/monitor/api/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: u.value, password: p.value }) })
+        .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+        .then(function (x) { if (x.s === 200) { csrf = x.j.csrf; loggedIn = true; msg(""); renderAuth(); if (lastState) render(lastState); loadAudit(); } else msg(x.j.error || "Falha no login"); });
+    }
+    b.addEventListener("click", go); p.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+    a.appendChild(u); a.appendChild(p); a.appendChild(b);
+  }
+}
+
+function poll() { fetch("/monitor/api/state", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(render).catch(function () { $("status").textContent = "sem conexão com o servidor"; }); }
+function connect() {
+  if (!window.EventSource) { startPolling(); return; }
+  es = new EventSource("/monitor/api/stream");
+  es.onmessage = function (e) { try { render(JSON.parse(e.data)); } catch (x) {} stopPolling(); };
+  es.onerror = function () { startPolling(); };
+}
+function startPolling() { if (!pollTimer) { poll(); pollTimer = setInterval(poll, 2000); } }
+function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+fetch("/monitor/api/session", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
+  adminEnabled = !!j.admin_enabled; loggedIn = !!j.logged_in; csrf = j.csrf || ""; renderAuth();
+}).catch(function () { renderAuth(); }).then(function () { connect(); loadSeries(); loadAudit(); setInterval(loadSeries, 5000); setInterval(loadAudit, 15000); });
+</script>
+</body>
+</html>

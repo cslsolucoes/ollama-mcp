@@ -55,6 +55,7 @@ type Config struct {
 	ToolsVerbosity string
 	TraceFile      string
 	AuditLogPath   string
+	ClientLabel    string // --client-label: name of this agent for the server queue; empty means <hostname>/<pid>
 	ShowVersion    bool
 	OCR            OCRFlags // --ocr-*: off unless OCR.Lib is set
 
@@ -142,6 +143,8 @@ Every flag falls back to its environment variable; the flag wins.
   --ocr-max-mem N         bytes per OCR process, default 1073741824 (MCPOLLAMA_OCR_MAX_MEM)
   --ocr-max-megapixels N  pixels per page, default 40 (dpi lowered to fit) (MCPOLLAMA_OCR_MAX_MEGAPIXELS)
   --ocr-dpi N             page render resolution, default 300      (MCPOLLAMA_OCR_DPI)
+  --client-label NAME     name of this agent for the server queue and its monitor
+                          (metadata only); default <hostname>/<pid> (MCPOLLAMA_CLIENT_LABEL)
   --tools-verbosity MODE  full|compact tools/list size             (MCPOLLAMA_TOOLS_VERBOSITY)
   --trace-file FILE       opt-in trace file (later phase)          (MCPOLLAMA_TRACE)
   --audit-log-path FILE   opt-in audit log (later phase)           (MCPOLLAMA_AUDIT_LOG)
@@ -176,6 +179,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fVerb     = fs.String("tools-verbosity", "", "")
 		fTrace    = fs.String("trace-file", "", "")
 		fAudit    = fs.String("audit-log-path", "", "")
+		fLabel    = fs.String("client-label", "", "")
 		fDebug    = fs.Bool("debug", false, "")
 		fVersion  = fs.Bool("version", false, "")
 
@@ -246,6 +250,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		ToolsVerbosity: str("tools-verbosity", "MCPOLLAMA_TOOLS_VERBOSITY", defaultVerbosity, fVerb),
 		TraceFile:      str("trace-file", "MCPOLLAMA_TRACE", "", fTrace),
 		AuditLogPath:   str("audit-log-path", "MCPOLLAMA_AUDIT_LOG", "", fAudit),
+		ClientLabel:    str("client-label", "MCPOLLAMA_CLIENT_LABEL", "", fLabel),
 		Debug:          boolean("debug", "MCPOLLAMA_DEBUG", fDebug),
 		ShowVersion:    *fVersion,
 		Timeout:        defaultTimeout,
@@ -422,5 +427,19 @@ func (c Config) ollamaOptions() ollama.Options {
 		Timeout:        c.Timeout,
 		MaxPromptChars: c.MaxPromptChars,
 		MaxLineBytes:   c.MaxLineBytes,
+		ClientLabel:    c.clientLabel(),
 	}
+}
+
+// clientLabel is --client-label, or <hostname>/<pid> by default so that each
+// agent shows up as its own client in the server queue.
+func (c Config) clientLabel() string {
+	if c.ClientLabel != "" {
+		return c.ClientLabel
+	}
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		host = "mcpollama"
+	}
+	return fmt.Sprintf("%s/%d", host, os.Getpid())
 }

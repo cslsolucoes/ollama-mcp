@@ -33,6 +33,8 @@ var (
 	ErrBadResponse       = errors.New("bad response")
 	ErrStream            = errors.New("stream failed")
 	ErrPromptTooLong     = errors.New("prompt too long")
+	ErrQueueFull         = errors.New("server queue full")
+	ErrRemoved           = errors.New("removed by the server administrator")
 )
 
 // Error is the single error type of the package. Msg is final: it was already

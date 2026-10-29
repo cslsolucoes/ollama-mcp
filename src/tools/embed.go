@@ -115,7 +115,7 @@ func (d Deps) embed(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResul
 		promptEval: resp.PromptEvalCount,
 		total:      time.Duration(resp.TotalDuration),
 		load:       time.Duration(resp.LoadDuration),
-		queue:      waited,
+		queue:      waited + time.Duration(resp.QueueMS)*time.Millisecond,
 	}
 	body := fmt.Sprintf("embeddings: %d vetor(es) de %d dimensões, modelo %s", len(resp.Embeddings), dims, u.model)
 	if withVectors {

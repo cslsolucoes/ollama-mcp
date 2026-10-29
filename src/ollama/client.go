@@ -12,10 +12,13 @@
 //   - Admin endpoints (pull, push, create, delete, copy, blobs) have no code
 //     here (SEC-012).
 //   - There is no automatic retry: resending a generation would duplicate load
-//     on the single shared GPU queue (OLL-014).
+//     on the single shared GPU queue (OLL-014). The one exception is a 503
+//     with Retry-After from the server queue (gateway): the request never ran,
+//     so it is retried once, and only if the call deadline leaves room.
 package ollama
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -24,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +57,10 @@ type Options struct {
 	MaxBodyBytes   int // ceiling of a non-stream response body (OLL-015)
 	MaxLineBytes   int // ceiling of one NDJSON line (OLL-015)
 
+	// ClientLabel names this agent to the server queue (X-Mcpollama-Client);
+	// metadata only, never content. Empty omits the header.
+	ClientLabel string
+
 	// DisableStream switches generate/chat to a single "stream":false
 	// response. The default is the internal stream (see Generate).
 	DisableStream bool
@@ -73,6 +81,7 @@ type Client struct {
 	maxBody    int
 	maxLine    int
 	noStream   bool
+	label      string
 
 	http   *http.Client
 	redact func(string) string
@@ -124,6 +133,7 @@ func New(o Options) (*Client, error) {
 		maxBody:    orInt(o.MaxBodyBytes, defaultMaxBodyBytes),
 		maxLine:    orInt(o.MaxLineBytes, defaultMaxLineBytes),
 		noStream:   o.DisableStream,
+		label:      cleanHeader(o.ClientLabel, 64, labelOK),
 		redact:     redact.New(secrets...),
 		http: &http.Client{
 			Transport: tr,
@@ -193,4 +203,54 @@ func (c *Client) debugf(format string, a ...any) {
 	if c.logf != nil {
 		c.logf(format, a...)
 	}
+}
+
+type toolKey struct{}
+
+// WithTool tags the calls made with ctx with the MCP tool name (header
+// X-Mcpollama-Tool). Metadata only.
+func WithTool(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, toolKey{}, name)
+}
+
+func toolFrom(ctx context.Context) string {
+	n, _ := ctx.Value(toolKey{}).(string)
+	return cleanHeader(n, 32, toolOK)
+}
+
+func labelOK(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._:/@+-", r)
+}
+
+func toolOK(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' || r == '.' || r == '-'
+}
+
+// cleanHeader maps every character outside the allowed set to '_' and cuts
+// the value, so a hostname with odd characters still makes a valid label.
+func cleanHeader(v string, max int, ok func(rune) bool) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	out := make([]rune, 0, len(v))
+	for _, r := range v {
+		if !ok(r) {
+			r = '_'
+		}
+		out = append(out, r)
+		if len(out) == max {
+			break
+		}
+	}
+	return string(out)
+}
+
+// queueMS reads the server-side queue wait from the gateway header.
+func queueMS(resp *http.Response) int64 {
+	n, err := strconv.ParseInt(strings.TrimSpace(resp.Header.Get("X-Queue-Ms")), 10, 64)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
