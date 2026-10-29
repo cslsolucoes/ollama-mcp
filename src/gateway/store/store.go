@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS events(ts INTEGER, kind TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
 CREATE INDEX IF NOT EXISTS idx_requests_enq ON requests(enqueued_at);
 CREATE INDEX IF NOT EXISTS idx_requests_client ON requests(client_label, enqueued_at);
+CREATE INDEX IF NOT EXISTS idx_requests_fin ON requests(finished_at);
 CREATE INDEX IF NOT EXISTS idx_gpu_ts ON gpu_samples(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
@@ -60,7 +61,21 @@ type Options struct {
 	ReqKeep     time.Duration                    // requests retention, default 90 days
 	GPUKeep     time.Duration                    // GPU samples retention, default 7 days
 	VacuumEvery time.Duration                    // default 7 days
+	// MaxRequests caps the requests table (Fase 9.5, S2): the retention is by
+	// age only, and a client in a loop at the rate the nginx allows writes
+	// ~864 thousand rows a day. Maintain deletes the oldest rows above the cap
+	// at every call (hourly). Default DefaultMaxRequests.
+	MaxRequests int64
 }
+
+// DefaultMaxRequests is the default cap of the requests table (~1 GB with the
+// indexes; ~33 thousand requests a day for the 90 days of retention).
+const DefaultMaxRequests = 3_000_000
+
+// dropEventEvery is the shortest gap between two "registros_descartados"
+// events: under a sustained overload every batch would write one, and the
+// events table never expires (Fase 9.5, S3).
+const dropEventEvery = time.Minute
 
 // Store is the SQLite history. Safe for concurrent use.
 type Store struct {
@@ -73,6 +88,8 @@ type Store struct {
 	wg      sync.WaitGroup
 	closed  atomic.Bool
 	closeMu sync.RWMutex
+
+	lastDropEvent time.Time // writer goroutine only
 }
 
 type itemKind int
@@ -132,6 +149,9 @@ func Open(path string, o Options) (*Store, error) {
 	}
 	if o.VacuumEvery <= 0 {
 		o.VacuumEvery = 7 * 24 * time.Hour
+	}
+	if o.MaxRequests <= 0 {
+		o.MaxRequests = DefaultMaxRequests
 	}
 	// Create the file with 0600 first: SQLite gives the -wal and -shm files the
 	// same permission bits as the main file.
@@ -272,6 +292,10 @@ func (s *Store) writer() {
 		case it, ok := <-s.ch:
 			if !ok {
 				flush()
+				if s.dropped.Load() > 0 { // the last count must not be lost at shutdown
+					s.lastDropEvent = time.Time{}
+					s.writeBatch(nil)
+				}
 				return
 			}
 			batch = append(batch, it)
@@ -317,9 +341,13 @@ func (s *Store) writeBatch(batch []item) int {
 			n++
 		}
 	}
-	// Report items lost earlier, once, in the same transaction.
-	if d := s.dropped.Swap(0); d > 0 {
-		_, _ = tx.Exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, time.Now().UnixMilli(), "registros_descartados", strconv.FormatInt(d, 10))
+	// Report items lost earlier in the same transaction, at most once a
+	// minute (the count accumulates in between).
+	if s.dropped.Load() > 0 && time.Since(s.lastDropEvent) >= dropEventEvery {
+		if d := s.dropped.Swap(0); d > 0 {
+			_, _ = tx.Exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, time.Now().UnixMilli(), "registros_descartados", strconv.FormatInt(d, 10))
+			s.lastDropEvent = time.Now()
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		s.logf("store: commit: %v", err)
@@ -500,15 +528,19 @@ type Stats struct {
 	PromptTokens int64          `json:"prompt_tokens"`
 	EvalTokens   int64          `json:"eval_tokens"`
 	TokensPerSec float64        `json:"tokens_per_sec"`
+	// Truncated is true when the window had more than maxStatRows requests:
+	// the numbers then cover only the newest maxStatRows (Fase 9.5, S1).
+	Truncated bool `json:"truncated"`
 }
 
-const maxStatRows = 200000
+// maxStatRows bounds the rows one Stats call reads (a var for the tests).
+var maxStatRows = 200000
 
 // Stats computes the statistics of the requests that finished in the window.
 func (s *Store) Stats(ctx context.Context, window time.Duration, label string) (Stats, error) {
 	st := Stats{Window: label, ByStatus: map[string]int{}, ByClass: map[string]int{}}
 	since := time.Now().Add(-window).UnixMilli()
-	rows, err := s.db.QueryContext(ctx, `SELECT status,error_class,started_at,wait_ms,run_ms,prompt_eval_count,eval_count FROM requests WHERE finished_at >= ? LIMIT ?`, since, maxStatRows)
+	rows, err := s.db.QueryContext(ctx, `SELECT status,error_class,started_at,wait_ms,run_ms,prompt_eval_count,eval_count FROM requests WHERE finished_at >= ? ORDER BY finished_at DESC LIMIT ?`, since, maxStatRows)
 	if err != nil {
 		return st, err
 	}
@@ -541,6 +573,7 @@ func (s *Store) Stats(ctx context.Context, window time.Duration, label string) (
 	if err := rows.Err(); err != nil {
 		return st, err
 	}
+	st.Truncated = st.Total >= maxStatRows
 	st.WaitP50, st.WaitP95 = Percentile(waits, 50), Percentile(waits, 95)
 	st.RunP50, st.RunP95 = Percentile(runs, 50), Percentile(runs, 95)
 	secs := window.Seconds()
@@ -632,6 +665,18 @@ func (s *Store) Prune(ctx context.Context, now time.Time) (reqs, gpus int64, err
 	return reqs, gpus, nil
 }
 
+// Cap deletes the oldest requests above opts.MaxRequests. The rowid grows with
+// every insert (INSERT OR REPLACE included), so the range delete is cheap and
+// keeps at most MaxRequests rows.
+func (s *Store) Cap(ctx context.Context) (int64, error) {
+	r, err := s.db.ExecContext(ctx, `DELETE FROM requests WHERE rowid <= (SELECT MAX(rowid) FROM requests) - ?`, s.opts.MaxRequests)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := r.RowsAffected()
+	return n, nil
+}
+
 // Vacuum compacts the database.
 func (s *Store) Vacuum(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `VACUUM`)
@@ -658,6 +703,12 @@ func (s *Store) setMetaTime(k string, t time.Time) {
 // Call it from a ticker (hourly is enough); the due dates survive restarts.
 func (s *Store) Maintain(ctx context.Context, now time.Time) error {
 	var errs []error
+	if n, err := s.Cap(ctx); err != nil {
+		errs = append(errs, err)
+	} else if n > 0 {
+		s.logf("store: teto de %d pedidos removeu os %d mais antigos", s.opts.MaxRequests, n)
+		s.exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, now.UnixMilli(), "teto_pedidos", strconv.FormatInt(n, 10))
+	}
 	if now.Sub(s.metaTime("last_prune")) >= 24*time.Hour {
 		reqs, gpus, err := s.Prune(ctx, now)
 		if err != nil {

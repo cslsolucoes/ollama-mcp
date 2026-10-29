@@ -78,7 +78,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 
 	bootID := store.BootID("")
 	st, err := store.Open(cfg.DB, store.Options{
-		BootID: bootID, Logf: logf, ReqKeep: cfg.RetentionReq, GPUKeep: cfg.RetentionGPU,
+		BootID: bootID, Logf: logf, ReqKeep: cfg.RetentionReq, GPUKeep: cfg.RetentionGPU, MaxRequests: int64(cfg.MaxReqRows),
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
@@ -122,7 +122,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	}
 	px, err := proxy.New(proxy.Config{
 		Upstream: cfg.Ollama, Queue: q, PriorityNets: cfg.PriorityNets, AllowedModels: cfg.AllowedModels,
-		MaxBodyBytes: cfg.MaxBodyBytes, Logf: dbg,
+		MaxBodyBytes: cfg.MaxBodyBytes, RunTimeout: cfg.RunTimeout, Logf: dbg,
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
@@ -147,6 +147,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		// No Read/WriteTimeout: generations and event streams are long-lived.
 		ErrorLog: lg,
 	}
+	srv.RegisterOnShutdown(mon.Close) // open /monitor panels must not hold the shutdown
 
 	bg, cancelBG := context.WithCancel(ctx)
 	var wg sync.WaitGroup
@@ -160,8 +161,8 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 
 	logf("mcpollama-gateway %s em %s -> Ollama %s (geracao=%d embed=%d fila=%d por-ip=%d) boot=%s",
 		Version, ln.Addr(), cfg.Ollama.Host, cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerIP, bootID)
-	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s",
-		cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerClient, cfg.PerIP, cfg.LabelsPerIP, cfg.StartStagger, cfg.MaxWait))
+	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s run_timeout=%s max_rows=%d",
+		cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerClient, cfg.PerIP, cfg.LabelsPerIP, cfg.StartStagger, cfg.MaxWait, cfg.RunTimeout, cfg.MaxReqRows))
 	if ready != nil {
 		ready(ln.Addr().String())
 	}

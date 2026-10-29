@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -62,8 +63,17 @@ type Config struct {
 	PriorityNets  []*net.IPNet // IPs allowed to ask for priority alta
 	AllowedModels []string     // empty means any model
 	MaxBodyBytes  int64        // request body ceiling, default 32 MiB
-	Logf          func(format string, args ...any)
+	// RunTimeout bounds how long a started request may hold its slot (Fase
+	// 9.5, P6): an Ollama that never answers or a stream that never ends is
+	// cut, the slot comes back and the client gets a clear error. Zero means
+	// the queue MaxWait (the entrypoint flag --run-timeout defaults to
+	// --max-wait, 10 min).
+	RunTimeout time.Duration
+	Logf       func(format string, args ...any)
 }
+
+// ErrRunTimeout is the cause of a request cut by RunTimeout.
+var ErrRunTimeout = errors.New("tempo máximo de execução no servidor esgotado")
 
 // Handler is the gateway front. Safe for concurrent use.
 type Handler struct {
@@ -101,6 +111,7 @@ type exchange struct {
 	status  int
 	body    *countingBody
 	proxyEr error
+	runCtx  context.Context
 }
 
 // New builds the Handler.
@@ -113,6 +124,9 @@ func New(cfg Config) (*Handler, error) {
 	}
 	if cfg.MaxBodyBytes <= 0 {
 		cfg.MaxBodyBytes = defaultMaxBody
+	}
+	if cfg.RunTimeout <= 0 {
+		cfg.RunTimeout = cfg.Queue.Config().MaxWait
 	}
 	h := &Handler{cfg: cfg}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
@@ -147,6 +161,8 @@ func New(cfg Config) (*Handler, error) {
 			switch {
 			case queue.IsAdminCancel(r.Context()):
 				writeJSON(w, http.StatusConflict, "cancelado pelo administrador")
+			case isRunTimeout(r.Context()):
+				writeJSON(w, http.StatusGatewayTimeout, ErrRunTimeout.Error())
 			case r.Context().Err() != nil:
 				// The client is gone: nobody to answer.
 			default:
@@ -309,7 +325,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 	pin, pfinal := h.priorityFor(ip, r.Header.Get(HeaderPriority))
 	qreq := queue.Request{
-		ID: id, Lane: rt.lane, ClientIP: ip,
+		ID: id, Lane: rt.lane, ClientIP: fairIP(ip),
 		ClientLabel: cleanLabel(r.Header.Get(HeaderClient)),
 		Tool:        cleanTool(r.Header.Get(HeaderTool)),
 		Endpoint:    path, Model: truncate(meta.Model, 96),
@@ -324,15 +340,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.rejectAcquire(w, r, err)
 		return
 	}
-	ex := &exchange{}
+	runCtx, cancelRun := context.WithTimeoutCause(tk.Ctx, h.cfg.RunTimeout, ErrRunTimeout)
+	ex := &exchange{runCtx: runCtx}
 	defer func() {
 		// Also runs when ReverseProxy aborts the handler (client gone mid-stream).
 		tk.Release(h.result(r.Context(), tk, ex))
 	}()
+	defer cancelRun() // runs first: the cause stays ErrRunTimeout only if the deadline hit
 	w.Header().Set(HeaderQueueMS, strconv.FormatInt(tk.Waited.Milliseconds(), 10))
 	w.Header().Set(HeaderQueuePosition, strconv.Itoa(tk.Position))
 
-	ctx := context.WithValue(tk.Ctx, ctxKey{}, ex)
+	ctx := context.WithValue(runCtx, ctxKey{}, ex)
 	out := r.WithContext(ctx)
 	out.Body = io.NopCloser(bytes.NewReader(body))
 	out.ContentLength = int64(len(body))
@@ -373,9 +391,14 @@ func (h *Handler) result(reqCtx context.Context, tk *queue.Ticket, ex *exchange)
 		res.Status = queue.StatusAdminCanceled
 		res.ErrorClass = "admin_cancel"
 	case ex.status >= 200 && ex.status < 300 && complete && !c.errorLine:
-		res.Status = queue.StatusOK
+		res.Status = queue.StatusOK // finished before the run timeout could matter
 	case ex.status >= 200 && ex.status < 300 && c.errorLine:
 		res.Status, res.ErrorClass = queue.StatusError, "stream_error"
+	case ex.runCtx != nil && isRunTimeout(ex.runCtx):
+		res.Status, res.ErrorClass = queue.StatusError, "run_timeout"
+		if res.HTTPStatus == 0 {
+			res.HTTPStatus = http.StatusGatewayTimeout
+		}
 	case reqCtx.Err() != nil:
 		res.Status, res.ErrorClass = queue.StatusCanceled, "client_gone"
 		if res.HTTPStatus == 0 || res.HTTPStatus < 400 {
@@ -397,6 +420,30 @@ func (h *Handler) result(reqCtx context.Context, tk *queue.Ticket, ex *exchange)
 	}
 	h.logf("req %s %s %s status=%d class=%s wait_ms=%d", tk.ID, tk.Req().Lane, tk.Req().Endpoint, res.HTTPStatus, res.ErrorClass, tk.Waited.Milliseconds())
 	return res
+}
+
+func isRunTimeout(ctx context.Context) bool {
+	return errors.Is(context.Cause(ctx), ErrRunTimeout)
+}
+
+// fairIP is the key of the per-IP limits and of the fairness. An IPv6 client
+// usually owns a whole /64 and can rotate its address inside it, so IPv6
+// addresses are grouped by /64 (Fase 9.5, P2). IPv4 (also IPv4-mapped) stays
+// as is.
+func fairIP(ip string) string {
+	a, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ip
+	}
+	a = a.Unmap()
+	if a.Is4() {
+		return a.String()
+	}
+	p, err := a.WithZone("").Prefix(64)
+	if err != nil {
+		return ip
+	}
+	return p.String()
 }
 
 func truncate(s string, n int) string {
@@ -459,8 +506,9 @@ func (b *countingBody) Read(p []byte) (int, error) {
 		b.eof = true
 	} else if err != nil {
 		b.readErr = err
-		if queue.IsAdminCancel(b.ctx) {
-			b.synth = []byte("\n{\"error\":\"cancelado pelo administrador\"}\n")
+		if msg := cutMessage(b.ctx); msg != "" {
+			line, _ := json.Marshal(map[string]string{"error": msg})
+			b.synth = append(append([]byte("\n"), line...), '\n')
 			n2 := copy(p[n:], b.synth)
 			b.synth = b.synth[n2:]
 			if len(b.synth) == 0 {
@@ -473,6 +521,17 @@ func (b *countingBody) Read(p []byte) (int, error) {
 }
 
 func (b *countingBody) Close() error { return b.rc.Close() }
+
+// cutMessage is the NDJSON error closing a stream the gateway cut on purpose.
+func cutMessage(ctx context.Context) string {
+	switch {
+	case queue.IsAdminCancel(ctx):
+		return "cancelado pelo administrador"
+	case isRunTimeout(ctx):
+		return ErrRunTimeout.Error()
+	}
+	return ""
+}
 
 func (b *countingBody) tail() []byte { return b.buf }
 

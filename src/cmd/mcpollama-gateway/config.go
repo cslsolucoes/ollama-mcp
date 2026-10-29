@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -31,6 +32,9 @@ environment variable; the flag wins.
   --labels-per-ip N       distinct labels per IP; more are folded into "<ip>/outros"
                                                              (MCPGW_LABELS_PER_IP, default 16)
   --max-wait D            longest wait in the line, then 504 (MCPGW_MAX_WAIT, default 10m)
+  --run-timeout D         longest run of a started request; the slot is freed and the
+                          client gets 504 or a final NDJSON error line
+                                                             (MCPGW_RUN_TIMEOUT, default = --max-wait)
   --age-after D           a baixa request competes as normal after this wait
                                                              (MCPGW_AGE_AFTER, default 5m)
   --start-stagger D       minimum gap between two generation starts
@@ -48,6 +52,8 @@ environment variable; the flag wins.
                                                              (MCPGW_AER_PATH)
   --retention-requests D  requests kept for                  (MCPGW_RETENTION_REQUESTS, default 2160h = 90 days)
   --retention-gpu D       GPU samples kept for               (MCPGW_RETENTION_GPU, default 168h = 7 days)
+  --max-request-rows N    cap of the request history; the oldest rows go first
+                                                             (MCPGW_MAX_REQUEST_ROWS, default 3000000)
   --non-loopback-listen   allow --listen outside the loopback (MCPGW_NON_LOOPBACK_LISTEN; not recommended)
   --debug                 log one line per request           (MCPGW_DEBUG)
   --version               print the version and exit
@@ -65,6 +71,8 @@ type Config struct {
 	PerIP         int
 	LabelsPerIP   int
 	MaxWait       time.Duration
+	RunTimeout    time.Duration
+	MaxReqRows    int
 	AgeAfter      time.Duration
 	StartStagger  time.Duration
 	PriorityNets  []*net.IPNet
@@ -96,6 +104,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fPerIP   = fs.Int("queue-per-ip", 0, "")
 		fLabels  = fs.Int("labels-per-ip", 0, "")
 		fMaxWait = fs.Duration("max-wait", 0, "")
+		fRunTO   = fs.Duration("run-timeout", 0, "")
+		fMaxRows = fs.Int("max-request-rows", 0, "")
 		fAge     = fs.Duration("age-after", 0, "")
 		fStagger = fs.Duration("start-stagger", 0, "")
 		fPrio    = fs.String("priority-ips", "", "")
@@ -195,6 +205,10 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 	}
 	// --queue-per-ip defaults to --queue-per-client.
 	c.PerIP = integer("queue-per-ip", "MCPGW_QUEUE_PER_IP", c.PerClient, fPerIP)
+	// --run-timeout defaults to --max-wait: a request should not hold a slot
+	// longer than anyone is allowed to wait for one (Fase 9.5).
+	c.RunTimeout = dur("run-timeout", "MCPGW_RUN_TIMEOUT", c.MaxWait, fRunTO)
+	c.MaxReqRows = integer("max-request-rows", "MCPGW_MAX_REQUEST_ROWS", 3_000_000, fMaxRows)
 	switch {
 	case set["max-body-bytes"]:
 		c.MaxBodyBytes = *fBody
@@ -233,26 +247,37 @@ func splitList(s string) []string {
 	return out
 }
 
-// parseNets reads CIDRs or bare IPs (a bare IP is a /32 or /128).
+// parseNets reads CIDRs or bare IPs (a bare IP is a /32 or /128). IPv4-mapped
+// IPv6 forms are turned into the IPv4 prefix they mean ("::ffff:10.0.0.5" is
+// 10.0.0.5/32, "::ffff:10.0.0.0/104" is 10.0.0.0/8): net.ParseCIDR read
+// "::ffff:10.0.0.5/32" as ::/32, which matched nothing (Fase 9.5, C1). A
+// mapped prefix shorter than /96 and zones are refused.
 func parseNets(s string) ([]*net.IPNet, error) {
 	var out []*net.IPNet
 	for _, p := range splitList(s) {
+		var pfx netip.Prefix
 		if !strings.Contains(p, "/") {
-			ip := net.ParseIP(p)
-			if ip == nil {
+			a, err := netip.ParseAddr(p)
+			if err != nil || a.Zone() != "" {
 				return nil, fmt.Errorf("%q is not an IP or CIDR", p)
 			}
-			if ip.To4() != nil {
-				p += "/32"
-			} else {
-				p += "/128"
+			a = a.Unmap()
+			pfx = netip.PrefixFrom(a, a.BitLen())
+		} else {
+			x, err := netip.ParsePrefix(p)
+			if err != nil {
+				return nil, fmt.Errorf("%q is not an IP or CIDR", p)
 			}
+			if x.Addr().Is4In6() {
+				if x.Bits() < 96 {
+					return nil, fmt.Errorf("%q: an IPv4-mapped prefix must be /96 or longer", p)
+				}
+				x = netip.PrefixFrom(x.Addr().Unmap(), x.Bits()-96)
+			}
+			pfx = x
 		}
-		_, n, err := net.ParseCIDR(p)
-		if err != nil {
-			return nil, fmt.Errorf("%q is not an IP or CIDR", p)
-		}
-		out = append(out, n)
+		pfx = pfx.Masked()
+		out = append(out, &net.IPNet{IP: net.IP(pfx.Addr().AsSlice()), Mask: net.CIDRMask(pfx.Bits(), pfx.Addr().BitLen())})
 	}
 	return out, nil
 }
@@ -287,14 +312,14 @@ func (c Config) validate() error {
 	if c.GenSlots < 1 || c.EmbedSlots < 1 || c.QueueMax < 1 || c.PerClient < 1 || c.PerIP < 1 || c.LabelsPerIP < 1 {
 		return errors.New("slots, --queue-max, --queue-per-client, --queue-per-ip and --labels-per-ip must be positive")
 	}
-	if c.MaxWait <= 0 || c.AgeAfter <= 0 || c.StartStagger < 0 || c.GPUInterval < 0 {
+	if c.MaxWait <= 0 || c.RunTimeout <= 0 || c.AgeAfter <= 0 || c.StartStagger < 0 || c.GPUInterval < 0 {
 		return errors.New("durations must be positive (--start-stagger and --gpu-interval may be 0)")
 	}
 	if c.MaxBodyBytes <= 0 {
 		return errors.New("--max-body-bytes must be positive")
 	}
-	if c.RetentionReq <= 0 || c.RetentionGPU <= 0 {
-		return errors.New("retention must be positive")
+	if c.RetentionReq <= 0 || c.RetentionGPU <= 0 || c.MaxReqRows < 1000 {
+		return errors.New("retention must be positive and --max-request-rows at least 1000")
 	}
 	if !c.NonLoopback && !isLoopbackAddr(c.Listen) {
 		return fmt.Errorf("--listen %q is not on the loopback: the gateway trusts the nginx (X-Real-IP); use --non-loopback-listen only if you know why", c.Listen)

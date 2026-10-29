@@ -442,8 +442,15 @@ func (m *Manager) abandon(t *Ticket, cause error, status string) error {
 		m.finishLocked(t, time.Now(), Result{Status: status, HTTPStatus: abandonHTTP(status), ErrorClass: status})
 		return cause
 	}
-	// Already gone (removed by the administrator).
-	if t.err != nil {
+	// Already gone. A running request cancelled by the administrator between
+	// the wake-up and now never reaches the proxy (no ticket, no Release):
+	// emit its record here, once (Fase 9.5, Q1).
+	if t.adminCx && !t.recorded {
+		t.recorded = true
+		m.record(m.endRecord(t, time.Now(), Result{Status: StatusAdminCanceled, HTTPStatus: 409, ErrorClass: "admin_cancel"}))
+		m.changed()
+	}
+	if t.err != nil { // removed by the administrator
 		return t.err
 	}
 	return cause
