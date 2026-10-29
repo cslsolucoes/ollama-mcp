@@ -265,3 +265,17 @@ events(ts INTEGER, kind TEXT, detail TEXT);   -- partida/parada do gateway, muda
   - **§4.2:** acrescenta a rota `POST /monitor/api/running/{id}/cancel` (fecha a conexão com o Ollama, libera o slot, `status=cancelado_admin`, auditado; o cliente recebe erro claro).
   - **§4.1/§6:** a página e as rotas GET dispensam login. O nginx continua com `allow 10.100.0.0/16; deny all` em `/monitor`. As rotas POST exigem sessão do administrador + CSRF.
   - **§6, CSRF com GET sem login:** as rotas GET não podem ter efeito colateral, e isso é testado na 9.5.
+- 2026-10-28 22:55 — **9.1 `src/gateway/queue` CONCLUÍDA** (agente sonnet, worktree isolado; commit "feat: Fase 9.1").
+  - **Arquivos:** `src/gateway/queue/queue.go`, `queue_test.go`, `fuzz_test.go`.
+  - **O que foi feito:**
+    - faixas `geracao`/`embed` com slots independentes; prioridades `alta|normal|baixa`; justiça por cliente (IP + label) por "quem foi servido há mais tempo", FIFO dentro do cliente; envelhecimento `baixa`→`normal` (calculado na hora de escolher, o `priority_final` do registro guarda o nível efetivo na partida);
+    - limites: total (503 `ErrFull`), por cliente (503 `ErrClientFull`), espera máxima (`ErrWaitTimeout`, 504), saída por contexto cancelado (registro `cancelado`);
+    - escalonamento de partida (padrão do entrypoint 300 ms) **só na faixa `geracao`** (embed é leve e curto; atrasá-lo não ajuda a fonte);
+    - ações atômicas sob o lock: `Promote`, `Demote`, `Remove` (o cliente recebe `ErrRemoved`, 409) e `Cancel` em execução (D9-8: cancela o contexto com causa `ErrAdminCanceled` e libera o slot **na hora**; o registro `cancelado_admin` sai no `Release` do proxy, uma única vez);
+    - semântica de promover/despromover: sobe/desce um nível e entra no **fim** do novo nível (não fura quem já esperava); já em `alta`, "topo" (pin com contador decrescente); já em `baixa`, "fim" (contador crescente);
+    - ids de 128 bits (`crypto/rand`, 32 hex); `Snapshot()` consistente com a ordem simulada de saída; ganchos `OnRecord`/`OnChange` chamados **fora do lock**.
+  - **O que deu certo:** primeira compilação limpa; as 24 provas de unidade passam; o fuzz `FuzzConcurrentActions` (4 goroutines, ações aleatórias, invariantes verificados durante a corrida e dreno ao final) rodou 20 s com 77.837 execuções sem falha; `TestRandomActions` (40 rodadas semeadas) roda no gate normal.
+  - **O que não deu certo / ajustes:** a 1ª versão dos arquivos foi recusada pela ferramenta (comando composto); recriados por Write, sem perda. Nenhum bug encontrado nos testes.
+  - **Gate (números):** `go build ./...` ok; `go vet ./...` ok; `gofmt -l .` vazio; `go test -count=1 ./...` 12 pacotes ok (queue 1,8 s); `-race -count=3 ./gateway/...` ok (6,2 s); build Linux `GOOS=linux CGO_ENABLED=0 go build ./gateway/...` ok. `go.mod`/`go.sum` **não** alterados nesta etapa (o SQLite entra na 9.3).
+  - **Estado:** 9.1 concluída.
+  - **Pendências (para a 9.5):** (1) `Retry-After` é fixo em 5 s (ajustar por vazão real?); (2) fairness considera só o último início por cliente; avaliar se um cliente com muitos pedidos em execução deveria perder preferência; (3) `Snapshot` é O(n²) por faixa (n ≤ 64, aceitável); (4) rodar o fuzz por 10 min.
