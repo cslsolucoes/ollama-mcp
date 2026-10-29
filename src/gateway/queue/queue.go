@@ -153,6 +153,7 @@ func (c Config) withDefaults() Config {
 // Request describes who is asking for a slot. Strings are already validated
 // by the proxy.
 type Request struct {
+	ID            string // optional; generated when empty
 	Lane          Lane
 	ClientIP      string
 	ClientLabel   string
@@ -352,8 +353,11 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 		return nil, err
 	}
 	now := time.Now()
+	if req.ID == "" {
+		req.ID = NewID()
+	}
 	t := &Ticket{
-		ID: NewID(), m: m, req: req, ready: make(chan struct{}),
+		ID: req.ID, m: m, req: req, ready: make(chan struct{}),
 		level: req.PriorityFinal, enqueued: now,
 	}
 	runCtx, cancel := context.WithCancelCause(ctx)
