@@ -247,7 +247,245 @@ events(ts INTEGER, kind TEXT, detail TEXT);   -- partida/parada do gateway, muda
 | Vazamento de conteúdo jurídico no banco | Só metadados; teste da sentinela; revisão adversarial |
 | Ações indevidas na fila | Login, CSRF, só POST, confirmação ao remover, auditoria |
 
-## 11. Changelog
+## 11. Extensão: faixa CPU/RAM com roteamento por prioridade (pedido do owner, 2026-10-28 22:59)
+
+> Pergunta do owner (22:57): "com a implementação da fila, podemos usar também a CPU e a RAM balanceando por prioridade o
+> que vai para GPU/VRAM e o que vai para CPU/RAM?". Resposta: sim, por **pedido inteiro**. Owner (22:59): "implemente isso
+> no plano, bem detalhado".
+> **Ordem:** começa **depois** da 9.7 (a fila da GPU implantada e aceita). As medições exigem o servidor livre, depois da 8.9.
+> Nada aqui muda o que já foi decidido para a GPU.
+
+### 11.1 Por que funciona e quais são os limites
+- **O servidor tem 93 GB de RAM** e CPU ociosa. A VRAM (32 GB) é o recurso escasso.
+- **Uma instância do Ollama não escolhe CPU ou GPU por pedido.** Pedir o mesmo modelo com outro `num_gpu` faz o Ollama
+  **recarregar** o modelo e tirar o de produção da VRAM, como aconteceu na 8.8. Então a faixa CPU é uma **segunda
+  instância do Ollama, só de CPU**, em `127.0.0.1:11435`, com os próprios modelos residentes na RAM.
+- **Um pedido não se divide nem migra durante a execução.** A escolha da faixa é feita uma vez, quando o pedido começa.
+  Um pedido que ainda espera pode trocar de faixa (11.4, regra R8).
+- **Prefill na CPU é ordens de grandeza mais lento.** Estimativa a medir: ~50–300 tok/s, contra ~5.000 na GPU.
+  Resumos e extrações de documentos são quase todo prefill, então **documento grande não vai para a CPU**, a menos que o
+  administrador mande.
+- **Rende bem na CPU:** embeddings (`nomic`, 137M), perguntas e gerações curtas, rascunhos e trabalho de fundo `baixa`.
+- **O modelo certo para CPU é MoE** (`qwen3-ia` = 30B com só 3B ativos por token). Os densos (`gemma4:12b`, `qwen3.5:9b`)
+  ficam lentos. Se a GPU passar a usar o `gemma4` (mais fiel) e a CPU o `qwen3-ia`, **a qualidade passa a depender da
+  faixa**, o que choca com a "primazia perfeita". Por isso a política padrão é **o mesmo modelo nas duas faixas**, e a troca
+  de modelo na CPU só existe como opção explícita (D9-C3).
+- **Energia:** a CPU em carga total soma ~100–150 W **na mesma fonte de 850 W**, já no limite com 4 GPUs a 100 W (memória
+  `servidor-ia-reboots-causa-fonte`). Isso é medido antes de ligar (11.3) e limitado por cota de CPU (11.2).
+
+### 11.2 Instância `ollama-cpu` (servidor)
+- **Unit nova** `/etc/systemd/system/ollama-cpu.service`, cópia da `ollama.service` com:
+  - `Environment="OLLAMA_HOST=127.0.0.1:11435"`;
+  - `Environment="CUDA_VISIBLE_DEVICES=-1"` + `Environment="OLLAMA_LLM_LIBRARY=cpu_avx2"` (ou `cpu_avx512`, conforme o
+    `lscpu` da 9.9), para garantir que **nenhuma** GPU é tocada;
+  - `OLLAMA_NUM_PARALLEL=<c>` (medido), `OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_CONTEXT_LENGTH`
+    (medido; padrão 16384 na CPU) e `OLLAMA_MAX_QUEUE=8`;
+  - **mesmo diretório de modelos** (`OLLAMA_MODELS`, blobs compartilhados, sem cópia em disco). Os modelos **só são
+    baixados pela instância principal**: a `ollama-cpu` não recebe `/api/pull`, e o gateway bloqueia;
+  - **isolamento de recursos:**
+    - `CPUAffinity=` reservando núcleos para o SO e para o runner da GPU, que também usa CPU (sampling, cópia de buffers).
+      Padrão: deixar 4 threads livres;
+    - `CPUQuota=` (teto de potência indireto);
+    - `MemoryMax=` (padrão 60 GB; o resto fica para o SO, o page cache e a instância GPU);
+    - `Nice=10` e `IOSchedulingClass=idle`;
+  - `After=ollama.service` (a instância GPU sobe primeiro) e um `ollama-cpu-warm` próprio, que carrega os modelos da
+    faixa CPU no boot.
+- Backups, `test -s`, gravação atômica e `sync`, como em toda mudança de servidor de hoje.
+- **Rollback:** `systemctl disable --now ollama-cpu` + gateway com `--cpu-lane=off`, de 1 flag.
+
+### 11.3 Medição antes de ligar (spike, sem rotear nada)
+Executada com a produção em horário combinado, **uma coisa por vez**, monitor de potência a 1 s e parada no 1º reboot:
+1. **Inventário do hardware:**
+   - `lscpu` (modelo, núcleos/threads, AVX2/AVX-512, NUMA);
+   - `free -g`;
+   - banda de memória (`mbw`, se houver, ou inferida pela taxa de geração);
+   - sensores (`sensors`) e potência do pacote da CPU por RAPL (`/sys/class/powercap/intel-rapl*/energy_uj`). Se for
+     AMD, `amd_energy` ou `zenpower`, conforme o que existir.
+2. **Velocidade na CPU**, por modelo (`qwen3-ia`, `nomic-embed-text`, `gemma4:12b`, `qwen3.5:9b`):
+   - prefill com 1k, 4k e 8k tokens;
+   - geração de 500 tokens;
+   - carga a frio e RAM ocupada;
+   - variando `num_thread` (½, ¾ e todas as threads livres).
+3. **Qualidade na CPU:** S2 (22 seções de b01) e S3 JSON, comparadas com a mesma suíte na GPU. **Com o mesmo modelo e a
+   mesma quantização, o resultado tem de ser equivalente.** Diferença acima do ruído barra o modelo na CPU.
+4. **Interferência:** com a GPU em carga multiagente (os degraus da 8.9), rodar a CPU em carga e medir:
+   - **(a)** a queda de vazão da GPU, porque o runner da GPU depende de CPU;
+   - **(b)** a temperatura da CPU;
+   - **(c)** a potência somada. Com isso se fixam `CPUAffinity`, `CPUQuota` e `num_thread`.
+5. **Energia:** pico somado de GPU (nvidia-smi) + CPU (RAPL) com tudo em carga. **Teto proposto: GPU + CPU ≤ ~650 W
+   medidos**, para sobrar margem dos 850 W ao resto da máquina e aos picos de milissegundos. Se passar, baixar a
+   `CPUQuota`.
+6. **Saída:** report com a tabela "modelo × faixa × velocidade × qualidade × W", que alimenta as decisões D9-C e os
+   parâmetros do roteador (11.4).
+
+### 11.4 Roteamento por prioridade no gateway
+**Novas entradas por pedido:**
+- prioridade (`alta`, `normal` ou `baixa`, já com a regra dos IPs autorizados);
+- endpoint (`generate`/`chat`/`embed`);
+- modelo pedido;
+- **tokens estimados do prompt** (`bytes_in / 3,5`, calibrado na 9.9);
+- `num_predict` pedido;
+- **espera estimada na GPU** = posição × média móvel (EWMA) da duração por faixa;
+- **tempo estimado na CPU** = tokens ÷ prefill medido + `num_predict` ÷ geração medida;
+- header opcional `X-Mcpollama-Lane: gpu|cpu|auto`.
+
+**Regras, avaliadas em ordem e todas configuráveis por flag:**
+
+| # | Regra | Padrão |
+| --- | --- | --- |
+| R1 | `embed` → **CPU** se a D9-C2 aprovar o `nomic` na CPU (libera ~0,8 GB de VRAM); senão, GPU | conforme a D9-C2 |
+| R2 | Modelo pedido **não disponível na CPU** → GPU | sempre |
+| R3 | `alta` → **sempre GPU**, nunca CPU | sempre |
+| R4 | `X-Mcpollama-Lane: cpu\|gpu` vale **só de IP autorizado** (a mesma lista `--priority-ips`); de outro IP é ignorado e fica `auto` | sempre |
+| R5 | Prompt estimado > `--cpu-max-prompt-tokens` → GPU (documento grande na CPU levaria minutos) | 4.000 tokens (ajustado pela medição) |
+| R6 | `baixa` → **CPU** se o tempo estimado na CPU ≤ `--cpu-max-est` (padrão 120 s); senão, fila `baixa` da GPU | ligado |
+| R7 | `normal` → GPU. **Transborda para a CPU só se:** espera estimada na GPU > `--overflow-wait` (padrão 60 s) **e** tempo estimado na CPU < espera estimada na GPU **e** o modelo é o mesmo nas duas faixas (ou a D9-C3 permitir outro) | ligado |
+| R8 | **Roubo de trabalho:** quando um slot da GPU fica livre e a fila da GPU está vazia, o gateway pega o pedido **mais antigo que ainda espera** na fila da CPU e o leva para a GPU. Pedido já iniciado na CPU não migra | ligado |
+| R9 | A faixa CPU fora do ar (instância parada ou erro de conexão) → tudo vai para a GPU, com registro de evento e alerta no monitor | sempre |
+
+- **Justiça e limites** (por IP, já corrigidos na 9.1) valem **por faixa e no total**: um IP não ocupa as duas faixas inteiras.
+- **Escalonamento de partida** (300 ms) vale entre as duas faixas juntas, porque o pico de energia é da máquina toda.
+- **Resposta:** header `X-Lane: gpu|cpu` + `X-Routing-Reason: R6` etc. O mcpollama mostra `lane=` e `rota=` na linha `[uso]`.
+- **Ações do administrador** no monitor, além das da §4.3: **mover para GPU** e **mover para CPU**, só para pedidos em
+  espera, auditadas. Nenhuma das duas fura a justiça.
+
+### 11.5 Monitor e SQLite
+- **Monitor:**
+  - coluna **Faixa** em todas as tabelas;
+  - filtro GPU/CPU/todas;
+  - cartão **CPU**: uso %, load, RAM usada/livre, temperatura, W do pacote (RAPL) e modelos residentes na `ollama-cpu`;
+  - cartão **Energia total**: GPU + CPU, com alerta visual acima do teto da 11.3;
+  - estatísticas por faixa: espera p50/p95, vazão, transbordos e roubos por hora.
+- **SQLite:**
+  - em `requests`: `routing_rule`, `est_gpu_wait_ms`, `est_cpu_ms`, `lane_moved_by` (`r8`/`admin`/nulo);
+  - tabela nova `cpu_samples(ts, util_pct, load1, ram_used_mib, ram_avail_mib, temp_c, rapl_w, boot_id)`, com retenção de 7 dias;
+  - eventos `cpu_lane_down`/`cpu_lane_up`.
+
+### 11.6 Etapas da extensão
+
+| Etapa | Conteúdo | Muda o servidor? | Modelo do agente |
+| --- | --- | --- | --- |
+| 9.9 | **Inventário + spike de medição** (11.3, itens 1–3) com uma `ollama-cpu` **temporária**, sem tráfego de produção; report | **sim — autorização** | opus (coordena; risco de energia) |
+| 9.10 | **Interferência e energia** (11.3, itens 4–5) durante a carga multiagente da GPU; fixa `CPUAffinity`, `CPUQuota`, `num_thread` e o teto de W | carga | opus |
+| 9.11 | Decisões D9-C com o owner, a partir dos reports da 9.9/9.10 | não | loop principal |
+| 9.12 | **Código:** faixa CPU no gateway (backend 2, R1–R9, EWMA, estimador de tokens, roubo de trabalho, R9 de queda), monitor (11.5), store (11.5), mcpollama (`lane`/`rota` no `[uso]`). Testes com **dois Ollama falsos** (gpu e cpu), um teste por regra, fuzz da decisão + concorrência, `-race` | não | sonnet |
+| 9.13 | **Revisão adversarial** da faixa CPU: falsificação de lane/prioridade, inanição entre faixas, roubo de trabalho em corrida, queda da `ollama-cpu` no meio de um pedido, estimador manipulável (prompt pequeno em bytes e grande em tokens) | não | opus |
+| 9.14 | **Implantação:** `ollama-cpu.service` + `ollama-cpu-warm` definitivos (11.2), gateway com `--cpu-lane=on`; backups e rollback ensaiado (`--cpu-lane=off` + `disable --now`) | **sim — autorização** | loop principal |
+| 9.15 | **Aceite ao vivo:**<br>- (a) carga mista: 10 agentes `normal` na GPU + 10 tarefas `baixa` de fundo;<br>- (b) o monitor mostra as duas faixas;<br>- (c) transbordo R7 e roubo R8 observados e auditados;<br>- (d) a qualidade das respostas da CPU é igual à da GPU (S2/S3);<br>- (e) a `ollama-cpu` derrubada no meio → R9 manda para a GPU, sem erro ao cliente que ainda esperava;<br>- (f) potência dentro do teto;<br>- (g) prova por 2ª via no SQLite. Para no 1º reboot | carga | opus |
+| 9.16 | Documentação (`CONEXAO-IA.md` local + servidor, `README`, `CLAUDE.md`) e report final | não | sonnet |
+
+### 11.7 Decisões D9-C (para a 9.11, com os números da medição)
+- **D9-C1:** ligar a faixa CPU? Só se a 9.9/9.10 mostrarem ganho real sem roubar vazão da GPU e dentro do teto de energia.
+- **D9-C2:** `nomic-embed-text` na CPU (R1)? Recomendação prévia: sim, se a latência do embed na CPU ficar abaixo de ~1 s.
+- **D9-C3:** modelo da faixa CPU: **o mesmo da GPU** (padrão, pela "primazia perfeita") ou um MoE mais rápido na CPU com
+  qualidade diferente, restrito a `baixa`.
+- **D9-C4:** limiares `--cpu-max-prompt-tokens`, `--cpu-max-est`, `--overflow-wait`, slots da CPU e núcleos reservados.
+- **D9-C5:** quem pode forçar a faixa (`X-Mcpollama-Lane`): a mesma lista de IPs da prioridade `alta` (padrão) ou uma lista própria.
+
+### 11.8 Riscos da extensão
+
+| Risco | Mitigação |
+| --- | --- |
+| A carga da CPU derruba a fonte | Medição de energia antes (9.10), teto de W, `CPUQuota`, parada no 1º reboot |
+| A CPU ocupada atrasa o runner da GPU | `CPUAffinity` reservando núcleos + medição de interferência (9.10) |
+| Qualidade diferente entre faixas | Mesmo modelo por padrão (D9-C3) + S2/S3 na CPU (9.9, 9.15) |
+| Pedido preso numa faixa lenta | R5/R6 por tempo estimado, R8 (roubo pela GPU), ação "mover para GPU" |
+| Estimador enganado (poucos bytes, muitos tokens) | Teto pelo `bytes_in` real + correção pela razão bytes/token medida + revisão 9.13 |
+| RAM esgotada (modelos + KV + page cache) | `MemoryMax` na `ollama-cpu`, `MAX_LOADED_MODELS=2`, monitor de RAM |
+| Atualização do Ollama esquecida numa das instâncias | As duas units usam o mesmo binário `/usr/local/bin/ollama`; checklist no `CONEXAO-IA.md` |
+
+### 11.9 Sobrecarga: repasse para um Ollama secundário (pool de backends) — pedido do owner, 2026-10-28 23:01
+> Owner: "e em caso de sobrecarga, podendo repassar para o ollama secundário". A §11 tem uma faixa CPU fixa; aqui o gateway
+> passa a ter um **pool de backends**: o primário (GPU local), a `ollama-cpu` local e **N secundários remotos**
+> (outro PC ou servidor com Ollama **na LAN da CSL**; somente modelos locais, nunca nuvem). Para onde vai cada pedido
+> depende da prioridade, da sobrecarga e da saúde de cada backend.
+
+**Registro de backends** (arquivo de configuração `--backends /etc/mcpollama-gateway/backends.json`, 0600):
+
+| Campo | Exemplo | Uso |
+| --- | --- | --- |
+| `id` | `gpu-local`, `cpu-local`, `sec-ws01` | nome no monitor e no SQLite |
+| `url` | `http://127.0.0.1:11434`, `https://10.100.x.y:8443` | destino |
+| `tipo` | `gpu`, `cpu`, `remoto` | entra nas regras |
+| `token_file` | `/etc/mcpollama-gateway/sec-ws01.token` | Bearer **próprio** do secundário (o token do cliente nunca é repassado); lido do arquivo, nunca logado |
+| `tls_ca` | caminho do PEM | TLS do remoto (mesmo padrão `SystemCertPool` + CA do mcpollama) |
+| `slots` / `ctx` | `2` / `32768` | concorrência e contexto no secundário |
+| `modelos` | `["qwen3-ia"]` | o que ele serve; o **digest** é conferido por `/api/tags` |
+| `classes` | `["alta","normal","baixa"]` | prioridades que ele aceita |
+| `max_prompt_tokens` | `8000` | teto (CPU e máquinas fracas) |
+| `ordem` | `1, 2, 3…` | preferência no repasse |
+
+**O que é sobrecarga no primário** (qualquer um dos itens, todos configuráveis):
+- **S1:** espera estimada na fila da GPU > `--overload-wait` (padrão 60 s). É a mesma EWMA da §11.4;
+- **S2:** fila da GPU > `--overload-queue` (padrão 75% do `--queue-max`);
+- **S3:** **primário sem saúde:**
+  - `/api/version` falha;
+  - o modelo não está residente;
+  - `ollama ps` mostra que o modelo saiu de "100% GPU" (caiu para CPU por falta de VRAM);
+  - 3 erros seguidos (5xx, conexão, timeout) → **disjuntor aberto** por 30 s, depois meio-aberto com 1 pedido de prova;
+- **S4:** **alerta de energia**: potência somada acima do teto da §11.3 por mais de X s. O gateway segura novos inícios no primário (protege a fonte) e repassa ao secundário.
+
+**Regras de repasse** (somam-se às R1–R9 da §11.4; avaliadas quando o pedido **ainda não começou**):
+
+| # | Regra |
+| --- | --- |
+| F1 | Sem sobrecarga → primário (ou CPU pelas R1/R6). |
+| F2 | Com sobrecarga → o 1º backend saudável, em `ordem`, que **sirva o mesmo modelo com o mesmo digest**, aceite a classe de prioridade e caiba em `max_prompt_tokens`, com slot livre ou com espera estimada menor que a do primário. |
+| F3 | `alta` **pode** ir a um secundário **remoto com GPU e o mesmo modelo** (D9-B3), mas **nunca** à CPU. |
+| F4 | **Mesmo modelo, mesmo digest** é obrigatório por padrão ("primazia perfeita"). Modelo diferente só com permissão explícita (D9-B2) e só para `baixa`. |
+| F5 | Nenhum secundário elegível → o pedido **continua esperando** no primário (sem erro), até a espera máxima. |
+| F6 | **Volta automática:** quando a sobrecarga termina (histerese: S1 e S2 abaixo de 50% do limiar por 30 s), os pedidos novos voltam ao primário. Os que já estão no secundário terminam lá. |
+| F7 | **Durante a execução não há repasse.** Se o backend falhar no meio, o cliente recebe erro claro, e o mcpollama refaz **1 vez**, se couber no timeout: as tools são de leitura e o reprocessamento é seguro. |
+| F8 | **Justiça e limites por IP valem no pool inteiro.** Um IP não ganha slots extras por causa do repasse. |
+
+**Limite estrutural: o gateway roda no mesmo servidor.** Se o servidor de IA reiniciar (o problema da fonte), o gateway cai junto e não consegue repassar. Por isso:
+- **mcpollama com fallback no cliente:** `--ollama-url-fallback` (lista), um secundário ou o gateway de outra máquina;
+  - em **erro de conexão** ou **503 de sobrecarga** do primário, o mcpollama tenta o fallback **uma vez**;
+  - a linha `[uso]` registra `backend=fallback`;
+  - o token do fallback vem do próprio arquivo dele, com o mesmo cuidado de redação;
+- **Opcional, depois:** um gateway também no secundário, para que os dois se cubram.
+
+**Monitor e SQLite:**
+- quadro **Backends**: estado (ok, sobrecarregado, disjuntor aberto, fora), slots usados/livres, fila, latência p50, modelo e digest, último erro;
+- a coluna **Backend** nas tabelas;
+- os eventos `overload_on/off`, `backend_down/up` e `breaker_open/close`;
+- ação do administrador: **"drenar backend"** (não recebe pedidos novos; os que estão rodando terminam), para manutenção;
+- SQLite: `requests.backend_id`, `requests.failover_rule`, tabela `backend_samples(ts, backend_id, estado, slots_usados, fila, p50_ms)` com 7 dias.
+
+**Segurança e sigilo:**
+- Os secundários ficam **só na LAN da CSL**, com TLS + token próprio.
+- Os documentos jurídicos **não saem da rede**, e nunca vão para nuvem: o owner decidiu "somente modelos locais".
+- Um backend remoto só entra no `backends.json` com aprovação do owner (D9-B1).
+- A revisão adversarial (9.13) cobre:
+  - SSRF pelo `url` (o arquivo é do root e não aceita URL vinda do cliente);
+  - vazamento do token do secundário;
+  - disjuntor manipulável por erros forçados;
+  - inanição do primário por histerese mal calibrada.
+
+**Etapas (encaixam na extensão):**
+- **9.12:** inclui o código do pool: registro de backends, saúde, disjuntor, S1–S4, F1–F8, "drenar".
+  - Testes com **três Ollama falsos** (gpu, cpu e remoto) cobrindo:
+    - um por regra;
+    - disjuntor;
+    - histerese;
+    - digest diferente recusado.
+  - Inclui também o `--ollama-url-fallback` do mcpollama.
+- **9.13:** inclui os vetores acima.
+- **9.14:** um secundário real (D9-B1), com token próprio.
+- **9.15:** aceite com:
+  - (h) sobrecarga provocada (10 agentes + fila cheia) → repasse ao secundário, visível no monitor;
+  - (i) o primário parado de propósito (`systemctl stop ollama`) → disjuntor + repasse;
+  - (j) a volta automática pela histerese;
+  - (k) o fallback do mcpollama com o gateway parado.
+
+**Decisões D9-B:**
+- **D9-B1, qual é o secundário remoto:** que máquina da LAN, com qual GPU, VRAM e modelo; ou **só a `ollama-cpu` local** por enquanto. Sem secundário remoto, a §11.9 fica restrita a "sobrecarga → CPU local" mais o fallback do cliente.
+- **D9-B2:** permitir modelo diferente no secundário para `baixa`. Padrão: não.
+- **D9-B3:** `alta` pode ir a um secundário remoto com GPU e o mesmo modelo. Padrão: sim.
+- **D9-B4:** limiares S1/S2/S4 e histerese. Os padrões acima são ajustados pela medição.
+- **D9-B5:** fallback no mcpollama (lado do cliente), ligado por padrão quando houver secundário.
+
+## 12. Changelog
 
 - 2026-10-28 22:40 — plano criado (estado: PLANEJADO) pelo loop principal (Opus 5.5), a partir dos pedidos do owner das 22:38 ("pool de espera em fila na retaguarda… `/monitor`… SQLite… faça o plano") e das 22:39 ("possibilidade de promover ou remover ou despromover na fila").
   - Contexto do mesmo dia: nginx liberado para 12 conexões por IP às 22:36; produção com 4 GPUs a 100 W às 22:11; Fase 8 aguardando o teste de carga 8.9 (`gemma4:12b` × `qwen3.5:9b`, depois do `think:false`, etapa 8.8 em andamento).
@@ -265,3 +503,23 @@ events(ts INTEGER, kind TEXT, detail TEXT);   -- partida/parada do gateway, muda
   - **§4.2:** acrescenta a rota `POST /monitor/api/running/{id}/cancel` (fecha a conexão com o Ollama, libera o slot, `status=cancelado_admin`, auditado; o cliente recebe erro claro).
   - **§4.1/§6:** a página e as rotas GET dispensam login. O nginx continua com `allow 10.100.0.0/16; deny all` em `/monitor`. As rotas POST exigem sessão do administrador + CSRF.
   - **§6, CSRF com GET sem login:** as rotas GET não podem ter efeito colateral, e isso é testado na 9.5.
+- 2026-10-28 23:01 — **Extensão "faixa CPU/RAM" acrescentada (§11)**, a pedido do owner.
+  - Pergunta das 22:57: "podemos usar também a CPU e a RAM balanceando por prioridade…". Pedido das 22:59: "implemente isso no plano então, bem detalhado".
+  - **Desenho:**
+    - segunda instância `ollama-cpu` (127.0.0.1:11435, sem GPU, blobs compartilhados, `CPUAffinity`/`CPUQuota`/`MemoryMax`);
+    - roteamento por pedido inteiro, com as regras R1–R9 (alta sempre GPU; baixa para a CPU se couber; normal transborda só por espera estimada; roubo de trabalho pela GPU; queda da CPU → GPU);
+    - monitor e SQLite por faixa;
+    - medição de velocidade, qualidade, interferência e **energia** antes de ligar (teto GPU+CPU ≈ 650 W, por causa da fonte de 850 W).
+  - **Etapas novas 9.9–9.16, depois da 9.7.** Decisões D9-C1..C5. Riscos em §11.8.
+  - **Numeração:** a extensão virou §11 e o Changelog passou a §12. As referências a "§11 Changelog" em mensagens anteriores a este registro apontam para o §12.
+  - Nenhuma execução.
+- 2026-10-28 23:03 — **§11.9 "Sobrecarga: repasse para Ollama secundário"** acrescentada, a pedido do owner (23:01: "e em caso de sobrecarga, podendo repassar para o ollama secundário").
+  - **Desenho:**
+    - pool de backends (`backends.json`: gpu-local, cpu-local, remotos da LAN com token e CA próprios);
+    - detecção de sobrecarga S1–S4 (espera, fila, saúde/disjuntor/saída de 100% GPU, **alerta de energia**);
+    - regras F1–F8 (mesmo modelo e digest obrigatório; `alta` nunca vai à CPU; sem repasse durante a execução; volta com histerese);
+    - **fallback no mcpollama** (`--ollama-url-fallback`), porque o gateway roda no mesmo servidor e cai junto num reboot;
+    - monitor (quadro Backends, "drenar backend");
+    - SQLite (`backend_id`, `failover_rule`, `backend_samples`).
+  - Encaixado nas etapas 9.12–9.15. Decisões D9-B1..B5. A D9-B1 (qual máquina é o secundário) é a que destrava o remoto.
+  - Nenhuma execução.
