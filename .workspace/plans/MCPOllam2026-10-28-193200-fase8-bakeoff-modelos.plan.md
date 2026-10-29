@@ -223,3 +223,27 @@ um modo por suíte, `--model` e `--allowed-models` por execução.
   - **Sigilo do report:** varredura sem caminhos de documentos, nomes de arquivo ou segredos; só ids neutros.
   - **Pendências atualizadas:** a 2 passa a ser **trocar a fonte por uma de maior potência**; depois disso, revalidar 130–150 W e o contexto de 131072. A 9 (commit) é feita neste registro. As outras continuam.
   - **Efeito na S7:** com 4 GPUs (32 GB), vale a projeção de 4 GPUs do report §S7. O `qwen3-ia` volta a fazer 5×32k.
+- 2026-10-28 22:40 — **8.8 think:false no mcpollama (concluído no código; sem commit).** Decisão do owner (22:33): o mcpollama envia `"think": false` em toda chamada de geração.
+  - **Motivo:** `gemma4:12b` e `qwen3.5:9b` têm thinking ligado por padrão; sem `think:false` pensam até o timeout (300 s, resposta vazia). O projeto nunca quer raciocínio (o campo `thinking` já não é decodificado, OLL-010).
+  - **Implementação:** `src/ollama/api.go`, `generateWire` e `chatWire` ganharam `Think bool \`json:"think"\``, sem `omitempty` e sem flag. Escolhi `bool` simples, e não `*bool` com `omitempty`, porque o valor zero (false) é exatamente o que tem de ir no fio, e assim não há como esquecer de preenchê-lo. Como todas as tools (generate, chat, summarize_file, extract, translate) passam por `Client.Generate`/`Client.Chat`, um único ponto cobre tudo, nos modos stream e não-stream. `embedWire` ficou intacto.
+  - **Testes novos:** `src/ollama/think_test.go` (corpo bruto de /api/generate e /api/chat contém `"think":false`, em stream e `DisableStream`; /api/embed não contém "think") e `src/tools/think_test.go` (tools generate, chat, summarize_file, extract, translate enviam `think:false`; tool embed não envia). Nenhum teste existente comparava o corpo exato, então nenhum precisou mudar. Descrições das tools inalteradas: TOOLS.md não regenerado; `TestToolsListBudget*` passa.
+  - **Gate (dentro de `src/`):** `go build ./...` ok; `go vet ./...` ok; `gofmt -l .` vazio; `go test -count=1 ./...` ok em 10 pacotes (doctext 22 s); `go test -race -count=1 ./...` ok em 10 pacotes (doctext 159 s). Os 7 testes novos (2 em ollama, 5 em tools) passam em `-v`.
+  - **Validação ao vivo (3 chamadas, uma por vez, binário em `scratchpad\think\mcpollama-mcp.exe`; `D:\MCP\mcpollama-mcp.exe` não foi tocado), prompt "Responda apenas: pong":**
+    1. `qwen3-ia` (padrão): 0,2 s, eval_count=2, texto "pong", load_ms=0. Modelo sem thinking aceita `think:false`.
+    2. `gemma4:12b`: 23,9 s no total, dos quais load_ms=23034 (carga a frio); eval_count=2, texto "pong", fim=stop. Não ficou pensando.
+    3. `qwen3.5:9b`: 22,3 s, load_ms=21883; eval_count=2, texto "pong", fim=stop.
+  - **O que não deu certo e solução:** (a) o 1º script de chamada falhou por erro meu de passagem de parâmetros do PowerShell (nenhuma chamada ao Ollama foi feita); reescrevi com função inline, sem perda de cota. (b) `curl -H @-` (token por stdin) devolveu `unauthorized` (3 respostas, sem efeito); usei `-H "Authorization: Bearer ..."` direto, sem imprimir o token (saídas redigidas).
+  - **VRAM:** `keep_alive:0` por curl em `gemma4:12b` e `qwen3.5:9b` (done_reason=unload); `/api/ps` depois de ~7 s devolveu `{"models":[]}`: nenhum modelo residente; o `qwen3-ia` recarrega a frio (~30 s) na próxima chamada.
+  - **Arquivos alterados:** `src/ollama/api.go`; novos `src/ollama/think_test.go` e `src/tools/think_test.go`; este plano.
+  - **Pendências:** 1. Commit (não feito, por instrução). 2. Instalar o binário novo em `D:\MCP\mcpollama-mcp.exe` só após fechar os clientes (build com `-ldflags -X main.Version`), e reiniciar a sessão do Claude Code. 3. Mencionar `think:false` em `TOOLS.md`/README se o owner quiser (nenhuma descrição mudou). 4. Medir o bake-off sem a variante-patch (`variante-nothink.patch` passa a ser redundante).
+- 2026-10-28 22:46 — **8.8 conferida pelo loop principal e efeito colateral corrigido.**
+  - **Gate refeito como 2ª via:** `go build`, `go vet`, `gofmt -l` vazio e `go test -count=1` em `./ollama`, `./tools` e `./mcpollama-mcp` passam.
+  - **Não deu certo:** ao carregar `gemma4`/`qwen3.5` nas chamadas ao vivo (`MAX_LOADED_MODELS=2`), o Ollama **descarregou o `qwen3-ia` e o `nomic` da produção**. Depois do `keep_alive:0` dos candidatos, a VRAM ficou vazia.
+  - **Solução (22:45):** `systemctl restart ollama-warm` + embed com `keep_alive:-1`. O `qwen3-ia` (64k) e o `nomic` voltaram residentes a 100% GPU.
+  - **Lição para a 8.9:** todo teste com candidato tira a produção do ar; restaurar e provar com `ollama ps` ao fim.
+  - **Decisões de 22:20–22:43:**
+    - D8-3 → "o foco é ter multiagentes trabalhando" + "executando os serviços com primazia perfeita";
+    - **medir `gemma4:12b` × `qwen3.5:9b` com carga real, em degraus de 2 → 5 → 10 agentes**, e decidir;
+    - 8.7 parcial executada às 22:35 (`ollama rm granite4.2:8b qwen3:14b`; 154 GB livres);
+    - nginx liberado de vez às 22:36 (`limit_conn 12`, `rate=600r/m`, `burst=60`; backup `ollama.conf.nginx-223601`; `nginx -t` OK).
+  - **Fase 9** (fila + `/monitor` + SQLite) planejada em `MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`.

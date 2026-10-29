@@ -62,6 +62,12 @@ type generateWire struct {
 	System  string        `json:"system,omitempty"`
 	Stream  bool          `json:"stream"`
 	Options *ModelOptions `json:"options,omitempty"`
+	// Think is always sent as false (plan 8.8): models such as gemma4 and
+	// qwen3.5 think by default and, with no budget for it, burn the whole
+	// timeout on reasoning and return an empty answer. The project never wants
+	// reasoning (the thinking field is not decoded, OLL-010). A pointer with
+	// omitempty would drop the field; a plain bool keeps "think":false on the wire.
+	Think bool `json:"think"`
 }
 
 type chatWire struct {
@@ -69,6 +75,7 @@ type chatWire struct {
 	Messages []ChatMessage `json:"messages"`
 	Stream   bool          `json:"stream"`
 	Options  *ModelOptions `json:"options,omitempty"`
+	Think    bool          `json:"think"` // always false, see generateWire.Think
 }
 
 type embedWire struct {
