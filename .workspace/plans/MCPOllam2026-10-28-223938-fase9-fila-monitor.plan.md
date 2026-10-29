@@ -1,6 +1,6 @@
 # Plano — Fase 9: fila de espera na retaguarda (gateway) e monitor `/monitor` com SQLite
 
-> **Estado:** **DECIDIDO, desenvolvimento 9.1–9.5 a iniciar** (2026-10-28 22:44). A implantação (9.6) só vem depois da 8.9 da Fase 8.
+> **Estado:** **9.1–9.5 CONCLUÍDAS** (9.5, revisão adversarial, em 2026-10-29 00:15: 12 achados, 0 Alto, todos corrigidos; report `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md`). **Próximo: 9.6 (implantação, com autorização)**, que só vem depois da 8.9 da Fase 8.
 > **Decisões do owner (AskUserQuestion, 22:43):**
 > - **D9-1:** `/monitor` **só na LAN, ver sem login**. As **ações** (promover, despromover, remover, cancelar) **exigem login** do administrador.
 > - **D9-2:** **Ollama só no loopback** (127.0.0.1); todo o tráfego passa pela fila.
@@ -351,3 +351,95 @@ events(ts INTEGER, kind TEXT, detail TEXT);   -- partida/parada do gateway, muda
     7. sem `--run-timeout` no gateway; um stream pendurado só termina pela desconexão do cliente;
     8. o teste de ponta a ponta do entrypoint leva ~5 s para encerrar (a tolerância de desligamento); investigar se é o `Shutdown` esperando conexões ociosas;
     9. `golang.org/x/sys` foi de v0.48.0 para v0.49.0 (exigência do SQLite): reconferir o OCR no Windows real (`go test -tags ocr`) antes do merge.
+
+- 2026-10-28 23:24 → 2026-10-29 00:15 — **9.5 revisão adversarial CONCLUÍDA** (subagente opus, worktree `agent-a5589ffef1a3fdd1b`; commits `3146afd` e `8814d7a` de correção + o commit "docs: Fase 9.5" do report).
+  - **Report:** `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md`. Ataques, logs e fuzz em `….testes/`, como na Fase 7. As regressões ficam nos pacotes (`fase95_regress_test.go`).
+  - **Método:**
+    - leitura de todo o código da 9.1–9.4;
+    - 30 vetores executáveis (`VEC|id|sev|arquivo:linha|resultado`) em 6 pacotes, rodados no `315f996` (`antes.log`) e no código corrigido (`depois.log`, `s2-depois.log`);
+    - uma regressão por achado; prova de que ela falha antes, numa cópia do `315f996` (`git archive`, sem tocar o repositório principal);
+    - fuzz de 10 min por alvo e gate completo.
+  - **O que deu certo (sem achado, 18 vetores OK):**
+    - `X-Real-IP` só de loopback com 1 valor (8 casos);
+    - smuggling: CL+CL, CL/TE com espaço e CL negativo → 400; `chunked, identity` e TE duplicado → 501; CL+TE → o contrabandeado vira 2º pedido e recebe 403. O Ollama só viu o corpo exato;
+    - 17 variantes de rota bloqueada (`/api/pull/`, `//api/pull`, `/api/%70ull`, `/API/pull`, `/v1/../api/pull`, `OPTIONS`/`HEAD`…): 0 chegou ao Ollama;
+    - contadores não enganados por `"done":true` no texto nem por `tool_call`;
+    - vazamento de slot: 0 nos 3 modos de falha;
+    - inanição de `baixa`: o envelhecimento funciona;
+    - escalonamento: quem desiste sai;
+    - corrida das ações: 1.800 pedidos = 1.800 registros com `-race`;
+    - SQLi no `/history`: parametrizado;
+    - sentinela nos erros: o `error_class` só tem texto fixo;
+    - XSS, CSRF (11 casos), fixação de sessão e exposição de segredo: OK;
+    - `hash-password`: não ecoa em stdout/stderr;
+    - ponta a ponta com `--debug`: token, prompt e resposta fora do log, do `/monitor` e do `.db`;
+    - cliente mcpollama: nova tentativa só em 503 + `Retry-After` inteiro, nunca depois de 409; `TOOLS.md` e descrições intactos.
+  - **O que não deu certo (12 achados, 0 Alto, todos corrigidos):**
+    - **Médios:**
+      - **M1** TOCTOU do login, achado do coordenador: 40 paralelas → 40 PBKDF2;
+      - **M2** bloqueio global, achado do coordenador: 40 IPs travavam o administrador;
+      - **M3** SSE só com teto global (pendência 4 da 9.4);
+      - **P6** sem `--run-timeout`: slot preso para sempre (pendências 9.2-1 e 9.4-7);
+      - **S2** histórico sem teto de linhas: ~864 mil/dia possíveis por 90 d.
+    - **Baixos:**
+      - **P2** rotação IPv6 dentro do /64;
+      - **C1** `--priority-ips ::ffff:a.b.c.d` aceito e sem efeito. A hipótese inicial, "casa com todo IPv4", foi **refutada pelo spike**;
+      - **Q1** registro perdido em Cancel × abandono;
+      - **S1** `Stats` sem índice (48 ms por chamada com 207 mil linhas, 2 vezes a cada 2 s com painel aberto) e truncamento silencioso;
+      - **S3** um evento de descarte por lote, numa tabela que nunca expira;
+      - **M8** `/stats` sem cache;
+      - **C5** SIGTERM com painel aberto esperava 30 s.
+  - **Solução:**
+    - **M1:** reserva atômica `tryBegin`/`end`/`abort` + semáforo de 2 PBKDF2;
+    - **M2:** teto global retirado; 5 por IP + backoff exponencial por IP (15 min → 24 h). Não houve necessidade de `--admin-ips`;
+    - **M3:** 4 streams por IP, 32 no total;
+    - **P6:** `--run-timeout` (`MCPGW_RUN_TIMEOUT`), **padrão = `--max-wait` (10 min)**. O motivo é a simetria: ninguém segura um slot mais do que alguém pode esperar por ele; a folga sobre os 120 s do mcpollama e os ~87 s medidos é grande; só uma geração patológica do contexto inteiro (~11 min) é cortada. Antes dos headers → 504; no stream → linha NDJSON de erro; registro `erro/run_timeout`;
+    - **S2:** `--max-request-rows` (`MCPGW_MAX_REQUEST_ROWS`, 3.000.000), `Store.Cap` por `rowid` a cada `Maintain` (de hora em hora), evento `teto_pedidos`;
+    - **P2:** `fairIP` agrupa o IPv6 por /64;
+    - **C1:** `parseNets` com `net/netip` (o mapeado vira IPv4; < /96 e zona são recusados);
+    - **Q1:** o `abandon` emite o registro;
+    - **S1:** índice `requests(finished_at)` (0,56 ms) + campo `truncated`;
+    - **S3:** no máximo 1 evento por minuto, sem perder a contagem (o `Close` grava o resto);
+    - **M8:** cache de 5 s por janela;
+    - **C5:** `RegisterOnShutdown(mon.Close)` (6 ms);
+    - **endurecimento H1:** o `Verify` compara o SHA-256 do usuário.
+  - **Medida da pendência 9.3-1/9.4-5 (`Stats` com 200 mil linhas, banco sintético de 90 dias, 207 mil linhas):**
+    - antes: 15m 48,2 ms, 7d 70,8 ms (4 MiB), 90d 305,6 ms (49 MiB, truncado);
+    - depois: 15m 0,56 ms, 7d 33,6 ms;
+    - a janela de 90d não é exposta e agora avisa o truncamento.
+  - **Gate (números):**
+    - `go build`/`go vet ./...` exit 0; `gofmt -l .` vazio;
+    - `go test -count=1 ./...`: 16 pacotes `ok`;
+    - `-race -count=1 ./...`: 16 `ok` (doctext 127 s);
+    - **OCR com a DLL real** (SHA-256 conferido, `tessdata\best`): ocr, doctext, tools e mcpollama-mcp `ok`, **385 PASS, 0 SKIP**. O `x/sys` v0.49.0 está validado (pendência 9.4-9);
+    - build Linux do gateway: 18.077.009 bytes; vet Linux ok;
+    - `go mod tidy`: **sem diff** (o `modernc.org/sqlite` já era direto; o aviso do editor estava velho);
+    - os 2 commits de correção foram verificados em exportação limpa (`git archive … src TOOLS.md`): tudo `ok`.
+  - **Fuzz de 10 min por alvo** (23:55:32 → 00:05:36, paralelo, `-parallel 3`), todos PASS:
+    - `FuzzConcurrentActions`: 213.938 execuções;
+    - `FuzzFairIP`: 6.972.864;
+    - `FuzzCountersFromModelText`: 3.282.757;
+    - `FuzzParseNets`: 3.729.010;
+    - `FuzzLoginLimiter`: 3.165.797.
+  - **Erros de processo (corrigidos, detalhe no report §3.2 e §6):**
+    - a 1ª versão do vetor Q4 usava prazo de 0 ms;
+    - a 1ª regressão do Q1 passava no código antigo por causa de um `Release` final; isso foi provado na cópia do `315f996` e corrigido;
+    - a 1ª regressão de SSE travou a suíte por 400 s por causa da ordem `defer` × `Cleanup`;
+    - um caso do O1 foi mal nomeado;
+    - um BOM do PowerShell 5.1 entrou num arquivo de teste;
+    - a 1ª exportação limpa ficou sem o `TOOLS.md`.
+  - **Estado:** 9.5 concluída.
+  - **Pendências (numeradas; detalhe no report §7):**
+    1. `hash-password` ecoa a senha no terminal: documentar `read -rs` na 9.6.
+    2. **Decisão do owner:** o gateway não policia `options` (`num_ctx`, `num_gpu`, `keep_alive:0`), que podem forçar recarga ou descarga e prefill gigante.
+    3. O limite de login e o de SSE usam o IP completo, não o /64. Basta enquanto o `/monitor` for só da LAN IPv4.
+    4. INFO: um cliente que desiste antes de entrar não gera registro.
+    5. 9.6: confirmar `proxy_request_buffering on` (o gateway não tem prazo de leitura do corpo).
+    6. 9.6: confirmar `X-Real-IP` em todo `location`, e não pôr `127.0.0.1` em `--priority-ips`.
+    7. 9.7: validar o teto de 3 milhões de linhas e o `--run-timeout` de 10 min com o volume real.
+    8. Pendência 9.4-8 diagnosticada: o gateway encerra em 5 ms; os ~5 s são do ambiente do worktree (0,35 s em exportação limpa).
+    9. Herdadas e ainda abertas:
+       - 9.1-1 e 9.1-2;
+       - 9.2-2, 9.2-3 e 9.2-4;
+       - 9.3-2, 9.3-3 e 9.3-4;
+       - 9.4-1, 9.4-2 e 9.4-3.

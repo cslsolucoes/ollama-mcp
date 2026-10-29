@@ -1,0 +1,28 @@
+== 3146afd
+build+vet ok
+gofmt ok
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	0.124s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	1.160s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	0.670s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	1.877s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	0.399s
+ok  	github.com/cslsoftwares/mcpollama/cmd/bakeoff	0.046s
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.066s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.379s
+ok  	github.com/cslsoftwares/mcpollama/tools	3.730s
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.749s
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.589s
+== 8814d7a
+build+vet ok
+gofmt ok
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	0.118s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	1.122s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	1.175s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	1.853s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	0.499s
+ok  	github.com/cslsoftwares/mcpollama/cmd/bakeoff	0.053s
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.059s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.350s
+ok  	github.com/cslsoftwares/mcpollama/tools	3.675s
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.722s
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.545s

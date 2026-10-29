@@ -1,0 +1,1093 @@
+﻿2026-10-29 00:09:18 $ go test -tags ocr -count=1 -v ./ocr ./doctext ./tools ./mcpollama-mcp (DLL D:\MCP\libtesseract64.dll, tessdata best, SHA-256 informado)
+=== RUN   TestConfigValidate
+--- PASS: TestConfigValidate (0.00s)
+=== RUN   TestConfigDefaults
+--- PASS: TestConfigDefaults (0.00s)
+=== RUN   TestWorkerArgsRoundTrip
+--- PASS: TestWorkerArgsRoundTrip (0.00s)
+=== RUN   TestNewPoolRefusesLibrary
+--- PASS: TestNewPoolRefusesLibrary (0.00s)
+=== RUN   TestJobWorkerIsInsideJob
+--- PASS: TestJobWorkerIsInsideJob (0.13s)
+=== RUN   TestJobKillOnClose
+--- PASS: TestJobKillOnClose (0.12s)
+=== RUN   TestJobMemoryCeiling
+--- PASS: TestJobMemoryCeiling (0.30s)
+=== RUN   TestJobGoHeapExhaustion
+    job_windows_test.go:108: Go heap past the ceiling: ocr: tempo da página esgotado
+--- PASS: TestJobGoHeapExhaustion (8.25s)
+=== RUN   TestRealOCRBestAndFast
+=== RUN   TestRealOCRBestAndFast/best
+    ocr_real_test.go:246: MEASURE model=best tesseract=5.3.3 startup(spawn+DLL+Init3)=151ms pages_ms=[3354 3197 2899] mean_ms=3150 conf=[95 95 95] words=12/12 rotated=0
+    ocr_real_test.go:249: MEASURE model=best worker_ws_idle_MiB=15.0 worker_ws_sampled_max_MiB=64.7 worker_ws_peak_MiB=80.6 worker_commit_peak_MiB=117.6
+=== RUN   TestRealOCRBestAndFast/fast
+    ocr_real_test.go:246: MEASURE model=fast tesseract=5.3.3 startup(spawn+DLL+Init3)=118ms pages_ms=[828 813 808] mean_ms=816 conf=[95 95 95] words=12/12 rotated=0
+    ocr_real_test.go:249: MEASURE model=fast worker_ws_idle_MiB=12.6 worker_ws_sampled_max_MiB=52.3 worker_ws_peak_MiB=69.9 worker_commit_peak_MiB=105.5
+--- PASS: TestRealOCRBestAndFast (12.24s)
+    --- PASS: TestRealOCRBestAndFast/best (9.62s)
+    --- PASS: TestRealOCRBestAndFast/fast (2.59s)
+=== RUN   TestRealOCRRotatedPage
+    ocr_real_test.go:277: MEASURE input_rotated_cw=90 reported_rotated=0 conf=95 words=12/12 ms=2014
+    ocr_real_test.go:277: MEASURE input_rotated_cw=180 reported_rotated=180 conf=95 words=12/12 ms=3706
+    ocr_real_test.go:277: MEASURE input_rotated_cw=270 reported_rotated=180 conf=95 words=12/12 ms=3750
+--- PASS: TestRealOCRRotatedPage (9.60s)
+=== RUN   TestRealWorkerStdoutClean
+    ocr_real_test.go:345: response 0: conf=95 text_bytes=668
+    ocr_real_test.go:345: response 1: conf=0 text_bytes=0
+    ocr_real_test.go:345: response 2: conf=95 text_bytes=668
+    ocr_real_test.go:350: stdout: 1405 bytes, exactly 4 frames; worker stderr: 0 bytes
+--- PASS: TestRealWorkerStdoutClean (1.88s)
+=== RUN   TestPoolRecognizeFake
+--- PASS: TestPoolRecognizeFake (0.19s)
+=== RUN   TestPoolWorkerEnvironmentIsClean
+--- PASS: TestPoolWorkerEnvironmentIsClean (0.10s)
+=== RUN   TestWorkerEnvFilter
+--- PASS: TestWorkerEnvFilter (0.00s)
+=== RUN   TestPoolPageTimeoutKillsWorker
+--- PASS: TestPoolPageTimeoutKillsWorker (1.60s)
+=== RUN   TestPoolContextCancelKillsWorker
+--- PASS: TestPoolContextCancelKillsWorker (1.01s)
+=== RUN   TestPoolWorkerCrashRecreatedOnce
+--- PASS: TestPoolWorkerCrashRecreatedOnce (0.19s)
+=== RUN   TestPoolWorkerCrashTwiceUnavailable
+--- PASS: TestPoolWorkerCrashTwiceUnavailable (0.19s)
+=== RUN   TestPoolHelloFailures
+--- PASS: TestPoolHelloFailures (0.28s)
+=== RUN   TestPoolEngineErrorKeepsWorker
+--- PASS: TestPoolEngineErrorKeepsWorker (0.10s)
+=== RUN   TestPoolImageLimits
+--- PASS: TestPoolImageLimits (0.00s)
+=== RUN   TestPoolClose
+--- PASS: TestPoolClose (0.09s)
+=== RUN   TestPoolCloseWhileBusy
+--- PASS: TestPoolCloseWhileBusy (0.11s)
+=== RUN   TestRequestRoundTrip
+=== RUN   TestRequestRoundTrip/plain
+=== RUN   TestRequestRoundTrip/one_pixel
+=== RUN   TestRequestRoundTrip/padded_stride
+=== RUN   TestRequestRoundTrip/sub-image
+--- PASS: TestRequestRoundTrip (0.00s)
+    --- PASS: TestRequestRoundTrip/plain (0.00s)
+    --- PASS: TestRequestRoundTrip/one_pixel (0.00s)
+    --- PASS: TestRequestRoundTrip/padded_stride (0.00s)
+    --- PASS: TestRequestRoundTrip/sub-image (0.00s)
+=== RUN   TestReadRequestLimits
+=== RUN   TestReadRequestLimits/short_header
+=== RUN   TestReadRequestLimits/bad_magic
+=== RUN   TestReadRequestLimits/bad_version
+=== RUN   TestReadRequestLimits/reserved
+=== RUN   TestReadRequestLimits/zero_width
+=== RUN   TestReadRequestLimits/zero_height
+=== RUN   TestReadRequestLimits/huge_width
+=== RUN   TestReadRequestLimits/over_dimension
+=== RUN   TestReadRequestLimits/stride_below_width
+=== RUN   TestReadRequestLimits/stride_far_above_width
+=== RUN   TestReadRequestLimits/stride_overflow
+=== RUN   TestReadRequestLimits/megapixels
+=== RUN   TestReadRequestLimits/dpi
+=== RUN   TestReadRequestLimits/truncated_pixels
+--- PASS: TestReadRequestLimits (0.00s)
+    --- PASS: TestReadRequestLimits/short_header (0.00s)
+    --- PASS: TestReadRequestLimits/bad_magic (0.00s)
+    --- PASS: TestReadRequestLimits/bad_version (0.00s)
+    --- PASS: TestReadRequestLimits/reserved (0.00s)
+    --- PASS: TestReadRequestLimits/zero_width (0.00s)
+    --- PASS: TestReadRequestLimits/zero_height (0.00s)
+    --- PASS: TestReadRequestLimits/huge_width (0.00s)
+    --- PASS: TestReadRequestLimits/over_dimension (0.00s)
+    --- PASS: TestReadRequestLimits/stride_below_width (0.00s)
+    --- PASS: TestReadRequestLimits/stride_far_above_width (0.00s)
+    --- PASS: TestReadRequestLimits/stride_overflow (0.00s)
+    --- PASS: TestReadRequestLimits/megapixels (0.00s)
+    --- PASS: TestReadRequestLimits/dpi (0.00s)
+    --- PASS: TestReadRequestLimits/truncated_pixels (0.00s)
+=== RUN   TestWriteRequestRefusesBadImages
+--- PASS: TestWriteRequestRefusesBadImages (0.00s)
+=== RUN   TestResponseRoundTripAndLimits
+--- PASS: TestResponseRoundTripAndLimits (0.00s)
+=== RUN   TestShortMessage
+--- PASS: TestShortMessage (0.00s)
+=== RUN   TestWorkerStdioDetachesStdout
+--- PASS: TestWorkerStdioDetachesStdout (0.03s)
+=== RUN   TestOpenTesseractRefusals
+=== RUN   TestOpenTesseractRefusals/relative_path
+=== RUN   TestOpenTesseractRefusals/hash_mismatch
+=== RUN   TestOpenTesseractRefusals/missing_DLL
+=== RUN   TestOpenTesseractRefusals/missing_model
+=== RUN   TestOpenTesseractRefusals/not_a_DLL
+--- PASS: TestOpenTesseractRefusals (0.00s)
+    --- PASS: TestOpenTesseractRefusals/relative_path (0.00s)
+    --- PASS: TestOpenTesseractRefusals/hash_mismatch (0.00s)
+    --- PASS: TestOpenTesseractRefusals/missing_DLL (0.00s)
+    --- PASS: TestOpenTesseractRefusals/missing_model (0.00s)
+    --- PASS: TestOpenTesseractRefusals/not_a_DLL (0.00s)
+=== RUN   TestRotateGray
+--- PASS: TestRotateGray (0.00s)
+=== RUN   TestCString
+--- PASS: TestCString (0.00s)
+=== RUN   FuzzOCRFrame
+=== RUN   FuzzOCRFrame/seed#0
+=== RUN   FuzzOCRFrame/seed#1
+=== RUN   FuzzOCRFrame/seed#2
+=== RUN   FuzzOCRFrame/seed#3
+=== RUN   FuzzOCRFrame/seed#4
+=== RUN   FuzzOCRFrame/seed#5
+--- PASS: FuzzOCRFrame (0.00s)
+    --- PASS: FuzzOCRFrame/seed#0 (0.00s)
+    --- PASS: FuzzOCRFrame/seed#1 (0.00s)
+    --- PASS: FuzzOCRFrame/seed#2 (0.00s)
+    --- PASS: FuzzOCRFrame/seed#3 (0.00s)
+    --- PASS: FuzzOCRFrame/seed#4 (0.00s)
+    --- PASS: FuzzOCRFrame/seed#5 (0.00s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/ocr	36.423s
+=== RUN   TestDetect
+=== RUN   TestDetect/docx_ok
+=== RUN   TestDetect/pptx_ok
+=== RUN   TestDetect/pdf_ok
+=== RUN   TestDetect/pdf_junk_before_header_within_1024
+=== RUN   TestDetect/pdf_header_starting_at_1019_(ends_inside_window)
+=== RUN   TestDetect/pdf_junk_past_1024
+=== RUN   TestDetect/docx_with_pdf_content
+=== RUN   TestDetect/pdf_with_zip_content
+=== RUN   TestDetect/pptx_with_pdf_content
+=== RUN   TestDetect/docx_empty
+=== RUN   TestDetect/docx_OLE_is_password_protected
+=== RUN   TestDetect/pptx_OLE_is_password_protected
+=== RUN   TestDetect/pdf_with_OLE_content
+=== RUN   TestDetect/.doc_OLE_is_legacy
+=== RUN   TestDetect/.ppt_OLE_is_legacy
+=== RUN   TestDetect/.xls_OLE_is_legacy_excel
+=== RUN   TestDetect/.doc_not_OLE_follows_the_text_path
+=== RUN   TestDetect/upper_case_extension
+=== RUN   TestDetect/mixed_case_pdf
+=== RUN   TestDetect/png_ok
+=== RUN   TestDetect/PNG_upper_case
+=== RUN   TestDetect/jpg_ok
+=== RUN   TestDetect/jpeg_ok
+=== RUN   TestDetect/png_with_jpg_content
+=== RUN   TestDetect/jpg_with_png_content
+=== RUN   TestDetect/png_truncated_signature
+=== RUN   TestDetect/jpg_two_bytes_only
+=== RUN   TestDetect/png_empty
+=== RUN   TestDetect/png_with_pdf_content
+=== RUN   TestDetect/png_signature_behind_a_.txt_follows_the_text_path
+=== RUN   TestDetect/.gif_is_not_an_image_format_here
+=== RUN   TestDetect/.tif_is_out_of_scope
+=== RUN   TestDetect/upper_case_OLE_doc
+=== RUN   TestDetect/no_extension_with_PK
+=== RUN   TestDetect/no_extension_with_pdf
+=== RUN   TestDetect/txt_with_pdf_bytes
+=== RUN   TestDetect/docm_out_of_scope
+=== RUN   TestDetect/pptm_out_of_scope
+=== RUN   TestDetect/dotx_out_of_scope
+=== RUN   TestDetect/potx_out_of_scope
+=== RUN   TestDetect/windows_path
+=== RUN   TestDetect/dot_in_directory_only
+--- PASS: TestDetect (0.00s)
+    --- PASS: TestDetect/docx_ok (0.00s)
+    --- PASS: TestDetect/pptx_ok (0.00s)
+    --- PASS: TestDetect/pdf_ok (0.00s)
+    --- PASS: TestDetect/pdf_junk_before_header_within_1024 (0.00s)
+    --- PASS: TestDetect/pdf_header_starting_at_1019_(ends_inside_window) (0.00s)
+    --- PASS: TestDetect/pdf_junk_past_1024 (0.00s)
+    --- PASS: TestDetect/docx_with_pdf_content (0.00s)
+    --- PASS: TestDetect/pdf_with_zip_content (0.00s)
+    --- PASS: TestDetect/pptx_with_pdf_content (0.00s)
+    --- PASS: TestDetect/docx_empty (0.00s)
+    --- PASS: TestDetect/docx_OLE_is_password_protected (0.00s)
+    --- PASS: TestDetect/pptx_OLE_is_password_protected (0.00s)
+    --- PASS: TestDetect/pdf_with_OLE_content (0.00s)
+    --- PASS: TestDetect/.doc_OLE_is_legacy (0.00s)
+    --- PASS: TestDetect/.ppt_OLE_is_legacy (0.00s)
+    --- PASS: TestDetect/.xls_OLE_is_legacy_excel (0.00s)
+    --- PASS: TestDetect/.doc_not_OLE_follows_the_text_path (0.00s)
+    --- PASS: TestDetect/upper_case_extension (0.00s)
+    --- PASS: TestDetect/mixed_case_pdf (0.00s)
+    --- PASS: TestDetect/png_ok (0.00s)
+    --- PASS: TestDetect/PNG_upper_case (0.00s)
+    --- PASS: TestDetect/jpg_ok (0.00s)
+    --- PASS: TestDetect/jpeg_ok (0.00s)
+    --- PASS: TestDetect/png_with_jpg_content (0.00s)
+    --- PASS: TestDetect/jpg_with_png_content (0.00s)
+    --- PASS: TestDetect/png_truncated_signature (0.00s)
+    --- PASS: TestDetect/jpg_two_bytes_only (0.00s)
+    --- PASS: TestDetect/png_empty (0.00s)
+    --- PASS: TestDetect/png_with_pdf_content (0.00s)
+    --- PASS: TestDetect/png_signature_behind_a_.txt_follows_the_text_path (0.00s)
+    --- PASS: TestDetect/.gif_is_not_an_image_format_here (0.00s)
+    --- PASS: TestDetect/.tif_is_out_of_scope (0.00s)
+    --- PASS: TestDetect/upper_case_OLE_doc (0.00s)
+    --- PASS: TestDetect/no_extension_with_PK (0.00s)
+    --- PASS: TestDetect/no_extension_with_pdf (0.00s)
+    --- PASS: TestDetect/txt_with_pdf_bytes (0.00s)
+    --- PASS: TestDetect/docm_out_of_scope (0.00s)
+    --- PASS: TestDetect/pptm_out_of_scope (0.00s)
+    --- PASS: TestDetect/dotx_out_of_scope (0.00s)
+    --- PASS: TestDetect/potx_out_of_scope (0.00s)
+    --- PASS: TestDetect/windows_path (0.00s)
+    --- PASS: TestDetect/dot_in_directory_only (0.00s)
+=== RUN   TestErrorMessages
+--- PASS: TestErrorMessages (0.00s)
+=== RUN   TestFormatString
+--- PASS: TestFormatString (0.00s)
+=== RUN   TestDefaultLimits
+--- PASS: TestDefaultLimits (0.00s)
+=== RUN   TestAltChunkHTML
+--- PASS: TestAltChunkHTML (0.00s)
+=== RUN   TestAltChunkTXTAndInCell
+--- PASS: TestAltChunkTXTAndInCell (0.00s)
+=== RUN   TestAltChunkImportedDOCX
+--- PASS: TestAltChunkImportedDOCX (0.00s)
+=== RUN   TestAltChunkUnreadable
+--- PASS: TestAltChunkUnreadable (0.00s)
+=== RUN   TestAltChunkSharesTheLimits
+--- PASS: TestAltChunkSharesTheLimits (0.03s)
+=== RUN   TestHTMLTextNeverLongerThanInput
+--- PASS: TestHTMLTextNeverLongerThanInput (0.01s)
+=== RUN   TestNumberingClausulaDecimal
+--- PASS: TestNumberingClausulaDecimal (0.00s)
+=== RUN   TestNumberingDefaultSuffixIsTab
+--- PASS: TestNumberingDefaultSuffixIsTab (0.00s)
+=== RUN   TestNumberingMultilevelRestart
+--- PASS: TestNumberingMultilevelRestart (0.00s)
+=== RUN   TestNumberingLvlRestartNever
+--- PASS: TestNumberingLvlRestartNever (0.00s)
+=== RUN   TestNumberingFormats
+--- PASS: TestNumberingFormats (0.00s)
+=== RUN   TestNumberingRomanAndLetters
+--- PASS: TestNumberingRomanAndLetters (0.00s)
+=== RUN   TestNumberingSuffixes
+--- PASS: TestNumberingSuffixes (0.00s)
+=== RUN   TestNumberingInheritedFromStyle
+--- PASS: TestNumberingInheritedFromStyle (0.00s)
+=== RUN   TestNumberingStyleLinkedLevel
+--- PASS: TestNumberingStyleLinkedLevel (0.00s)
+=== RUN   TestNumberingDirectOverridesStyle
+--- PASS: TestNumberingDirectOverridesStyle (0.00s)
+=== RUN   TestNumberingStartOverride
+--- PASS: TestNumberingStartOverride (0.00s)
+=== RUN   TestNumberingLevelStartAndOverrideLevel
+--- PASS: TestNumberingLevelStartAndOverrideLevel (0.00s)
+=== RUN   TestNumberingIsLglForcesDecimal
+--- PASS: TestNumberingIsLglForcesDecimal (0.00s)
+=== RUN   TestNumberingStyleLinkedAbstract
+--- PASS: TestNumberingStyleLinkedAbstract (0.00s)
+=== RUN   TestNumberingUnknownAndMissing
+--- PASS: TestNumberingUnknownAndMissing (0.00s)
+=== RUN   TestNumberingStyleCycleDoesNotHang
+--- PASS: TestNumberingStyleCycleDoesNotHang (0.00s)
+=== RUN   TestNumberingEmptyNumberedParagraphAndTable
+--- PASS: TestNumberingEmptyNumberedParagraphAndTable (0.00s)
+=== RUN   TestNumberingNotAppliedToHeaderParagraphsAndDeterminism
+--- PASS: TestNumberingNotAppliedToHeaderParagraphsAndDeterminism (0.00s)
+=== RUN   TestNumberingLargeAndOverTheCeiling
+--- PASS: TestNumberingLargeAndOverTheCeiling (0.55s)
+=== RUN   TestDOCXParagraphsTabsBreaks
+--- PASS: TestDOCXParagraphsTabsBreaks (0.00s)
+=== RUN   TestDOCXPageBreakAlone
+--- PASS: TestDOCXPageBreakAlone (0.00s)
+=== RUN   TestDOCXTable
+--- PASS: TestDOCXTable (0.00s)
+=== RUN   TestDOCXTableNestedAndBreaksInCell
+--- PASS: TestDOCXTableNestedAndBreaksInCell (0.00s)
+=== RUN   TestDOCXRevisions
+--- PASS: TestDOCXRevisions (0.00s)
+=== RUN   TestDOCXAlternateContentOnce
+--- PASS: TestDOCXAlternateContentOnce (0.00s)
+=== RUN   TestDOCXFields
+--- PASS: TestDOCXFields (0.00s)
+=== RUN   TestDOCXHeadersFootersOnce
+--- PASS: TestDOCXHeadersFootersOnce (0.00s)
+=== RUN   TestDOCXNotesAndComments
+--- PASS: TestDOCXNotesAndComments (0.00s)
+=== RUN   TestDOCXContentControlsTextBoxesMath
+--- PASS: TestDOCXContentControlsTextBoxesMath (0.00s)
+=== RUN   TestDOCXStrictOOXML
+--- PASS: TestDOCXStrictOOXML (0.00s)
+=== RUN   TestDOCXNonStandardPrefix
+--- PASS: TestDOCXNonStandardPrefix (0.00s)
+=== RUN   TestDOCXIgnoredParts
+--- PASS: TestDOCXIgnoredParts (0.00s)
+=== RUN   TestDOCXBlankLinesCollapsed
+--- PASS: TestDOCXBlankLinesCollapsed (0.00s)
+=== RUN   TestDOCXMissingDocumentXML
+--- PASS: TestDOCXMissingDocumentXML (0.00s)
+=== RUN   TestDOCXMalformedXMLAndDTD
+--- PASS: TestDOCXMalformedXMLAndDTD (0.00s)
+=== RUN   TestDOCXTextCeiling
+--- PASS: TestDOCXTextCeiling (0.00s)
+=== RUN   TestExtractContext
+--- PASS: TestExtractContext (0.00s)
+=== RUN   TestExtractRecoversPanic
+--- PASS: TestExtractRecoversPanic (0.00s)
+=== RUN   TestExtractFormatText
+--- PASS: TestExtractFormatText (0.00s)
+=== RUN   TestExtractNormalizesAndSetsFormat
+--- PASS: TestExtractNormalizesAndSetsFormat (0.00s)
+=== RUN   TestDOCXDeterminism
+--- PASS: TestDOCXDeterminism (0.00s)
+=== RUN   TestDOCXPendingRevisionsNeedContent
+--- PASS: TestDOCXPendingRevisionsNeedContent (0.00s)
+=== RUN   TestDOCXLvlTextAmplificationBounded
+--- PASS: TestDOCXLvlTextAmplificationBounded (0.01s)
+=== RUN   TestDOCXCellTextCountsAgainstCeiling
+--- PASS: TestDOCXCellTextCountsAgainstCeiling (0.00s)
+=== RUN   TestDOCXUnbalancedFieldRefused
+--- PASS: TestDOCXUnbalancedFieldRefused (0.00s)
+=== RUN   TestDOCXRelTargetsCaseAndNoDuplicate
+--- PASS: TestDOCXRelTargetsCaseAndNoDuplicate (0.00s)
+=== RUN   TestPPTXHardening
+--- PASS: TestPPTXHardening (0.00s)
+=== RUN   TestPDFDeadlineCutsALongPage
+    hardening_test.go:208: cortado em 301ms (antes da correcao: 3,7-5,6 s com timeout de 2 s)
+--- PASS: TestPDFDeadlineCutsALongPage (3.26s)
+=== RUN   TestDOCXHiddenTextDirect
+--- PASS: TestDOCXHiddenTextDirect (0.00s)
+=== RUN   TestDOCXHiddenTextFromStyles
+--- PASS: TestDOCXHiddenTextFromStyles (0.00s)
+=== RUN   TestDOCXHiddenNumberedParagraphAndCell
+--- PASS: TestDOCXHiddenNumberedParagraphAndCell (0.00s)
+=== RUN   TestPPTXHiddenShapesAndSlides
+--- PASS: TestPPTXHiddenShapesAndSlides (0.00s)
+=== RUN   TestImagePNGAndJPEG
+=== RUN   TestImagePNGAndJPEG/png
+=== RUN   TestImagePNGAndJPEG/jpg
+--- PASS: TestImagePNGAndJPEG (0.01s)
+    --- PASS: TestImagePNGAndJPEG/png (0.00s)
+    --- PASS: TestImagePNGAndJPEG/jpg (0.00s)
+=== RUN   TestImageLowConfidenceAndRotation
+--- PASS: TestImageLowConfidenceAndRotation (0.00s)
+=== RUN   TestImageWithoutOCRIsRefused
+--- PASS: TestImageWithoutOCRIsRefused (0.00s)
+=== RUN   TestImageBombRefusedWithoutAllocating
+    image_test.go:153: bomba 100000x100000 recusada; alocado 1200 bytes
+--- PASS: TestImageBombRefusedWithoutAllocating (0.01s)
+=== RUN   TestImageReducedToTheCeiling
+--- PASS: TestImageReducedToTheCeiling (0.04s)
+=== RUN   TestImageMalformedAndBlank
+--- PASS: TestImageMalformedAndBlank (0.00s)
+=== RUN   TestImageOCRFailureAndUnavailable
+--- PASS: TestImageOCRFailureAndUnavailable (0.00s)
+=== RUN   TestGrayConversionPaths
+--- PASS: TestGrayConversionPaths (0.00s)
+=== RUN   TestJPEGProgressiveDetection
+--- PASS: TestJPEGProgressiveDetection (0.00s)
+=== RUN   TestJPEGBombsRefusedWithoutAllocating
+--- PASS: TestJPEGBombsRefusedWithoutAllocating (0.00s)
+=== RUN   TestNormalizeText
+--- PASS: TestNormalizeText (0.00s)
+=== RUN   TestNormalizeInvalidUTF8
+--- PASS: TestNormalizeInvalidUTF8 (0.00s)
+=== RUN   TestNormalizeFFFDThreshold
+--- PASS: TestNormalizeFFFDThreshold (0.00s)
+=== RUN   TestNormalizeDeterministic
+--- PASS: TestNormalizeDeterministic (0.00s)
+=== RUN   TestOCRMarkersStatsAndBlankPage
+--- PASS: TestOCRMarkersStatsAndBlankPage (0.02s)
+=== RUN   TestOCROnlyPagesWithoutText
+--- PASS: TestOCROnlyPagesWithoutText (0.00s)
+=== RUN   TestOCRWholeScannedDocumentIsRead
+--- PASS: TestOCRWholeScannedDocumentIsRead (0.01s)
+=== RUN   TestOCRWithoutEngineKeepsTheCurrentRefusal
+--- PASS: TestOCRWithoutEngineKeepsTheCurrentRefusal (0.00s)
+=== RUN   TestOCRNothingRecognizedIsRefused
+--- PASS: TestOCRNothingRecognizedIsRefused (0.02s)
+=== RUN   TestOCRPageFailureAndPanic
+--- PASS: TestOCRPageFailureAndPanic (0.02s)
+=== RUN   TestOCRUnavailableRefuses
+--- PASS: TestOCRUnavailableRefuses (0.01s)
+=== RUN   TestOCRTimeBudget
+    ocr_test.go:266: orçamento: 3 lidas, 3 sem tempo, 1.3s
+--- PASS: TestOCRTimeBudget (1.30s)
+=== RUN   TestOCRCancelIsReturned
+--- PASS: TestOCRCancelIsReturned (0.00s)
+=== RUN   TestOCRMaxPages
+--- PASS: TestOCRMaxPages (0.01s)
+=== RUN   TestOCRReducesDPIToFitMegapixels
+    ocr_test.go:335: Carta a 1 MP: 103 dpi, 876x1133
+--- PASS: TestOCRReducesDPIToFitMegapixels (0.00s)
+=== RUN   TestFitDPI
+--- PASS: TestFitDPI (0.00s)
+=== RUN   TestOCRParallelKeepsOrder
+    ocr_test.go:408: pico de paralelismo: 4
+--- PASS: TestOCRParallelKeepsOrder (0.14s)
+=== RUN   TestOCRTextCountsAgainstMaxTextRunes
+--- PASS: TestOCRTextCountsAgainstMaxTextRunes (0.01s)
+=== RUN   TestOCRMarker
+--- PASS: TestOCRMarker (0.00s)
+=== RUN   TestOCRFailureKeepsTheFewNativeRunes
+--- PASS: TestOCRFailureKeepsTheFewNativeRunes (0.00s)
+=== RUN   TestScannedPDFWithRealEngine
+    pdf_scan_test.go:147: teto de 2 MP: (1241,1606) a 146 dpi
+--- PASS: TestScannedPDFWithRealEngine (0.98s)
+=== RUN   TestPDFASCII
+--- PASS: TestPDFASCII (0.01s)
+=== RUN   TestPDFAccents
+--- PASS: TestPDFAccents (0.01s)
+=== RUN   TestPDFThreePagesMarkers
+--- PASS: TestPDFThreePagesMarkers (0.01s)
+=== RUN   TestPDFBlankMiddlePage
+--- PASS: TestPDFBlankMiddlePage (0.01s)
+=== RUN   TestPDFAllBlankIsNoText
+--- PASS: TestPDFAllBlankIsNoText (0.00s)
+=== RUN   TestPDFHyphenation
+--- PASS: TestPDFHyphenation (0.00s)
+=== RUN   TestPDFTruncatedAndGarbage
+--- PASS: TestPDFTruncatedAndGarbage (0.02s)
+=== RUN   TestPDFPermissionPasswordOpens
+--- PASS: TestPDFPermissionPasswordOpens (0.01s)
+=== RUN   TestPDFOpenPasswordRefused
+--- PASS: TestPDFOpenPasswordRefused (0.00s)
+=== RUN   TestPDFMaxPages
+--- PASS: TestPDFMaxPages (0.01s)
+=== RUN   TestPDFMaxTextRunes
+--- PASS: TestPDFMaxTextRunes (0.00s)
+=== RUN   TestPDFContext
+--- PASS: TestPDFContext (0.00s)
+=== RUN   TestPDFDeterminism
+--- PASS: TestPDFDeterminism (0.33s)
+=== RUN   TestPDFRenderGray
+--- PASS: TestPDFRenderGray (0.02s)
+=== RUN   TestPDFEngineLifecycle
+    pdf_test.go:240: sem cache: 1ª extração 3.278s (inclui a inicialização do motor); 2ª 7ms
+    pdf_test.go:240: com cache, cache vazio: 1ª extração 3.376s (inclui a inicialização do motor); 2ª 7ms
+    pdf_test.go:240: com cache, cache preenchido (reinício do motor): 1ª extração 114ms (inclui a inicialização do motor); 2ª 5ms
+--- PASS: TestPDFEngineLifecycle (6.79s)
+=== RUN   TestPDFTimePerPage
+    pdf_test.go:284: 20 páginas x 5: 13.832ms por extração, 0.69 ms/página (inclui abrir o documento)
+--- PASS: TestPDFTimePerPage (3.11s)
+=== RUN   TestFakeEngineMarkersFooterAndHyphen
+--- PASS: TestFakeEngineMarkersFooterAndHyphen (0.00s)
+=== RUN   TestFakeEngineHyphenNotAcrossPages
+--- PASS: TestFakeEngineHyphenNotAcrossPages (0.00s)
+=== RUN   TestFakeEngineAllBlank
+--- PASS: TestFakeEngineAllBlank (0.00s)
+=== RUN   TestFakeEngineErrors
+--- PASS: TestFakeEngineErrors (0.00s)
+=== RUN   TestFakeEngineContextBetweenPages
+--- PASS: TestFakeEngineContextBetweenPages (0.00s)
+=== RUN   TestPlainHyphenAtLineEndIsKept
+--- PASS: TestPlainHyphenAtLineEndIsKept (0.00s)
+=== RUN   TestPDFiumSoftHyphens
+--- PASS: TestPDFiumSoftHyphens (0.00s)
+=== RUN   TestPPTXOrderBySldIdLst
+--- PASS: TestPPTXOrderBySldIdLst (0.00s)
+=== RUN   TestPPTXLayoutMasterAndSldNumIgnored
+--- PASS: TestPPTXLayoutMasterAndSldNumIgnored (0.00s)
+=== RUN   TestPPTXNestedGroup
+--- PASS: TestPPTXNestedGroup (0.00s)
+=== RUN   TestPPTXBreaksAndRuns
+--- PASS: TestPPTXBreaksAndRuns (0.00s)
+=== RUN   TestPPTXTableWithMerge
+--- PASS: TestPPTXTableWithMerge (0.00s)
+=== RUN   TestPPTXHiddenSlide
+--- PASS: TestPPTXHiddenSlide (0.00s)
+=== RUN   TestPPTXAlternateContentNoDuplicate
+--- PASS: TestPPTXAlternateContentNoDuplicate (0.00s)
+=== RUN   TestPPTXNonStandardPrefixAndStrict
+--- PASS: TestPPTXNonStandardPrefixAndStrict (0.00s)
+=== RUN   TestPPTXMissingPresentation
+--- PASS: TestPPTXMissingPresentation (0.00s)
+=== RUN   TestPPTXRelOutsidePackage
+--- PASS: TestPPTXRelOutsidePackage (0.00s)
+=== RUN   TestPPTXMissingSlidePart
+--- PASS: TestPPTXMissingSlidePart (0.00s)
+=== RUN   TestPPTXTooLong
+--- PASS: TestPPTXTooLong (0.00s)
+=== RUN   TestPPTXDeterminism
+--- PASS: TestPPTXDeterminism (0.00s)
+=== RUN   TestPPTXContextCanceled
+--- PASS: TestPPTXContextCanceled (0.00s)
+=== RUN   TestPPTXGarbageNoPanic
+--- PASS: TestPPTXGarbageNoPanic (0.00s)
+=== RUN   TestMinimalPackageOK
+--- PASS: TestMinimalPackageOK (0.00s)
+=== RUN   TestNotAZip
+--- PASS: TestNotAZip (0.00s)
+=== RUN   TestZipBomb
+    security_test.go:101: pacote de 103792 bytes comprimidos; descompactado real: 100 MiB
+    security_test.go:114: MEMORIA zip bomb 100 MiB (limite de entrada 64 MiB): pico de heap acima da base = 0 MiB; total alocado = 0 MiB
+    security_test.go:130: MEMORIA zip bomb com limite de entrada 1 MiB: pico = 0 MiB
+    security_test.go:150: MEMORIA zip bomb com cabeçalho mentiroso (1 KiB declarado): pico = 0 MiB
+--- PASS: TestZipBomb (0.10s)
+=== RUN   TestMaxTotalBytesAcrossEntries
+--- PASS: TestMaxTotalBytesAcrossEntries (0.00s)
+=== RUN   TestReadPresizedAtDefaultLimit
+    security_test.go:194: MEMORIA parte de 64 MiB (método 0): pico = 64 MiB, total alocado = 64 MiB, tempo = 23.8168ms
+    security_test.go:194: MEMORIA parte de 64 MiB (método 255): pico = 64 MiB, total alocado = 64 MiB, tempo = 17.9444ms
+--- PASS: TestReadPresizedAtDefaultLimit (0.10s)
+=== RUN   TestReadLyingUpwardChargesBudget
+--- PASS: TestReadLyingUpwardChargesBudget (0.00s)
+=== RUN   TestReadBoundedOwnCount
+--- PASS: TestReadBoundedOwnCount (0.00s)
+=== RUN   TestTenThousandEntriesRefusedBeforeIterating
+--- PASS: TestTenThousandEntriesRefusedBeforeIterating (0.01s)
+=== RUN   TestUnsafeEntryNames
+--- PASS: TestUnsafeEntryNames (0.00s)
+=== RUN   TestDuplicateEntry
+--- PASS: TestDuplicateEntry (0.00s)
+=== RUN   TestEncryptedEntry
+--- PASS: TestEncryptedEntry (0.00s)
+=== RUN   TestUnsupportedMethod
+--- PASS: TestUnsupportedMethod (0.00s)
+=== RUN   TestRelationships
+--- PASS: TestRelationships (0.00s)
+=== RUN   TestRelationshipsDoctypeRefused
+--- PASS: TestRelationshipsDoctypeRefused (0.00s)
+=== RUN   TestXMLDoctypeRefused
+--- PASS: TestXMLDoctypeRefused (0.00s)
+=== RUN   TestXMLDepth
+--- PASS: TestXMLDepth (0.00s)
+=== RUN   TestXMLTextRunes
+--- PASS: TestXMLTextRunes (0.00s)
+=== RUN   TestXMLMalformedAndCharset
+--- PASS: TestXMLMalformedAndCharset (0.00s)
+=== RUN   TestNamespacesByURI
+--- PASS: TestNamespacesByURI (0.00s)
+=== RUN   TestPackageDeterminism
+--- PASS: TestPackageDeterminism (0.00s)
+=== RUN   FuzzPDF
+=== RUN   FuzzPDF/seed#0
+=== RUN   FuzzPDF/seed#1
+=== RUN   FuzzPDF/seed#2
+=== RUN   FuzzPDF/seed#3
+=== RUN   FuzzPDF/seed#4
+=== RUN   FuzzPDF/seed#5
+=== RUN   FuzzPDF/seed#6
+=== RUN   FuzzPDF/seed#7
+=== RUN   FuzzPDF/seed#8
+=== RUN   FuzzPDF/seed#9
+=== RUN   FuzzPDF/seed#10
+--- PASS: FuzzPDF (0.05s)
+    --- PASS: FuzzPDF/seed#0 (0.01s)
+    --- PASS: FuzzPDF/seed#1 (0.01s)
+    --- PASS: FuzzPDF/seed#2 (0.00s)
+    --- PASS: FuzzPDF/seed#3 (0.01s)
+    --- PASS: FuzzPDF/seed#4 (0.00s)
+    --- PASS: FuzzPDF/seed#5 (0.00s)
+    --- PASS: FuzzPDF/seed#6 (0.00s)
+    --- PASS: FuzzPDF/seed#7 (0.00s)
+    --- PASS: FuzzPDF/seed#8 (0.00s)
+    --- PASS: FuzzPDF/seed#9 (0.00s)
+    --- PASS: FuzzPDF/seed#10 (0.00s)
+=== RUN   FuzzPPTX
+=== RUN   FuzzPPTX/seed#0
+=== RUN   FuzzPPTX/seed#1
+=== RUN   FuzzPPTX/seed#2
+=== RUN   FuzzPPTX/seed#3
+--- PASS: FuzzPPTX (0.00s)
+    --- PASS: FuzzPPTX/seed#0 (0.00s)
+    --- PASS: FuzzPPTX/seed#1 (0.00s)
+    --- PASS: FuzzPPTX/seed#2 (0.00s)
+    --- PASS: FuzzPPTX/seed#3 (0.00s)
+=== RUN   FuzzOpenPackage
+=== RUN   FuzzOpenPackage/seed#0
+=== RUN   FuzzOpenPackage/seed#1
+=== RUN   FuzzOpenPackage/seed#2
+=== RUN   FuzzOpenPackage/seed#3
+=== RUN   FuzzOpenPackage/seed#4
+--- PASS: FuzzOpenPackage (0.00s)
+    --- PASS: FuzzOpenPackage/seed#0 (0.00s)
+    --- PASS: FuzzOpenPackage/seed#1 (0.00s)
+    --- PASS: FuzzOpenPackage/seed#2 (0.00s)
+    --- PASS: FuzzOpenPackage/seed#3 (0.00s)
+    --- PASS: FuzzOpenPackage/seed#4 (0.00s)
+=== RUN   FuzzXMLSafe
+=== RUN   FuzzXMLSafe/seed#0
+=== RUN   FuzzXMLSafe/seed#1
+=== RUN   FuzzXMLSafe/seed#2
+=== RUN   FuzzXMLSafe/seed#3
+=== RUN   FuzzXMLSafe/seed#4
+=== RUN   FuzzXMLSafe/seed#5
+--- PASS: FuzzXMLSafe (0.00s)
+    --- PASS: FuzzXMLSafe/seed#0 (0.00s)
+    --- PASS: FuzzXMLSafe/seed#1 (0.00s)
+    --- PASS: FuzzXMLSafe/seed#2 (0.00s)
+    --- PASS: FuzzXMLSafe/seed#3 (0.00s)
+    --- PASS: FuzzXMLSafe/seed#4 (0.00s)
+    --- PASS: FuzzXMLSafe/seed#5 (0.00s)
+=== RUN   FuzzDOCX
+=== RUN   FuzzDOCX/seed#0
+=== RUN   FuzzDOCX/seed#1
+=== RUN   FuzzDOCX/seed#2
+=== RUN   FuzzDOCX/seed#3
+=== RUN   FuzzDOCX/seed#4
+=== RUN   FuzzDOCX/seed#5
+--- PASS: FuzzDOCX (0.00s)
+    --- PASS: FuzzDOCX/seed#0 (0.00s)
+    --- PASS: FuzzDOCX/seed#1 (0.00s)
+    --- PASS: FuzzDOCX/seed#2 (0.00s)
+    --- PASS: FuzzDOCX/seed#3 (0.00s)
+    --- PASS: FuzzDOCX/seed#4 (0.00s)
+    --- PASS: FuzzDOCX/seed#5 (0.00s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/doctext	17.106s
+=== RUN   TestModelAllowedLatestAndCase
+--- PASS: TestModelAllowedLatestAndCase (0.00s)
+=== RUN   TestSplitModels
+--- PASS: TestSplitModels (0.00s)
+=== RUN   TestDisallowedModelNeverCallsOllama
+--- PASS: TestDisallowedModelNeverCallsOllama (0.00s)
+=== RUN   TestAllowedModelPassesThroughWithLatest
+--- PASS: TestAllowedModelPassesThroughWithLatest (0.00s)
+=== RUN   TestExplicitAllowlist
+--- PASS: TestExplicitAllowlist (0.00s)
+=== RUN   TestListModelsFiltersAndShowsOutsideVRAM
+--- PASS: TestListModelsFiltersAndShowsOutsideVRAM (0.00s)
+=== RUN   TestArgsStrings
+--- PASS: TestArgsStrings (0.00s)
+=== RUN   TestArgsNumbers
+--- PASS: TestArgsNumbers (0.00s)
+=== RUN   TestArgsBoolListAndUnknown
+--- PASS: TestArgsBoolListAndUnknown (0.00s)
+=== RUN   TestEmbedSummaryByDefault
+--- PASS: TestEmbedSummaryByDefault (0.00s)
+=== RUN   TestEmbedStringInputAndVectors
+--- PASS: TestEmbedStringInputAndVectors (0.00s)
+=== RUN   TestEmbedValidation
+--- PASS: TestEmbedValidation (0.00s)
+=== RUN   TestEmbedOllamaErrors
+--- PASS: TestEmbedOllamaErrors (0.00s)
+=== RUN   TestListModels
+--- PASS: TestListModels (0.00s)
+=== RUN   TestListModelsPSFailureIsPartialTagsFailureIsError
+--- PASS: TestListModelsPSFailureIsPartialTagsFailureIsError (0.00s)
+=== RUN   TestListModelsBypassesTheGPUQueue
+--- PASS: TestListModelsBypassesTheGPUQueue (0.00s)
+=== RUN   TestSummarizeDocxPromptAndFooter
+--- PASS: TestSummarizeDocxPromptAndFooter (0.01s)
+=== RUN   TestSummarizeDocxNoPendingRevisions
+--- PASS: TestSummarizeDocxNoPendingRevisions (0.00s)
+=== RUN   TestSummarizePPTXFooter
+--- PASS: TestSummarizePPTXFooter (0.01s)
+=== RUN   TestSummarizePDFFooter
+--- PASS: TestSummarizePDFFooter (0.14s)
+=== RUN   TestTranslateDocumentNotice
+--- PASS: TestTranslateDocumentNotice (0.01s)
+=== RUN   TestTextFooterHasFormatTxtOnly
+--- PASS: TestTextFooterHasFormatTxtOnly (0.00s)
+=== RUN   TestDocumentRefusalsThroughTool
+--- PASS: TestDocumentRefusalsThroughTool (0.01s)
+=== RUN   TestDocxEmptyIsRefused
+--- PASS: TestDocxEmptyIsRefused (0.00s)
+=== RUN   TestDocContextCancelled
+--- PASS: TestDocContextCancelled (0.00s)
+=== RUN   TestSplitChunksNeverCutsPositionMarkers
+--- PASS: TestSplitChunksNeverCutsPositionMarkers (0.02s)
+=== RUN   TestDocDescriptionsMinimal
+--- PASS: TestDocDescriptionsMinimal (0.00s)
+=== RUN   TestDocumentAttacksWithRealExtractor
+    filetools_docs_test.go:540: VEC|doc/dotdot|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/verbatim-prefix|BLOQUEADO|caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    filetools_docs_test.go:540: VEC|doc/hardlink-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/device-pdf|BLOQUEADO|caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    filetools_docs_test.go:540: VEC|doc/drive-relative-pdf|BLOQUEADO|caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    filetools_docs_test.go:540: VEC|doc/trailing-sp-secret|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/junction-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/secrets-dir|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/symlink-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/credentials-docx|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/ads-pdf|BLOQUEADO|caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    filetools_docs_test.go:540: VEC|doc/ads-abs|BLOQUEADO|caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    filetools_docs_test.go:540: VEC|doc/device-docx|BLOQUEADO|caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    filetools_docs_test.go:540: VEC|doc/outside-abs|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/env-docx|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/unc-pdf|BLOQUEADO|caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    filetools_docs_test.go:540: VEC|doc/wildcard-pdf|BLOQUEADO|caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    filetools_docs_test.go:540: VEC|doc/trailing-dot-secret|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+--- PASS: TestDocumentAttacksWithRealExtractor (0.05s)
+=== RUN   TestFooterFlags
+--- PASS: TestFooterFlags (0.01s)
+=== RUN   TestDocFooterFlagsOnlyWhenTheyApply
+--- PASS: TestDocFooterFlagsOnlyWhenTheyApply (0.00s)
+=== RUN   TestReduceInRounds
+--- PASS: TestReduceInRounds (0.01s)
+=== RUN   TestReduceThatDoesNotShrinkStops
+--- PASS: TestReduceThatDoesNotShrinkStops (0.01s)
+=== RUN   TestExtractMapReduce
+--- PASS: TestExtractMapReduce (0.01s)
+=== RUN   TestTranslateMapConcatenates
+--- PASS: TestTranslateMapConcatenates (0.01s)
+=== RUN   TestTranslateStopsAtOutputCeilingAndSaysSo
+--- PASS: TestTranslateStopsAtOutputCeilingAndSaysSo (0.00s)
+=== RUN   TestMaxChunksRefusesBeforeCalling
+--- PASS: TestMaxChunksRefusesBeforeCalling (0.01s)
+=== RUN   TestMaxPromptCharsTooLowForTheInstruction
+--- PASS: TestMaxPromptCharsTooLowForTheInstruction (0.00s)
+=== RUN   TestFailureOnAMiddlePartNamesIt
+--- PASS: TestFailureOnAMiddlePartNamesIt (0.01s)
+=== RUN   TestCancellationStopsTheMapReduce
+--- PASS: TestCancellationStopsTheMapReduce (0.01s)
+=== RUN   TestPartsGoThroughTheGPUQueue
+--- PASS: TestPartsGoThroughTheGPUQueue (0.01s)
+=== RUN   TestRefusalsNeverReachTheModel
+--- PASS: TestRefusalsNeverReachTheModel (0.01s)
+=== RUN   TestEmptyFileIsRefused
+--- PASS: TestEmptyFileIsRefused (0.00s)
+=== RUN   TestHandlerWithoutRootsRefuses
+--- PASS: TestHandlerWithoutRootsRefuses (0.00s)
+=== RUN   TestFileToolArguments
+--- PASS: TestFileToolArguments (0.00s)
+=== RUN   TestFileToolSchemasTakeAPathNotText
+--- PASS: TestFileToolSchemasTakeAPathNotText (0.00s)
+=== RUN   TestFileToolsWriteNothing
+--- PASS: TestFileToolsWriteNothing (0.03s)
+=== RUN   TestOCRFooterAndNotice
+=== RUN   TestOCRFooterAndNotice/pdf_with_OCR
+=== RUN   TestOCRFooterAndNotice/pdf_with_pages_left_out
+=== RUN   TestOCRFooterAndNotice/pdf_whose_OCR_pages_all_failed
+=== RUN   TestOCRFooterAndNotice/png
+=== RUN   TestOCRFooterAndNotice/jpg
+=== RUN   TestOCRFooterAndNotice/pdf_without_OCR
+--- PASS: TestOCRFooterAndNotice (0.05s)
+    --- PASS: TestOCRFooterAndNotice/pdf_with_OCR (0.01s)
+    --- PASS: TestOCRFooterAndNotice/pdf_with_pages_left_out (0.01s)
+    --- PASS: TestOCRFooterAndNotice/pdf_whose_OCR_pages_all_failed (0.01s)
+    --- PASS: TestOCRFooterAndNotice/png (0.01s)
+    --- PASS: TestOCRFooterAndNotice/jpg (0.01s)
+    --- PASS: TestOCRFooterAndNotice/pdf_without_OCR (0.01s)
+=== RUN   TestImageThroughToolWithDoctext
+--- PASS: TestImageThroughToolWithDoctext (0.01s)
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/http500
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/http400
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/http401
+=== RUN   TestFileToolErrorDoesNotEchoUpstreamBody/stream-error
+--- PASS: TestFileToolErrorDoesNotEchoUpstreamBody (0.02s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/http500 (0.01s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/http400 (0.00s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/http401 (0.00s)
+    --- PASS: TestFileToolErrorDoesNotEchoUpstreamBody/stream-error (0.00s)
+=== RUN   TestSanitizeUpstreamKeepsLocalErrors
+--- PASS: TestSanitizeUpstreamKeepsLocalErrors (0.00s)
+=== RUN   TestReduceUsesFreshNonce
+--- PASS: TestReduceUsesFreshNonce (0.01s)
+=== RUN   TestSplitChunks
+--- PASS: TestSplitChunks (0.00s)
+=== RUN   TestSplitChunksLongLineAndUnicode
+--- PASS: TestSplitChunksLongLineAndUnicode (0.00s)
+=== RUN   TestSummarizeFileSinglePart
+--- PASS: TestSummarizeFileSinglePart (0.00s)
+=== RUN   TestPromptDelimitsFileContentAgainstInjection
+--- PASS: TestPromptDelimitsFileContentAgainstInjection (0.01s)
+=== RUN   TestExtractPromptCarriesInstructionAndFormat
+--- PASS: TestExtractPromptCarriesInstructionAndFormat (0.00s)
+=== RUN   TestTranslatePromptAndOutput
+--- PASS: TestTranslatePromptAndOutput (0.00s)
+=== RUN   TestSummarizeMapReduce
+    filetools_test.go:235: map-reduce: 7 calls = 6 parts + 1 combine, ceiling 2600
+--- PASS: TestSummarizeMapReduce (0.01s)
+=== RUN   TestGatewayHeadersAndQueueMS
+--- PASS: TestGatewayHeadersAndQueueMS (0.00s)
+=== RUN   TestEmbedAndChatCarryToolAndQueue
+--- PASS: TestEmbedAndChatCarryToolAndQueue (0.00s)
+=== RUN   TestQueueFullRetriesOnceThenSucceeds
+--- PASS: TestQueueFullRetriesOnceThenSucceeds (1.00s)
+=== RUN   TestQueueFullGivesUpAfterOneRetry
+--- PASS: TestQueueFullGivesUpAfterOneRetry (1.00s)
+=== RUN   TestQueueFullNoRetryWhenItDoesNotFitTheTimeout
+--- PASS: TestQueueFullNoRetryWhenItDoesNotFitTheTimeout (0.00s)
+=== RUN   TestBare503IsNotRetried
+--- PASS: TestBare503IsNotRetried (0.00s)
+=== RUN   TestRemovedByAdministratorIsClearAndNotRetried
+--- PASS: TestRemovedByAdministratorIsClearAndNotRetried (0.00s)
+=== RUN   TestAdminCancelMidStreamShowsTheServerMessage
+--- PASS: TestAdminCancelMidStreamShowsTheServerMessage (0.00s)
+=== RUN   TestGenerateSuccessUsageLineAndNoThinking
+--- PASS: TestGenerateSuccessUsageLineAndNoThinking (0.00s)
+=== RUN   TestGenerateModelPerCall
+--- PASS: TestGenerateModelPerCall (0.00s)
+=== RUN   TestGenerateBadArgumentsNeverReachOllama
+--- PASS: TestGenerateBadArgumentsNeverReachOllama (0.00s)
+=== RUN   TestGenerateOllamaErrors
+=== RUN   TestGenerateOllamaErrors/401
+=== RUN   TestGenerateOllamaErrors/403
+=== RUN   TestGenerateOllamaErrors/404
+=== RUN   TestGenerateOllamaErrors/500
+=== RUN   TestGenerateOllamaErrors/503
+--- PASS: TestGenerateOllamaErrors (0.00s)
+    --- PASS: TestGenerateOllamaErrors/401 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/403 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/404 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/500 (0.00s)
+    --- PASS: TestGenerateOllamaErrors/503 (0.00s)
+=== RUN   TestGenerateConnectionDropped
+--- PASS: TestGenerateConnectionDropped (0.00s)
+=== RUN   TestGenerateMidStreamFailureKeepsPartialText
+--- PASS: TestGenerateMidStreamFailureKeepsPartialText (0.00s)
+=== RUN   TestPromptCeilingAppliesToEveryTool
+--- PASS: TestPromptCeilingAppliesToEveryTool (0.00s)
+=== RUN   TestLongAnswerIsCappedAndUsageLineSurvives
+--- PASS: TestLongAnswerIsCappedAndUsageLineSurvives (0.00s)
+=== RUN   TestColdLoadIsReportedAndTimeoutNamesIt
+--- PASS: TestColdLoadIsReportedAndTimeoutNamesIt (0.40s)
+=== RUN   TestChatSuccessStatelessWithSystem
+--- PASS: TestChatSuccessStatelessWithSystem (0.00s)
+=== RUN   TestChatValidation
+--- PASS: TestChatValidation (0.00s)
+=== RUN   TestChatOllamaErrorAndPartial
+--- PASS: TestChatOllamaErrorAndPartial (0.00s)
+=== RUN   TestQueueNilNeverBlocks
+--- PASS: TestQueueNilNeverBlocks (0.00s)
+=== RUN   TestQueueSlotsAndMinimum
+--- PASS: TestQueueSlotsAndMinimum (0.05s)
+=== RUN   TestGPUQueueSerialisesCalls
+--- PASS: TestGPUQueueSerialisesCalls (0.40s)
+=== RUN   TestCancelWhileWaitingFreesTheLine
+--- PASS: TestCancelWhileWaitingFreesTheLine (0.11s)
+=== RUN   TestCancelDuringGenerationFreesTheQueue
+--- PASS: TestCancelDuringGenerationFreesTheQueue (0.00s)
+=== RUN   TestExactToolSet
+--- PASS: TestExactToolSet (0.00s)
+=== RUN   TestQualifiedNameLimit
+    registry_test.go:49: longest qualified name: 23 of 60
+--- PASS: TestQualifiedNameLimit (0.00s)
+=== RUN   TestAnnotationsAreExplicit
+--- PASS: TestAnnotationsAreExplicit (0.00s)
+=== RUN   TestSchemaConformance
+--- PASS: TestSchemaConformance (0.00s)
+=== RUN   TestDescriptionsShortAndStatic
+--- PASS: TestDescriptionsShortAndStatic (0.00s)
+=== RUN   TestToolsListBudget
+    registry_test.go:145: full tools/list payload: 4390 bytes (budget 4400)
+--- PASS: TestToolsListBudget (0.00s)
+=== RUN   TestToolsListBudgetWithFileTools
+    registry_test.go:157: full tools/list payload with file tools: 7800 bytes (budget 7800)
+--- PASS: TestToolsListBudgetWithFileTools (0.00s)
+=== RUN   TestCatalogInSync
+--- PASS: TestCatalogInSync (0.00s)
+=== RUN   TestCatalogIsDeterministicAndSorted
+--- PASS: TestCatalogIsDeterministicAndSorted (0.00s)
+=== RUN   TestNoAdminEndpointsInSource
+--- PASS: TestNoAdminEndpointsInSource (0.00s)
+=== RUN   TestArgumentHelpersLiveInOneFile
+--- PASS: TestArgumentHelpersLiveInOneFile (0.00s)
+=== RUN   TestSentinelNeverReachesResultsErrorsOrLogs
+--- PASS: TestSentinelNeverReachesResultsErrorsOrLogs (0.01s)
+=== RUN   TestClientLogCarriesNoContent
+--- PASS: TestClientLogCarriesNoContent (0.00s)
+=== RUN   TestToolsWriteNothingToDisk
+--- PASS: TestToolsWriteNothingToDisk (0.00s)
+=== RUN   TestRegistryConstructionIsLazy
+--- PASS: TestRegistryConstructionIsLazy (0.00s)
+=== RUN   TestGenerateSendsThinkFalse
+--- PASS: TestGenerateSendsThinkFalse (0.00s)
+=== RUN   TestChatSendsThinkFalse
+--- PASS: TestChatSendsThinkFalse (0.00s)
+=== RUN   TestFileToolsSendThinkFalse
+--- PASS: TestFileToolsSendThinkFalse (0.01s)
+=== RUN   TestEmbedDoesNotSendThink
+--- PASS: TestEmbedDoesNotSendThink (0.00s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/tools	3.555s
+=== RUN   TestClientLabelDefaultAndOverride
+--- PASS: TestClientLabelDefaultAndOverride (0.00s)
+=== RUN   TestPingAndToolsListAnswerWhileAToolRuns
+--- PASS: TestPingAndToolsListAnswerWhileAToolRuns (0.01s)
+=== RUN   TestCancelledNotificationCancelsContextAndSuppressesResponse
+=== RUN   TestCancelledNotificationCancelsContextAndSuppressesResponse/7
+=== RUN   TestCancelledNotificationCancelsContextAndSuppressesResponse/"abc"
+--- PASS: TestCancelledNotificationCancelsContextAndSuppressesResponse (0.01s)
+    --- PASS: TestCancelledNotificationCancelsContextAndSuppressesResponse/7 (0.01s)
+    --- PASS: TestCancelledNotificationCancelsContextAndSuppressesResponse/"abc" (0.01s)
+=== RUN   TestCancelOfAnotherIDOrUnknownIDIsIgnored
+--- PASS: TestCancelOfAnotherIDOrUnknownIDIsIgnored (0.01s)
+=== RUN   TestDuplicateInflightIDIsRejected
+--- PASS: TestDuplicateInflightIDIsRejected (0.00s)
+=== RUN   TestEOFWaitsForRunningCalls
+--- PASS: TestEOFWaitsForRunningCalls (0.15s)
+=== RUN   TestManyConcurrentCallsAreAllAnsweredIntact
+--- PASS: TestManyConcurrentCallsAreAllAnsweredIntact (0.01s)
+=== RUN   TestToolErrorStillAnswersWhenNotCancelled
+--- PASS: TestToolErrorStillAnswersWhenNotCancelled (0.00s)
+=== RUN   TestCallLogCarriesCountersFromMeta
+--- PASS: TestCallLogCarriesCountersFromMeta (0.00s)
+=== RUN   TestResultTextIsRedactedByTheDispatcher
+--- PASS: TestResultTextIsRedactedByTheDispatcher (0.00s)
+=== RUN   TestDefaults
+--- PASS: TestDefaults (0.00s)
+=== RUN   TestEnvFallback
+--- PASS: TestEnvFallback (0.00s)
+=== RUN   TestFlagBeatsEnv
+--- PASS: TestFlagBeatsEnv (0.00s)
+=== RUN   TestBoolRule
+--- PASS: TestBoolRule (0.00s)
+=== RUN   TestBadEnvValues
+--- PASS: TestBadEnvValues (0.00s)
+=== RUN   TestValidate
+--- PASS: TestValidate (0.00s)
+=== RUN   TestVersionFlag
+--- PASS: TestVersionFlag (0.00s)
+=== RUN   TestExitCodes
+--- PASS: TestExitCodes (0.00s)
+=== RUN   TestRealMainServesAndKeepsStdoutClean
+--- PASS: TestRealMainServesAndKeepsStdoutClean (0.00s)
+=== RUN   TestTokenNotInUsageOrErrors
+--- PASS: TestTokenNotInUsageOrErrors (0.00s)
+=== RUN   TestNoLiteralContextLimits
+--- PASS: TestNoLiteralContextLimits (0.00s)
+=== RUN   TestOllamaOptionsFromConfig
+--- PASS: TestOllamaOptionsFromConfig (0.00s)
+=== RUN   TestAllowedModelsDefaultIsTheTunedSet
+--- PASS: TestAllowedModelsDefaultIsTheTunedSet (0.00s)
+=== RUN   TestAllowedModelsEnvFlagAndSeparators
+--- PASS: TestAllowedModelsEnvFlagAndSeparators (0.00s)
+=== RUN   TestAllowedModelsMustContainDefaults
+--- PASS: TestAllowedModelsMustContainDefaults (0.00s)
+=== RUN   TestDocFlags
+--- PASS: TestDocFlags (0.00s)
+=== RUN   TestDocExtractorCarriesFlags
+--- PASS: TestDocExtractorCarriesFlags (0.00s)
+=== RUN   TestDocExtractorIsDocument
+--- PASS: TestDocExtractorIsDocument (0.00s)
+=== RUN   TestDocExtractorExtractAndRefusals
+--- PASS: TestDocExtractorExtractAndRefusals (0.00s)
+=== RUN   TestUserSafe
+--- PASS: TestUserSafe (0.00s)
+=== RUN   TestDocExtractorTextCeiling
+--- PASS: TestDocExtractorTextCeiling (0.00s)
+=== RUN   TestStartDoesNotInitialisePDFEngine
+    docs_test.go:135: start + initialize + tools/list in 2.1234ms
+--- PASS: TestStartDoesNotInitialisePDFEngine (0.01s)
+=== RUN   TestBadDocFlagsStopTheStart
+--- PASS: TestBadDocFlagsStopTheStart (0.00s)
+=== RUN   TestDocxEndToEndAndDebugLog
+--- PASS: TestDocxEndToEndAndDebugLog (0.01s)
+=== RUN   TestFileToolsExistOnlyWithAllowRoot
+--- PASS: TestFileToolsExistOnlyWithAllowRoot (0.01s)
+=== RUN   TestBadAllowRootStopsTheStart
+--- PASS: TestBadAllowRootStopsTheStart (0.00s)
+=== RUN   TestFileContentNeverInLogsOrErrors
+--- PASS: TestFileContentNeverInLogsOrErrors (0.01s)
+=== RUN   TestRealToolsListWithAllowRoot
+    files_wiring_test.go:183: full tools/list with --allow-root: 7834 bytes
+    files_wiring_test.go:183: compact tools/list with --allow-root: 4417 bytes
+--- PASS: TestRealToolsListWithAllowRoot (0.01s)
+=== RUN   TestAllowRootConfig
+--- PASS: TestAllowRootConfig (0.00s)
+=== RUN   TestBadRootShapesStopTheStart
+--- PASS: TestBadRootShapesStopTheStart (0.00s)
+=== RUN   TestBroadRootWarning
+--- PASS: TestBroadRootWarning (0.01s)
+=== RUN   TestRealOCRScannedPDFAndImages
+    ocr_real_test.go:157: setupOCR 17ms (síncrono); probe concluído em 202ms; OCR enabled: Tesseract 5.3.3, lang por, models best, workers 4, dpi 300, max_pages 30, max_megapixels 40
+    ocr_real_test.go:182: pdf digitalizado: formato=pdf paginas_ocr=1 conf=95 falhas=0 palavras 14/14 [] em 5.001s
+    ocr_real_test.go:182: png: formato=png paginas_ocr=1 conf=95 falhas=0 palavras 14/14 [] em 719ms
+    ocr_real_test.go:182: jpg: formato=jpg paginas_ocr=1 conf=95 falhas=0 palavras 14/14 [] em 754ms
+--- PASS: TestRealOCRScannedPDFAndImages (6.81s)
+=== RUN   TestRealOCREndToEnd
+    ocr_real_test.go:234: [arquivo] nome=digitalizado.pdf bytes=64706 caracteres=417 partes=1 chamadas=1 omitidas=0 formato=pdf paginas=1 paginas_sem_texto=1 paginas_ocr=1 conf_ocr_media=95 paginas_ocr_falhas=0
+    ocr_real_test.go:237: stderr: mcpollama dev ready (stdio)
+        file tools enabled: 1 allowed root(s), max_file_bytes=4194304, max_doc_bytes=33554432 (.docx/.pptx/.pdf/.png/.jpg), max_chunks=40; the text of files under the roots is sent to the Ollama server
+        OCR enabled: Tesseract 5.3.3, lang por, models best, workers 4, dpi 300, max_pages 30, max_megapixels 40
+        method=tools/call tool=summarize_file status=ok dur=5.8788232s prompt_eval_count=12 eval_count=3 total_ms=1000 load_ms=0 queue_ms=0 parts=1; total 5.904s
+--- PASS: TestRealOCREndToEnd (5.94s)
+=== RUN   TestOCRFlagsDefaultsEnvAndFlags
+--- PASS: TestOCRFlagsDefaultsEnvAndFlags (0.00s)
+=== RUN   TestOCRConfigResolve
+--- PASS: TestOCRConfigResolve (0.00s)
+=== RUN   TestSetupOCRWarnings
+--- PASS: TestSetupOCRWarnings (0.00s)
+=== RUN   TestWrongHashServerStarts
+--- PASS: TestWrongHashServerStarts (0.01s)
+=== RUN   TestProbeFailureTurnsOCROff
+    ocr_test.go:208: partida 126ms; log: WARNING: OCR disabled: ocr: OCR indisponível nesta chamada: ocr: configuração inválida: não foi possível carregar a biblioteca do OCR (%1 não é um aplicativo Win32 válido.); the file tools run without OCR (scanned PDFs and images are refused)
+--- PASS: TestProbeFailureTurnsOCROff (0.13s)
+=== RUN   TestOCRWorkerModeHiddenAndStrict
+--- PASS: TestOCRWorkerModeHiddenAndStrict (0.00s)
+=== RUN   TestDocExtractorWithOCR
+--- PASS: TestDocExtractorWithOCR (0.00s)
+=== RUN   TestInitializeNegotiation
+--- PASS: TestInitializeNegotiation (0.00s)
+=== RUN   TestInitializeBadParams
+--- PASS: TestInitializeBadParams (0.00s)
+=== RUN   TestNotificationsGetNoResponse
+--- PASS: TestNotificationsGetNoResponse (0.00s)
+=== RUN   TestPingReturnsEmptyObject
+--- PASS: TestPingReturnsEmptyObject (0.00s)
+=== RUN   TestToolsListEmptyIsArray
+--- PASS: TestToolsListEmptyIsArray (0.00s)
+=== RUN   TestToolsListSortedDeterministic
+--- PASS: TestToolsListSortedDeterministic (0.00s)
+=== RUN   TestToolsVerbosityCompact
+--- PASS: TestToolsVerbosityCompact (0.00s)
+=== RUN   TestUnknownMethod
+--- PASS: TestUnknownMethod (0.00s)
+=== RUN   TestInvalidJSONParseError
+--- PASS: TestInvalidJSONParseError (0.00s)
+=== RUN   TestValidJSONNotAnObjectIsInvalidRequest
+--- PASS: TestValidJSONNotAnObjectIsInvalidRequest (0.00s)
+=== RUN   TestMissingMethodOrVersion
+--- PASS: TestMissingMethodOrVersion (0.00s)
+=== RUN   TestEmptyLinesIgnored
+--- PASS: TestEmptyLinesIgnored (0.00s)
+=== RUN   TestIDPreserved
+--- PASS: TestIDPreserved (0.00s)
+=== RUN   TestLastLineWithoutNewline
+--- PASS: TestLastLineWithoutNewline (0.00s)
+=== RUN   TestLongLines
+--- PASS: TestLongLines (0.00s)
+=== RUN   TestLineCeilingBoundary
+--- PASS: TestLineCeilingBoundary (0.00s)
+=== RUN   TestHugeLineDoesNotKillServer
+--- PASS: TestHugeLineDoesNotKillServer (0.00s)
+=== RUN   TestToolsCallUnknownTool
+--- PASS: TestToolsCallUnknownTool (0.00s)
+=== RUN   TestToolsCallBadParams
+--- PASS: TestToolsCallBadParams (0.00s)
+=== RUN   TestToolsCallArgumentsDefaultToEmptyObject
+--- PASS: TestToolsCallArgumentsDefaultToEmptyObject (0.00s)
+=== RUN   TestToolsCallSuccessAndIsError
+--- PASS: TestToolsCallSuccessAndIsError (0.00s)
+=== RUN   TestToolPanicRecovered
+--- PASS: TestToolPanicRecovered (0.00s)
+=== RUN   TestStdoutIsOnlyJSONRPC
+--- PASS: TestStdoutIsOnlyJSONRPC (0.00s)
+=== RUN   TestLogsDefaultToMetadataOnly
+--- PASS: TestLogsDefaultToMetadataOnly (0.00s)
+=== RUN   TestLogLineCap
+--- PASS: TestLogLineCap (0.00s)
+=== RUN   TestRedactorIgnoresEmptySecret
+--- PASS: TestRedactorIgnoresEmptySecret (0.00s)
+=== RUN   TestTokenNeverInAnyOutput
+--- PASS: TestTokenNeverInAnyOutput (0.00s)
+=== RUN   TestInsecureWarnings
+--- PASS: TestInsecureWarnings (0.00s)
+=== RUN   TestDuplicateToolRejected
+--- PASS: TestDuplicateToolRejected (0.00s)
+=== RUN   TestFastWithoutBackend
+--- PASS: TestFastWithoutBackend (0.00s)
+=== RUN   TestContextCancelStopsLoop
+--- PASS: TestContextCancelStopsLoop (0.00s)
+=== RUN   TestLeadingBOMTolerated
+--- PASS: TestLeadingBOMTolerated (0.00s)
+=== RUN   TestRealRegistryIsLazy
+--- PASS: TestRealRegistryIsLazy (0.00s)
+=== RUN   TestMissingURLFailsOnlyTheToolCall
+--- PASS: TestMissingURLFailsOnlyTheToolCall (0.00s)
+=== RUN   TestErrorChannelsOnTheRealRegistry
+--- PASS: TestErrorChannelsOnTheRealRegistry (0.00s)
+=== RUN   TestEndToEndGenerateUsageAndNoLeaks
+--- PASS: TestEndToEndGenerateUsageAndNoLeaks (0.00s)
+=== RUN   TestUpstreamEchoingTheTokenIsScrubbed
+--- PASS: TestUpstreamEchoingTheTokenIsScrubbed (0.00s)
+=== RUN   TestDroppedConnectionIsAToolError
+--- PASS: TestDroppedConnectionIsAToolError (0.00s)
+=== RUN   TestPingAndListModelsAnswerWhileGenerating
+--- PASS: TestPingAndListModelsAnswerWhileGenerating (0.01s)
+=== RUN   TestCancelAbortsTheUpstreamCallAndFreesTheQueue
+--- PASS: TestCancelAbortsTheUpstreamCallAndFreesTheQueue (0.01s)
+=== RUN   TestRealToolsListExactSetFullAndCompact
+    tools_wiring_test.go:362: tools/list full: result line = 4424 bytes
+    tools_wiring_test.go:362: tools/list compact: result line = 2527 bytes
+--- PASS: TestRealToolsListExactSetFullAndCompact (0.00s)
+=== RUN   TestRealToolsListIsDeterministic
+--- PASS: TestRealToolsListIsDeterministic (0.00s)
+=== RUN   TestToolsMdMatchesTheRealToolsList
+--- PASS: TestToolsMdMatchesTheRealToolsList (0.00s)
+=== RUN   TestNoFileIsCreated
+--- PASS: TestNoFileIsCreated (0.01s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	13.244s
+exit 0

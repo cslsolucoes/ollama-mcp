@@ -1,0 +1,26 @@
+2026-10-29 00:06:20
+$ go build ./...
+build exit 0
+$ go vet ./...
+vet exit 0
+$ gofmt -l .
+gofmt fim (vazio acima = ok)
+$ go test -count=1 ./...
+ok  	github.com/cslsoftwares/mcpollama/cmd/bakeoff	0.048s
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.041s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	5.684s
+ok  	github.com/cslsoftwares/mcpollama/doctext	15.896s
+ok  	github.com/cslsoftwares/mcpollama/files	0.692s
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	0.099s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	1.147s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	1.161s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	1.872s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	0.503s
+?   	github.com/cslsoftwares/mcpollama/mcp	[no test files]
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.596s
+ok  	github.com/cslsoftwares/mcpollama/ocr	12.932s
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.733s
+ok  	github.com/cslsoftwares/mcpollama/redact	0.042s
+ok  	github.com/cslsoftwares/mcpollama/tools	3.684s
+test exit 0
+2026-10-29 00:06:40

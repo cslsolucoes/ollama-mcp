@@ -1,0 +1,8 @@
+2026-10-29 00:10:06
+$ GOOS=linux CGO_ENABLED=0 go build ./cmd/mcpollama-gateway
+exit 0
+tamanho 18077009 bytes
+$ GOOS=linux CGO_ENABLED=0 go vet ./gateway/... ./cmd/mcpollama-gateway
+vet linux exit 0
+$ go mod tidy && git diff --exit-code go.mod go.sum
+tidy sem diff
