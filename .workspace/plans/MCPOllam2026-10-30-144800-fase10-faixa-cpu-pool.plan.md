@@ -235,3 +235,16 @@
     2. Opcional: arredondar também os tokens nas rotas abertas.
     3. Troca da fonte.
     4. IP/SSH do secundário.
+- 2026-10-30 18:17 — **Ordem do owner: "finalizar a fase até onde é possível, e congelar o plano".**
+  - Respostas das 18:12:
+    - 1 = retomar a 10.4 (retomada às 18:13 num worktree isolado, agente sonnet);
+    - 2 = secundário 4× RTX 2060 **sem data** para ativar;
+    - 3 = backup do `content.db` e divisão da RAM: **só anotar, sem data**;
+    - 4 = fonte **sem data**, mas o owner **comprou o acionador para duas fontes**.
+  - **Plano de fechamento:**
+    1. 10.4 (código);
+    2. 10.5 (revisão adversarial, opus);
+    3. 10.6 (implantação com um único backend, comportamento idêntico ao de hoje; fallback do mcpollama desligado);
+    4. 10.7 (aceite do pool numa **instância de teste**, com um secundário **temporário** que substitui o PC 2060: repasse por sobrecarga, disjuntor, histerese, drenar e fallback do mcpollama), sem tocar na produção;
+    5. 10.8 (documentação + report).
+  - Em seguida, **🧊 CONGELAR** este plano (convenção do ProvidersORM: estado no cabeçalho e o arquivo movido para `.workspace/plans/congelados/`). As pendências sem data ficam listadas para o descongelamento: 10.S secundário, segunda fonte, backup do `content.db` e divisão da RAM.
