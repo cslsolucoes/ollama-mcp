@@ -1,0 +1,31 @@
+== build Linux (GOOS=linux, saida no scratchpad)
+gateway ok
+mcpollama-mcp ok
+vet linux ok
+== CR no index.html: 0 bytes CR (contados com tr -cd ''; arquivo de 583 linhas, sem alteracao nesta revisao). A 1a medida deu 583 = numero de linhas: erro meu de aspas no shell (o padrao do grep virou vazio e casou toda linha); refeito.
+, contados com tr -cd): 0  [a 1a medida, 583, foi erro meu: $'
+' dentro de aspas duplas virou o padrao 'r' e contou linhas com a letra r]
+== budget e catalogo
+ok  	github.com/cslsoftwares/mcpollama/cmd/bakeoff	0.127s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.097s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.080s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/doctext	0.125s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/files	0.088s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	0.092s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	0.084s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	0.123s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	0.056s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	0.048s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	0.087s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/pool	0.080s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	0.069s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	0.117s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	0.110s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.102s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/ocr	0.102s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.093s [no tests to run]
+ok  	github.com/cslsoftwares/mcpollama/redact	0.077s [no tests to run]
+--- PASS: TestToolsListBudget (0.00s)
+--- PASS: TestToolsListBudgetWithFileTools (0.00s)
+--- PASS: TestCatalogInSync (0.00s)
+ok  	github.com/cslsoftwares/mcpollama/tools	0.124s

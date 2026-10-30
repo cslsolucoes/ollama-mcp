@@ -344,6 +344,7 @@ Rótulo válido: `^[A-Za-z0-9._:/@+-]{1,64}$`; fora disso vira `invalido`; vazio
 | Administrador **cancelou** em execução | antes dos headers: **409** `cancelado pelo administrador`; no meio do stream: linha final `{"error":"cancelado pelo administrador"}` | registrado `cancelado_admin` |
 | Cliente desistiu (fechou a conexão) | nada (ninguém para ler); sai da fila | registrado `cancelado` / `client_gone`, HTTP 499 no registro |
 | Ollama fora ou conexão recusada | **502** `Ollama indisponível` (sem `Retry-After`) | `upstream_unreachable` |
+| Um **secundário** (pool, 10.4) respondeu com redirecionamento (3xx) | **502** `Ollama indisponível`; o `Location` e o `Set-Cookie` do secundário não chegam ao cliente | `upstream_redirect` (revisão 10.5) |
 
 **Escalonamento de partida** (`--start-stagger`, 300 ms): entre o início de duas gerações passam no mínimo 300 ms. Com 1
 slot de geração o efeito é pequeno; vale para quando houver mais slots (os prefills não começam no mesmo milissegundo, o
@@ -962,9 +963,9 @@ ou ação do monitor pode criar ou mudar um backend (nada de SSRF pelo cliente).
 | Campo | Obrigatório | O que é |
 | --- | --- | --- |
 | `id` | sim | `a-z 0-9 . _ -`, até 32, único. **`gpu-local` é reservado** (o primário). Aparece no monitor, no SQLite e nos eventos |
-| `url` | sim | `http(s)://host[:porta]`, sem usuário, caminho, query nem fragmento. Recusados: esquemas que não sejam http/https, `0.0.0.0` e endereços de link-local/multicast (onde moram os serviços de metadados de nuvem) |
+| `url` | sim | `http(s)://host[:porta]`, sem usuário, caminho, query nem fragmento; porta entre 1 e 65535 (revisão 10.5). Recusados: esquemas que não sejam http/https, `0.0.0.0` e endereços de link-local/multicast (onde moram os serviços de metadados de nuvem). O arquivo é lido **uma vez**, na partida: trocá-lo depois não muda nada até reiniciar |
 | `tipo` | sim | `gpu`, `cpu` ou `remoto`. Entra nas regras: **`alta` nunca vai para `cpu`**, e `cpu` aceita por padrão só `normal` e `baixa` |
-| `token_file` | não | Arquivo (modo `0600`) com o **Bearer próprio do secundário**, uma linha, ASCII visível. Só com `https://` (ou loopback): o token não vai em texto puro pela rede. **Nunca** aparece em log, evento, banco, monitor ou erro |
+| `token_file` | não | Arquivo (modo `0600`) com o **Bearer próprio do secundário**, uma linha, ASCII visível. Só com `https://` (ou loopback): o token não vai em texto puro pela rede. **Nunca** aparece em log, evento, banco, monitor ou erro; se o secundário o ecoar numa resposta (versão, nome do modelo), o gateway o troca por `[redigido]` antes do monitor (revisão 10.5). O modo e o "arquivo comum" são conferidos de novo no arquivo **aberto** (um arquivo trocado entre a checagem e a leitura é recusado). O **dono** do arquivo não é conferido (igual ao `--admin-file`) |
 | `tls_ca` | não | PEM da CA do secundário (só com `https://`). Usa o pool do sistema **mais** essa CA (o mesmo código do cliente mcpollama) |
 | `slots` | não (1) | Gerações simultâneas nesse backend (1 a 64) |
 | `modelos` | não | Modelos que ele serve (`:latest` é ignorado). Vazio = qualquer modelo cujo digest bata com o do primário |
@@ -1000,7 +1001,9 @@ ou ação do monitor pode criar ou mudar um backend (nada de SSRF pelo cliente).
 
 ### 16.3 Saúde e disjuntor
 
-- **Checagem ativa** a cada `--health-interval` (5 s): `GET /api/version`, `/api/ps` e `/api/tags`. Registra a versão, o
+- **Checagem ativa** a cada `--health-interval` (5 s): `GET /api/ps` e `/api/tags` (sempre: no primário essa leitura é também
+  o quadro **Modelos**, que mostra o erro com o Ollama fora) e, se elas responderem, `/api/version` (revisão 10.5, N1). Um
+  backend mudo custa 2 × 3 s por rodada. Registra a versão, o
   modelo **residente**, **onde** ele está (`100% GPU` ou dividido com a CPU) e os digests. Um backend `gpu`/`remoto` com o modelo
   fora de 100% GPU fica `degradado` (e, no primário, conta como S3). *Modelo não residente não é falha*: o Ollama descarrega
   por ociosidade e a carga a frio (16 a 22 s) é normal; só aparece como informação.
@@ -1008,12 +1011,17 @@ ou ação do monitor pode criar ou mudar um backend (nada de SSRF pelo cliente).
   **conexão com o backend** (`upstream_unreachable`: recusa, dial, TLS; o proxy nunca a grava quando foi o cliente que desistiu).
   **5xx, conexão cortada (`upstream_dropped`), timeout, erro no meio do stream, 4xx e desistência do cliente são NEUTROS**:
   dependem do pedido ou do cliente (um pedido malformado faz o Ollama devolver 500; um cliente pode derrubar a própria
-  conexão), e se contassem **um cliente abriria o disjuntor do primário para todos e forçaria o repasse** (DoS). Quem abre o
+  conexão), e se contassem **um cliente abriria o disjuntor do primário para todos e forçaria o repasse** (DoS). **Revisão
+  10.5:** um erro do proxy **depois** de a conexão ser feita (o backend fecha antes de responder) também é neutro, porque um
+  corpo de pedido pode provocá-lo; o registro continua `upstream_unreachable`. Um **3xx** de um secundário vira **502
+  `upstream_redirect`** (neutro), sem `Location` nem `Set-Cookie` para o cliente. Quem abre o
   disjuntor é o que nenhum cliente controla: a falha de conexão e a **checagem ativa**. Testado: 50 pedidos de um cliente que geram 500
   e 100 desistências no meio do stream deixam o disjuntor **fechado**; 3 recusas de conexão ou 3 checagens ativas falhas abrem.
 - **Disjuntor** (por backend): `--breaker-failures` (3) falhas seguidas, ativas ou passivas → **aberto** por `--breaker-open`
   (30 s; o backend não recebe início nenhum) → **meio-aberto**: deixa passar **um** pedido de prova; se der certo, **fechado**;
-  se falhar, aberto de novo. Sucesso de um pedido zera a contagem. Eventos `breaker_open` e `breaker_close`.
+  se falhar, aberto de novo. **A checagem ativa que dá certo depois do tempo aberto também fecha** (revisão 10.5, B1: sem isso
+  um secundário meio-aberto, que não é elegível, nunca recebia a prova e ficava fora do pool até reiniciar). Sucesso de um
+  pedido zera a contagem. Eventos `breaker_open` e `breaker_close`.
 - Eventos `backend_down` (a checagem ativa falhou) e `backend_up` (voltou).
 - Com **só o primário** (sem secundário) o disjuntor é contado e mostrado, mas **não segura** os pedidos: o gateway segue
   mandando ao único Ollama, como sempre.
@@ -1077,7 +1085,7 @@ cliente, **desligado por padrão**:
 
 | Flag | Env | O que faz |
 | --- | --- | --- |
-| `--ollama-url-fallback URL` | `OLLAMA_HOST_FALLBACK` | Um segundo servidor (outro gateway ou um Ollama da LAN). Com erro de **conexão** ou **503 de fila cheia** (com `Retry-After`) do primário, o mcpollama tenta o fallback **uma vez**, sem esperar o `Retry-After` do primário. A linha `[uso]` ganha `backend=fallback` (e o `_meta` também). Timeout, 4xx, 5xx e cortes no meio **não** disparam o fallback |
+| `--ollama-url-fallback URL` | `OLLAMA_HOST_FALLBACK` | Um segundo servidor (outro gateway ou um Ollama da LAN). Com erro de **conexão** ou **503 de fila cheia** (com `Retry-After`) do primário, o mcpollama tenta o fallback **uma vez**, sem esperar o `Retry-After` do primário. A linha `[uso]` ganha `backend=fallback` (e o `_meta` também). Timeout, 4xx, 5xx e cortes no meio **não** disparam o fallback. "Erro de conexão" é só o que acontece **antes** de o pedido sair (dial, DNS, recusa, proxy): uma resposta malformada ou um GOAWAY do HTTP/2 chegam depois de o primário ler o pedido e **não** disparam (revisão 10.5, FB1: senão o trabalho rodava duas vezes) |
 | `--fallback-api-key TOKEN` | `OLLAMA_FALLBACK_API_KEY` | O Bearer **do fallback**; o token do primário **nunca** vai para ele. Redigido em log e erro como o do primário. Só com `https://` (ou loopback) |
 | `--fallback-tls-ca FILE` | `OLLAMA_FALLBACK_TLS_CA` | CA (PEM) do fallback, somada ao pool do sistema. O `--insecure` do primário **não** vale para o fallback |
 
@@ -1086,7 +1094,16 @@ Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primári
 ### 16.8 Limites conhecidos
 
 - O estado de **drenar**, a EWMA e o disjuntor ficam em memória (reiniciar zera).
-- A estimativa de tokens é por bytes (÷ 3): uma boa aproximação, não o tokenizador do modelo.
+- A estimativa de tokens é por bytes (÷ 3): uma boa aproximação, não o tokenizador do modelo. **Manipulável** (revisão 10.5,
+  R5): um prompt de dígitos (o Qwen faz 1 token por dígito) tem ~3× a estimativa, então um `max_prompt_tokens` de 1.000 aceita
+  ~3.000 tokens reais. O efeito é um prefill mais longo naquele backend, limitado pelo `--run-timeout`. A cota segura é bytes ÷ 1
+  (decisão do owner, ver o plano).
+- O digest é **declarado pelo próprio secundário** (`/api/tags`): é uma checagem contra engano de configuração, não uma
+  fronteira de segurança. Um secundário mal-intencionado pode declarar o digest certo e servir outro modelo; a proteção é só
+  confiar no host do `backends.json` (root, `0600`), com TLS e token próprio.
+- O monitor aberto mostra o `host:porta` de cada secundário (e ele aparece no "último erro"). É informação da LAN, sem
+  credencial; se o owner preferir, dá para mostrar só com login (pendência da 10.5).
 - Digest igual não prova tempo igual: um secundário com outra GPU responde mais devagar; `max_prompt_tokens` e `classes` são os botões.
 - O gateway roda **no servidor primário**: se ele cair, não repassa. Para isso existe o fallback do cliente.
-- Falta a **revisão adversarial** do pool (10.5) e o aceite numa instância de teste (10.7). Ver o plano da Fase 10.
+- **Revisão adversarial do pool (10.5) feita** em 2026-10-30 (report `MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool`).
+  Falta o aceite numa instância de teste (10.7) e a rodada Linux dos testes de modo de arquivo. Ver o plano da Fase 10.

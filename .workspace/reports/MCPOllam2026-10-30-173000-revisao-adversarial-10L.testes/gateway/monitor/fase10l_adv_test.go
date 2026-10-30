@@ -334,7 +334,10 @@ func TestAdvLIDsAndNoNewPOST(t *testing.T) {
 	for _, p := range posts {
 		list = append(list, p[1])
 	}
-	want := "/monitor/api/login /monitor/api/logout /monitor/api/queue/{id}/promote /monitor/api/queue/{id}/demote /monitor/api/queue/{id}/remove /monitor/api/running/{id}/cancel"
+	// Fase 10.5: a 10.4 acrescentou drain/undrain (sessao + CSRF + mesma origem,
+	// TestDrainNeedsAdminCSRFAndSameSite e o vetor M1 da 10.5). A lista exata
+	// continua sendo a protecao: qualquer POST novo sem revisao faz este vetor falhar.
+	want := "/monitor/api/login /monitor/api/logout /monitor/api/queue/{id}/promote /monitor/api/queue/{id}/demote /monitor/api/queue/{id}/remove /monitor/api/running/{id}/cancel /monitor/api/backends/{id}/drain /monitor/api/backends/{id}/undrain"
 	f := newJobFixture(t, time.Minute, true)
 	ck, _ := f.login(t)
 	var csrf []string
@@ -347,7 +350,7 @@ func TestAdvLIDsAndNoNewPOST(t *testing.T) {
 		vecL(t, "A3-ids-csrf", "Media", "gateway/monitor/monitor.go:208", fmt.Sprintf("FALHA: ids ok=%v posts=%v nao-405=%v", ok, list, csrf))
 		t.Fail()
 	} else {
-		vecL(t, "A3-ids-csrf", "Media", "gateway/monitor/monitor.go:208", "OK: 20.000 ids hex de 128 bits sem repeticao (crypto/rand); nenhum POST novo na 10.L; POST nas rotas de jobs = 405")
+		vecL(t, "A3-ids-csrf", "Media", "gateway/monitor/monitor.go:208", "OK: 20.000 ids hex de 128 bits sem repeticao (crypto/rand); POSTs = lista exata (10.L + drain/undrain da 10.4); POST nas rotas de jobs = 405")
 	}
 }
 

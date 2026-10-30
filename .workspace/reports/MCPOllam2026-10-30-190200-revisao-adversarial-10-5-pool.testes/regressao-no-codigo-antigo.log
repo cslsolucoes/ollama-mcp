@@ -1,0 +1,29 @@
+# regressoes 10.5 no codigo da 10.4 (git archive ed57add); linhas longas cortadas em 400 colunas
+--- FAIL: TestRegress105SecondaryBreakerClosesAfterTheActiveCheck (0.08s)
+    fase105_regress_test.go:47: a checagem ativa ok depois do tempo aberto deve fechar: {ID:sec-gpu Type:gpu Primary:false Host:127.0.0.1:46122 State:disjuntor_aberto Breaker:meio_aberto Drained:false Slots:1 Used:0 Free:1 Queue:0 P50MS:0 Model:qwen3-ia Digest:sha256-aaaa Processor:100% GPU LastError:HTTP 500 LastCheck:2026-10-30 19:22:01.7312274 -0300 -03 m=+0.063059801 Version:0.40.8 Order:0 Rul
+--- FAIL: TestRegress105RegistryPortRange (0.00s)
+    fase105_regress_test.go:70: http://10.0.0.5:0 aceita
+    fase105_regress_test.go:70: http://10.0.0.5:65536 aceita
+    fase105_regress_test.go:70: http://10.0.0.5:99999 aceita
+    fase105_regress_test.go:70: http://10.0.0.5:11434? aceita
+--- FAIL: TestRegress105EchoedTokenIsScrubbed (0.00s)
+    fase105_regress_test.go:106: status {ID:s Type:gpu Primary:false Host:127.0.0.1:46126 State:ok Breaker:fechado Drained:false Slots:1 Used:0 Free:1 Queue:0 P50MS:0 Model:Bearer TOKEN-REGRESS-T2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+--- FAIL: TestRegress105ModelsReadingRunsWhenTheOllamaIsDown (0.00s)
+    fase105_regress_test.go:126: o quadro Modelos ficou parado com o Ollama fora: {At:2026-10-30 19:22:01.7592854 -0300 -03 m=+0.091117601 Loaded:[{Name:qwen3-ia SizeVRAMMiB:0 SizeMiB:0 Processor:100% GPU ContextLength:0 ExpiresAt: Allowed:true Digest:}] Installed:[{Name:qwen3-ia SizeMiB:0 ParameterSize: Quantization: Family: ModifiedAt: Allowed:true Digest:}] Allowed:[] AllowAll:true ThinkSuffix:
+--- FAIL: TestRegress105ProxyDropAfterConnectAndRedirect (0.01s)
+    fase105_regress_test.go:196: status 307
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/pool	0.130s
+--- FAIL: TestRegress105NoFallbackOnceThePrimaryReadTheRequest (0.01s)
+    fase105_regress_test.go:56: a resposta malformada não deu erro
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/ollama	0.042s
+--- FAIL: TestRegress105ModelsBoardShowsTheOllamaDown (3.10s)
+    fase105_regress_test.go:43: Ollama fora e o quadro Modelos parado: {Loaded:[{}] Err:}
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	3.136s
+FAIL
+
+# N1 no codigo de ANTES da 10.4 (git archive 94a0785): o RunLoop do coletor mostrava o erro (prova de que e regressao da 10.4)
+    old94_n1_test.go: 94a0785: quadro Modelos com o Ollama fora -> erro="ps: Get ...: dial tcp ...: connectex: ... recusou ativamente.; tags: ..."
+--- PASS: TestOld94ModelsBoardShowsTheOllamaDown (5.09s)
