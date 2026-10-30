@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -206,10 +207,55 @@ func TestConnectionDroppedOnGet(t *testing.T) {
 	wantKind(t, err, ErrConnectionDropped)
 }
 
+// The server writes one chunk and then kills the connection. With an RST
+// the kernel may discard what the client has not read yet, so under load the
+// client could see the reset before the response headers (classified "sem
+// resposta", no partial) and the test flapped. The handler now waits for the
+// client to report the response headers (Logf "status=200"), which arrive in
+// the same segment as the first chunk, before it sends the RST. The test
+// still proves ErrConnectionDropped + "no meio da resposta" + partial kept.
+// FB1 (fallback only when the request never left) does not touch this path:
+// transportErr classifies before the fallback is considered, and none is set.
 func TestConnectionDroppedMidStream(t *testing.T) {
+	gotHeaders := make(chan struct{})
+	var once sync.Once
 	srv, _ := newMock(t, func(w http.ResponseWriter, r *http.Request) {
 		writeStream(w, `{"response":"antes da queda ","done":false}`+"\n")
+		select {
+		case <-gotHeaders:
+		case <-time.After(5 * time.Second):
+			t.Error("the client never reported the response headers")
+		}
 		hijackClose(t, w)
+	})
+	c := newClient(t, srv, func(o *Options) {
+		o.Logf = func(format string, args ...any) {
+			if strings.Contains(fmt.Sprintf(format, args...), "status=200") {
+				once.Do(func() { close(gotHeaders) })
+			}
+		}
+	})
+	got, err := c.Generate(context.Background(), GenerateRequest{Prompt: "x"})
+	e := wantKind(t, err, ErrConnectionDropped)
+	if !strings.Contains(e.Msg, "no meio da resposta") {
+		t.Fatalf("msg: %q", e.Msg)
+	}
+	if got == nil || got.Response != "antes da queda " {
+		t.Fatalf("partial: %+v", got)
+	}
+}
+
+// Same proof with a graceful close (FIN, no chunk terminator): the kernel keeps
+// the unread data, so this variant has no race at all.
+func TestConnectionClosedMidStreamKeepsPartial(t *testing.T) {
+	srv, _ := newMock(t, func(w http.ResponseWriter, r *http.Request) {
+		writeStream(w, `{"response":"antes da queda ","done":false}`+"\n")
+		conn, _, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			t.Errorf("hijack: %v", err)
+			return
+		}
+		conn.Close()
 	})
 	got, err := newClient(t, srv, nil).Generate(context.Background(), GenerateRequest{Prompt: "x"})
 	e := wantKind(t, err, ErrConnectionDropped)

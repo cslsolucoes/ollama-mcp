@@ -156,6 +156,7 @@ func TestHTTPStatusMap(t *testing.T) {
 	}{
 		{"401 json", 401, `{"error":"unauthorized"}`, ErrUnauthorized, "token ausente ou inválido (OLLAMA_API_KEY)"},
 		{"403 nginx html", 403, html, ErrForbidden, "endpoint bloqueado pelo nginx"},
+		{"403 gateway allowlist", 403, `{"error":"modelo \"x\" não permitido neste servidor"}`, ErrModelNotAllowed, "modelo não permitido pelo servidor"},
 		{"404 model", 404, `{"error":"model 'x' not found"}`, ErrNotFound, "modelo ou endpoint não encontrado"},
 		{"400", 400, `{"error":"invalid options"}`, ErrBadRequest, "invalid options"},
 		{"500", 500, `{"error":"boom"}`, ErrServer, "erro do servidor Ollama"},
@@ -337,5 +338,18 @@ func TestTransportIsClonedFromDefault(t *testing.T) {
 	}
 	if c.http.Timeout != 0 {
 		t.Fatal("http.Client.Timeout must stay zero (it would cut streams)")
+	}
+}
+
+// 10.7 cosmetic: a 403 from the gateway allowlist must not blame the nginx.
+func TestGatewayAllowlist403IsNotTheNginxBlock(t *testing.T) {
+	srv, _ := newMock(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(403)
+		io.WriteString(w, `{"error":"modelo \"x\" não permitido neste servidor"}`)
+	})
+	_, err := newClient(t, srv, nil).Tags(context.Background())
+	e := wantKind(t, err, ErrModelNotAllowed)
+	if !errors.Is(err, ErrForbidden) || strings.Contains(e.Msg, "nginx") {
+		t.Fatalf("msg=%q forbidden=%v", e.Msg, errors.Is(err, ErrForbidden))
 	}
 }

@@ -188,6 +188,33 @@ func (p *Pool) unlock() {
 
 func (p *Pool) emit(kind, detail string) { p.pending = append(p.pending, event{kind, detail}) }
 
+// EventEvery is the minimum time between two events of the same kind about the
+// same backend (a dead backend flaps open, half-open, open every ~20 s).
+const EventEvery = time.Minute
+
+// emitLimited emits a backend event at most once per EventEvery per backend and
+// kind; the ones skipped are counted and reported by the next emitted event.
+func (p *Pool) emitLimited(b *Backend, kind, detail string, now time.Time) {
+	l := b.evLim[kind]
+	if l == nil {
+		if b.evLim == nil {
+			b.evLim = map[string]*evLimit{}
+		}
+		l = &evLimit{}
+		b.evLim[kind] = l
+	}
+	if !l.last.IsZero() && now.Sub(l.last) < EventEvery {
+		l.suppressed++
+		return
+	}
+	if l.suppressed > 0 {
+		detail += " (+" + itoa(l.suppressed) + " eventos iguais suprimidos no último minuto)"
+		l.suppressed = 0
+	}
+	l.last = now
+	p.emit(kind, detail)
+}
+
 func (p *Pool) changed() {
 	if f := p.cfg.OnChange; f != nil {
 		f()
@@ -210,10 +237,10 @@ func (p *Pool) failLocked(b *Backend, now time.Time, active bool) {
 	switch {
 	case b.br == brHalf:
 		b.br, b.openedAt = brOpen, now
-		p.emit("breaker_open", b.ID+": falhou no meio-aberto")
+		p.emitLimited(b, "breaker_open", b.ID+": falhou no meio-aberto", now)
 	case b.br == brClosed && b.fails >= p.cfg.BreakerFails:
 		b.br, b.openedAt = brOpen, now
-		p.emit("breaker_open", b.ID+": "+itoa(b.fails)+" falhas seguidas")
+		p.emitLimited(b, "breaker_open", b.ID+": "+itoa(b.fails)+" falhas seguidas", now)
 	}
 }
 
@@ -282,7 +309,7 @@ func (p *Pool) NoteEnd(id string, o Outcome, probe, gen bool, runMS int64, now t
 			b.fails = 0
 		case b.br == brHalf && probe:
 			b.br, b.fails = brClosed, 0
-			p.emit("breaker_close", b.ID+": a prova deu certo")
+			p.emitLimited(b, "breaker_close", b.ID+": a prova deu certo", now)
 		}
 		if gen && runMS > 0 {
 			b.ring[b.ringN%ringSize] = runMS
@@ -719,6 +746,7 @@ func (p *Pool) observe(b *Backend, version string, snap models.Snapshot, err err
 			}
 		}
 		b.degraded = false
+		b.lastErr = "" // healthy again: the old error must not linger on the monitor
 		if b.Kind() != KindCPU {
 			for _, l := range snap.Loaded {
 				if l.Processor != "100% GPU" && l.Processor != "-" {
@@ -741,7 +769,7 @@ func (p *Pool) observe(b *Backend, version string, snap models.Snapshot, err err
 		p.advance(b, now)
 		if b.br == brHalf && !b.probing {
 			b.br, b.fails = brClosed, 0
-			p.emit("breaker_close", b.ID+": a checagem ativa deu certo")
+			p.emitLimited(b, "breaker_close", b.ID+": a checagem ativa deu certo", now)
 		}
 	}
 	p.unlock()

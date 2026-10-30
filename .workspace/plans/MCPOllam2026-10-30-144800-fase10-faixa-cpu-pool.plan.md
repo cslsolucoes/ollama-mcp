@@ -390,3 +390,23 @@
     - `CHANGELOG.md` e `NOTICE.md`;
     - 144 links, 0 quebrados.
   - **Próximo:** correção 10.7-1 (sobrecarga que conta o próprio pedido) + cosméticos + teste instável → gateway `0.12.1` e mcpollama `0.9.0` em `D:\MCP` → 10.8 → congelar.
+- 2026-10-30 20:36 — **correções pós-aceite** (agente sonnet; `master`, sem servidor, SSH, `D:\MCP`, `.mcp.json`, `src/files`, `src/doctext`, `src/ocr`; sem push).
+  - **Estado:** concluído no código; versões/implantação (gateway `0.12.1`, mcpollama `0.9.0`) ficam para o loop principal.
+  - **10.7-1 (S1 conta o próprio pedido) — feito.**
+    - **Causa:** `estWait` usava `WaitingGen + 1` e só zerava com `WaitingGen == 0`. No despacho o pedido novo já está na fila, então um pedido isolado com o primário livre dava EWMA × 2 ÷ slots.
+    - **Solução:** `queued(in) = max(0, WaitingGen − slots livres)` e `estWait = EWMA × (WaitingGen − 1 + PrimaryUsed) ÷ slots`, 0 quando `queued == 0`. Com o primário cheio, a diferença para a fórmula antiga (que contava o próprio pedido) é EWMA × (slots − 2) ÷ slots: com 2 slots os valores do teste existente (60 s e 70 s) não mudam; com 1 slot a estimativa cai uma EWMA, que é a correção pedida.
+    - **S2 tinha o mesmo vício:** `WaitingGen > OverloadQueue` contava pedidos que cabiam nos slots livres. Agora usa `queued`; a calma da histerese e o `fila=` do evento também.
+    - **Regressão (`src/gateway/pool/fase10fix_regress_test.go`), falha antes e passa depois:** `TestS1DoesNotCountTheArrivingRequest` (antes: `EstWait 1m20s`, `On:true`), `TestS2IgnoresRequestsThatFitInFreeSlots` (antes: `S2:true`). Os testes antigos do pool (`TestEstimatedWaitUsesTheEWMA`, histerese) passam sem mudança.
+  - **Cosméticos — feitos, cada um com teste que falha antes:**
+    - (a) `observe` limpa `lastErr` quando a checagem dá certo e o modelo não está degradado (`TestLastErrorIsClearedWhenTheBackendRecovers`).
+    - (b) `ollama.ErrModelNotAllowed` (embrulha `ErrForbidden`): 403 com JSON que traz `não permitido neste servidor` → "modelo não permitido pelo servidor"; o 403 HTML do nginx continua igual; `tools.sanitizeUpstream` também distingue. Distinção pelo corpo (o gateway responde JSON, o nginx responde HTML); descrições das tools intactas (testes de budget verdes). Testes: `TestHTTPStatusMap` (novo caso), `TestGatewayAllowlist403IsNotTheNginxBlock`, `TestSanitizeUpstreamModelNotAllowed`.
+    - (c) `emitLimited`: 1 evento por minuto por backend e tipo (`breaker_open`, `breaker_close`), com contador de suprimidos no seguinte (`TestBreakerEventsAreRateLimited`: 9 falhas em 168 s dão 3 eventos, o 2º com "+2").
+  - **Teste instável `TestConnectionDroppedMidStream` — feito.**
+    - **Causa:** o mock fazia `hijack` + RST (`SetLinger(0)`) logo depois de gravar o chunk. O RST pode descartar o que o cliente ainda não leu; sob carga o cliente via o reset antes dos cabeçalhos, e a classificação virava "sem resposta" com parcial `nil`.
+    - **Reprodução:** binário do teste antigo, 12 processos × 150 execuções ao mesmo tempo: **2 de 12 processos falharam**; o teste novo: **0 de 12**.
+    - **Solução:** o handler espera o cliente avisar que leu os cabeçalhos (`Options.Logf`, linha `status=200`; cabeçalhos e 1º chunk saem no mesmo segmento) antes do RST. O que o teste prova não mudou: `ErrConnectionDropped` + "no meio da resposta" + parcial preservada. Novo teste `TestConnectionClosedMidStreamKeepsPartial` (fecha com FIN, sem corrida nenhuma) cobre a mesma prova de outro jeito.
+    - **FB1 (10.5):** não altera essa classificação. `transportErr` classifica antes de considerar o fallback, e o teste não configura fallback. Nada a ajustar.
+  - **O que não deu certo:** a 1ª versão do script de edição do teste gravou uma quebra de linha dentro de uma string Go (`"
+"` virou newline); `gofmt` acusou, corrigi antes de rodar.
+  - **Documentação:** `CHANGELOG.md` (gateway e mcpollama, "Não lançado"), `docs/MANUAL-GATEWAY.md` (fórmula da S1 e da S2).
+  - **Pendências:** (1) implantar gateway `0.12.1` e mcpollama `0.9.0` (loop principal); (2) 10.8, 10.S e as herdadas da 10.7 §6.5.

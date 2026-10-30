@@ -345,6 +345,8 @@ func sanitizeUpstream(err error) error {
 	switch {
 	case oe.Status == http.StatusUnauthorized:
 		msg = "token ausente ou inválido (OLLAMA_API_KEY)"
+	case errors.Is(oe, ollama.ErrModelNotAllowed):
+		msg = "modelo não permitido pelo servidor"
 	case oe.Status == http.StatusForbidden:
 		msg = "endpoint bloqueado pelo nginx"
 	case oe.Status == http.StatusNotFound:

@@ -14,6 +14,12 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 Já no `master`, depois da tag `mcpollama-v0.8.1`; ainda não saiu em um binário com tag.
 
+#### Corrigido
+- Mensagem do 403 da lista de modelos do gateway: um 403 com JSON `... não permitido neste servidor` agora diz **"modelo não
+  permitido pelo servidor"** em vez de "endpoint bloqueado pelo nginx" (o 403 HTML do nginx não mudou). Nova classe de erro
+  `ErrModelNotAllowed` (também é `ErrForbidden`); sem mudança nas descrições das tools nem no `tools/list`.
+- Teste `TestConnectionDroppedMidStream` (Fase 2) determinístico: só o teste mudou, não o código do cliente.
+
 #### Adicionado
 - Fallback opcional para um segundo servidor (`5a77853`, 2026-10-30): flags `--ollama-url-fallback`, `--fallback-api-key` e
   `--fallback-tls-ca` (env `OLLAMA_HOST_FALLBACK`, `OLLAMA_FALLBACK_API_KEY`, `OLLAMA_FALLBACK_TLS_CA`). **Desligado por
@@ -78,6 +84,19 @@ Já no `master`, depois da tag `mcpollama-v0.8.1`; ainda não saiu em um binári
 
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
+
+### [Não lançado]
+
+Já no `master`, depois da tag `gateway-v0.12.0` (correções pós-aceite da Fase 10.7).
+
+#### Corrigido
+- **Sobrecarga S1 não conta mais o próprio pedido** (10.7-1): a espera estimada passa a ser EWMA × (esperando à frente +
+  executando) ÷ slots; antes, um pedido isolado com o primário livre dava EWMA × 2 ÷ slots e ligava `overload_on` sem motivo
+  quando a geração média passava de metade de `--overload-wait`. A S2 e a histerese de calma passam a contar só a fila que
+  não cabe nos slots livres. Só age com secundário configurado.
+- **"Último erro" do backend** some do monitor quando ele volta a ficar saudável (`backend_up`).
+- **Eventos do disjuntor**: no máximo 1 `breaker_open` e 1 `breaker_close` por minuto por backend; o evento seguinte informa
+  quantos iguais foram suprimidos. O estado do disjuntor no quadro não muda.
 
 ### [0.12.0] - 2026-10-30 (tag `gateway-v0.12.0`)
 

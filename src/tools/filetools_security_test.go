@@ -88,6 +88,18 @@ func TestSanitizeUpstreamKeepsLocalErrors(t *testing.T) {
 	}
 }
 
+// 10.7 cosmetic: a 403 from the gateway allowlist is not "blocked by the nginx".
+func TestSanitizeUpstreamModelNotAllowed(t *testing.T) {
+	got := sanitizeUpstream(&ollama.Error{Kind: ollama.ErrModelNotAllowed, Status: 403, Msg: "x"})
+	if !strings.Contains(got.Error(), "modelo não permitido pelo servidor") || strings.Contains(got.Error(), "nginx") || !errors.Is(got, ollama.ErrForbidden) {
+		t.Fatalf("message: %v", got)
+	}
+	got = sanitizeUpstream(&ollama.Error{Kind: ollama.ErrForbidden, Status: 403, Msg: "x"})
+	if !strings.Contains(got.Error(), "nginx") {
+		t.Fatalf("the plain 403 keeps the nginx message: %v", got)
+	}
+}
+
 // SEC-m-01: the reduce prompts use a fresh nonce; a partial that forges a
 // closing marker with the map nonce cannot close the data block.
 func TestReduceUsesFreshNonce(t *testing.T) {

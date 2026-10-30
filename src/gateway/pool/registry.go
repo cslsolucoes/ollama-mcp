@@ -289,7 +289,14 @@ type Backend struct {
 	loaded      []models.Loaded
 	ring        [ringSize]int64
 	ringN       int
-	ewma        float64 // ms, generation runs that ended ok (primary only)
+	ewma        float64             // ms, generation runs that ended ok (primary only)
+	evLim       map[string]*evLimit // breaker event rate limit, by kind
+}
+
+// evLimit is the rate limit state of one event kind of one backend.
+type evLimit struct {
+	last       time.Time
+	suppressed int
 }
 
 // Token returns the bearer token of this backend ("" when it has none). It is

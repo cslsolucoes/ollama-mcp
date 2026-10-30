@@ -20,8 +20,12 @@ import (
 // Error kinds. Every error returned by the client is an *Error whose Kind is
 // one of these, so callers (and tests) can branch with errors.Is.
 var (
-	ErrUnauthorized      = errors.New("unauthorized")
-	ErrForbidden         = errors.New("forbidden")
+	ErrUnauthorized = errors.New("unauthorized")
+	ErrForbidden    = errors.New("forbidden")
+	// ErrModelNotAllowed is a 403 from the gateway allowlist (it is also an
+	// ErrForbidden): the model is not allowed by the server, nothing to do with
+	// the nginx endpoint block.
+	ErrModelNotAllowed   = fmt.Errorf("model not allowed: %w", ErrForbidden)
 	ErrNotFound          = errors.New("not found")
 	ErrBadRequest        = errors.New("bad request")
 	ErrServer            = errors.New("server error")
@@ -115,6 +119,18 @@ func (c *Client) detail(body []byte) string {
 	return s
 }
 
+// modelNotAllowedMarker is the tail of the gateway answer for a model outside
+// its allowlist (gateway/proxy: `modelo "x" não permitido neste servidor`). The
+// nginx block is an HTML page, so a JSON body with this marker is the gateway.
+const modelNotAllowedMarker = "não permitido neste servidor"
+
+func isModelNotAllowed(body []byte) bool {
+	var j struct {
+		Error string `json:"error"`
+	}
+	return json.Unmarshal(body, &j) == nil && strings.Contains(j.Error, modelNotAllowedMarker)
+}
+
 // statusError is the OLL-004 map. Short, actionable, no server HTML.
 func (c *Client) statusError(method, path string, status int, body []byte) *Error {
 	d := c.detail(body)
@@ -125,6 +141,8 @@ func (c *Client) statusError(method, path string, status int, body []byte) *Erro
 	switch {
 	case status == 401:
 		return c.fail(ErrUnauthorized, status, "token ausente ou inválido (OLLAMA_API_KEY)%s", suffix)
+	case status == 403 && isModelNotAllowed(body):
+		return c.fail(ErrModelNotAllowed, status, "modelo não permitido pelo servidor%s", suffix)
 	case status == 403:
 		return c.fail(ErrForbidden, status, "endpoint bloqueado pelo nginx%s", suffix)
 	case status == 404:
