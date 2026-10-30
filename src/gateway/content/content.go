@@ -73,9 +73,12 @@ type Store struct {
 
 	// The cap runs in the background (revisão 10.L, D4): bgMu guards capBusy
 	// and the closing, capWG lets Close wait for a run in progress.
-	bgMu    sync.Mutex
-	capBusy bool
-	capWG   sync.WaitGroup
+	bgMu       sync.Mutex
+	capBusy    bool
+	capRetryAt time.Time     // after a failed trigger, no new run before this (D6)
+	capEventAt time.Time     // last teto_conteudo_falhou event
+	stop       chan struct{} // closed by Close: cuts the backoff between runs
+	capWG      sync.WaitGroup
 }
 
 // Open creates (0600) or opens the content database.
@@ -112,7 +115,7 @@ func Open(path string, o Options) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("content: schema: %w", err)
 	}
-	s := &Store{db: db, opts: o}
+	s := &Store{db: db, opts: o, stop: make(chan struct{})}
 	var sum int64
 	if err := db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err != nil {
 		db.Close()
@@ -126,6 +129,9 @@ func Open(path string, o Options) (*Store, error) {
 func (s *Store) Close() error {
 	s.bgMu.Lock()
 	already := s.closed.Swap(true)
+	if !already {
+		close(s.stop)
+	}
 	s.bgMu.Unlock()
 	if already {
 		return nil
@@ -231,7 +237,7 @@ func (s *Store) added(n int64) {
 // D4: 614 deletes took 829 ms inside the write that passed the cap).
 func (s *Store) triggerCap() {
 	s.bgMu.Lock()
-	if s.closed.Load() || s.capBusy {
+	if s.closed.Load() || s.capBusy || time.Now().Before(s.capRetryAt) {
 		s.bgMu.Unlock()
 		return
 	}
@@ -240,40 +246,99 @@ func (s *Store) triggerCap() {
 	s.bgMu.Unlock()
 	go func() {
 		defer s.capWG.Done()
-		for {
-			s.enforceCap()
+		for attempt := 1; ; attempt++ {
+			removed, err := s.enforceCap()
 			s.bgMu.Lock()
-			// a write that came in meanwhile may have passed the cap again
-			if s.closed.Load() || s.total.Load() <= s.opts.MaxBytes {
+			over := s.total.Load() > s.opts.MaxBytes
+			// A write that came in meanwhile may have passed the cap again: run
+			// once more, but only while the runs make progress. An error, a run
+			// that removed nothing, or too many runs end the goroutine (revisão
+			// 10.L, D6: a failing enforceCap used to make this loop spin at 100%
+			// of a CPU forever).
+			if s.closed.Load() || !over {
+				s.capBusy = false
+				s.bgMu.Unlock()
+				return
+			}
+			if err != nil || removed == 0 {
+				// no progress: stop, cool down, re-read the truth, report
+				s.capBusy = false
+				s.capRetryAt = time.Now().Add(capCooldown)
+				s.bgMu.Unlock()
+				s.resyncTotal()
+				s.capFailed(err, removed, attempt)
+				return
+			}
+			if attempt >= capMaxAttempts {
+				// progress, but writes keep coming: end this goroutine; the
+				// next write past the cap starts a new one
 				s.capBusy = false
 				s.bgMu.Unlock()
 				return
 			}
 			s.bgMu.Unlock()
+			select { // a short backoff between runs; Close cuts it
+			case <-time.After(time.Duration(attempt) * capBackoff):
+			case <-s.stop:
+			}
 		}
 	}()
 }
 
-// capBatch is how many jobs one transaction of the cap deletes (one fsync).
-const capBatch = 500
+// Limits of the background cap (revisão 10.L, D6).
+const (
+	capBatch       = 500 // jobs one transaction of the cap deletes (one fsync)
+	capMaxAttempts = 5   // runs per trigger
+	capBackoff     = 20 * time.Millisecond
+	capCooldown    = time.Minute // after a failed trigger, no new one before this
+	capEventEvery  = time.Minute // at most one teto_conteudo_falhou per minute
+)
+
+// resyncTotal re-reads the real total, so the next write decides again on the
+// truth and not on a counter that a failed run left behind.
+func (s *Store) resyncTotal() {
+	var sum int64
+	if err := s.db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
+		s.total.Store(sum)
+	}
+}
+
+// capFailed logs a cap run that could not bring the total under the cap and
+// reports teto_conteudo_falhou, at most once per capEventEvery.
+func (s *Store) capFailed(err error, removed int64, attempt int) {
+	why := fmt.Sprintf("tentativas=%d removidos_na_ultima=%d total=%d teto=%d", attempt, removed, s.total.Load(), s.opts.MaxBytes)
+	if err != nil {
+		why += " erro=" + err.Error()
+	}
+	s.logf("content: o teto não conseguiu baixar o total (%s); nova tentativa em %s", why, capCooldown)
+	s.bgMu.Lock()
+	send := time.Since(s.capEventAt) >= capEventEvery
+	if send {
+		s.capEventAt = time.Now()
+	}
+	s.bgMu.Unlock()
+	if send && s.opts.OnEvent != nil {
+		s.opts.OnEvent("teto_conteudo_falhou", why)
+	}
+}
 
 // enforceCap deletes the oldest jobs until the total is under 90% of the cap
 // (a margin, so the next write does not trigger it again) and reports an event.
 // The deletes go in transactions of capBatch: one synchronous commit each,
 // not one per job.
-func (s *Store) enforceCap() {
+func (s *Store) enforceCap() (removed int64, err error) {
 	s.capMu.Lock()
 	defer s.capMu.Unlock()
 	if s.total.Load() <= s.opts.MaxBytes {
-		return
+		return 0, nil
 	}
 	target := s.opts.MaxBytes / 10 * 9
-	var removed, freed int64
+	var freed int64
 	for s.total.Load() > target && !s.closed.Load() {
 		rows, err := s.db.Query(`SELECT job_id, COALESCE(length(prompt),0)+COALESCE(length(response),0) FROM job_content ORDER BY created_at, rowid LIMIT ?`, capBatch)
 		if err != nil {
 			s.logf("content: teto: %v", err)
-			return
+			return removed, err
 		}
 		type victim struct {
 			id string
@@ -287,13 +352,16 @@ func (s *Store) enforceCap() {
 			}
 		}
 		rows.Close()
+		if err := rows.Err(); err != nil {
+			return removed, err
+		}
 		if len(vs) == 0 {
 			break
 		}
 		tx, err := s.db.Begin()
 		if err != nil {
 			s.logf("content: teto: %v", err)
-			return
+			return removed, err
 		}
 		var bn, bf, need int64 = 0, 0, s.total.Load() - target
 		for _, v := range vs {
@@ -303,14 +371,14 @@ func (s *Store) enforceCap() {
 			if _, err := tx.Exec(`DELETE FROM job_content WHERE job_id=?`, v.id); err != nil {
 				_ = tx.Rollback()
 				s.logf("content: teto: %v", err)
-				return
+				return removed, err
 			}
 			bn++
 			bf += v.n
 		}
 		if err := tx.Commit(); err != nil {
 			s.logf("content: teto: %v", err)
-			return
+			return removed, err
 		}
 		s.total.Add(-bf)
 		removed += bn
@@ -325,6 +393,7 @@ func (s *Store) enforceCap() {
 	if s.opts.OnEvent != nil {
 		s.opts.OnEvent("teto_conteudo", fmt.Sprintf("removidos=%d bytes_liberados=%d total_agora=%d teto=%d", removed, freed, s.total.Load(), s.opts.MaxBytes))
 	}
+	return removed, nil
 }
 
 // ---- answer sink -------------------------------------------------------------
@@ -521,7 +590,9 @@ func (s *Store) Maintain(ctx context.Context, now time.Time) error {
 		}
 	}
 	if s.total.Load() > s.opts.MaxBytes {
-		s.enforceCap()
+		if _, err := s.enforceCap(); err != nil {
+			s.logf("content: manutenção: teto: %v", err)
+		}
 	}
 	return nil
 }

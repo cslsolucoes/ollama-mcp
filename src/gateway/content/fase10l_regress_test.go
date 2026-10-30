@@ -121,3 +121,71 @@ func TestRegress10LSavePromptDoesNotCopyTheWholePrompt(t *testing.T) {
 		t.Fatalf("SavePrompt alocou %d MiB para guardar 16 MiB", a>>20)
 	}
 }
+
+// D6 (achado do coordenador, revisão automática): se o enforceCap falha (banco
+// fechado por baixo, disco cheio, travado) ou não remove nada, a goroutine do
+// triggerCap girava para sempre (100% de uma CPU). Agora ela termina em tempo
+// limitado, sem vazar goroutine, com um evento teto_conteudo_falhou (no máximo
+// 1 por minuto) e um intervalo antes de tentar de novo.
+func TestRegress10LCapFailureDoesNotSpin(t *testing.T) {
+	var mu sync.Mutex
+	var events []string
+	s, _ := open(t, Options{MaxBytes: 1 << 20, MaxJobBytes: 64 << 10, OnEvent: func(k, d string) { mu.Lock(); events = append(events, k); mu.Unlock() }})
+	s.SavePrompt("a", "x", time.Now())
+	base := runtime.NumGoroutine()
+	s.db.Close()            // o banco some por baixo: toda consulta falha
+	s.total.Store(64 << 20) // contador acima do teto
+	done := make(chan struct{})
+	start := time.Now()
+	s.triggerCap()
+	go func() { s.WaitCap(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		s.closed.Store(true) // solta a goroutine do código antigo para o teste terminar
+		<-done
+		t.Fatal("a goroutine do teto gira sem parar com o enforceCap falhando")
+	}
+	el := time.Since(start)
+	// dentro do intervalo, novas gravações acima do teto não sobem outra goroutine
+	for i := 0; i < 1000; i++ {
+		s.triggerCap()
+	}
+	s.WaitCap()
+	time.Sleep(50 * time.Millisecond)
+	if n := runtime.NumGoroutine(); n > base+1 {
+		t.Fatalf("goroutines: %d antes, %d depois", base, n)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	fails := 0
+	for _, e := range events {
+		if e == "teto_conteudo_falhou" {
+			fails++
+		}
+	}
+	if fails != 1 {
+		t.Fatalf("eventos teto_conteudo_falhou = %d (%v), quero 1", fails, events)
+	}
+	t.Logf("a rodada que falhou terminou em %s", el.Round(time.Millisecond))
+}
+
+// D6 (cont.): contador acima do teto sem nada para remover (tabela vazia): a
+// rodada relê o total real e termina; nada gira.
+func TestRegress10LCapNothingToRemoveEnds(t *testing.T) {
+	s, _ := open(t, Options{MaxBytes: 1 << 20, MaxJobBytes: 64 << 10})
+	s.total.Store(64 << 20)
+	done := make(chan struct{})
+	s.triggerCap()
+	go func() { s.WaitCap(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		s.closed.Store(true)
+		<-done
+		t.Fatal("girou sem nada para remover")
+	}
+	if s.Total() != 0 {
+		t.Fatalf("o contador não foi corrigido: %d", s.Total())
+	}
+}

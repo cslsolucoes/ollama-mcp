@@ -158,11 +158,13 @@ func TestSynchronousFullAndPrivateFile(t *testing.T) {
 // The partial answer is on disk every FlushEvery, before Finish: this is what a
 // reboot leaves behind.
 func TestPartialAnswerIsFlushedWhileStreaming(t *testing.T) {
-	s, _ := open(t, Options{FlushEvery: 20 * time.Millisecond})
+	// 200 ms, not 20: with 20 ms a slow fsync under the full suite made the
+	// "terceiro" write find the flush due again (flaky, revisão 10.L)
+	s, _ := open(t, Options{FlushEvery: 200 * time.Millisecond})
 	s.SavePrompt("p", "pergunta", time.Now())
 	k := s.NewSink("p")
 	k.Write("primeiro ")
-	time.Sleep(40 * time.Millisecond)
+	time.Sleep(250 * time.Millisecond)
 	k.Write("segundo ") // this write finds the flush due
 	c, _, _ := s.Get(context.Background(), "p")
 	if c.Response != "primeiro segundo " || c.RespFinal {
