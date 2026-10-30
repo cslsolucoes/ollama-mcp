@@ -13,6 +13,14 @@
 //   - atomic administrator actions under the lock: promote, demote, remove (a
 //     waiting request) and cancel (a running one).
 //
+// Backend pool (Fase 10.4): the line is one for the whole pool. A generation
+// that has not started is given to the primary when it has a free slot and is
+// usable; when the primary is overloaded (pool.Evaluate) it may be given to the
+// first eligible secondary instead (same model and digest, class accepted,
+// prompt fits). Nothing moves after the start. Fairness, the per-IP limits and
+// the queue size are those of the line, so they hold for the whole pool.
+// Without a pool the line has one backend, "gpu-local", and behaves as before.
+//
 // The line lives in memory and is the only truth about "now". Persistence is
 // somebody else's job: the manager only calls the OnRecord/OnChange hooks,
 // always outside its lock, and the hooks must not block.
@@ -27,6 +35,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/cslsoftwares/mcpollama/gateway/pool"
 )
 
 // Lane separates workloads that must not wait behind each other.
@@ -121,7 +131,11 @@ type Config struct {
 	LabelsPerIP  int           // distinct labels per IP; more are folded into "<ip>/outros"; default 16
 	MaxWait      time.Duration // default 10 min
 	AgeAfter     time.Duration // baixa -> normal, default 5 min
-	StartStagger time.Duration // minimum gap between two geracao starts; 0 disables
+	StartStagger time.Duration // minimum gap between two geracao starts on the primary; 0 disables
+
+	// Pool is the backend pool (Fase 10.4). nil means one backend, "gpu-local",
+	// with GenSlots slots. When set, GenSlots is taken from its primary.
+	Pool *pool.Pool
 
 	// OnRecord receives one Record per request that leaves the system. OnChange
 	// is called after every state change. Both run outside the lock and must
@@ -191,6 +205,10 @@ type Result struct {
 	LoadMS     int64
 	Responded  bool  // the model returned some answer (text, or embeddings)
 	RespBytes  int64 // bytes of generated text received (0 for embeddings)
+	// AfterConnect (Fase 10.5) marks an upstream_unreachable that happened after
+	// the connection to the backend was made (EOF or reset before the answer).
+	// The record keeps the class; the circuit breaker treats it as neutral.
+	AfterConnect bool
 }
 
 // Record is the metadata row of a request (no text, plan section 5).
@@ -219,6 +237,8 @@ type Record struct {
 	Think         string // reasoning mode (Fase 9.6a)
 	Responded     bool   // Fase 10.L: some answer came back
 	RespBytes     int64  // Fase 10.L: bytes of generated text received
+	Backend       string // Fase 10.4: where it ran ("" when it never started)
+	FailoverRule  string // Fase 10.4: why it did not run on the primary ("F2:S1", "" when it did)
 }
 
 type state int
@@ -251,6 +271,9 @@ type Ticket struct {
 	rank      int64    // <0 pinned on top, >0 pushed to the bottom
 	enqueued  time.Time
 	started   time.Time
+	backend   string // Fase 10.4: assigned at the start
+	rule      string
+	probe     bool // the half-open probe of its backend
 	finalPrio Priority
 	adminCx   bool
 	recorded  bool
@@ -277,6 +300,9 @@ type Manager struct {
 	timer     *time.Timer // pending stagger wake-up
 	after     []func()    // hooks to run after unlock
 	totals    Totals
+	pool      *pool.Pool
+	bRun      map[string]int // generation requests running, per backend
+	genSlots  int            // slots of the generation lane, all backends
 }
 
 type served struct {
@@ -298,8 +324,20 @@ type Totals struct {
 // New builds a Manager.
 func New(cfg Config) *Manager {
 	cfg = cfg.withDefaults()
+	if cfg.Pool == nil {
+		cfg.Pool = pool.New(pool.Config{PrimarySlots: cfg.GenSlots, QueueMax: cfg.QueueMax})
+	} else {
+		cfg.GenSlots = cfg.Pool.Primary().Slots
+	}
+	gs := 0
+	for _, b := range cfg.Pool.Backends() {
+		gs += b.Slots
+	}
 	return &Manager{
 		cfg:       cfg,
+		pool:      cfg.Pool,
+		bRun:      map[string]int{},
+		genSlots:  gs,
 		waiting:   map[Lane][]*Ticket{LaneGen: nil, LaneEmbed: nil},
 		running:   map[Lane]map[string]*Ticket{LaneGen: {}, LaneEmbed: {}},
 		byID:      map[string]*Ticket{},
@@ -315,7 +353,27 @@ func (m *Manager) Slots(l Lane) int {
 	if l == LaneEmbed {
 		return m.cfg.EmbedSlots
 	}
-	return m.cfg.GenSlots
+	return m.genSlots
+}
+
+// Pool returns the backend pool of the line.
+func (m *Manager) Pool() *pool.Pool { return m.pool }
+
+// Poke re-evaluates the pool and starts whatever can start now. Call it on a
+// timer (the hysteresis and the open breaker depend on time) and when the pool
+// state changes (a backend went down or up, was drained).
+func (m *Manager) Poke() {
+	m.lockOp()
+	if m.pool.HasSecondaries() {
+		m.pool.Evaluate(time.Now(), m.loadInputLocked())
+	}
+	m.dispatchLocked()
+	m.changed()
+	m.unlockOp()
+}
+
+func (m *Manager) loadInputLocked() pool.LoadInput {
+	return pool.LoadInput{WaitingGen: len(m.waiting[LaneGen]), PrimaryUsed: m.bRun[m.pool.Primary().ID]}
 }
 
 // Config returns the effective configuration (hooks included).
@@ -500,6 +558,7 @@ func (m *Manager) endRecord(t *Ticket, now time.Time, r Result) Record {
 		Status: r.Status, HTTPStatus: r.HTTPStatus, ErrorClass: r.ErrorClass,
 		PromptEval: r.PromptEval, Eval: r.Eval, LoadMS: r.LoadMS,
 		Responded: r.Responded, RespBytes: r.RespBytes,
+		Backend: t.backend, FailoverRule: t.rule,
 	}
 	if rec.PriorityFinal == 0 {
 		rec.PriorityFinal = t.level
@@ -537,6 +596,22 @@ func (t *Ticket) Release(r Result) {
 	}
 }
 
+// Backend is the id of the backend the request was given to ("" before it
+// starts). Valid once Acquire returned.
+func (t *Ticket) Backend() string {
+	t.m.mu.Lock()
+	defer t.m.mu.Unlock()
+	return t.backend
+}
+
+// FailoverRule is the rule that sent the request away from the primary ("" when
+// it runs on the primary).
+func (t *Ticket) FailoverRule() string {
+	t.m.mu.Lock()
+	defer t.m.mu.Unlock()
+	return t.rule
+}
+
 // Req returns the request data of the ticket.
 func (t *Ticket) Req() Request { return t.req }
 
@@ -569,8 +644,42 @@ func (t *Ticket) FinalPriority() Priority {
 	return t.finalPrio
 }
 
-func (m *Manager) finishLocked(t *Ticket, now time.Time, r Result) {
+// outcomeOf classifies a finished request for the circuit breaker. ONLY what no
+// client controls counts: ok, and a failure to reach the backend
+// (upstream_unreachable: dial, connection or TLS error; the proxy never sets it
+// when the client's own context ended). A 5xx, a dropped connection, a timeout
+// or a stream error depends on the request (a malformed or abusive one makes the
+// Ollama answer 500) or on the client leaving, so they are neutral: otherwise one
+// client could open the breaker for everybody and force the hand-over to a
+// secondary. A connection that was made and then closed before the answer
+// (AfterConnect) is neutral too: a request body can cause it (revisão 10.5, B3).
+// The active health check (/api/version, /api/ps) is the other input of the
+// breaker.
+func outcomeOf(r Result) pool.Outcome {
+	switch {
+	case r.Status == "" || r.Status == StatusOK:
+		return pool.OutcomeOK
+	case r.ErrorClass == "upstream_unreachable" && !r.AfterConnect:
+		return pool.OutcomeFail
+	}
+	return pool.OutcomeNeutral
+}
+
+// freeSlotLocked takes a running request out of its lane (and backend count).
+func (m *Manager) freeSlotLocked(t *Ticket) {
 	delete(m.running[t.req.Lane], t.ID)
+	if t.req.Lane == LaneGen {
+		if n := m.bRun[t.backend] - 1; n > 0 {
+			m.bRun[t.backend] = n
+		} else {
+			delete(m.bRun, t.backend)
+		}
+	}
+}
+
+func (m *Manager) finishLocked(t *Ticket, now time.Time, r Result) {
+	m.freeSlotLocked(t)
+	m.pool.NoteEnd(t.backend, outcomeOf(r), t.probe, t.req.Lane == LaneGen, now.Sub(t.started).Milliseconds(), now)
 	delete(m.byID, t.ID)
 	m.refLabelLocked(t, -1)
 	t.st = stDone
@@ -729,36 +838,119 @@ func (m *Manager) servedSnapshotLocked() map[string]uint64 {
 	return s
 }
 
-// dispatchLocked starts as many waiting requests as the free slots and the
-// stagger allow.
+// dispatchLocked starts as many waiting requests as the free slots, the pool
+// and the stagger allow.
 func (m *Manager) dispatchLocked() {
 	now := time.Now()
-	for _, lane := range []Lane{LaneEmbed, LaneGen} {
-		for len(m.running[lane]) < m.Slots(lane) && len(m.waiting[lane]) > 0 {
-			if lane == LaneGen && m.cfg.StartStagger > 0 && !m.lastStart.IsZero() {
-				if next := m.lastStart.Add(m.cfg.StartStagger); now.Before(next) {
-					m.armTimerLocked(next.Sub(now))
-					break
+	m.dispatchEmbedLocked(now)
+	m.dispatchGenLocked(now)
+}
+
+// startLocked moves waiting request w[i] of lane to running on backend b.
+func (m *Manager) startLocked(lane Lane, i int, b *pool.Backend, rule string, now time.Time) {
+	t := m.waiting[lane][i]
+	m.waiting[lane] = append(m.waiting[lane][:i:i], m.waiting[lane][i+1:]...)
+	m.dropPerClientLocked(t)
+	t.st = stRunning
+	t.started = now
+	t.finalPrio = m.effectiveLocked(t, now)
+	t.backend, t.rule = b.ID, rule
+	t.probe = m.pool.NoteStart(b.ID, now)
+	m.running[lane][t.ID] = t
+	if lane == LaneGen {
+		m.bRun[b.ID]++
+		m.lastStart = now
+	}
+	m.startSeq++
+	m.served[t.key] = served{seq: m.startSeq, last: now, ip: t.req.ClientIP}
+	m.served[t.req.ClientIP] = served{seq: m.startSeq, last: now, ip: t.req.ClientIP}
+	m.totals.Started++
+	close(t.ready)
+}
+
+// dispatchEmbedLocked: embeddings run on the primary only (the secondaries are
+// for generation; a model's embedding space must not change with the backend).
+func (m *Manager) dispatchEmbedLocked(now time.Time) {
+	pr := m.pool.Primary()
+	for len(m.running[LaneEmbed]) < m.Slots(LaneEmbed) && len(m.waiting[LaneEmbed]) > 0 {
+		if !m.pool.CanStart(pr.ID, now) {
+			return
+		}
+		i := m.pickLocked(m.waiting[LaneEmbed], now, m.servedSnapshotLocked())
+		m.startLocked(LaneEmbed, i, pr, "", now)
+	}
+}
+
+func (m *Manager) dispatchGenLocked(now time.Time) {
+	for len(m.waiting[LaneGen]) > 0 {
+		i, b, rule := m.nextGenLocked(now)
+		if b == nil {
+			return
+		}
+		// The stagger protects the power supply of the primary; a secondary is
+		// another machine and starts at once.
+		if b.Primary && m.cfg.StartStagger > 0 && !m.lastStart.IsZero() {
+			if next := m.lastStart.Add(m.cfg.StartStagger); now.Before(next) {
+				m.armTimerLocked(next.Sub(now))
+				return
+			}
+		}
+		m.startLocked(LaneGen, i, b, rule, now)
+	}
+}
+
+// nextGenLocked decides the next generation start: the waiting request (index
+// into m.waiting[LaneGen]), the backend and the rule. b is nil when nothing can
+// start. Order: the primary when it has a free slot and is usable; otherwise,
+// when the primary is overloaded, the first secondary (by preference) that has
+// a free slot and is eligible for some waiting request; the request the line
+// would serve next among the eligible ones goes. A primary that is unhealthy
+// (down, off the GPU) yields to an eligible secondary first, and is still used
+// when none is (F5: nothing eligible, the request waits for or uses the
+// primary, no error).
+func (m *Manager) nextGenLocked(now time.Time) (int, *pool.Backend, string) {
+	w := m.waiting[LaneGen]
+	pr := m.pool.Primary()
+	primaryOK := m.bRun[pr.ID] < pr.Slots && m.pool.CanStart(pr.ID, now)
+	fromPrimary := func() (int, *pool.Backend, string) {
+		return m.pickLocked(w, now, m.servedSnapshotLocked()), pr, ""
+	}
+	if !m.pool.HasSecondaries() {
+		if primaryOK {
+			return fromPrimary()
+		}
+		return -1, nil, ""
+	}
+	ov := m.pool.Evaluate(now, m.loadInputLocked())
+	if primaryOK && !(ov.On && m.pool.PrimaryYields(now)) {
+		return fromPrimary()
+	}
+	if ov.On {
+		for _, sb := range m.pool.Secondaries() {
+			if m.bRun[sb.ID] >= sb.Slots || !m.pool.CanStart(sb.ID, now) {
+				continue
+			}
+			var elig []*Ticket
+			for _, t := range w {
+				if m.pool.Eligible(sb, t.req.Model, m.effectiveLocked(t, now).String(), pool.EstimateTokens(t.req.BytesIn)) {
+					elig = append(elig, t)
 				}
 			}
-			i := m.pickLocked(m.waiting[lane], now, m.servedSnapshotLocked())
-			t := m.waiting[lane][i]
-			m.waiting[lane] = append(m.waiting[lane][:i:i], m.waiting[lane][i+1:]...)
-			m.dropPerClientLocked(t)
-			t.st = stRunning
-			t.started = now
-			t.finalPrio = m.effectiveLocked(t, now)
-			m.running[lane][t.ID] = t
-			m.startSeq++
-			m.served[t.key] = served{seq: m.startSeq, last: now, ip: t.req.ClientIP}
-			m.served[t.req.ClientIP] = served{seq: m.startSeq, last: now, ip: t.req.ClientIP}
-			if lane == LaneGen {
-				m.lastStart = now
+			if len(elig) == 0 {
+				continue
 			}
-			m.totals.Started++
-			close(t.ready)
+			pick := elig[m.pickLocked(elig, now, m.servedSnapshotLocked())]
+			for i, t := range w {
+				if t == pick {
+					return i, sb, "F2:" + ov.Rules
+				}
+			}
 		}
 	}
+	if primaryOK {
+		return fromPrimary()
+	}
+	return -1, nil, ""
 }
 
 func (m *Manager) armTimerLocked(d time.Duration) {
@@ -868,7 +1060,8 @@ func (m *Manager) Cancel(id string) (ActionResult, error) {
 	}
 	before := t.describe()
 	t.adminCx = true
-	delete(m.running[t.req.Lane], t.ID)
+	m.freeSlotLocked(t)
+	m.pool.NoteEnd(t.backend, pool.OutcomeNeutral, t.probe, false, 0, time.Now()) // frees a half-open probe
 	delete(m.byID, t.ID)
 	m.refLabelLocked(t, -1)
 	t.st = stDone
@@ -899,22 +1092,24 @@ func (t *Ticket) describe() string {
 
 // Item is one request as the monitor shows it.
 type Item struct {
-	ID          string    `json:"id"`
-	Lane        Lane      `json:"lane"`
-	ClientIP    string    `json:"client_ip"`
-	ClientLabel string    `json:"client_label"`
-	Tool        string    `json:"tool"`
-	Endpoint    string    `json:"endpoint"`
-	Model       string    `json:"model"`
-	PriorityIn  string    `json:"priority_in"`
-	Priority    string    `json:"priority"` // current level (waiting) or granted (running)
-	Position    int       `json:"position"` // 1-based place in the lane order; 0 when running
-	EnqueuedAt  time.Time `json:"enqueued_at"`
-	StartedAt   time.Time `json:"started_at"`
-	WaitingMS   int64     `json:"waiting_ms"`
-	RunningMS   int64     `json:"running_ms"`
-	BytesIn     int64     `json:"bytes_in"`
-	Think       string    `json:"think"` // reasoning mode: on, off, modelo or ""
+	ID           string    `json:"id"`
+	Lane         Lane      `json:"lane"`
+	ClientIP     string    `json:"client_ip"`
+	ClientLabel  string    `json:"client_label"`
+	Tool         string    `json:"tool"`
+	Endpoint     string    `json:"endpoint"`
+	Model        string    `json:"model"`
+	PriorityIn   string    `json:"priority_in"`
+	Priority     string    `json:"priority"` // current level (waiting) or granted (running)
+	Position     int       `json:"position"` // 1-based place in the lane order; 0 when running
+	EnqueuedAt   time.Time `json:"enqueued_at"`
+	StartedAt    time.Time `json:"started_at"`
+	WaitingMS    int64     `json:"waiting_ms"`
+	RunningMS    int64     `json:"running_ms"`
+	BytesIn      int64     `json:"bytes_in"`
+	Think        string    `json:"think"`         // reasoning mode: on, off, modelo or ""
+	Backend      string    `json:"backend"`       // where it runs ("" while waiting)
+	FailoverRule string    `json:"failover_rule"` // why it is not on the primary
 }
 
 // Snapshot is a consistent photo of the line.
@@ -974,6 +1169,7 @@ func (m *Manager) itemLocked(t *Ticket, now time.Time, pos int) Item {
 		EnqueuedAt: t.enqueued, BytesIn: t.req.BytesIn, Think: t.req.Think,
 	}
 	if t.st == stRunning {
+		it.Backend, it.FailoverRule = t.backend, t.rule
 		it.Priority = t.finalPrio.String()
 		it.StartedAt = t.started
 		it.WaitingMS = t.started.Sub(t.enqueued).Milliseconds()
@@ -1030,6 +1226,19 @@ func (m *Manager) checkInvariants() string {
 				return "running ticket inconsistent"
 			}
 		}
+	}
+	perBackend := map[string]int{}
+	for _, t := range m.running[LaneGen] {
+		perBackend[t.backend]++
+	}
+	for id, n := range perBackend {
+		b := m.pool.Backend(id)
+		if b == nil || n > b.Slots || m.bRun[id] != n {
+			return fmt.Sprintf("backend %s runs %d (counter %d)", id, n, m.bRun[id])
+		}
+	}
+	if len(perBackend) != len(m.bRun) {
+		return "bRun size mismatch"
 	}
 	if len(m.byID) != nWait+nRun {
 		return fmt.Sprintf("byID %d != waiting %d + running %d", len(m.byID), nWait, nRun)

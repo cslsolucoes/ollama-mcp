@@ -1,0 +1,107 @@
+== ataques 9.5 + 10.L + 10.5 no codigo corrigido, -short
+    fase105_adv_test.go:82: VEC|N1-quadro-modelos-parado|Media|gateway/pool/pool.go:657|OK: sem --backends, o quadro Modelos mostra o erro com o Ollama fora: ps: Get "http://127.0.0.1:65124/api/ps": dial tcp 127.0.0.1:65124: connectex: Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente.; tags: Get "http://127.0.0.1:65124/api/tags": dial tcp 127.0.0.1:65124: connectex: Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente.
+    fase105_adv_test.go:168: VEC|T1-tokens-em-lugar-nenhum|Alta|gateway/pool/registry.go:249|OK: 8 fontes (5 rotas do monitor, log --debug, gw.db/-wal, content.db/-wal) sem o token do secundario nem o do cliente; 1 geracao(oes) no secundario; 7 ocorrencias do id sec-t1 no gw.db (backend_samples e requests gravados)
+    fase10l_adv_test.go:92: VEC|R2-content-db-corrompido|Media|cmd/mcpollama-gateway/main.go:97|OK lixo: pedido 200, content_enabled=false, evento conteudo_indisponivel content.db não abriu; o gateway segue sem gravar o texto: content: schema: file is not a database (26)
+    fase10l_adv_test.go:92: VEC|R2-content-db-corrompido|Media|cmd/mcpollama-gateway/main.go:97|OK diretorio: pedido 200, content_enabled=false, evento conteudo_indisponivel content.db não abriu; o gateway segue sem gravar o texto: content: cannot create D:\Users\claiton.linhares\AppData\Local\Temp\TestAdvLCorruptContentDBKeepsGatewayUp2927780605\002\content.db: open D:\Users\claiton.linhares\AppData\Local\Temp\TestAdvLCorruptContentDBKeepsGatewayUp2927780605\002\content.db: is a directory
+    fase9_adv_test.go:65: VEC|C1-priority-ips-ipv4-mapeado|Baixa|cmd/mcpollama-gateway/config.go:245|OK: formas mapeadas viram o prefixo IPv4 equivalente ou sao recusadas
+    fase9_adv_test.go:82: VEC|C2-priority-ips-malformado|Media|cmd/mcpollama-gateway/config.go:237|OK: 9 formas malformadas recusadas (partida falha)
+    fase9_adv_test.go:104: VEC|C3-hash-password|Media|cmd/mcpollama-gateway/main.go:209|OK: senha so pelo stdin; nao aparece em stdout/stderr (sucesso e 2 erros). Risco residual: o terminal ecoa o que se digita (documentar `read -rs`)
+    fase9_adv_test.go:177: VEC|C4-e2e-sem-segredo|Alta|cmd/mcpollama-gateway/main.go:123|OK: token removido antes do Ollama; prompt/resposta/token ausentes do log --debug, do /monitor e do .db/-wal
+    fase9_adv_test.go:211: VEC|C5-shutdown-sse|Baixa|cmd/mcpollama-gateway/main.go:183|OK: encerrou em 279ms com 1 painel aberto
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	8.559s
+    fase10l_adv_test.go:43: VEC|D2-teto-por-job|Media|gateway/content/content.go:160|OK: prompt 16777218 bytes -> guardado 16777216 truncado=true; resposta 17 MiB -> 16777216 truncada=true resp_bytes=17825792; exatamente 16 MiB -> 16777216
+    fase10l_adv_test.go:79: VEC|D3-teto-total-concorrente|Media|gateway/content/content.go:188|OK: 640 jobs x 16 KiB (10 MiB) num teto de 2 MiB: SUM real 1875968, contador 1875968, eventos 14, jobs mais novos (i=39) presentes 16/16
+    fase10l_adv_test.go:122: VEC|D4-teto-no-caminho-do-pedido|Media|gateway/content/content.go:180|OK: a gravacao que passou do teto (4096000 bytes antes, teto 4194304) levou 5ms (restaram 3387 de 4001 jobs)
+    fase10l_adv_test.go:146: VEC|D5-flush-parcial|Baixa|gateway/content/content.go:322|MEDIDA: custo de 1 flush com a resposta ja em 1 MiB: 8.6ms, 4 MiB: 44.2ms, 16 MiB: 345.9ms
+    fase10l_adv_test.go:153: VEC|P1-permissoes|Media|gateway/content/content.go:89|N/A no Windows (sem bits POSIX); rodar o binario de teste Linux no servidor
+    fase10l_adv_test.go:199: VEC|R1-corrompido-erro|Baixa|gateway/content/content.go:100|OK: Open recusa: content: schema: file is not a database (26)
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	41.545s
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	1.099s
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	1.165s
+    fase10l_adv_test.go:137: VEC|K1-sigkill-no-stream|Alta|gateway/store/jobs.go:94|OK (processo filho morto por TerminateProcess): boot-A->boot-A: interrompido_gateway responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true | boot-A->boot-B: interrompido_reboot responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true
+    fase10l_adv_test.go:326: VEC|E1-eco-log-sentinela|Alta|gateway/proxy/journal.go:50|OK: 7 pedidos (JSON quebrado, modelo proibido, rota bloqueada...) sem eco; log, gw.db e -wal sem o texto; o texto esta so no content.db
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	3.748s
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	1.428s
+    fase105_adv_test.go:105: VEC|M1-drain-sessao-csrf-origem|Media|gateway/monitor/backends.go:17|OK: 10 tentativas sem sessao/CSRF/origem ou com metodo errado e 9 ids maliciosos -> nenhum 200, nada drenado; o caminho valido drena, retoma e audita
+    fase105_adv_test.go:158: VEC|M2-nada-sensivel-no-monitor|Alta|gateway/monitor/monitor.go:359|OK: 6 fontes (state, history, export csv/jsonl, export admin, SSE) sem token, sem caminho do token_file e sem URL; index.html sem sink de HTML e sem CR
+    fase10l_adv_test.go:120: VEC|H1-hash-aberto|Media|gateway/monitor/jobs.go:184|OK: nenhum prompt_sha256 nas rotas GET abertas nem no export sem conteudo
+    fase10l_adv_test.go:147: VEC|H2-tamanho-exato-aberto|Media|gateway/monitor/jobs.go:184|OK: sem sessao os tamanhos saem arredondados a 1 KiB
+    fase10l_adv_test.go:201: VEC|V1-variantes-caminho|Alta|gateway/monitor/monitor.go:221|OK: 29 variantes (caminho, %2F, maiusculas, HEAD, OPTIONS, POST, conteudo duplicado/estranho) sem texto e sem 2xx
+    fase10l_adv_test.go:249: VEC|V2-sse-state-detalhe|Alta|gateway/monitor/monitor.go:349|OK: SSE, /state, /jobs/{id} e erros (id, filtro, formato) sem o texto, com e sem sessao
+    fase10l_adv_test.go:297: VEC|A1-sessao|Alta|gateway/monitor/jobs.go:193|OK: expirada, de outro gateway, apos logout, csrf como cookie e cookie duplicado: todos 401
+    fase10l_adv_test.go:315: VEC|A2-get-cross-site|Baixa|gateway/monitor/jobs.go:193|OK: 403 / 403
+    fase10l_adv_test.go:353: VEC|A3-ids-csrf|Media|gateway/monitor/monitor.go:208|OK: 20.000 ids hex de 128 bits sem repeticao (crypto/rand); POSTs = lista exata (10.L + drain/undrain da 10.4); POST nas rotas de jobs = 405
+    fase10l_adv_test.go:396: VEC|I1-sql-filtros|Baixa|gateway/monitor/jobs.go:114|OK: parametros sempre ligados; status desconhecido ignorado; tabela intacta
+    fase10l_adv_test.go:444: VEC|I2-csv-jsonl|Baixa|gateway/monitor/jobs.go:229|OK: nenhuma celula comeca com = + - @ TAB CR LF; JSONL com 1 objeto por linha
+    fase10l_adv_test.go:466: VEC|I3-xss-estatico|Alta|gateway/monitor/index.html|OK: sem sumidouros de HTML, sem handlers/estilo inline, LF
+    fase9_adv_m8_test.go:44: VEC|M8-stats-sem-cache|Baixa|gateway/monitor/monitor.go:491|OK: 30 GET paralelos -> 1 calculo(s) (7.6127ms)
+    fase9_adv_test.go:68: VEC|M1-login-toctou|Media|gateway/monitor/monitor.go:587|OK: 40 paralelas -> 5 avaliadas; codigos map[401:5 429:35]
+    fase9_adv_test.go:84: VEC|M2-login-bloqueio-global|Media|gateway/monitor/admin.go:226|OK: falhas de outros IPs nao bloqueiam o administrador
+    fase9_adv_test.go:127: VEC|M3-sse-por-ip|Media|gateway/monitor/monitor.go:301|OK: 1 IP limitado a 4 streams; outro IP recebe 200
+    fase9_adv_test.go:161: VEC|M4-xss|Alta|gateway/monitor/monitor.go:191|OK: <, > e & escapados no JSON; nosniff; pagina so textContent; CSP sem unsafe-inline
+    fase9_adv_test.go:203: VEC|M5-csrf|Alta|gateway/monitor/monitor.go:535|OK: sem token=403; token errado=403; Origin null=403; Origin subdominio=403; Origin sufixo=403; Sec-Fetch-Site same-site=403; Sec-Fetch-Site cross-site=403; form text/plain=415; sem cookie=401; Origin ausente, tudo certo=409; Origin igual=409
+    fase9_adv_test.go:223: VEC|M6-fixacao-sessao|Alta|gateway/monitor/monitor.go:606|OK: login sempre gera token novo de 256 bits; o cookie plantado nao vira sessao; HttpOnly+Secure+SameSite=Strict
+    fase9_adv_test.go:245: VEC|M7-exposicao-api|Alta|gateway/monitor/monitor.go:296|OK: nenhuma rota GET anonima devolve cookie, CSRF ou hash; o proxy nunca passa prompt/token ao queue (ver S5 e o teste-sentinela)
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	7.724s
+    fase105_adv_test.go:262: VEC|B1-disjuntor-secundario-preso|Media|gateway/pool/pool.go:318|OK: o disjuntor do secundario fecha depois que a checagem volta e ele recebe o repasse (estado=ok)
+    fase105_adv_test.go:313: VEC|B2-cliente-abre-disjuntor|Alta|gateway/queue/queue.go:652|OK: 25 pedidos hostis (500, 404, run_timeout, keep_alive/num_gpu, corte) e o primario segue fechado/ok; 25 registros
+    fase105_adv_test.go:354: VEC|B3-corte-antes-dos-cabecalhos|Baixa|gateway/proxy/proxy.go:491|OK: corte depois da conexao e neutro (codigos [502 502 502 502]); recusa de conexao x3 abre
+    fase105_adv_test.go:377: VEC|B4-inanicao-histerese|Media|gateway/queue/queue.go:917|OK: sob histerese o primario livre leva os pedidos: [gpu-local gpu-local gpu-local gpu-local]
+    fase105_adv_test.go:403: VEC|B5-flapping|Baixa|gateway/pool/pool.go:686|MEDIDA: 40 checagens alternadas -> disjuntor fechado e 40 eventos backend_down/up (1 por troca; a 5 s isso daria ate 17.280/dia por backend)
+    fase105_adv_test.go:432: VEC|B6-custo-checagem|Baixa|gateway/pool/pool.go:650|MEDIDA: 3 GET por rodada (version+ps+tags); backend mudo: rodada de 400ms com timeout de 200 ms por GET, estado fora
+    fase105_adv_test.go:458: VEC|R1-execucao-repassada|Alta|gateway/queue/queue.go:851|OK: drenar, abrir o disjuntor e sobrecarregar nao movem o pedido que ja comecou
+    fase105_adv_test.go:480: VEC|R2-alta-na-cpu|Media|gateway/pool/pool.go:434|OK: com o primario fora e a cpu listando 'alta', nenhum pedido alta foi para a cpu
+    fase105_adv_test.go:531: VEC|R3-corrida-drenar|Media|gateway/monitor/backends.go:46|OK: 1782 pedidos em 4 goroutines; 0 inicios no drenado depois de SetDrained+Poke (um inicio decidido antes do drenar ainda pode cair nele: e o mesmo que ter comecado um instante antes)
+    fase105_adv_test.go:580: VEC|R4-justica-no-pool|Media|gateway/queue/queue.go:929|OK: a vaga do secundario foi para o IP novo (a justica e a da fila unica); o limite por IP ja e o da fila (TestF8)
+    fase105_adv_test.go:591: VEC|R5-estimativa-tokens|Baixa|gateway/pool/pool.go:62|MEDIDA: 3032 bytes de corpo -> estimativa 1011 tokens; so os 3000 digitos podem dar 3000 tokens (3.0x). Um max_prompt_tokens=1000 da cpu aceita este pedido. Efeito: prefill mais longo na cpu, limitado pelo --run-timeout; decisao do owner (bytes/1 e a cota segura)
+    fase105_adv_test.go:608: VEC|R6-digest-forjado|Info|gateway/pool/pool.go:470|ACEITO (modelo de ameaca): o secundario que declara o digest do primario recebe o repasse (HTTP 200, 1 geracao no secundario). Protecao real = confianca no host do backends.json (root, 0600) + TLS + token proprio
+    fase105_adv_test.go:663: VEC|S1-url-registro|Baixa|gateway/pool/registry.go:214|OK: 21 URLs (userinfo, file:, unix:, gopher:, porta 0/-1/65536/99999, link-local, 0.0.0.0, caminho, query, CRLF) com o resultado esperado
+    fase105_adv_test.go:700: VEC|S2-redirect-secundario|Baixa|gateway/proxy/proxy.go:187|OK: 3xx do secundario vira HTTP 502 sem Location/Set-Cookie; nenhum pedido ao destino do redirect; checagem com 302 -> fora
+    fase105_adv_test.go:726: VEC|S3-registro-trocado|Baixa|gateway/pool/registry.go:305|OK: URL e token lidos uma vez na partida; trocar os arquivos depois nao muda o pool (sem recarga a quente)
+    fase105_adv_test.go:760: VEC|T2-token-ecoado-no-quadro|Baixa|gateway/pool/pool.go:691|OK: o texto livre do secundario (version "Bearerredigidoimgsrcxonerroraler", modelo de 96 bytes) e limitado e o token sai redigido
+    fase105_adv_test.go:815: VEC|T3-token-do-cliente|Alta|gateway/proxy/proxy.go:176|OK: minusculo, duplicado, Proxy-Authorization, Cookie e trailer chunked nunca chegam a backend algum (5 pedidos: 2 no primario, 3 no secundario, todos so com o token proprio); o primario nunca viu o token do secundario
+    fase105_adv_test.go:823: VEC|S4-modo-symlink-dono|Baixa|gateway/pool/registry.go:149|N/A no Windows: rodar no Linux do servidor (pendencia); dono do arquivo nao e conferido (igual ao --admin-file)
+ok  	github.com/cslsoftwares/mcpollama/gateway/pool	2.437s
+    fase9_adv_test.go:60: VEC|P1-x-real-ip|Alta|gateway/proxy/proxy.go:175|OK: 8 casos (forjado de fora, duplicado, lista, mapeado, ::1, zona)
+    fase9_adv_test.go:85: VEC|P2-ipv6-rotacao|Baixa|gateway/proxy/proxy.go:309|OK: o /64 conta como 1 IP; 2 em espera
+    fase9_adv_test.go:152: VEC|P3-smuggling|Alta|gateway/proxy/proxy.go:286|OK: o Ollama so viu /api/generate com o corpo exato (1 vezes); [CL+TE=[200 403] TE chunked,identity=[501] TE duplicado=[501] CL com espaco=[400] TE com espaco=[400] CL negativo=[400] CL+CL=[400]]
+    fase9_adv_test.go:197: VEC|P4-rotas-bloqueadas|Alta|gateway/proxy/proxy.go:261|OK: nenhuma variante chegou ao Ollama; POST /api/pull=403; POST /api/pull/=403; POST //api/pull=404; POST /api/%70ull=403; POST /API/pull=404; POST /v1/../api/pull=307; OPTIONS /api/pull=403; HEAD /api/pull=403; DELETE /api/delete=403; POST /api/blobs/sha256:abc=403; POST /api/tags/../pull=307; POST /api/create%2F=403; OPTIONS /api/generate=405; HEAD /api/generate=405; POST /api/copy?x=1=403; POST /./api/push=307; POST /api/pull%00=404
+    fase9_adv_test.go:226: VEC|P5-contadores-falsos|Baixa|gateway/proxy/proxy.go:508|OK: so a ultima linha conta; texto e tool_call nao enganam (eval=41 pe=44)
+    fase9_adv_test.go:287: VEC|P6-sem-run-timeout|Media|gateway/proxy/proxy.go:340|OK: /api/generate=200 "\"x\",\"done\":false}\n\n{\"error\":\"tempo máximo de execução no servidor esgotado\"}"; /api/chat=504 "{\"error\":\"tempo máximo de execução no servidor esgotado\"}"
+    fase9_adv_test.go:325: VEC|P7-vazamento-slot|Alta|gateway/proxy/proxy.go:328|OK: 0 slots presos; respostas 502/200; registros [erro/upstream_unreachable erro/upstream_dropped cancelado/cancelado]
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	3.629s
+    fase9_adv_test.go:48: VEC|Q1-cancel-x-abandono|Baixa|gateway/queue/queue.go:445|OK: 1 registro cancelado_admin
+    fase9_adv_test.go:95: VEC|Q2-inanicao-baixa|Media|gateway/queue/queue.go:591|OK: baixa envelhecido comecou apesar do fluxo continuo de normal de outro IP
+    fase9_adv_test.go:131: VEC|Q3-desiste-no-escalonamento|Media|gateway/queue/queue.go:680|OK: saiu da fila; slots 1 -> 0; invariantes ok
+    fase9_adv_test.go:208: VEC|Q4-acoes-x-inicio-fim|Alta|gateway/queue/queue.go:738|OK: 1800 pedidos, 1800 registros, 0 slots presos
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	6.428s
+    fase9_adv_test.go:93: VEC|S1-stats-scan|Baixa|gateway/store/store.go:511|OK: Stats usa indice
+    fase9_adv_test.go:143: VEC|S3-eventos-descarte|Baixa|gateway/store/store.go:321|OK: 1 evento(s) em 20 lotes (agregado)
+    fase9_adv_test.go:168: VEC|S4-sqli-history|Alta|gateway/store/store.go:462|OK: filtros parametrizados; 0 linhas e tabela intacta
+    fase9_adv_test.go:238: VEC|S5-sentinela-erros|Alta|gateway/proxy/proxy.go:387|OK: 0 ocorrencias em .db/-wal/-shm; error_class=[upstream_500 stream_error upstream_400]
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	10.534s
+    fase9_adv_test.go:65: VEC|O1-retry-503|Media|ollama/api.go:323|OK: tentativas 503 RA=0=1; 503 RA=-3=1; 503 RA=data HTTP=1; 503 RA=1.5=1; 429 RA=1=1; 502 RA=1=1; 409 generico=1; 409 administrador RA=1=1; 503 RA=1 sempre (embed)=2
+    filetools_docs_test.go:540: VEC|doc/unc-pdf|BLOQUEADO|caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+    filetools_docs_test.go:540: VEC|doc/symlink-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/ads-pdf|BLOQUEADO|caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    filetools_docs_test.go:540: VEC|doc/device-pdf|BLOQUEADO|caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    filetools_docs_test.go:540: VEC|doc/wildcard-pdf|BLOQUEADO|caminho não permitido: caracteres curinga ou inválidos no Windows (< > " | ? *) são recusados
+    filetools_docs_test.go:540: VEC|doc/dotdot|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/secrets-dir|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/ads-abs|BLOQUEADO|caminho não permitido: fluxos NTFS alternativos (arquivo:fluxo) são recusados
+    filetools_docs_test.go:540: VEC|doc/hardlink-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/env-docx|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/device-docx|BLOQUEADO|caminho não permitido: nomes de dispositivo do Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9) são recusados
+    filetools_docs_test.go:540: VEC|doc/trailing-sp-secret|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/junction-outside|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/outside-abs|BLOQUEADO|arquivo não encontrado ou fora das raízes permitidas (--allow-root)
+    filetools_docs_test.go:540: VEC|doc/credentials-docx|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/drive-relative-pdf|BLOQUEADO|caminho não permitido: caminhos relativos à unidade (C:arquivo) são recusados; use um caminho completo
+    filetools_docs_test.go:540: VEC|doc/trailing-dot-secret|BLOQUEADO|acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode ser lido
+    filetools_docs_test.go:540: VEC|doc/verbatim-prefix|BLOQUEADO|caminho não permitido: caminhos UNC (\\servidor\compartilhamento) e os prefixos \\?\ e \\.\ são recusados
+ok  	github.com/cslsoftwares/mcpollama/tools	4.891s
+    fase105_adv_test.go:90: VEC|FB1-fallback-duplica|Baixa|ollama/api.go:323|OK: resposta malformada depois de o primario ler o pedido -> sem fallback (cannot connect); recusa de conexao -> fallback
+    fase105_adv_test.go:136: VEC|FB2-fallback-so-conexao-503|Media|ollama/api.go:392|OK: HTTP 400/401/403/404/409/413/429/500/502/503/504, erro no stream, timeout e corte no meio -> 0 pedidos ao fallback
+    fase105_adv_test.go:177: VEC|FB3-laco-e-tokens|Alta|ollama/client.go:158|OK: 503+503 -> primario 2 (1 nova tentativa), fallback 1, erro server queue full; cada um so com o proprio token; fallback sem token nao recebe Authorization
+    fase105_adv_test.go:193: VEC|FB4-timeout-total|Media|ollama/api.go:115|OK: primario fora + fallback mudo -> 300ms com --timeout 300ms (cannot connect)
+ok  	github.com/cslsoftwares/mcpollama/ollama	2.505s

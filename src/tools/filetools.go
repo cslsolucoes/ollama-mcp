@@ -404,6 +404,9 @@ func (j *fileJob) call(ctx context.Context, prompt string) (string, error) {
 	j.u.total += time.Duration(resp.TotalDuration)
 	j.u.load += time.Duration(resp.LoadDuration)
 	j.u.doneReason = resp.DoneReason
+	if resp.Backend != "" {
+		j.u.backend = resp.Backend // any part served by the fallback marks the result
+	}
 	return resp.Response, nil
 }
 

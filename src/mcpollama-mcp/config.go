@@ -36,10 +36,15 @@ const (
 
 // Config is the resolved server configuration (flag > env > default).
 type Config struct {
-	OllamaURL      string
-	APIKey         string
-	TLSCA          string
-	Insecure       bool
+	OllamaURL string
+	APIKey    string
+	TLSCA     string
+	Insecure  bool
+	// Fallback (Fase 10.4), off by default: tried once when the primary cannot
+	// be reached or answers 503 "queue full". Its token and CA are its own.
+	FallbackURL    string
+	FallbackAPIKey string
+	FallbackTLSCA  string
 	Model          string
 	EmbedModel     string
 	AllowedModels  string // raw list separated by ; or ,; empty means Model and EmbedModel only
@@ -114,6 +119,12 @@ Every flag falls back to its environment variable; the flag wins.
                           process list, prefer the env var         (OLLAMA_API_KEY)
   --tls-ca FILE           extra CA bundle (PEM)                    (OLLAMA_TLS_CA)
   --insecure              skip TLS verification (not recommended)  (OLLAMA_INSECURE)
+  --ollama-url-fallback URL  second server tried ONCE when the primary cannot be
+                          reached or answers 503 "queue full"; the [uso] line then
+                          carries backend=fallback. Off unless set (OLLAMA_HOST_FALLBACK)
+  --fallback-api-key TOKEN   Bearer token of the fallback (never the primary's)
+                                                                   (OLLAMA_FALLBACK_API_KEY)
+  --fallback-tls-ca FILE  extra CA bundle (PEM) of the fallback    (OLLAMA_FALLBACK_TLS_CA)
   --model NAME            generation model, default qwen3-ia       (OLLAMA_MODEL)
   --embed-model NAME      embeddings model, default nomic-embed-text (OLLAMA_EMBED_MODEL)
   --allowed-models LIST   models the tools may use, separated by ; or ,; default is
@@ -165,6 +176,9 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fKey      = fs.String("api-key", "", "")
 		fCA       = fs.String("tls-ca", "", "")
 		fInsecure = fs.Bool("insecure", false, "")
+		fFbURL    = fs.String("ollama-url-fallback", "", "")
+		fFbKey    = fs.String("fallback-api-key", "", "")
+		fFbCA     = fs.String("fallback-tls-ca", "", "")
 		fModel    = fs.String("model", "", "")
 		fEmbed    = fs.String("embed-model", "", "")
 		fAllowed  = fs.String("allowed-models", "", "")
@@ -237,6 +251,9 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		APIKey:         str("api-key", "OLLAMA_API_KEY", "", fKey),
 		TLSCA:          str("tls-ca", "OLLAMA_TLS_CA", "", fCA),
 		Insecure:       boolean("insecure", "OLLAMA_INSECURE", fInsecure),
+		FallbackURL:    str("ollama-url-fallback", "OLLAMA_HOST_FALLBACK", "", fFbURL),
+		FallbackAPIKey: str("fallback-api-key", "OLLAMA_FALLBACK_API_KEY", "", fFbKey),
+		FallbackTLSCA:  str("fallback-tls-ca", "OLLAMA_FALLBACK_TLS_CA", "", fFbCA),
 		Model:          str("model", "OLLAMA_MODEL", defaultModel, fModel),
 		EmbedModel:     str("embed-model", "OLLAMA_EMBED_MODEL", defaultEmbedModel, fEmbed),
 		AllowedModels:  str("allowed-models", "MCPOLLAMA_ALLOWED_MODELS", "", fAllowed),
@@ -330,6 +347,23 @@ func (c Config) validate() error {
 			return errors.New("--ollama-url must be an http(s) URL with a host")
 		}
 	}
+	if c.FallbackURL != "" {
+		u, err := url.Parse(c.FallbackURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return errors.New("--ollama-url-fallback must be an http(s) URL with a host")
+		}
+	} else if c.FallbackAPIKey != "" || c.FallbackTLSCA != "" {
+		return errors.New("--fallback-api-key and --fallback-tls-ca need --ollama-url-fallback")
+	}
+	if c.FallbackTLSCA != "" {
+		pem, err := os.ReadFile(c.FallbackTLSCA)
+		if err != nil {
+			return fmt.Errorf("--fallback-tls-ca: cannot read %s", c.FallbackTLSCA)
+		}
+		if !x509.NewCertPool().AppendCertsFromPEM(pem) {
+			return fmt.Errorf("--fallback-tls-ca: no PEM certificate found in %s", c.FallbackTLSCA)
+		}
+	}
 	if c.TLSCA != "" {
 		pem, err := os.ReadFile(c.TLSCA)
 		if err != nil {
@@ -395,7 +429,13 @@ func (c Config) guardWith(logf func(string, ...any)) (*files.Guard, error) {
 // secrets returns every value that must never reach a log or an error:
 // the token and the credentials embedded in the URL.
 func (c Config) secrets() []string {
-	s := []string{c.APIKey}
+	s := []string{c.APIKey, c.FallbackAPIKey}
+	if u, err := url.Parse(c.FallbackURL); err == nil && u.User != nil {
+		if pw, ok := u.User.Password(); ok {
+			s = append(s, pw)
+		}
+		s = append(s, u.User.Username())
+	}
 	if u, err := url.Parse(c.OllamaURL); err == nil && u.User != nil {
 		if pw, ok := u.User.Password(); ok {
 			s = append(s, pw)
@@ -422,6 +462,9 @@ func (c Config) ollamaOptions() ollama.Options {
 		APIKey:         c.APIKey,
 		TLSCA:          c.TLSCA,
 		Insecure:       c.Insecure,
+		FallbackURL:    c.FallbackURL,
+		FallbackAPIKey: c.FallbackAPIKey,
+		FallbackTLSCA:  c.FallbackTLSCA,
 		Model:          c.Model,
 		EmbedModel:     c.EmbedModel,
 		Timeout:        c.Timeout,

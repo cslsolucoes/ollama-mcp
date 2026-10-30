@@ -1,0 +1,28 @@
+== go build ./...
+ok
+== go vet ./...
+ok
+== gofmt -l .
+(fim gofmt)
+== go test -count=1 ./...
+ok  	github.com/cslsoftwares/mcpollama/cmd/bakeoff	0.115s
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.079s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	5.604s
+ok  	github.com/cslsoftwares/mcpollama/doctext	18.128s
+ok  	github.com/cslsoftwares/mcpollama/files	1.301s
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	2.053s
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	1.330s
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	1.289s
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	2.330s
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	1.419s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	3.063s
+ok  	github.com/cslsoftwares/mcpollama/gateway/pool	0.791s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	1.929s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	4.864s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	2.347s
+?   	github.com/cslsoftwares/mcpollama/mcp	[no test files]
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.909s
+ok  	github.com/cslsoftwares/mcpollama/ocr	13.256s
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.879s
+ok  	github.com/cslsoftwares/mcpollama/redact	0.060s
+ok  	github.com/cslsoftwares/mcpollama/tools	3.924s

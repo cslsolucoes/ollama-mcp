@@ -26,6 +26,7 @@ e da revisão adversarial da Fase 9. Onde o plano e o código divergem, vale o c
 13. [Limites e futuro](#13-limites-e-futuro)
 14. [Referências](#14-referências)
 15. [Notas de conferência](#15-notas-de-conferência)
+16. [Pool de backends e secundário (Fase 10.4)](#16-pool-de-backends-e-secundário-fase-104)
 
 ---
 
@@ -235,7 +236,7 @@ Voltar ao binário anterior: `systemctl stop mcpollama-gateway; install -m 0755 
 
 Cada flag tem uma variável de ambiente `MCPGW_*`. **Ordem: flag > variável de ambiente > padrão.** Booleanos de
 ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é verdadeiro. Durações aceitam `300ms`, `10m`,
-`2160h`. Fonte: `src/cmd/mcpollama-gateway/config.go` (31 flags). **A unit de produção** é `mcpollama-gateway.service`.
+`2160h`. Fonte: `src/cmd/mcpollama-gateway/config.go` (38 flags). **A unit de produção** é `mcpollama-gateway.service`.
 
 > Na unit, as flags vão em `ExecStart`. Como a flag vence a variável de ambiente, definir `Environment=MCPGW_X=...`
 > **não** muda uma flag que já está no `ExecStart`.
@@ -280,13 +281,20 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--retention-content D` | `MCPGW_RETENTION_CONTENT` | `168h` (7 dias) | Quanto tempo fica o texto dos jobs (os metadados seguem com `--retention-requests`, 90 dias) | padrão |
 | `--retention-job-gpu D` | `MCPGW_RETENTION_JOB_GPU` | `168h` (7 dias) | Quanto tempo fica o extrato de GPU segundo a segundo de cada job (`job_gpu_samples`) | padrão |
 | `--monitor-keep-done D` | `MCPGW_MONITOR_KEEP_DONE` | `5m` | Quanto tempo um pedido concluído continua **visível** no `/monitor` ("Concluídos nos últimos 5 min"). Só exibição: não ocupa vaga nem entra nos limites. `0` esconde a lista | padrão |
+| `--backends FILE` | `MCPGW_BACKENDS` | vazio | **Pool de backends (10.4).** JSON dos Ollamas **secundários**, modo **`0600`** (senão a partida é recusada, código 2, como o `--admin-file`). Formato e regras na seção 16. **Sem ele o pool é um só backend, `gpu-local` = `--ollama`, e o gateway se comporta como antes** | não usado (sem secundário) |
+| `--overload-wait D` | `MCPGW_OVERLOAD_WAIT` | `1m` | **S1**: o primário está sobrecarregado quando a espera estimada de um pedido novo passa disso (EWMA da duração de uma geração × lugares à frente ÷ slots). Só age com secundário | padrão |
+| `--overload-queue N` | `MCPGW_OVERLOAD_QUEUE` | `0` (= 75% de `--queue-max`) | **S2**: sobrecarga quando MAIS de N pedidos de geração esperam. Não pode passar de `--queue-max` | padrão |
+| `--overload-hold D` | `MCPGW_OVERLOAD_HOLD` | `30s` | Histerese: o primário só retoma o trabalho depois de a carga ficar abaixo de **50%** dos dois limites, e o primário saudável, por esse tempo | padrão |
+| `--health-interval D` | `MCPGW_HEALTH_INTERVAL` | `5s` | Checagem ativa de cada backend: `/api/version`, `/api/ps` (modelo residente, saiu de 100% GPU?) e `/api/tags` (digests). Também é a leitura do quadro "Modelos" | padrão |
+| `--breaker-failures N` | `MCPGW_BREAKER_FAILURES` | `3` | Falhas seguidas (ativas ou passivas) que abrem o disjuntor de um backend | padrão |
+| `--breaker-open D` | `MCPGW_BREAKER_OPEN` | `30s` | Quanto tempo o disjuntor fica aberto; depois fica meio-aberto e deixa passar **um** pedido de prova | padrão |
 | `--non-loopback-listen` | `MCPGW_NON_LOOPBACK_LISTEN` | `false` | Permite `--listen` fora do loopback (não recomendado) | não usado |
 | `--debug` | `MCPGW_DEBUG` | `false` | Uma linha de log por pedido (`req <id> <faixa> <rota> status=... class=... wait_ms=...`), nunca com texto | não usado |
 | `--version` | (sem env) | — | Imprime a versão e sai | — |
 
 **Validações da partida** (erro = sair com código 2): slots, `--queue-*` e `--labels-per-ip` ≥ 1; durações > 0
 (`--start-stagger` e `--gpu-interval` podem ser 0); `--sample-store-interval` > 0 e >= `--gpu-interval`; `--max-body-bytes` > 0; retenções > 0 e `--max-request-rows` ≥ 1000;
-`--listen` no loopback; `--db` não vazio; com `--log-content`: `--content-db` diferente de `--db`, `--content-max-bytes` ≥ 1 MiB, `--content-max-job-bytes` ≥ 1024 e ≤ o teto total; `--retention-content` e `--retention-job-gpu` > 0; `--monitor-keep-done` ≥ 0; `--admin-file` com permissão `0600` (ver Nota N1).
+`--listen` no loopback; `--db` não vazio; com `--log-content`: `--content-db` diferente de `--db`, `--content-max-bytes` ≥ 1 MiB, `--content-max-job-bytes` ≥ 1024 e ≤ o teto total; `--retention-content` e `--retention-job-gpu` > 0; `--monitor-keep-done` ≥ 0; `--admin-file` com permissão `0600` (ver Nota N1). pool: `--overload-wait`, `--overload-hold`, `--health-interval`, `--breaker-open` > 0, `--breaker-failures` ≥ 1, `--overload-queue` ≥ 0 e ≤ `--queue-max`; `--backends` legível, `0600` e válido (ver seção 16).
 
 **Subcomando:** `mcpollama-gateway hash-password [-user NOME] [-iterations N]` lê a senha do **stdin** (primeira linha,
 mínimo 8 caracteres no código; o script de senha exige 12) e imprime `usuario:pbkdf2-sha256$600000$<sal>$<hash>`.
@@ -336,6 +344,7 @@ Rótulo válido: `^[A-Za-z0-9._:/@+-]{1,64}$`; fora disso vira `invalido`; vazio
 | Administrador **cancelou** em execução | antes dos headers: **409** `cancelado pelo administrador`; no meio do stream: linha final `{"error":"cancelado pelo administrador"}` | registrado `cancelado_admin` |
 | Cliente desistiu (fechou a conexão) | nada (ninguém para ler); sai da fila | registrado `cancelado` / `client_gone`, HTTP 499 no registro |
 | Ollama fora ou conexão recusada | **502** `Ollama indisponível` (sem `Retry-After`) | `upstream_unreachable` |
+| Um **secundário** (pool, 10.4) respondeu com redirecionamento (3xx) | **502** `Ollama indisponível`; o `Location` e o `Set-Cookie` do secundário não chegam ao cliente | `upstream_redirect` (revisão 10.5) |
 
 **Escalonamento de partida** (`--start-stagger`, 300 ms): entre o início de duas gerações passam no mínimo 300 ms. Com 1
 slot de geração o efeito é pequeno; vale para quando houver mais slots (os prefills não começam no mesmo milissegundo, o
@@ -452,6 +461,7 @@ Windows; o Firefox tem loja própria (importe lá ou ative `security.enterprise_
 | Cartões | Em execução; Na fila; Concluídos hoje (status `ok` desde 00:00 do servidor); Erros hoje (status `erro`); Espera p50 e p95 (15 min); **Tokens/s** (tokens gerados nos últimos 15 min ÷ 900 s, é média e não instantâneo); Pedidos/min (15 min) |
 | Em execução | Faixa, id (8 caracteres), cliente (passe o mouse: IP + rótulo), tool, modelo, raciocínio, prioridade concedida, rodando há, esperou; botão **Cancelar** (logado) |
 | Fila de espera | Posição (a ordem em que vão começar, simulada), faixa, id, cliente, tool, modelo, raciocínio, prioridade atual (já com envelhecimento), esperando há; botões **▲ ▼ ✕** (logado) |
+| **Backends** (10.4) | Uma linha por backend do pool (o primário `gpu-local` e os secundários): **id**, **tipo** (`gpu`, `cpu`, `remoto`), **estado** (`ok`, `sobrecarregado` (primário), `disjuntor aberto`, `fora`, `degradado` (modelo fora de 100% GPU), `drenado`), **disjuntor** (fechado, aberto, meio-aberto), **slots usados** e livres, **fila** (esperando que esse backend poderia pegar; no primário são todos), **p50** da duração das gerações, **modelo · digest · onde está**, **último erro** (passe o mouse) e, logado, o botão **Drenar / Retomar**. Sem `--backends` há uma linha só |
 | GPUs | Por GPU: potência em uso **e o limite aplicado** ("71 W / 100 W"; é o `enforced.power.limit`, o power cap que o `nvidia-powercap.service` aplica), uma barra fina com a fração do limite usada (cor de aviso acima de **90%** do limite; o teto da placa, `power.max_limit`, aparece ao passar o mouse na barra), memória (MiB), uso (%), temperatura; linha `AER 00:1b.4 (corrigíveis): N`; "registros descartados: N" se o buffer do banco encheu. Se o driver não informa o limite, mostra só os W |
 | CPU / RAM | Logo abaixo das GPUs, no mesmo visual de cartões. **CPU**: uso total (%, pelo delta de `/proc/stat` entre duas amostras; a primeira amostra após a partida mostra `-`), frequência média (GHz) e temperatura do pacote (°C, hwmon `coretemp` "Package id 0", ou a zona térmica `x86_pkg_temp`). **Carga** 1/5/15 min. **RAM**: usada/total em GB, % e "Ollama: X GB" (soma do `VmRSS` dos processos de nome `ollama`). **Swap**: usado/total. Abaixo, **uma barra por thread** (T0..T11), agrupadas por núcleo físico ("Núcleo 0: T0 T6 · 45 °C"; o núcleo vem de `topology/core_id`, a temperatura de `coretemp` "Core N"). Rodapé: "potência da CPU: indisponível (só root)" quando o RAPL não é legível (no servidor, `/sys/class/powercap/intel-rapl*/energy_uj` é `root 0400`; o gateway roda como `mcpgw` e **não** abre essa permissão). Qualquer leitura que falhe vira `-` e um texto curto de erro no rodapé; o gateway nunca para por isso |
 | Modelos | Duas tabelas. **Carregados (VRAM)**, do `/api/ps` do Ollama: nome, VRAM em GB, GPU/CPU (`100% GPU`, ou o split `70%/30% CPU/GPU` calculado de `size_vram`/`size`), contexto, quando expira e se é permitido. **Disponíveis (instalados)**, do `/api/tags`: nome, tamanho, parâmetros, quantização, família e "permitido" sim/não (o mesmo critério do `--allowed-models`; sem a lista, tudo é permitido). A legenda lista os permitidos e explica que os nomes com o sufixo de `--think-suffix` são **virtuais**: `qwen3-ia-think` liga o raciocínio de `qwen3-ia`, e o gateway tira o sufixo. O gateway consulta o próprio Ollama (`--ollama`, loopback, direto, fora da fila) **a cada 5 s**, uma consulta de cada vez; a página só lê o cache, então abrir 30 painéis não gera nenhuma consulta a mais. Se o Ollama não responde, a lista fica vazia e o rodapé mostra um erro curto (`ps: ...` / `tags: ...`). Cada carga ou descarga de modelo vira um evento `modelo_carregado` / `modelo_descarregado` (a primeira leitura depois da partida não gera evento, e um erro de consulta não conta como descarga) |
@@ -473,6 +483,7 @@ do quadro de cartões.
 | **▼ Despromover** | pedido esperando | Desce um nível; já em `baixa`: vai ao **fim** da faixa | nada; começa depois |
 | **✕ Remover** | pedido esperando | Tira da fila (pede confirmação e motivo opcional) | **409** `removido da fila pelo administrador`; o mcpollama não repete |
 | **Cancelar** | pedido em execução | Fecha a conexão com o Ollama e libera o slot na hora (confirmação e motivo) | **409** `cancelado pelo administrador` (ou, se já transmitia, linha final de erro no stream) |
+| **Drenar / Retomar** (10.4) | backend, quadro Backends | O backend **não recebe pedidos novos**; o que está rodando termina. Serve para manutenção. Drenar o primário manda o trabalho ao secundário elegível (se não houver, espera). **Retomar** desfaz. Pede confirmação e motivo opcional; vai para a auditoria (`drain` / `undrain`, `request_id` = id do backend) | nada; o pedido espera ou roda em outro backend |
 
 Ação sobre um pedido que já saiu da fila (começou, terminou ou o cliente desistiu): a página mostra
 `não está mais na fila` / `não está mais em execução` (**409**). Toda ação válida grava na **auditoria**: data/hora,
@@ -520,7 +531,7 @@ diferentes) dá 403.
 | Método | Rota | Parâmetros | Resposta (resumo) |
 | --- | --- | --- | --- |
 | GET | `/monitor` e `/monitor/` | — | A página HTML (CSP restritiva, `no-store`) |
-| GET | `/api/state` | — | Foto: `{now, version, boot_id, uptime_s, queue:{running[], waiting[], slots, in_use, totals}, gpu:{samples[], aer_corr_1b4, error?}, cards, recent[], events[], jobs[] (log de jobs, até 200), recent_done[] (terminaram nos últimos `keep_done_ms`), keep_done_ms, content_enabled, dropped, admin_enabled}` |
+| GET | `/api/state` | — | Foto: `{now, version, boot_id, uptime_s, queue:{running[], waiting[], slots, in_use, totals}, gpu:{samples[], aer_corr_1b4, error?}, cards, recent[], events[], jobs[] (log de jobs, até 200), recent_done[] (terminaram nos últimos `keep_done_ms`), keep_done_ms, content_enabled, dropped, admin_enabled, backends[] (10.4: o quadro Backends, uma linha por backend: id, type, primary, host, state, breaker, drained, slots, used, free, queue, p50_ms, model, digest, processor, last_error, last_check, version, order, rules)}` |
 | GET | `/api/jobs` | `desde`, `ate` (RFC 3339 ou epoch ms), `status` (lista separada por vírgula), `cliente` (exato), `limite` (padrão 200, máx. 1000), `offset` | **Log de jobs** (Fase 10.L): `{rows:[{...campos de /history..., responded, resp_bytes, backend, peak_power_w, peak_clock_mhz, samples}]}`, mais novo primeiro, **inclui `na_fila` e `em_execucao`**. Só metadados. Cache de 1 s |
 | GET | `/api/jobs/{id}` | — | `{job, samples:[{ts, job_id, gpu, power_w, power_limit_w, clock_mhz, util_pct, mem_used_mib, temp_c}], content_enabled}`. O extrato tem 1 linha por GPU por segundo (`gpu` = -1 é a linha da CPU). **Sem o texto.** Só com a sessão do administrador (e pedido do próprio site) vem também `content:{prompt_bytes, resp_bytes, prompt_sha256, truncado, resp_final, stored_bytes}`: o hash e os tamanhos exatos permitiriam confirmar que um documento conhecido foi enviado (revisão 10.L) |
 | GET | `/api/jobs/{id}/content` | — | **Só administrador logado** (cookie de sessão; sem sessão = **401**; pedido de outro site, `Sec-Fetch-Site` cross-site/same-site ou `Origin` alheio = **403**): `{prompt, response, prompt_bytes, resp_bytes, prompt_sha256, prompt_truncated, resp_truncated, truncado, resp_final, created_at, updated_at}`. `resp_final=false` = resposta parcial (em andamento ou job interrompido). 404 se o texto não existe (apagado) ou `--log-content=false` |
@@ -537,6 +548,8 @@ diferentes) dá 403.
 | POST | `/api/queue/{id}/demote` | idem | idem |
 | POST | `/api/queue/{id}/remove` | idem | idem (o cliente recebe 409) |
 | POST | `/api/running/{id}/cancel` | idem | idem; 409 `não está mais em execução` |
+| POST | `/api/backends/{id}/drain` | `{"reason":"..."}` opcional | **10.4.** Drena o backend `{id}` (o id do `backends.json`, ou `gpu-local`): não recebe pedidos novos, o que roda termina. 200 `{ok, acao, id, antes, depois}`; **409** se já está drenado; **404** backend desconhecido; 400 id inválido; 401/403 como as outras ações |
+| POST | `/api/backends/{id}/undrain` | idem | **10.4.** Retoma o backend. 409 se já está ativo |
 
 O `{id}` são 32 caracteres hexadecimais (o `id` completo de `/state`, não os 8 da página). Outros códigos das ações:
 400 id inválido, 401 sem sessão, 403 CSRF/origem, 503 sem `--admin-file`.
@@ -590,6 +603,7 @@ assíncrona e em lote (nunca atrasa a fila); se o buffer de 4096 itens enche, o 
 | `audit` | `id`, `ts`, `usuario`, `ip`, `acao`, `request_id`, `antes`, `depois`, `motivo` |
 | `gpu_samples` | `ts`, `gpu`, `bus_id`, `power_w`, `mem_used_mib`, `util_pct`, `temp_c`, `aer_corr_1b4`, `boot_id`, `clock_mhz` (clock gráfico; NULL nas linhas anteriores à 10.L), `power_limit_w` (limite aplicado em W; `NULL` nas linhas antigas, gravadas antes do campo existir; -1 = o driver não informou) |
 | `cpu_samples` | `ts`, `util_pct`, `load1`, `load5`, `load15`, `ram_total_mib`, `ram_used_mib`, `ram_avail_mib`, `swap_used_mib`, `swap_total_mib`, `temp_c`, `freq_mhz`, `ollama_rss_mib`, `power_w`, `boot_id`, `threads_json` (índice em `ts`). -1 = não legível. `threads_json` é o detalhe por thread, curto: `{"t":[[id,uso_%,core_id],...],"c":[[core_id,temp_c],...]}` |
+| `backend_samples` (**10.4**) | `ts`, `backend_id`, `estado` (`ok`, `sobrecarregado`, `disjuntor_aberto`, `fora`, `degradado`, `drenado`), `slots_usados`, `fila`, `p50_ms`. Uma linha por backend a cada `--sample-store-interval`. Índice em `ts`. Só ids, estados e contadores: **nunca** URL nem token |
 | `events` | `ts`, `kind`, `detail` |
 | `meta` | `k`, `v` (`boot_id`, `last_prune`, `last_vacuum`) |
 
@@ -605,11 +619,13 @@ rejeitados `fila cheia` ou `limite de pedidos em espera deste cliente`. `think`:
 | `requests` | 90 dias (`--retention-requests`) **e** teto de 3.000.000 linhas (`--max-request-rows`), as mais antigas saem primeiro (evento `teto_pedidos`) |
 | `job_gpu_samples` | 7 dias (`--retention-job-gpu`) |
 | `job_content` (`content.db`) | 7 dias (`--retention-content`) **e** teto total de 2 GiB (`--content-max-bytes`): passou, apaga os jobs mais antigos até 90% (em segundo plano, em transações de 500 jobs: o pedido que passou do teto não espera) e grava o evento `teto_conteudo`. Se o apagamento falha (disco cheio, banco travado ou corrompido), grava `teto_conteudo_falhou` (no máximo 1 por minuto) e só tenta de novo depois de 1 min; 16 MiB por parte (`--content-max-job-bytes`), cortado com `truncado=sim`. Hora em hora; o arquivo devolve as páginas livres ao disco (`auto_vacuum` incremental), mas pode ficar um pouco maior que o total lógico |
-| `gpu_samples` e `cpu_samples` | 7 dias (`--retention-gpu`); gravam 1 linha a cada `--sample-store-interval` (5 s), não a cada coleta |
+| `gpu_samples`, `cpu_samples` e `backend_samples` (10.4) | 7 dias (`--retention-gpu`); gravam 1 linha a cada `--sample-store-interval` (5 s), não a cada coleta |
 | `audit` e `events` | **nunca expiram** |
 | `VACUUM` | semanal |
 
 **Migração (10.L):** a abertura também acrescenta `requests.responded`, `requests.resp_bytes`, `requests.backend`, `gpu_samples.clock_mhz` e cria `job_gpu_samples`, cada passo só se faltar (rodar duas vezes não muda nada). A ordem de gravação mudou: o registro do pedido passa a existir **desde a entrada na fila** e o fim vira um `UPSERT` (a linha e o `rowid` são os mesmos). Voltar a um binário antigo: ele ignora as colunas novas, mas **não** conhece os estados `na_fila`/`em_execucao`/`interrompido_*`.
+
+**Migração (10.4):** a abertura acrescenta `requests.failover_rule` (a regra que mandou o job a um secundário: `F2:S1`, `F2:S2`, `F2:S3`, `F2:S1+S2`, `F2:hist`; vazio = rodou no primário) e cria `backend_samples`, cada passo só se faltar (idempotente, testado com 3 aberturas seguidas). `requests.backend` (da 10.L) passa a trazer o id real do backend onde o job rodou (`gpu-local` ou o id do `backends.json`); o `Started` do log de jobs grava o backend do ticket, e o `Finish` repete (o UPSERT mantém o valor gravado no início).
 
 **Migração (anterior):** ao abrir um banco antigo, o gateway cria `cpu_samples` e acrescenta `gpu_samples.power_limit_w` (`ALTER TABLE ... ADD COLUMN`), cada passo só se faltar; abrir de novo não muda nada, e os dados existentes ficam intactos. Para voltar a um binário antigo basta ignorar a tabela e a coluna novas (o binário antigo não as lê).
 
@@ -850,14 +866,14 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje** tem 2 faixas (geração e embedding), todas na **GPU**, para **um** Ollama (`127.0.0.1:11434`). Não faz
+**O gateway de hoje** tem 2 faixas (geração e embedding), todas na **GPU**, para **um** Ollama (`127.0.0.1:11434`). Não faz **Desde a 10.4**, com `--backends`, repassa o trabalho que ainda não começou a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (seção 16); a faixa CPU local foi **descartada** (D9-C1: o saldo de vazão era ~0).
 roteamento por prioridade entre GPU e CPU, nem repasse a outro servidor.
 
 **PLANEJADO e NÃO implementado** (plano, §11 e §11.9; começa depois do aceite 9.7; nenhuma flag abaixo existe no
 `config.go`):
 
 - **Faixa CPU/RAM** (uma segunda instância `ollama-cpu` e roteamento por pedido): regras R1–R9 (embedding na CPU se aprovado; `alta` sempre GPU; `baixa` na CPU se o tempo estimado couber; `normal` transborda se a espera na GPU passar de 60 s; roubo de trabalho da fila da CPU pela GPU; CPU fora do ar = tudo na GPU), header `X-Mcpollama-Lane`, headers de resposta `X-Lane` e `X-Routing-Reason`, ações do monitor "mover para GPU/CPU".
-- **Pool de backends / repasse a um Ollama secundário** na LAN em caso de sobrecarga (`--backends` com JSON de backends, gatilhos `--overload-wait` e `--overload-queue`, Bearer próprio de cada secundário).
+- ~~Pool de backends / repasse a um Ollama secundário~~ **implementado na 10.4** (seção 16); falta só ter um secundário de verdade (10.S) e a revisão adversarial (10.5). `--overload-wait` e `--overload-queue` existem, com os padrões abaixo.
 - Etapas 9.9 a 9.16 do plano (medições antes de ligar qualquer coisa).
 
 Hoje, para aguentar mais carga, os únicos botões são `--gen-slots` (inútil enquanto o Ollama atende 1 pedido por vez) e
@@ -905,3 +921,189 @@ Divergências entre fontes, resolvidas a favor do **código** (e dos scripts com
 | N14 | O mcpollama envia só `X-Mcpollama-Client` e `X-Mcpollama-Tool` (conferido em `src/ollama/api.go`); `X-Mcpollama-Priority` e `X-Mcpollama-Think` não são enviados por ele. | Usados por `curl`/scripts; o mcpollama usa os padrões do gateway. |
 | N15 | O `stage2.sh` espera `pull: 403` e `sem token: 401` pelo nginx; isso decorre do `location ~ ^/api/(pull...)` (403 antes da autenticação) e do `location /` (401 sem Bearer). | Confirmado no `ollama.conf`. |
 | N16 | Os limites de SSE (4 por IP, 32 total) e de login (5, 15 min, 24 h, 2 verificações) são **constantes** do código, sem flag. | Mudar exige novo binário. |
+
+
+---
+
+## 16. Pool de backends e secundário (Fase 10.4)
+
+**Em uma frase.** O gateway continua com **uma fila só**; cada geração que **ainda não começou** pode rodar no **primário**
+(`gpu-local` = `--ollama`) ou, se o primário estiver sobrecarregado ou doente, num **Ollama secundário** da LAN que serve o
+**mesmo modelo com o mesmo digest**. Nada muda de lugar depois que o pedido começa.
+
+**Sem `--backends` o pool é um backend só (`gpu-local`) e tudo se comporta como antes da 10.4.** O monitor mostra uma linha
+no quadro Backends e o log de jobs diz `gpu-local`. Isso é verificado por teste (a estrutura implícita e um pool explícito de 1
+produzem a mesma fila passo a passo; e a suíte antiga da fila, do proxy, do monitor e do log de jobs roda sem alteração).
+
+### 16.1 O arquivo `backends.json`
+
+Passado em `--backends` (ou `MCPGW_BACKENDS`). **Modo `0600`** (dono `mcpgw`); com `0640`/`0644` a partida é **recusada** (código
+2). É lido **só na partida**: para mudar, edite e reinicie o gateway. **É a única fonte das URLs**: nenhum pedido, cabeçalho
+ou ação do monitor pode criar ou mudar um backend (nada de SSRF pelo cliente). Aceita no máximo 8 backends.
+
+```json
+{
+  "backends": [
+    {
+      "id": "sec-4x2060",
+      "url": "https://10.100.2.60:8443",
+      "tipo": "remoto",
+      "token_file": "/etc/mcpollama-gateway/sec-4x2060.token",
+      "tls_ca": "/etc/mcpollama-gateway/cloudflare-origin-ca.pem",
+      "slots": 2,
+      "modelos": ["qwen3-ia"],
+      "classes": ["alta", "normal", "baixa"],
+      "max_prompt_tokens": 16000,
+      "ordem": 1
+    }
+  ]
+}
+```
+
+| Campo | Obrigatório | O que é |
+| --- | --- | --- |
+| `id` | sim | `a-z 0-9 . _ -`, até 32, único. **`gpu-local` é reservado** (o primário). Aparece no monitor, no SQLite e nos eventos |
+| `url` | sim | `http(s)://host[:porta]`, sem usuário, caminho, query nem fragmento; porta entre 1 e 65535 (revisão 10.5). Recusados: esquemas que não sejam http/https, `0.0.0.0` e endereços de link-local/multicast (onde moram os serviços de metadados de nuvem). O arquivo é lido **uma vez**, na partida: trocá-lo depois não muda nada até reiniciar |
+| `tipo` | sim | `gpu`, `cpu` ou `remoto`. Entra nas regras: **`alta` nunca vai para `cpu`**, e `cpu` aceita por padrão só `normal` e `baixa` |
+| `token_file` | não | Arquivo (modo `0600`) com o **Bearer próprio do secundário**, uma linha, ASCII visível. Só com `https://` (ou loopback): o token não vai em texto puro pela rede. **Nunca** aparece em log, evento, banco, monitor ou erro; se o secundário o ecoar numa resposta (versão, nome do modelo), o gateway o troca por `[redigido]` antes do monitor (revisão 10.5). O modo e o "arquivo comum" são conferidos de novo no arquivo **aberto** (um arquivo trocado entre a checagem e a leitura é recusado). O **dono** do arquivo não é conferido (igual ao `--admin-file`) |
+| `tls_ca` | não | PEM da CA do secundário (só com `https://`). Usa o pool do sistema **mais** essa CA (o mesmo código do cliente mcpollama) |
+| `slots` | não (1) | Gerações simultâneas nesse backend (1 a 64) |
+| `modelos` | não | Modelos que ele serve (`:latest` é ignorado). Vazio = qualquer modelo cujo digest bata com o do primário |
+| `classes` | não | Prioridades aceitas (`alta`, `normal`, `baixa`). Vazio = todas (`gpu`/`remoto`) ou `normal`+`baixa` (`cpu`) |
+| `max_prompt_tokens` | não (sem limite) | Teto do prompt nesse backend. O gateway **estima** os tokens como `bytes do corpo ÷ 3` (pessimista para português) |
+| `ordem` | não (0) | Preferência no repasse: menor primeiro; empate pelo `id` |
+
+### 16.2 Como acrescentar um secundário
+
+1. **No secundário:** instale o Ollama e traga **o mesmo modelo, com o mesmo digest** do primário
+   (`ollama pull`/cópia do mesmo blob). Compare: `curl -s http://127.0.0.1:11434/api/tags | python3 -m json.tool | grep -A3 qwen3-ia`
+   nos dois; o campo `digest` tem de ser **igual**. Digest diferente = o secundário **nunca** recebe o modelo (regra F4),
+   mesmo que o nome seja igual.
+2. **Rede e TLS:** o secundário só na LAN da CSL, atrás de nginx com TLS e Bearer (como o primário). Pegue a CA (PEM) se o
+   certificado não for de uma CA do sistema.
+3. **No servidor do gateway (root):**
+   ```bash
+   install -d -m 0750 -o root -g mcpgw /etc/mcpollama-gateway
+   printf '%s\n' '<TOKEN DO SECUNDARIO>' | install -m 0600 -o mcpgw -g mcpgw /dev/stdin /etc/mcpollama-gateway/sec-4x2060.token
+   install -m 0600 -o mcpgw -g mcpgw /dev/null /etc/mcpollama-gateway/backends.json
+   nano /etc/mcpollama-gateway/backends.json        # o JSON da seção 16.1
+   ```
+   Modo e dono: **`mcpgw:mcpgw 0600`** nos dois arquivos (o gateway roda como `mcpgw`).
+4. **Na unit:** acrescente `--backends /etc/mcpollama-gateway/backends.json` ao `ExecStart` (ou
+   `Environment=MCPGW_BACKENDS=...`, se a flag não estiver no `ExecStart`), `systemctl daemon-reload` e
+   `systemctl restart mcpollama-gateway`. O fila é esvaziada no reinício (aviso aos clientes).
+5. **Conferir:** `journalctl -u mcpollama-gateway -n 20` deve dizer `backend secundário sec-4x2060 (remoto) em <host>, 2 slot(s), com token próprio`;
+   o `/monitor` mostra o quadro **Backends** com duas linhas e o digest do modelo nas duas. Se a linha do secundário estiver em
+   `fora`, veja o "Último erro" (passe o mouse).
+6. **Teste sem risco:** **Drene** o primário no monitor (logado) e mande um pedido: ele deve rodar no secundário
+   (`backend=sec-4x2060`, `failover_rule=F2:S3`, no log de jobs). **Retome** o primário em seguida.
+7. **Rollback:** tire a flag do `ExecStart` e reinicie: volta ao `gpu-local` só. Nada no banco precisa ser desfeito.
+
+### 16.3 Saúde e disjuntor
+
+- **Checagem ativa** a cada `--health-interval` (5 s): `GET /api/ps` e `/api/tags` (sempre: no primário essa leitura é também
+  o quadro **Modelos**, que mostra o erro com o Ollama fora) e, se elas responderem, `/api/version` (revisão 10.5, N1). Um
+  backend mudo custa 2 × 3 s por rodada. Registra a versão, o
+  modelo **residente**, **onde** ele está (`100% GPU` ou dividido com a CPU) e os digests. Um backend `gpu`/`remoto` com o modelo
+  fora de 100% GPU fica `degradado` (e, no primário, conta como S3). *Modelo não residente não é falha*: o Ollama descarrega
+  por ociosidade e a carga a frio (16 a 22 s) é normal; só aparece como informação.
+- **Checagem passiva (revisão de segurança, MEDIUM):** o resultado de cada pedido. Conta como falha **só** a falha de
+  **conexão com o backend** (`upstream_unreachable`: recusa, dial, TLS; o proxy nunca a grava quando foi o cliente que desistiu).
+  **5xx, conexão cortada (`upstream_dropped`), timeout, erro no meio do stream, 4xx e desistência do cliente são NEUTROS**:
+  dependem do pedido ou do cliente (um pedido malformado faz o Ollama devolver 500; um cliente pode derrubar a própria
+  conexão), e se contassem **um cliente abriria o disjuntor do primário para todos e forçaria o repasse** (DoS). **Revisão
+  10.5:** um erro do proxy **depois** de a conexão ser feita (o backend fecha antes de responder) também é neutro, porque um
+  corpo de pedido pode provocá-lo; o registro continua `upstream_unreachable`. Um **3xx** de um secundário vira **502
+  `upstream_redirect`** (neutro), sem `Location` nem `Set-Cookie` para o cliente. Quem abre o
+  disjuntor é o que nenhum cliente controla: a falha de conexão e a **checagem ativa**. Testado: 50 pedidos de um cliente que geram 500
+  e 100 desistências no meio do stream deixam o disjuntor **fechado**; 3 recusas de conexão ou 3 checagens ativas falhas abrem.
+- **Disjuntor** (por backend): `--breaker-failures` (3) falhas seguidas, ativas ou passivas → **aberto** por `--breaker-open`
+  (30 s; o backend não recebe início nenhum) → **meio-aberto**: deixa passar **um** pedido de prova; se der certo, **fechado**;
+  se falhar, aberto de novo. **A checagem ativa que dá certo depois do tempo aberto também fecha** (revisão 10.5, B1: sem isso
+  um secundário meio-aberto, que não é elegível, nunca recebia a prova e ficava fora do pool até reiniciar). Sucesso de um
+  pedido zera a contagem. Eventos `breaker_open` e `breaker_close`.
+- Eventos `backend_down` (a checagem ativa falhou) e `backend_up` (voltou).
+- Com **só o primário** (sem secundário) o disjuntor é contado e mostrado, mas **não segura** os pedidos: o gateway segue
+  mandando ao único Ollama, como sempre.
+
+### 16.4 Sobrecarga do primário e repasse
+
+O primário está **sobrecarregado** quando qualquer um vale (só avaliado com secundário):
+
+| Gatilho | Condição |
+| --- | --- |
+| **S1** | espera estimada de um pedido novo > `--overload-wait` (60 s). Estimativa = EWMA (α = 0,2) da duração das gerações que terminaram bem no primário × (esperando + 1) ÷ slots do primário; 0 enquanto houver slot livre e ninguém esperando, ou sem amostras |
+| **S2** | mais de `--overload-queue` (75% de `--queue-max`) gerações esperando |
+| **S3** | primário sem saúde: checagem ativa falhando, modelo fora de 100% GPU, disjuntor aberto ou meio-aberto, ou drenado |
+| **S4** | energia: **só o gancho**, desligado (`EnergyHook` nulo). Ligado, seguraria novos inícios no primário e repassaria |
+
+Quando o primário **tem slot livre e está bom**, o pedido roda nele (F1). Quando não: se há sobrecarga, o gateway procura o
+primeiro secundário (por `ordem`) **com slot livre** e **elegível** para algum pedido que espera, e dá a ele o pedido que a fila
+serviria a seguir **entre os elegíveis** (justiça e limites por IP continuam os da fila única: F8). **Elegível** (F2–F4):
+sem drenar e saudável; `modelos` inclui o modelo (se informado); a **classe** de prioridade é aceita (`alta` nunca em `cpu`); o
+prompt cabe em `max_prompt_tokens`; e o **digest do modelo no secundário é igual ao do primário** (os dois lidos do `/api/tags`; o do
+primário é o último conhecido, então vale mesmo com o primário fora). Sem digest conhecido dos dois lados, **não** é elegível.
+
+- **F5:** sem secundário elegível o pedido **continua na fila** (nada de erro), até `--max-wait`.
+- **F6 (volta):** a sobrecarga só desliga depois de `--overload-hold` (30 s) com a carga **abaixo de 50%** dos dois limites e o
+  primário saudável; um pico no meio reinicia a contagem. Eventos `overload_on` e `overload_off`. Os que já estão no secundário
+  terminam lá.
+- **F7:** **não há repasse durante a execução.** Se o backend cair no meio, o cliente recebe o erro; o mcpollama pode refazer (seção 16.7).
+- Um primário **doente** (S3) cede a vez ao secundário elegível; se não houver, o pedido ainda vai ao primário (como hoje). Com o disjuntor
+  do primário **aberto**, nada começa nele; o primeiro pedido depois dos 30 s é a prova.
+- **Embeddings rodam só no primário** (o espaço de vetores não pode mudar de um backend para outro).
+- O `--start-stagger` vale só para os inícios no **primário** (protege a fonte dele); um secundário é outra máquina.
+- O job registra **onde** rodou (`requests.backend`) e **por quê** (`requests.failover_rule`).
+
+### 16.5 Drenar e retomar (manutenção)
+
+No `/monitor`, logado, o botão **Drenar** de um backend (ou `POST /monitor/api/backends/{id}/drain`): ele não recebe início novo,
+o que roda termina, e o estado fica `drenado`. **Retomar** (`.../undrain`) desfaz. Só administrador, com CSRF e mesma origem; cada
+ação grava auditoria (`drain`/`undrain`) e um evento (`backend_drenado`/`backend_retomado`). **Drenar o primário** manda o trabalho
+ao secundário elegível (S3); sem secundário elegível os pedidos esperam. O estado de drenar fica **em memória**: reiniciar o gateway
+volta tudo ao normal.
+
+### 16.6 Eventos e consultas
+
+Eventos novos: `overload_on`, `overload_off`, `backend_down`, `backend_up`, `breaker_open`, `breaker_close`, `backend_drenado`,
+`backend_retomado` e `gateway_pool` (ids e limites, na partida).
+
+```bash
+DB=/var/lib/mcpollama-gateway/gateway.db
+# onde rodaram os jobs de hoje e por que regra
+sqlite3 -readonly "$DB" "SELECT backend, COALESCE(failover_rule,'-'), count(*) FROM requests WHERE enqueued_at > (strftime('%s','now','start of day')*1000) GROUP BY 1,2;"
+# o quadro do pool na última hora (estado, slots usados, fila, p50)
+sqlite3 -readonly "$DB" "SELECT datetime(ts/1000,'unixepoch','localtime'), backend_id, estado, slots_usados, fila, p50_ms FROM backend_samples WHERE ts > (strftime('%s','now','-1 hour')*1000) ORDER BY ts DESC LIMIT 60;"
+# sobrecargas, quedas e disjuntores
+sqlite3 -readonly "$DB" "SELECT datetime(ts/1000,'unixepoch','localtime'), kind, detail FROM events WHERE kind IN ('overload_on','overload_off','backend_down','backend_up','breaker_open','breaker_close','backend_drenado','backend_retomado') ORDER BY ts DESC LIMIT 30;"
+```
+
+### 16.7 Fallback do mcpollama (cliente)
+
+Para o caso em que o **servidor inteiro** cai (o gateway cai junto e não consegue repassar), o mcpollama tem um fallback no
+cliente, **desligado por padrão**:
+
+| Flag | Env | O que faz |
+| --- | --- | --- |
+| `--ollama-url-fallback URL` | `OLLAMA_HOST_FALLBACK` | Um segundo servidor (outro gateway ou um Ollama da LAN). Com erro de **conexão** ou **503 de fila cheia** (com `Retry-After`) do primário, o mcpollama tenta o fallback **uma vez**, sem esperar o `Retry-After` do primário. A linha `[uso]` ganha `backend=fallback` (e o `_meta` também). Timeout, 4xx, 5xx e cortes no meio **não** disparam o fallback. "Erro de conexão" é só o que acontece **antes** de o pedido sair (dial, DNS, recusa, proxy): uma resposta malformada ou um GOAWAY do HTTP/2 chegam depois de o primário ler o pedido e **não** disparam (revisão 10.5, FB1: senão o trabalho rodava duas vezes) |
+| `--fallback-api-key TOKEN` | `OLLAMA_FALLBACK_API_KEY` | O Bearer **do fallback**; o token do primário **nunca** vai para ele. Redigido em log e erro como o do primário. Só com `https://` (ou loopback) |
+| `--fallback-tls-ca FILE` | `OLLAMA_FALLBACK_TLS_CA` | CA (PEM) do fallback, somada ao pool do sistema. O `--insecure` do primário **não** vale para o fallback |
+
+Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primário. As descrições das tools não mudaram.
+
+### 16.8 Limites conhecidos
+
+- O estado de **drenar**, a EWMA e o disjuntor ficam em memória (reiniciar zera).
+- A estimativa de tokens é por bytes (÷ 3): uma boa aproximação, não o tokenizador do modelo. **Manipulável** (revisão 10.5,
+  R5): um prompt de dígitos (o Qwen faz 1 token por dígito) tem ~3× a estimativa, então um `max_prompt_tokens` de 1.000 aceita
+  ~3.000 tokens reais. O efeito é um prefill mais longo naquele backend, limitado pelo `--run-timeout`. A cota segura é bytes ÷ 1
+  (decisão do owner, ver o plano).
+- O digest é **declarado pelo próprio secundário** (`/api/tags`): é uma checagem contra engano de configuração, não uma
+  fronteira de segurança. Um secundário mal-intencionado pode declarar o digest certo e servir outro modelo; a proteção é só
+  confiar no host do `backends.json` (root, `0600`), com TLS e token próprio.
+- O monitor aberto mostra o `host:porta` de cada secundário (e ele aparece no "último erro"). É informação da LAN, sem
+  credencial; se o owner preferir, dá para mostrar só com login (pendência da 10.5).
+- Digest igual não prova tempo igual: um secundário com outra GPU responde mais devagar; `max_prompt_tokens` e `classes` são os botões.
+- O gateway roda **no servidor primário**: se ele cair, não repassa. Para isso existe o fallback do cliente.
+- **Revisão adversarial do pool (10.5) feita** em 2026-10-30 (report `MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool`).
+  Falta o aceite numa instância de teste (10.7) e a rodada Linux dos testes de modo de arquivo. Ver o plano da Fase 10.

@@ -1,0 +1,15 @@
+== go test -race -count=1 (gcc de E:\MCPOllam\deps\gcc-mingw-w64\bin)
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	8.775s
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	3.422s
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	14.625s
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	3.788s
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	2.577s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	10.186s
+ok  	github.com/cslsoftwares/mcpollama/gateway/pool	1.955s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	3.198s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	6.055s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	9.833s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	21.956s
+ok  	github.com/cslsoftwares/mcpollama/ollama	2.042s
+ok  	github.com/cslsoftwares/mcpollama/tools	6.333s
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	2.137s

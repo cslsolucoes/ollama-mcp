@@ -19,14 +19,17 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/http/httputil"
 	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 )
 
@@ -81,8 +84,14 @@ type Config struct {
 	// Journal, when set, receives the full prompt and the answer of every queued
 	// job (Fase 10.L); nil disables the job log in the proxy.
 	Journal Journal
-	// Backend names where the jobs run, for the log ("gpu-local" by default).
+	// Backend names where the jobs run, for the log when the ticket names none
+	// ("gpu-local" by default).
 	Backend string
+	// Pool, when set, resolves the backend a ticket was given to (Fase 10.4):
+	// requests given to a secondary go to its URL, over its own TLS policy and
+	// with its own bearer token. The client's Authorization header is never
+	// forwarded to any backend. nil means the single Upstream.
+	Pool *pool.Pool
 
 	Logf func(format string, args ...any)
 }
@@ -130,9 +139,19 @@ type exchange struct {
 	status  int
 	body    *countingBody
 	proxyEr error
+	backend *pool.Backend // nil: the primary (Upstream)
 	runCtx  context.Context
 	tee     *respTee // nil without a journal
+	// connected is set when the transport got a connection to the backend: an
+	// error after that (EOF or reset before the answer) is not "unreachable" for
+	// the circuit breaker, because a request body can cause it (revisão 10.5, B3).
+	connected atomic.Bool
 }
+
+// errUpstreamRedirect: a secondary answered 3xx. Ollama never redirects a
+// generation; the redirect is not passed to the client, whose SDK could follow
+// it and send the prompt to the Location (revisão 10.5, S2).
+var errUpstreamRedirect = errors.New("o backend respondeu com redirecionamento")
 
 // New builds the Handler.
 func New(cfg Config) (*Handler, error) {
@@ -157,19 +176,38 @@ func New(cfg Config) (*Handler, error) {
 	tr.MaxIdleConnsPerHost = 16
 	h.proxy = &httputil.ReverseProxy{
 		FlushInterval: -1,
-		Transport:     tr,
+		Transport:     backendTransport{def: tr},
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(cfg.Upstream)
-			pr.Out.Host = cfg.Upstream.Host
+			target := cfg.Upstream
+			var sec *pool.Backend
+			if ex, _ := pr.In.Context().Value(ctxKey{}).(*exchange); ex != nil && ex.backend != nil {
+				sec = ex.backend
+				target = sec.URL
+			}
+			pr.SetURL(target)
+			pr.Out.Host = target.Host
 			for _, k := range []string{"X-Real-Ip", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
 				"Authorization", "Cookie", HeaderClient, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID} {
 				pr.Out.Header.Del(k)
+			}
+			// The only credential that reaches a backend is its own.
+			if sec != nil && sec.Token() != "" {
+				pr.Out.Header.Set("Authorization", "Bearer "+sec.Token())
 			}
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			ex, _ := resp.Request.Context().Value(ctxKey{}).(*exchange)
 			if ex == nil {
 				return nil
+			}
+			if ex.backend != nil {
+				// A secondary is another machine: its cookies never reach the
+				// gateway's origin (the monitor lives there) and its redirects are
+				// not passed on (revisão 10.5, S2).
+				resp.Header.Del("Set-Cookie")
+				if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+					return errUpstreamRedirect
+				}
 			}
 			ex.status = resp.StatusCode
 			ex.body = &countingBody{rc: resp.Body, ctx: resp.Request.Context()}
@@ -198,6 +236,28 @@ func New(cfg Config) (*Handler, error) {
 		ErrorLog: log.New(io.Discard, "", 0),
 	}
 	return h, nil
+}
+
+// backendTransport sends a request through the transport of the backend it was
+// given to (its TLS policy) and everything else through the default one.
+type backendTransport struct{ def http.RoundTripper }
+
+func (t backendTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if ex, _ := r.Context().Value(ctxKey{}).(*exchange); ex != nil && ex.backend != nil && ex.backend.Transport != nil {
+		return ex.backend.Transport.RoundTrip(r)
+	}
+	return t.def.RoundTrip(r)
+}
+
+// backendOf resolves the backend of a started ticket: nil for the primary.
+func (h *Handler) backendOf(tk *queue.Ticket) *pool.Backend {
+	if h.cfg.Pool == nil {
+		return nil
+	}
+	if b := h.cfg.Pool.Backend(tk.Backend()); b != nil && !b.Primary {
+		return b
+	}
+	return nil
 }
 
 func (h *Handler) logf(format string, a ...any) {
@@ -370,10 +430,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runCtx, cancelRun := context.WithTimeoutCause(tk.Ctx, h.cfg.RunTimeout, ErrRunTimeout)
-	ex := &exchange{runCtx: runCtx}
+	ex := &exchange{runCtx: runCtx, backend: h.backendOf(tk)}
 	if jr != nil {
 		// Write-ahead: the "em_execucao" row is on disk before the Ollama hears of the job.
-		jr.Started(tk.ID, tk.StartedAt(), h.cfg.Backend)
+		bname := tk.Backend()
+		if bname == "" {
+			bname = h.cfg.Backend
+		}
+		jr.Started(tk.ID, tk.StartedAt(), bname)
 		if sink := jr.Response(tk.ID); sink != nil {
 			ex.tee = newRespTee(routeKinds[path], sink)
 		}
@@ -387,6 +451,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(HeaderQueuePosition, strconv.Itoa(tk.Position))
 
 	ctx := context.WithValue(runCtx, ctxKey{}, ex)
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { ex.connected.Store(true) }})
 	out := r.WithContext(ctx)
 	out.Body = io.NopCloser(bytes.NewReader(body))
 	out.ContentLength = int64(len(body))
@@ -443,8 +508,11 @@ func (h *Handler) result(reqCtx context.Context, tk *queue.Ticket, ex *exchange)
 		if res.HTTPStatus == 0 || res.HTTPStatus < 400 {
 			res.HTTPStatus = 499
 		}
+	case errors.Is(ex.proxyEr, errUpstreamRedirect):
+		res.Status, res.ErrorClass, res.HTTPStatus = queue.StatusError, "upstream_redirect", 502
 	case ex.proxyEr != nil:
 		res.Status, res.ErrorClass, res.HTTPStatus = queue.StatusError, "upstream_unreachable", 502
+		res.AfterConnect = ex.connected.Load()
 	case ex.status >= 400:
 		res.Status, res.ErrorClass = queue.StatusError, "upstream_"+strconv.Itoa(ex.status)
 	case ex.body != nil && !complete && ex.body.readErr == nil:

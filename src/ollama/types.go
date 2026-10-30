@@ -22,6 +22,9 @@ type Usage struct {
 	// QueueMS is the wait in the server-side queue (header X-Queue-Ms set by the
 	// gateway); 0 when there is no gateway. Not part of the Ollama JSON.
 	QueueMS int64 `json:"-"`
+	// Backend is "fallback" when the call was served by the fallback server
+	// (--ollama-url-fallback) and "" for the primary. Not part of the Ollama JSON.
+	Backend string `json:"-"`
 }
 
 // GenerateRequest is the input of Generate. Model empty means the client default.
@@ -91,6 +94,7 @@ type EmbedResponse struct {
 	PromptEvalCount int         `json:"prompt_eval_count"`
 	Error           string      `json:"error"`
 	QueueMS         int64       `json:"-"` // see Usage.QueueMS
+	Backend         string      `json:"-"` // see Usage.Backend
 }
 
 // ModelDetails is the "details" object shared by tags, ps and show.

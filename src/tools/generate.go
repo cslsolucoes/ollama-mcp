@@ -106,6 +106,7 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 		queue:      waited + time.Duration(resp.QueueMS)*time.Millisecond,
 		doneReason: resp.DoneReason,
 		think:      think,
+		backend:    resp.Backend,
 	}), nil
 }
 

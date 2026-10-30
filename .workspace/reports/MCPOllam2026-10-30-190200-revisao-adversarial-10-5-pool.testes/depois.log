@@ -1,0 +1,57 @@
+codigo corrigido (worktree, antes do commit)
+    fase105_adv_test.go:262: VEC|B1-disjuntor-secundario-preso|Media|gateway/pool/pool.go:318|OK: o disjuntor do secundario fecha depois que a checagem volta e ele recebe o repasse (estado=ok)
+--- PASS: TestAdv5B1SecondaryBreakerRecovers (0.17s)
+    fase105_adv_test.go:313: VEC|B2-cliente-abre-disjuntor|Alta|gateway/queue/queue.go:652|OK: 25 pedidos hostis (500, 404, run_timeout, keep_alive/num_gpu, corte) e o primario segue fechado/ok; 25 registros
+--- PASS: TestAdv5B2ClientCannotOpenTheBreaker (0.67s)
+    fase105_adv_test.go:354: VEC|B3-corte-antes-dos-cabecalhos|Baixa|gateway/proxy/proxy.go:491|OK: corte depois da conexao e neutro (codigos [502 502 502 502]); recusa de conexao x3 abre
+--- PASS: TestAdv5B3DropBeforeHeadersIsNeutral (0.01s)
+    fase105_adv_test.go:377: VEC|B4-inanicao-histerese|Media|gateway/queue/queue.go:917|OK: sob histerese o primario livre leva os pedidos: [gpu-local gpu-local gpu-local gpu-local]
+--- PASS: TestAdv5B4NoPrimaryStarvation (0.01s)
+    fase105_adv_test.go:403: VEC|B5-flapping|Baixa|gateway/pool/pool.go:686|MEDIDA: 40 checagens alternadas -> disjuntor fechado e 40 eventos backend_down/up (1 por troca; a 5 s isso daria ate 17.280/dia por backend)
+--- PASS: TestAdv5B5Flapping (0.00s)
+    fase105_adv_test.go:432: VEC|B6-custo-checagem|Baixa|gateway/pool/pool.go:650|MEDIDA: 3 GET por rodada (version+ps+tags); backend mudo: rodada de 401ms com timeout de 200 ms por GET, estado fora
+--- PASS: TestAdv5B6ActiveCheckCost (0.40s)
+    fase105_adv_test.go:458: VEC|R1-execucao-repassada|Alta|gateway/queue/queue.go:851|OK: drenar, abrir o disjuntor e sobrecarregar nao movem o pedido que ja comecou
+--- PASS: TestAdv5R1RunningRequestNeverMoves (0.00s)
+    fase105_adv_test.go:480: VEC|R2-alta-na-cpu|Media|gateway/pool/pool.go:434|OK: com o primario fora e a cpu listando 'alta', nenhum pedido alta foi para a cpu
+--- PASS: TestAdv5R2HighNeverOnCPU (0.07s)
+    fase105_adv_test.go:531: VEC|R3-corrida-drenar|Media|gateway/monitor/backends.go:46|OK: 2895 pedidos em 4 goroutines; 0 inicios no drenado depois de SetDrained+Poke (um inicio decidido antes do drenar ainda pode cair nele: e o mesmo que ter comecado um instante antes)
+--- PASS: TestAdv5R3DrainRace (0.21s)
+    fase105_adv_test.go:580: VEC|R4-justica-no-pool|Media|gateway/queue/queue.go:929|OK: a vaga do secundario foi para o IP novo (a justica e a da fila unica); o limite por IP ja e o da fila (TestF8)
+--- PASS: TestAdv5R4FairnessAcrossBackends (0.03s)
+    fase105_adv_test.go:591: VEC|R5-estimativa-tokens|Baixa|gateway/pool/pool.go:62|MEDIDA: 3032 bytes de corpo -> estimativa 1011 tokens; so os 3000 digitos podem dar 3000 tokens (3.0x). Um max_prompt_tokens=1000 da cpu aceita este pedido. Efeito: prefill mais longo na cpu, limitado pelo --run-timeout; decisao do owner (bytes/1 e a cota segura)
+--- PASS: TestAdv5R5TokenEstimateIsManipulable (0.00s)
+    fase105_adv_test.go:608: VEC|R6-digest-forjado|Info|gateway/pool/pool.go:470|ACEITO (modelo de ameaca): o secundario que declara o digest do primario recebe o repasse (HTTP 200, 1 geracao no secundario). Protecao real = confianca no host do backends.json (root, 0600) + TLS + token proprio
+--- PASS: TestAdv5R6DigestIsSelfReported (0.00s)
+    fase105_adv_test.go:663: VEC|S1-url-registro|Baixa|gateway/pool/registry.go:214|OK: 21 URLs (userinfo, file:, unix:, gopher:, porta 0/-1/65536/99999, link-local, 0.0.0.0, caminho, query, CRLF) com o resultado esperado
+--- PASS: TestAdv5S1RegistryURL (0.01s)
+    fase105_adv_test.go:700: VEC|S2-redirect-secundario|Baixa|gateway/proxy/proxy.go:187|OK: 3xx do secundario vira HTTP 502 sem Location/Set-Cookie; nenhum pedido ao destino do redirect; checagem com 302 -> fora
+--- PASS: TestAdv5S2RedirectFromASecondary (0.00s)
+    fase105_adv_test.go:726: VEC|S3-registro-trocado|Baixa|gateway/pool/registry.go:305|OK: URL e token lidos uma vez na partida; trocar os arquivos depois nao muda o pool (sem recarga a quente)
+--- PASS: TestAdv5S3RegistrySwappedAfterStart (0.00s)
+    fase105_adv_test.go:760: VEC|T2-token-ecoado-no-quadro|Baixa|gateway/pool/pool.go:691|OK: o texto livre do secundario (version "Bearerredigidoimgsrcxonerroraler", modelo de 96 bytes) e limitado e o token sai redigido
+--- PASS: TestAdv5T2EchoedTokenNeverInTheBoard (0.02s)
+    fase105_adv_test.go:815: VEC|T3-token-do-cliente|Alta|gateway/proxy/proxy.go:176|OK: minusculo, duplicado, Proxy-Authorization, Cookie e trailer chunked nunca chegam a backend algum (5 pedidos: 2 no primario, 3 no secundario, todos so com o token proprio); o primario nunca viu o token do secundario
+--- PASS: TestAdv5T3ClientTokenNeverReachesABackend (0.01s)
+    fase105_adv_test.go:823: VEC|S4-modo-symlink-dono|Baixa|gateway/pool/registry.go:149|N/A no Windows: rodar no Linux do servidor (pendencia); dono do arquivo nao e conferido (igual ao --admin-file)
+--- SKIP: TestAdv5S4FileModesLinux (0.00s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/pool	1.650s
+    fase105_adv_test.go:105: VEC|M1-drain-sessao-csrf-origem|Media|gateway/monitor/backends.go:17|OK: 10 tentativas sem sessao/CSRF/origem ou com metodo errado e 9 ids maliciosos -> nenhum 200, nada drenado; o caminho valido drena, retoma e audita
+--- PASS: TestAdv5M1DrainGate (0.05s)
+    fase105_adv_test.go:158: VEC|M2-nada-sensivel-no-monitor|Alta|gateway/monitor/monitor.go:359|OK: 6 fontes (state, history, export csv/jsonl, export admin, SSE) sem token, sem caminho do token_file e sem URL; index.html sem sink de HTML e sem CR
+--- PASS: TestAdv5M2NothingSensitiveInTheMonitor (0.08s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	0.159s
+    fase105_adv_test.go:90: VEC|FB1-fallback-duplica|Baixa|ollama/api.go:323|OK: resposta malformada depois de o primario ler o pedido -> sem fallback (cannot connect); recusa de conexao -> fallback
+--- PASS: TestAdv5FB1NoFallbackAfterThePrimarySawTheRequest (0.01s)
+    fase105_adv_test.go:136: VEC|FB2-fallback-so-conexao-503|Media|ollama/api.go:392|OK: HTTP 400/401/403/404/409/413/429/500/502/503/504, erro no stream, timeout e corte no meio -> 0 pedidos ao fallback
+--- PASS: TestAdv5FB2OnlyConnectionAnd503 (0.41s)
+    fase105_adv_test.go:177: VEC|FB3-laco-e-tokens|Alta|ollama/client.go:158|OK: 503+503 -> primario 2 (1 nova tentativa), fallback 1, erro server queue full; cada um so com o proprio token; fallback sem token nao recebe Authorization
+--- PASS: TestAdv5FB3NoLoopAndTokens (1.00s)
+    fase105_adv_test.go:193: VEC|FB4-timeout-total|Media|ollama/api.go:115|OK: primario fora + fallback mudo -> 300ms com --timeout 300ms (cannot connect)
+--- PASS: TestAdv5FB4TotalTimeout (0.30s)
+ok  	github.com/cslsoftwares/mcpollama/ollama	1.750s
+    fase105_adv_test.go:82: VEC|N1-quadro-modelos-parado|Media|gateway/pool/pool.go:657|OK: sem --backends, o quadro Modelos mostra o erro com o Ollama fora: ps: Get "http://127.0.0.1:16231/api/ps": dial tcp 127.0.0.1:16231: connectex: Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente.; tags: Get "http://127.0.0.1:16231/api/tags": dial tcp 127.0.0.1:16231: connectex: Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente.
+--- PASS: TestAdv5N1ModelsBoardSeesTheOllamaDown (0.14s)
+    fase105_adv_test.go:168: VEC|T1-tokens-em-lugar-nenhum|Alta|gateway/pool/registry.go:249|OK: 8 fontes (5 rotas do monitor, log --debug, gw.db/-wal, content.db/-wal) sem o token do secundario nem o do cliente; 1 geracao(oes) no secundario; 7 ocorrencias do id sec-t1 no gw.db (backend_samples e requests gravados)
+--- PASS: TestAdv5T1TokensNowhere (0.63s)
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.804s

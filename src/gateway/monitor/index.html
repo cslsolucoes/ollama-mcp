@@ -80,6 +80,7 @@ svg .line.s0{stroke:#2f6fed}svg .line.s1{stroke:#e0783a}svg .line.s2{stroke:#22a
   <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div>
     <div class="l sub" id="donehead"></div><div class="wrap"><table id="donelist"></table></div></section>
   <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div></section>
+  <section><h2>Backends</h2><div class="wrap"><table id="backends"></table></div><div id="bkmeta" class="empty"></div></section>
   <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
   <section><h2>CPU / RAM</h2><div class="gpus" id="cpucards"></div><div class="threads" id="cputhreads"></div><div id="cpumeta" class="empty"></div></section>
   <section><h2>Modelos</h2>
@@ -168,6 +169,10 @@ function act(kind, id) {
     if (!confirm("Cancelar este pedido em execução? A conexão com o modelo será fechada.")) return;
     reason = prompt("Motivo (opcional):") || "";
     path = "/monitor/api/running/" + id + "/cancel";
+  } else if (kind === "drain" || kind === "undrain") {
+    if (kind === "drain" && !confirm("Drenar este backend? Ele não recebe pedidos novos; o que está rodando termina.")) return;
+    reason = prompt("Motivo (opcional):") || "";
+    path = "/monitor/api/backends/" + id + "/" + kind;
   } else path = "/monitor/api/queue/" + id + "/" + kind;
   post(path, { reason: reason }).then(function (r) {
     if (r.status === 200) msg(""); else msg((r.body && r.body.error) || ("Erro " + r.status));
@@ -181,6 +186,29 @@ function btn(label, title, kind, id, cls) {
   return b;
 }
 
+function backendCell(it) {
+  if (!it.backend) return { text: "-", cls: "dim" };
+  return { text: it.backend + (it.failover_rule ? " (" + it.failover_rule + ")" : ""), title: it.failover_rule ? "repassado pela regra " + it.failover_rule : "backend onde rodou" };
+}
+function renderBackends(list) {
+  var cls = { ok: "ok", sobrecarregado: "cancelado", degradado: "cancelado", disjuntor_aberto: "erro", fora: "erro", drenado: "na_fila" };
+  var label = { ok: "ok", sobrecarregado: "sobrecarregado", degradado: "degradado (fora da GPU)", disjuntor_aberto: "disjuntor aberto", fora: "fora", drenado: "drenado" };
+  var rows = (list || []).map(function (b) {
+    var ctl = "";
+    if (loggedIn) {
+      ctl = b.drained ? btn("Retomar", "Volta a receber pedidos novos", "undrain", b.id) : btn("Drenar", "Não recebe pedidos novos; o que está rodando termina", "drain", b.id);
+    }
+    var model = b.model ? b.model + (b.digest ? " · " + b.digest : "") + (b.processor ? " · " + b.processor : "") : "-";
+    return [{ text: b.id + (b.primary ? " (primário)" : ""), title: b.host }, b.type, { text: label[b.state] || b.state, cls: cls[b.state] || "" },
+      b.breaker === "fechado" ? "fechado" : { text: b.breaker === "aberto" ? "aberto" : "meio-aberto", cls: "erro" },
+      b.used + "/" + b.slots + " (livres " + b.free + ")", b.queue, b.p50_ms ? fmtMs(b.p50_ms) : "-", { text: model, title: model },
+      { text: b.last_error || "-", title: b.last_error || "", cls: b.last_error ? "" : "dim" }, ctl];
+  });
+  table("backends", ["Backend", "Tipo", "Estado", "Disjuntor", "Slots usados", "Fila", "p50", "Modelo · digest", "Último erro", ""], rows, "Sem backends.");
+  var ov = (list || []).filter(function (b) { return b.rules; })[0];
+  $("bkmeta").textContent = list && list.length > 1 ? (ov ? "Primário sobrecarregado: " + ov.rules + "." : "Primário sem sobrecarga.") + " A fila é uma só; slots e fila por backend contam só a geração." : "Um só backend (sem --backends): comportamento de sempre.";
+}
+
 function render(s) {
   lastState = s;
   $("status").textContent = "versão " + s.version + " · boot " + (s.boot_id || "?").slice(0, 8) + " · ativo há " + fmtMs(s.uptime_s * 1000) + " · atualizado " + new Date(s.now).toLocaleTimeString("pt-BR");
@@ -192,11 +220,11 @@ function render(s) {
 
   var q = s.queue, slots = q.slots || {}, inuse = q.in_use || {};
   var runRows = q.running.map(function (it) {
-    var cells = [it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.running_ms), fmtMs(it.waiting_ms)];
+    var cells = [it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, backendCell(it), thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.running_ms), fmtMs(it.waiting_ms)];
     cells.push(loggedIn ? btn("Cancelar", "Cancelar este pedido em execução", "cancel", it.id, "danger") : "");
     return cells;
   });
-  table("running", ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Raciocínio", "Prioridade", "Rodando há", "Esperou", ""], runRows,
+  table("running", ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Prioridade", "Rodando há", "Esperou", ""], runRows,
     "Nada em execução (slots: geração " + (inuse.geracao || 0) + "/" + (slots.geracao || 0) + ", embed " + (inuse.embed || 0) + "/" + (slots.embed || 0) + ").");
 
   var waitRows = q.waiting.map(function (it) {
@@ -204,9 +232,9 @@ function render(s) {
     if (loggedIn) {
       box.appendChild(btn("▲", "Promover", "promote", it.id)); box.appendChild(btn("▼", "Despromover", "demote", it.id)); box.appendChild(btn("✕", "Remover da fila", "remove", it.id, "danger"));
     }
-    return [it.position, it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.waiting_ms), box];
+    return [it.position, it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, { text: "-", title: "o backend é escolhido quando o pedido começa", cls: "dim" }, thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.waiting_ms), box];
   });
-  table("waiting", ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Raciocínio", "Prioridade", "Esperando há", ""], waitRows, "Ninguém esperando.");
+  table("waiting", ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Prioridade", "Esperando há", ""], waitRows, "Ninguém esperando.");
 
   var recent = (s.recent || []).map(function (r) {
     return [fmtTime(r.finished_at), { text: r.status, cls: r.status }, r.http_status, who(r), r.tool, r.model, thinkLabel(r.think), fmtMs(r.wait_ms), fmtMs(r.run_ms), r.prompt_eval_count + " / " + r.eval_count, r.error_class];
@@ -234,6 +262,7 @@ function render(s) {
       g.appendChild(d);
     });
   }
+  renderBackends(s.backends);
   renderCPU(s.cpu);
   renderModels(s.models);
   renderJobs(s);
@@ -391,10 +420,10 @@ function renderJobs(s) {
     var run = fin ? j.run_ms : (j.started_at ? now - j.started_at : 0);
     var b = el("button", "Detalhes"); b.type = "button";
     b.addEventListener("click", function () { openJob(j.id); });
-    return [fmtTime(j.enqueued_at), { text: statusText(j.status), cls: j.status }, who(j), j.tool, j.model, thinkLabel(j.think), fmtMs(wait), j.started_at ? fmtMs(run) : "-",
+    return [fmtTime(j.enqueued_at), { text: statusText(j.status), cls: j.status }, who(j), j.tool, j.model, backendCell(j), thinkLabel(j.think), fmtMs(wait), j.started_at ? fmtMs(run) : "-",
       fin ? j.prompt_eval_count + " / " + j.eval_count : "-", respLabel(j), j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-", j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-", b];
   });
-  table("joblog", ["Entrada", "Status", "Cliente", "Tool", "Modelo", "Raciocínio", "Esperou", "Rodou", "Tokens (prompt / gerados)", "Resposta", "Pico W", "Pico clock", ""], rows, "Nenhum job registrado ainda.");
+  table("joblog", ["Entrada", "Status", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Esperou", "Rodou", "Tokens (prompt / gerados)", "Resposta", "Pico W", "Pico clock", ""], rows, "Nenhum job registrado ainda.");
   if (selJob && !selFinal) loadDetail(false);
 }
 // "Concluídos nos últimos N min": finished requests stay in view for --monitor-keep-done,

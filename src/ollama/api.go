@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -113,6 +115,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	ctx, fu := withFallbackProbe(ctx)
 
 	wire := generateWire{Model: model, Prompt: req.Prompt, System: req.System, Stream: !c.noStream, Options: req.Options, Think: req.Think}
 	var out GenerateResponse
@@ -121,7 +124,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 		if err != nil {
 			return nil, err
 		}
-		out.QueueMS = q
+		out.QueueMS, out.Backend = q, fu.backend()
 		if out.Error != "" {
 			return nil, c.fail(ErrStream, 0, "o servidor reportou erro na geração: %s", c.detail([]byte(out.Error)))
 		}
@@ -146,7 +149,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 		return false, nil
 	})
 	out.Response = text.String()
-	out.QueueMS = qms
+	out.QueueMS, out.Backend = qms, fu.backend()
 	if err != nil {
 		if text.Len() == 0 {
 			return nil, err
@@ -175,6 +178,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	ctx, fu := withFallbackProbe(ctx)
 
 	wire := chatWire{Model: model, Messages: req.Messages, Stream: !c.noStream, Options: req.Options, Think: req.Think}
 	var out ChatResponse
@@ -183,7 +187,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		if err != nil {
 			return nil, err
 		}
-		out.QueueMS = q
+		out.QueueMS, out.Backend = q, fu.backend()
 		if out.Error != "" {
 			return nil, c.fail(ErrStream, 0, "o servidor reportou erro na geração: %s", c.detail([]byte(out.Error)))
 		}
@@ -208,7 +212,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return false, nil
 	})
 	out.Message = ChatMessage{Role: "assistant", Content: text.String()}
-	out.QueueMS = qms
+	out.QueueMS, out.Backend = qms, fu.backend()
 	if err != nil {
 		if text.Len() == 0 {
 			return nil, err
@@ -237,13 +241,14 @@ func (c *Client) Embed(ctx context.Context, req EmbedRequest) (*EmbedResponse, e
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	ctx, fu := withFallbackProbe(ctx)
 
 	var out EmbedResponse
 	q, err := c.callJSONQ(ctx, http.MethodPost, pathEmbed, embedWire{Model: model, Input: req.Input}, &out)
 	if err != nil {
 		return nil, err
 	}
-	out.QueueMS = q
+	out.QueueMS, out.Backend = q, fu.backend()
 	if out.Error != "" {
 		return nil, c.fail(ErrServer, 0, "o servidor reportou erro no embed: %s", c.detail([]byte(out.Error)))
 	}
@@ -313,7 +318,18 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 	resp, err := c.http.Do(req)
 	if err != nil {
 		c.debugf("%s %s failed after %dms", method, path, time.Since(start).Milliseconds())
-		return nil, c.transportErr(ctx, err, start, false, 0)
+		terr := c.transportErr(ctx, err, start, false, 0)
+		// Connection error: the primary never saw the request, so the fallback
+		// cannot duplicate work. A timeout or a cut stream is not retried here,
+		// and neither is any error after the connection was made (a malformed
+		// answer, an HTTP/2 GOAWAY or stream reset): the primary may have run the
+		// request (revisão 10.5, FB1).
+		if neverSent(err) {
+			if fr, ok := c.tryFallback(ctx, terr, method, path, in, start); ok {
+				return fr, nil
+			}
+		}
+		return nil, terr
 	}
 	c.debugf("%s %s status=%d headers_after=%dms", method, path, resp.StatusCode, time.Since(start).Milliseconds())
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -322,6 +338,13 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 		// The server queue (gateway) refused or dropped the request before the
 		// model ran it, so a single retry cannot duplicate work (OLL-014 holds).
 		if wait, ok := queueFullWait(resp); ok {
+			// The primary refused the request (503, queue full): try the fallback
+			// once, before waiting for the primary.
+			if !retried {
+				if fr, ok := c.tryFallback(ctx, c.fail(ErrQueueFull, resp.StatusCode, "fila cheia"), method, path, in, start); ok {
+					return fr, nil
+				}
+			}
 			if !retried && retryFits(ctx, wait) {
 				c.debugf("%s %s queue full, one retry in %s", method, path, wait)
 				t := time.NewTimer(wait)
@@ -343,6 +366,56 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 		return nil, c.statusError(method, path, resp.StatusCode, b)
 	}
 	return resp, nil
+}
+
+// fbKey carries, in the context of one call, the flag the fallback sets.
+type fbKey struct{}
+
+// fallbackProbe tells the entry point of a call whether the fallback served it.
+type fallbackProbe struct{ used atomic.Bool }
+
+func withFallbackProbe(ctx context.Context) (context.Context, *fallbackProbe) {
+	p := &fallbackProbe{}
+	return context.WithValue(ctx, fbKey{}, p), p
+}
+
+// backend is "fallback" when the fallback served the call, "" otherwise.
+func (p *fallbackProbe) backend() string {
+	if p != nil && p.used.Load() {
+		return "fallback"
+	}
+	return ""
+}
+
+// tryFallback sends the same request to the fallback server, once, when cause
+// is a connection error or a "queue full" refusal of the primary. ok is true
+// with the open response of the fallback (the caller closes it). Any failure of
+// the fallback is dropped and the primary's own error stands.
+func (c *Client) tryFallback(ctx context.Context, cause *Error, method, path string, in any, start time.Time) (*http.Response, bool) {
+	if c.fb == nil || ctx.Err() != nil {
+		return nil, false
+	}
+	if !errors.Is(cause, ErrConnect) && !errors.Is(cause, ErrQueueFull) {
+		return nil, false
+	}
+	c.debugf("%s %s: primário indisponível (%v), tentando o fallback uma vez", method, path, cause.Kind)
+	resp, err := c.fb.sendOnce(ctx, method, path, in, start, true)
+	if err != nil {
+		c.debugf("%s %s: o fallback também falhou", method, path)
+		return nil, false
+	}
+	if p, _ := ctx.Value(fbKey{}).(*fallbackProbe); p != nil {
+		p.used.Store(true)
+	}
+	return resp, true
+}
+
+// neverSent tells whether a transport error happened before any byte of the
+// request could reach the server: dialing (DNS, refused, unreachable) or
+// connecting through a proxy.
+func neverSent(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && (op.Op == "dial" || op.Op == "proxyconnect")
 }
 
 // queueFullWait recognises the gateway's "queue full" answer: 503 with a
