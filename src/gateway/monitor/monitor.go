@@ -330,7 +330,7 @@ func (h *Handler) refreshExtras(ctx context.Context) extras {
 			e.cards.TokensPerSec, e.cards.PerMinute = st.TokensPerSec, st.PerMinute
 		}
 		if rows, err := s.History(ctx, store.HistoryQuery{Limit: 50}); err == nil {
-			e.recent = rows
+			e.recent = coarseRows(rows) // open: no exact size (revisão 10.L, H2)
 		}
 		if ev, err := s.Events(ctx, 10); err == nil {
 			e.events = ev
@@ -342,6 +342,7 @@ func (h *Handler) refreshExtras(ctx context.Context) extras {
 
 func (h *Handler) state(ctx context.Context) State {
 	snap := h.cfg.Queue.Snapshot()
+	snap.Running, snap.Waiting = coarseItems(snap.Running), coarseItems(snap.Waiting) // open: no exact size (revisão 10.L, H2)
 	ex := h.refreshExtras(ctx)
 	st := State{
 		Now: snap.Now, Version: h.cfg.Version, BootID: h.cfg.BootID,
@@ -570,7 +571,7 @@ func (h *Handler) apiHistory(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusInternalServerError, "erro ao consultar o histórico")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"rows": rows})
+	writeJSON(w, http.StatusOK, map[string]any{"rows": coarseRows(rows)})
 }
 
 var windows = map[string]time.Duration{"15m": 15 * time.Minute, "1h": time.Hour, "24h": 24 * time.Hour, "7d": 7 * 24 * time.Hour}

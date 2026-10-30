@@ -99,10 +99,15 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 			OnEvent: st.Event,
 		})
 		if err != nil {
-			fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
-			return 1
+			// A corrupt or unreadable content.db must not take the gateway down
+			// (revisão 10.L, R2): it goes on without the text and says so in the
+			// log and in an event. The file is left as it is, for inspection.
+			cs = nil
+			logf("conteúdo dos jobs DESLIGADO: %v (o gateway segue sem gravar prompt/resposta)", err)
+			st.Event("conteudo_indisponivel", "content.db não abriu; o gateway segue sem gravar o texto: "+err.Error())
+		} else {
+			defer cs.Close()
 		}
-		defer cs.Close()
 	} else {
 		logf("--log-content=false: o texto dos jobs não é gravado")
 	}

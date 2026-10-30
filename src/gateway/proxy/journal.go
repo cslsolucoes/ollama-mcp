@@ -61,6 +61,7 @@ func extractPrompt(kind routeKind, body []byte) string {
 		return nil, false
 	}
 	var b strings.Builder
+	b.Grow(len(body)) // the text is about the body's size: no doubling copies (revisão 10.L, M1)
 	section := func(label string, raw json.RawMessage) {
 		if b.Len() > 0 {
 			b.WriteString("\n\n")

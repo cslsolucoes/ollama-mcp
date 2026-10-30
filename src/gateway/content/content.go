@@ -70,6 +70,12 @@ type Store struct {
 	total  atomic.Int64 // stored bytes, kept in step with the writes
 	capMu  sync.Mutex   // one cap enforcement at a time
 	closed atomic.Bool
+
+	// The cap runs in the background (revisão 10.L, D4): bgMu guards capBusy
+	// and the closing, capWG lets Close wait for a run in progress.
+	bgMu    sync.Mutex
+	capBusy bool
+	capWG   sync.WaitGroup
 }
 
 // Open creates (0600) or opens the content database.
@@ -91,6 +97,11 @@ func Open(path string, o Options) (*Store, error) {
 		return nil, fmt.Errorf("content: cannot create %s: %w", path, err)
 	}
 	f.Close()
+	// A file that already existed keeps its mode on O_CREATE: force 0600 (the
+	// -wal and -shm copy the mode of the main file; revisão 10.L, P1).
+	if err := os.Chmod(path, 0o600); err != nil {
+		return nil, fmt.Errorf("content: cannot chmod %s: %w", path, err)
+	}
 	// auto_vacuum first: it only takes effect before the first table exists.
 	db, err := sql.Open("sqlite", path+"?_pragma=auto_vacuum(2)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)")
 	if err != nil {
@@ -113,11 +124,18 @@ func Open(path string, o Options) (*Store, error) {
 
 // Close closes the database.
 func (s *Store) Close() error {
-	if s.closed.Swap(true) {
+	s.bgMu.Lock()
+	already := s.closed.Swap(true)
+	s.bgMu.Unlock()
+	if already {
 		return nil
 	}
+	s.capWG.Wait() // a cap run in progress ends before the database closes
 	return s.db.Close()
 }
+
+// WaitCap waits for a background cap run in progress (tests and diagnostics).
+func (s *Store) WaitCap() { s.capWG.Wait() }
 
 func (s *Store) logf(format string, a ...any) {
 	if s.opts.Logf != nil {
@@ -152,14 +170,38 @@ func cutUTF8(b []byte, n int) []byte {
 	return b[:n]
 }
 
+// cutUTF8String is cutUTF8 for a string (no copy).
+func cutUTF8String(s string, n int) string {
+	if n >= len(s) {
+		return s
+	}
+	if n <= 0 {
+		return ""
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
+
 // SavePrompt stores the prompt of a job. It is idempotent (the first one wins),
 // synchronous and durable. It returns the stored size and whether it was cut.
 func (s *Store) SavePrompt(id, prompt string, now time.Time) (stored int, truncated bool, err error) {
-	sum := sha256.Sum256([]byte(prompt))
-	b := []byte(prompt)
-	if int64(len(b)) > s.opts.MaxJobBytes {
-		b, truncated = cutUTF8(b, int(s.opts.MaxJobBytes)), true
+	// Hash the string as it is and copy only what is stored: a 32 MiB prompt
+	// must not be copied whole once more (revisão 10.L, M1).
+	hs := sha256.New()
+	chunk := make([]byte, 64<<10) // io.WriteString would copy the whole string
+	for i := 0; i < len(prompt); i += len(chunk) {
+		n := copy(chunk, prompt[i:])
+		hs.Write(chunk[:n])
 	}
+	var sum [sha256.Size]byte
+	hs.Sum(sum[:0])
+	keep := prompt
+	if int64(len(keep)) > s.opts.MaxJobBytes {
+		keep, truncated = cutUTF8String(keep, int(s.opts.MaxJobBytes)), true
+	}
+	b := []byte(keep)
 	trunc := 0
 	if truncated {
 		trunc = 1
@@ -176,15 +218,49 @@ func (s *Store) SavePrompt(id, prompt string, now time.Time) (stored int, trunca
 	return len(b), truncated, nil
 }
 
-// added accounts for stored bytes and enforces the total cap when it is passed.
+// added accounts for stored bytes and starts the total cap when it is passed.
 func (s *Store) added(n int64) {
 	if s.total.Add(n) > s.opts.MaxBytes {
-		s.enforceCap()
+		s.triggerCap()
 	}
 }
 
+// triggerCap runs enforceCap in the background, one run at a time. Whoever
+// passed the cap is a prompt being accepted or an answer streaming with the GPU
+// slot held: it must not pay for deleting thousands of old jobs (revisão 10.L,
+// D4: 614 deletes took 829 ms inside the write that passed the cap).
+func (s *Store) triggerCap() {
+	s.bgMu.Lock()
+	if s.closed.Load() || s.capBusy {
+		s.bgMu.Unlock()
+		return
+	}
+	s.capBusy = true
+	s.capWG.Add(1)
+	s.bgMu.Unlock()
+	go func() {
+		defer s.capWG.Done()
+		for {
+			s.enforceCap()
+			s.bgMu.Lock()
+			// a write that came in meanwhile may have passed the cap again
+			if s.closed.Load() || s.total.Load() <= s.opts.MaxBytes {
+				s.capBusy = false
+				s.bgMu.Unlock()
+				return
+			}
+			s.bgMu.Unlock()
+		}
+	}()
+}
+
+// capBatch is how many jobs one transaction of the cap deletes (one fsync).
+const capBatch = 500
+
 // enforceCap deletes the oldest jobs until the total is under 90% of the cap
 // (a margin, so the next write does not trigger it again) and reports an event.
+// The deletes go in transactions of capBatch: one synchronous commit each,
+// not one per job.
 func (s *Store) enforceCap() {
 	s.capMu.Lock()
 	defer s.capMu.Unlock()
@@ -193,8 +269,8 @@ func (s *Store) enforceCap() {
 	}
 	target := s.opts.MaxBytes / 10 * 9
 	var removed, freed int64
-	for s.total.Load() > target {
-		rows, err := s.db.Query(`SELECT job_id, COALESCE(length(prompt),0)+COALESCE(length(response),0) FROM job_content ORDER BY created_at, rowid LIMIT 100`)
+	for s.total.Load() > target && !s.closed.Load() {
+		rows, err := s.db.Query(`SELECT job_id, COALESCE(length(prompt),0)+COALESCE(length(response),0) FROM job_content ORDER BY created_at, rowid LIMIT ?`, capBatch)
 		if err != nil {
 			s.logf("content: teto: %v", err)
 			return
@@ -214,18 +290,31 @@ func (s *Store) enforceCap() {
 		if len(vs) == 0 {
 			break
 		}
+		tx, err := s.db.Begin()
+		if err != nil {
+			s.logf("content: teto: %v", err)
+			return
+		}
+		var bn, bf, need int64 = 0, 0, s.total.Load() - target
 		for _, v := range vs {
-			if s.total.Load() <= target {
+			if bf >= need {
 				break
 			}
-			if _, err := s.db.Exec(`DELETE FROM job_content WHERE job_id=?`, v.id); err != nil {
+			if _, err := tx.Exec(`DELETE FROM job_content WHERE job_id=?`, v.id); err != nil {
+				_ = tx.Rollback()
 				s.logf("content: teto: %v", err)
 				return
 			}
-			s.total.Add(-v.n)
-			removed++
-			freed += v.n
+			bn++
+			bf += v.n
 		}
+		if err := tx.Commit(); err != nil {
+			s.logf("content: teto: %v", err)
+			return
+		}
+		s.total.Add(-bf)
+		removed += bn
+		freed += bf
 	}
 	// Re-read the real total: it corrects any drift of the running counter.
 	var sum int64

@@ -258,8 +258,14 @@ func TestJobDetailHasTheGPUExtractWithoutText(t *testing.T) {
 		Content map[string]any
 		On      bool `json:"content_enabled"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil || len(d.Samples) != 3 || d.Job.PeakClockMHz != 1400 || !d.On || d.Content == nil {
+	// without a session: no content.Info (hash, exact sizes; revisão 10.L, H1)
+	if err := json.Unmarshal(w.Body.Bytes(), &d); err != nil || len(d.Samples) != 3 || d.Job.PeakClockMHz != 1400 || !d.On || d.Content != nil {
 		t.Fatalf("%v %s", err, w.Body)
+	}
+	cookie, _ := f.login(t)
+	d.Content = nil
+	if err := json.Unmarshal(do(f.h, "GET", "/monitor/api/jobs/"+idN(3), "", map[string]string{"Cookie": cookie}).Body.Bytes(), &d); err != nil || d.Content == nil || d.Content["prompt_sha256"] == "" {
+		t.Fatalf("admin detail: %v %+v", err, d.Content)
 	}
 	if strings.Contains(w.Body.String(), "segredo-do-prompt") {
 		t.Fatal("detail carries the text")

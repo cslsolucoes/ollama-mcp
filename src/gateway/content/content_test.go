@@ -93,6 +93,7 @@ func TestTotalCapDeletesOldestAndReportsEvent(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	s.WaitCap() // the cap runs in the background (revisão 10.L, D4)
 	if s.Total() > 10000 {
 		t.Fatalf("total %d still above the cap", s.Total())
 	}

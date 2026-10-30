@@ -4,7 +4,14 @@ package monitor
 // like every GET of the monitor (the LAN restriction is the nginx's job). The
 // TEXT of the jobs (prompt and answer) is served only to the logged-in
 // administrator: a GET needs the session cookie (no CSRF token, it changes
-// nothing); without it the answer is 401.
+// nothing) and a same-site request; without it the answer is 401 (403 for a
+// cross-site one).
+//
+// Revisão adversarial 10.L: what describes the text itself (its SHA-256 and its
+// exact sizes) is administrator-only too. The hash lets whoever holds a
+// candidate document confirm it was sent to the AI, and an exact size narrows
+// it down. Without a session the open routes give the sizes rounded up to whole
+// KiB (coarseBytes) and never the hash.
 
 import (
 	"context"
@@ -18,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/gateway/content"
+	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
 )
 
@@ -71,6 +79,7 @@ func (h *Handler) liveJobs(ctx context.Context) []store.JobRow {
 		}
 		return []store.JobRow{}
 	}
+	rows = coarseJobRows(rows)
 	c.live.at, c.live.rows = h.cfg.Now(), rows
 	return rows
 }
@@ -98,6 +107,7 @@ func (h *Handler) recentDone(ctx context.Context) []store.JobRow {
 	}
 	// ordered by when they ended, newest first
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].FinishedAt > rows[j].FinishedAt })
+	rows = coarseJobRows(rows)
 	c.done.at, c.done.rows = now, rows
 	return rows
 }
@@ -111,12 +121,67 @@ func jobQueryFrom(r *http.Request) (store.JobQuery, bool) {
 	}
 	jq := store.JobQuery{Since: since, Until: until, Client: q.Get("cliente"),
 		Limit: atoiDef(q.Get("limite"), 200), Offset: atoiDef(q.Get("offset"), 0)}
+	seen := map[string]bool{}
 	for _, s := range strings.Split(q.Get("status"), ",") {
-		if s = strings.TrimSpace(s); s != "" {
+		if s = strings.TrimSpace(s); jobStatuses[s] && !seen[s] {
+			seen[s] = true
 			jq.Status = append(jq.Status, s)
 		}
 	}
+	if strings.TrimSpace(q.Get("status")) != "" && len(jq.Status) == 0 {
+		jq.Status = []string{"-"} // only unknown statuses: match nothing, as before
+	}
 	return jq, true
+}
+
+// jobStatuses are the values a status filter can take; anything else is
+// dropped, so the list cannot pass the SQLite variable limit (a 500) however
+// long the query string is (revisão 10.L, I1).
+var jobStatuses = map[string]bool{
+	queue.StatusOK: true, queue.StatusError: true, queue.StatusCanceled: true, queue.StatusRemoved: true,
+	queue.StatusRejected: true, queue.StatusExpired: true, queue.StatusQueued: true, queue.StatusRunning: true,
+	queue.StatusInterruptedReboot: true, queue.StatusInterruptedRestart: true,
+}
+
+// coarseBytes rounds a size up to whole KiB. The open routes use it so they
+// never give the exact size of a client's text (revisão 10.L, H2).
+func coarseBytes(n int64) int64 {
+	if n <= 0 {
+		return n
+	}
+	return (n + 1023) / 1024 * 1024
+}
+
+func coarseRow(r store.Row) store.Row {
+	r.BytesIn, r.RespBytes = coarseBytes(r.BytesIn), coarseBytes(r.RespBytes)
+	return r
+}
+
+// coarseRows returns a copy with the sizes rounded (the input may be shared).
+func coarseRows(rs []store.Row) []store.Row {
+	out := make([]store.Row, len(rs))
+	for i, r := range rs {
+		out[i] = coarseRow(r)
+	}
+	return out
+}
+
+func coarseJobRows(rs []store.JobRow) []store.JobRow {
+	out := make([]store.JobRow, len(rs))
+	for i, r := range rs {
+		r.Row = coarseRow(r.Row)
+		out[i] = r
+	}
+	return out
+}
+
+func coarseItems(its []queue.Item) []queue.Item {
+	out := make([]queue.Item, len(its))
+	for i, it := range its {
+		it.BytesIn = coarseBytes(it.BytesIn)
+		out[i] = it
+	}
+	return out
 }
 
 func (h *Handler) apiJobs(w http.ResponseWriter, r *http.Request) {
@@ -144,6 +209,7 @@ func (h *Handler) apiJobs(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusInternalServerError, "erro ao consultar o log de jobs")
 		return
 	}
+	rows = coarseJobRows(rows)
 	c.mu.Lock()
 	if c.byQuery == nil || len(c.byQuery) >= jobsCacheMax {
 		c.byQuery = map[string]jobsCacheEntry{}
@@ -179,18 +245,40 @@ func (h *Handler) apiJob(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, http.StatusInternalServerError, "erro ao consultar o extrato")
 		return
 	}
+	// Without the administrator session: rounded sizes and no content.Info (its
+	// prompt_sha256 and exact sizes would let a candidate document be
+	// confirmed; revisão 10.L, H1).
+	admin := h.adminRead(r)
+	if !admin {
+		job.Row = coarseRow(job.Row)
+	}
 	out := map[string]any{"job": job, "samples": samples, "content_enabled": h.cfg.Content != nil}
-	if h.cfg.Content != nil {
+	if h.cfg.Content != nil && admin {
 		if in, found, cerr := h.cfg.Content.Info(r.Context(), id); cerr == nil && found {
-			out["content"] = in // sizes only; the text has its own endpoint
+			out["content"] = in // sizes and hash; the text has its own endpoint
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
+// adminRead reports whether a GET comes from the logged-in administrator and
+// from this site (the same Sec-Fetch-Site / Origin check as the POSTs).
+func (h *Handler) adminRead(r *http.Request) bool {
+	if !sameSite(r) {
+		return false
+	}
+	_, s := h.current(r)
+	return s != nil
+}
+
 // requireSession answers 401 unless the request carries the administrator's
-// session.
+// session, and 403 for a cross-site request (a second layer behind the
+// SameSite=Strict cookie; revisão 10.L, A2).
 func (h *Handler) requireSession(w http.ResponseWriter, r *http.Request) bool {
+	if !sameSite(r) {
+		jsonErr(w, http.StatusForbidden, "origem não permitida")
+		return false
+	}
 	if _, s := h.current(r); s != nil {
 		return true
 	}
@@ -225,9 +313,9 @@ func (h *Handler) apiJobContent(w http.ResponseWriter, r *http.Request) {
 }
 
 // csvSafe defuses spreadsheet formulas: a cell starting with = + - @ or a
-// control character is read by Excel as a formula.
+// control character (tab, CR, LF) is read by a spreadsheet as a formula.
 func csvSafe(s string) string {
-	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+	if s != "" && strings.ContainsRune("=+-@\t\r\n", rune(s[0])) {
 		return "'" + s
 	}
 	return s
@@ -317,6 +405,9 @@ func (h *Handler) apiJobsExport(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			h.logf("monitor: export: %v", err)
 			return // headers are gone; the truncated file is the signal
+		}
+		if !withContent {
+			rows = coarseJobRows(rows) // metadata only, open: no exact size
 		}
 		for _, j := range rows {
 			var c content.Content
