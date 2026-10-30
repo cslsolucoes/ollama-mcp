@@ -95,3 +95,20 @@
     7. AER 364, sem base da sessão;
     8. RAM "usada" de 9,5 → 14 GB.
   - Sem commit (ordem do owner).
+- 2026-10-30 16:25 — **10.3 DECIDIDA pelo owner (AskUserQuestion): "Implementar só o pool pronto para um secundário futuro".**
+  - **D9-C1: NÃO implantar a faixa CPU.** Pela medição 10.1/10.2:
+    - o prefill na CPU é ~90× mais lento, a geração ~11× e os embeddings ~16×;
+    - a CPU é limitada a 35 W (PL1);
+    - a carga na CPU tira 4–10% da geração da GPU;
+    - o saldo de vazão é ~0.
+    - As decisões D9-C2..C5 ficam sem efeito.
+  - **Escopo novo das etapas 10.4–10.8:** pool de backends, com `backends.json` opcional; **sem ele, um único `gpu-local`, que é o comportamento de hoje, e um teste de não regressão prova isso**. Incluem:
+    - saúde ativa e passiva + disjuntor (3 falhas → aberto 30 s → meio-aberto);
+    - sobrecarga S1–S3 (S4, energia, opcional);
+    - repasse F1–F8 (mesmo modelo e digest; `alta` só para secundário GPU; sem migração durante a execução; histerese);
+    - ação "drenar backend" no `/monitor`;
+    - quadro "Backends";
+    - store `backend_id`/`failover_rule`/`backend_samples`;
+    - mcpollama `--ollama-url-fallback` (+ token e CA próprios), **desligado por padrão**.
+  - **Aceite (10.7)** numa INSTÂNCIA DE TESTE do gateway, com um secundário temporário (por exemplo, uma `ollama-cpu` na 11435 só durante o teste), para provar o repasse e o disjuntor sem tocar na produção.
+  - 10.4 disparada (agente sonnet).
