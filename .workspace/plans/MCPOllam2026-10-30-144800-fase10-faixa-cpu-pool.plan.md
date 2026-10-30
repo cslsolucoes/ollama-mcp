@@ -205,3 +205,33 @@
     5. **Decisão do owner:** os contadores de tokens seguem exatos nas rotas abertas (o arredondamento a KiB é mitigação, não sigilo).
     6. Export por `OFFSET` pode repetir ou pular linha com jobs chegando (Baixa).
     7. Pendências 3 a 8 da 10.L (acima) seguem como estavam; a 8 foi confirmada pelo K1.
+- 2026-10-30 18:12 — **10.L IMPLANTADA e conferida** (loop principal).
+  - **Instalações:** `0.11.0-6cbaf22` às 17:29 e `0.11.1-f7975fb` às 18:09 (correções da revisão adversarial `cd71ed8`/`998a70d`), pelo instalador (`-Modo Atualizar`). O gate foi refeito como 2ª via antes de cada uma: 19 pacotes ok, gofmt vazio, 0 CR.
+  - **Conferido no servidor:**
+    - pedido-sentinela → job `ok` com início e fim;
+    - prompt (com a sentinela) e resposta (332 caracteres) no `content.db`;
+    - **sentinela ausente** do `gateway.db`/`-wal`;
+    - `/jobs/{id}/content` sem sessão → 401;
+    - extrato de GPU do job: 4 GPUs + CPU, clock máximo de 1.395 MHz (trava ok);
+    - `content.db*` com 600, dono `mcpgw`;
+    - **teste Linux do `content` (P1/sync FULL) rodado no servidor como `mcpgw`: PASS 2/2**;
+    - nenhum evento `conteudo_indisponivel`/`teto_conteudo_falhou` depois da instalação.
+  - **Extrato temporário `gpu-extrato`** (16:53–17:31): parado e removido; o CSV fica em `/root/gpu-extrato-20261030.csv`.
+  - `CONEXAO-IA.md` (PC = servidor) e `CLAUDE.md` (`3358810`) atualizados.
+  - **Estado das etapas:**
+
+    | Etapa | Estado |
+    | --- | --- |
+    | 10.1/10.2 | concluídas |
+    | 10.3 | decidida |
+    | **10.L** | **concluída** |
+    | 10.4 | estacionada (`wip/fase10-4-pool`) |
+    | 10.5–10.8 | pendentes (dependem da 10.4) |
+    | **10.S** (nova) | pendente (depende do pool e do IP/SSH do owner) |
+
+    A 10.S é a preparação do secundário 4× RTX 2060 (i5-10500T, 24 GB de VRAM, 32 GB de RAM depois da divisão dos pentes).
+  - **Pendências do owner:**
+    1. Backup × `content.db` (excluir ou cifrar).
+    2. Opcional: arredondar também os tokens nas rotas abertas.
+    3. Troca da fonte.
+    4. IP/SSH do secundário.
