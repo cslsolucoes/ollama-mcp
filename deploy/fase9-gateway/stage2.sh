@@ -47,12 +47,15 @@ install -m 0644 -o root -g root "$D/ollama.conf" "$NG.new"; mv -f "$NG.new" "$NG
 nginx -t
 systemctl reload nginx
 trap - ERR
+# o reload troca os workers de forma gradual: sem esta espera, a 1a conferencia pode cair num worker
+# antigo (que ainda aponta direto ao Ollama) - aconteceu na ativacao de 2026-10-30 12:12
+sleep 5
 
 # 4) verificacao pelo caminho real (nginx + Bearer + gateway + Ollama); token so pelo stdin
 R=$(printf 'Authorization: Bearer %s\n' "$(sed -n 2p /root/API-Key)" | curl -sk -m 60 https://127.0.0.1:8443/api/generate -H @- \
   -H 'X-Mcpollama-Client: deploy96/check' -D "$B/h.txt" -d '{"model":"qwen3-ia","prompt":"Responda apenas: pong","stream":false}')
 echo "resposta: $(echo "$R" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(repr(d.get("response")), "eval", d.get("eval_count"), "thinking", len(d.get("thinking") or ""))')"
-grep -iE '^x-(request-id|queue-ms|queue-position):' "$B/h.txt" | tr -d '\r'; rm -f "$B/h.txt"
+grep -iE '^x-(request-id|queue-ms|queue-position):' "$B/h.txt" | tr -d '\r' || echo "AVISO: resposta sem os headers da fila (nginx ainda nao recarregou?) - confira de novo"; rm -f "$B/h.txt"
 echo "sem token:  $(curl -sk -m 5 -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/api/version)"
 echo "pull:       $(curl -sk -m 5 -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/api/pull)"
 echo "/monitor:   $(curl -sk -m 5 -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/monitor)"

@@ -11,7 +11,7 @@ read -rs -p "Senha do admin do /monitor (12+ caracteres): " PW; echo
 read -rs -p "Repita a senha: " PW2; echo
 [ "$PW" = "$PW2" ] || { unset PW PW2; echo "as senhas nao conferem; nada foi gravado"; exit 1; }
 unset PW2
-[ ${#PW} -ge 12 ] || { unset PW; echo "senha curta (minimo 12); nada foi gravado"; exit 1; }
+N=${#PW}; [ "$N" -ge 12 ] || { unset PW; echo "senha curta: $N caracteres contados (minimo 12); nada foi gravado"; exit 1; }
 printf "%s\n" "$PW" | /usr/local/bin/mcpollama-gateway hash-password -user admin > "$F.new"
 unset PW
 test -s "$F.new"

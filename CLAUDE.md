@@ -184,10 +184,14 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
   config em `%USERPROFILE%\.openclaude\csl-ollama.env`) é o que este servidor substitui por uma
   tool MCP. Desde 2026-10-26 ele usa o mesmo `qwen3-ia` (decisão do owner: **só modelos
   otimizados para o hardware**: `qwen3-ia` para geração e `nomic-embed-text` para embeddings).
-  Pelo `/v1`, o `ia-local` raciocina a cada chamada até a fila (gateway, Fase 9) poder desligar o
-  raciocínio. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
-- **Fase 9 (fila + `/monitor`):** código em `src/gateway/` e `src/cmd/mcpollama-gateway/`
-  (9.1–9.5 concluídas e revisadas; ainda **não implantado**). Plano:
+  Desde a fila (2026-10-30), o `ia-local` (`/v1`) chega **sem raciocínio** por padrão; com
+  `OPENAI_MODEL=qwen3-ia-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
+- **Fase 9 (fila + `/monitor`):** código em `src/gateway/` e `src/cmd/mcpollama-gateway/`.
+  **Implantado em 2026-10-30 12:12** (9.6): nginx :8443 → `mcpollama-gateway` 127.0.0.1:11500 →
+  Ollama **só em 127.0.0.1:11434**. Monitor em `https://ia.cslsolucoes.com.br:8443/monitor`, só na LAN,
+  com usuário `admin`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
+  e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e manual:
+  `deploy/fase9-gateway/` (`Instalar-Gateway.ps1`, `MANUAL.md`). Plano:
   `.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`. Mudanças em
   `src/gateway/` exigem rodar de novo os testes de ataque de
   `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.testes/`.

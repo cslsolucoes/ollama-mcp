@@ -747,3 +747,36 @@ Executada com a produção em horário combinado, **uma coisa por vez**, monitor
     5. O modelo `<base>-think` **não existe no Ollama**: `/api/tags` e `/v1/models` não o listam. Se algum cliente validar o nome contra a lista, não vai achá-lo; documentar na 9.6b (nginx/implantação).
     6. `think` em `/api/embed` e o sufixo em embedding **não são aplicados** (por desenho); o rótulo fica vazio.
     7. Herdadas: pendências 1, 3 a 9 da 9.5 continuam como estavam (a 2 foi resolvida aqui: o gateway agora policia `options` e `keep_alive`).
+- 2026-10-30 12:20 — **9.6 IMPLANTAÇÃO CONCLUÍDA** (loop principal, com autorização do owner: "prossiga com as 1, 2 e 3").
+  - **Decisões do owner (2026-10-29/30):**
+    - `--priority-ips` = toda a LAN `10.100.2.0/24`;
+    - senha digitada pelo owner;
+    - políticas antes de instalar, numa instalação única (9.6a, `6d51d48`);
+    - fechar a porta 11434. Uma máquina `…da01::4` chamava a porta direto, sem token: 541 `/api/generate` em 27–28/10.
+  - **Instalador e pacote:** `deploy/fase9-gateway/`, com `Instalar-Gateway.ps1`, etapas 1/2, rollback, script de senha e `MANUAL.md` (15 seções, 31 flags conferidas).
+    - Commits `2cb599d`, `7e47707` e `f2d0162`, mais a correção da corrida do reload neste registro.
+  - **O que deu certo:**
+    - etapa 1 (usuário `mcpgw`, pastas, binário `0.9.0-2cb599d` com SHA-256 conferido);
+    - integridade provada por 3 recusas: arquivo adulterado, hash errado e pasta 0755;
+    - etapa 2 às 12:12:40: gateway `active`/`enabled`, Ollama em `127.0.0.1:11434`, nginx → 11500 com `nginx -t` ok.
+    - **Conferência pela estação 10.100.2.30:**
+      - `10.100.2.2:11434` → sem conexão (porta fechada); sem token → 401; `/api/pull` → 403; `/monitor` → 200;
+      - `CF-Connecting-IP: 203.0.113.77` forjado da LAN → registrado como `10.100.2.30` (correção do nginx funcionando);
+      - `/v1` padrão → "pong", 2 tokens, sem raciocínio; `qwen3-ia-think` → raciocínio de 687 caracteres;
+      - a tool MCP `generate` desta sessão passou pela fila (`queue_ms` 0);
+      - histórico do SQLite com `client_ip`, `label`, `think` e `status`.
+  - **O que não deu certo, e as soluções:**
+    1. **N1:** os scripts gravavam a senha com `0640`, e o gateway recusa (`admin.go`: só 0600). Corrigido para `mcpgw:mcpgw 0600` e provado no servidor (0640 → código 2; 0600 → `/monitor` 200).
+    2. **Senha:** o owner digitou 10 caracteres e o script exige 12, então recusou ("senha curta"). O script passou a mostrar a contagem.
+       - O owner deixou a senha em `/root/mcpgw_password.txt` (0600). O hash foi gerado desse arquivo **sem exibir a senha**.
+       - O gateway aceita a partir de 8. Recomendação: trocar por uma de 12 ou mais (`-Modo Senha`) e apagar o `.txt`.
+    3. **Corrida do reload:** o 1º teste da etapa 2 caiu num worker antigo do nginx, ainda direto ao Ollama (resposta com raciocínio e sem headers da fila), e o `grep` encerrou o script **depois** da ativação, sem rollback.
+       - Os workers novos começaram às 12:13:02; nas conferências seguintes tudo passou pela fila.
+       - Solução: `sleep 5` depois do reload, e o `grep` dos headers deixa de ser fatal.
+    4. **Erro meu de processo:** o instalador ficou parado pedindo a senha nesta sessão sem terminal. Encerrei com `TaskStop` às 11:31, sem efeito no servidor.
+  - **Backups:** `/root/srv-backup-20261028/fase96-ativacao-20261030-121239`. **Rollback:** `bash <pasta>/rollback.sh <pasta>`.
+  - **Pendências:**
+    1. 9.7: aceite ao vivo, com 2 → 5 → 10 agentes, ações no `/monitor` (login, promover, remover, cancelar) e a página aberta num navegador real.
+    2. Trocar a senha por uma de 12 ou mais e apagar `/root/mcpgw_password.txt`.
+    3. Identificar a máquina `2804:2904:706:da01::4`, que perdeu o acesso direto e deve passar a usar :8443 com token.
+    4. As extensões §11 (faixa CPU e pool) continuam planejadas.
