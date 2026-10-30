@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 )
@@ -573,7 +574,7 @@ func (p *Pool) Status(now time.Time, loads map[string]Load) []Status {
 		// The model: the resident one, otherwise the first one the registry names, otherwise the first installed.
 		if len(b.loaded) > 0 {
 			l := b.loaded[0]
-			s.Model, s.Processor, s.Digest = l.Name, l.Processor, l.Digest
+			s.Model, s.Processor, s.Digest = b.scrub(l.Name, 96), b.scrub(l.Processor, 32), b.scrub(l.Digest, 80)
 		} else if len(b.Modelos) > 0 {
 			s.Model = b.Modelos[0]
 		} else if len(b.installed) > 0 { // nothing resident: show the first installed model
@@ -582,7 +583,7 @@ func (p *Pool) Status(now time.Time, loads map[string]Load) []Status {
 				names = append(names, n)
 			}
 			sort.Strings(names)
-			s.Model = names[0]
+			s.Model = b.scrub(names[0], 96)
 		}
 		if s.Digest == "" && s.Model != "" {
 			s.Digest = b.installed[NormModel(s.Model)]
@@ -647,6 +648,11 @@ func (p *Pool) Run(ctx context.Context) {
 
 // CheckOnce runs one active check of b: /api/version, then /api/ps and
 // /api/tags (the resident model, whether it left 100% GPU, the digests).
+//
+// The reading of the models (/api/ps, /api/tags) comes first and always runs:
+// on the primary it is also the "Modelos" board, which must show the error when
+// the Ollama is down, as the collector's own loop did before the pool (revisão
+// 10.5, N1). /api/version only runs when that reading worked.
 func (p *Pool) CheckOnce(ctx context.Context, b *Backend) {
 	if b.col == nil {
 		return
@@ -654,13 +660,12 @@ func (p *Pool) CheckOnce(ctx context.Context, b *Backend) {
 	var v struct {
 		Version string `json:"version"`
 	}
-	err := b.col.Get(ctx, "/api/version", &v)
-	var snap models.Snapshot
-	if err == nil {
-		snap = b.col.Once(ctx)
-		if snap.Err != "" {
-			err = errors.New(snap.Err)
-		}
+	var err error
+	snap := b.col.Once(ctx)
+	if snap.Err != "" {
+		err = errors.New(snap.Err)
+	} else {
+		err = b.col.Get(ctx, "/api/version", &v)
 	}
 	p.observe(b, v.Version, snap, err)
 }
@@ -681,14 +686,14 @@ func (p *Pool) observe(b *Backend, version string, snap models.Snapshot, err err
 	b.checked, b.lastCheck = true, now
 	was := b.checkFailed
 	if err != nil {
-		msg := shortErr(err)
+		msg := b.scrub(shortErr(err), 160)
 		b.checkFailed, b.lastErr = true, msg
 		if !was {
 			p.emit("backend_down", b.ID+": "+msg)
 		}
 		p.failLocked(b, now, true)
 	} else {
-		b.checkFailed, b.version = false, version
+		b.checkFailed, b.version = false, cleanVersion(b.scrub(version, 64))
 		b.loaded = snap.Loaded
 		b.installed = make(map[string]string, len(snap.Installed))
 		for _, m := range snap.Installed {
@@ -701,7 +706,7 @@ func (p *Pool) observe(b *Backend, version string, snap models.Snapshot, err err
 			for _, l := range snap.Loaded {
 				if l.Processor != "100% GPU" && l.Processor != "-" {
 					b.degraded = true
-					b.lastErr = "modelo " + l.Name + " fora de 100% GPU: " + l.Processor
+					b.lastErr = b.scrub("modelo "+l.Name+" fora de 100% GPU: "+l.Processor, 160)
 				}
 			}
 		}
@@ -711,9 +716,47 @@ func (p *Pool) observe(b *Backend, version string, snap models.Snapshot, err err
 		if b.failActive && b.br == brClosed {
 			b.fails = 0
 		}
+		// A successful active check is a probe too: it reached the backend
+		// (version, ps and tags). Without this a secondary whose breaker opened
+		// stayed half-open forever, because a half-open secondary is not eligible
+		// and so never got the probe request (revisão 10.5, B1). The open period is
+		// kept: only an open breaker whose time is up closes here.
+		p.advance(b, now)
+		if b.br == brHalf && !b.probing {
+			b.br, b.fails = brClosed, 0
+			p.emit("breaker_close", b.ID+": a checagem ativa deu certo")
+		}
 	}
 	p.unlock()
 	p.changed()
+}
+
+// scrub removes the backend's own token from text that came from the backend
+// (a misconfigured or hostile secondary could echo the Authorization header in
+// its answers) and clips it, so it is safe for the open monitor state.
+func (b *Backend) scrub(s string, max int) string {
+	if b.token != "" {
+		s = strings.ReplaceAll(s, b.token, "[redigido]")
+	}
+	if len(s) > max {
+		s = s[:max]
+		for !utf8.ValidString(s) {
+			s = s[:len(s)-1]
+		}
+	}
+	return s
+}
+
+// cleanVersion keeps a version string to the characters a version has.
+func cleanVersion(v string) string {
+	out := make([]byte, 0, len(v))
+	for i := 0; i < len(v) && len(out) < 32; i++ {
+		c := v[i]
+		if c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '.' || c == '-' || c == '+' || c == '_' {
+			out = append(out, c)
+		}
+	}
+	return string(out)
 }
 
 func shortErr(err error) string {

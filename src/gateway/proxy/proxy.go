@@ -19,12 +19,14 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/http/httputil"
 	"net/netip"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/gateway/pool"
@@ -140,7 +142,16 @@ type exchange struct {
 	backend *pool.Backend // nil: the primary (Upstream)
 	runCtx  context.Context
 	tee     *respTee // nil without a journal
+	// connected is set when the transport got a connection to the backend: an
+	// error after that (EOF or reset before the answer) is not "unreachable" for
+	// the circuit breaker, because a request body can cause it (revisão 10.5, B3).
+	connected atomic.Bool
 }
+
+// errUpstreamRedirect: a secondary answered 3xx. Ollama never redirects a
+// generation; the redirect is not passed to the client, whose SDK could follow
+// it and send the prompt to the Location (revisão 10.5, S2).
+var errUpstreamRedirect = errors.New("o backend respondeu com redirecionamento")
 
 // New builds the Handler.
 func New(cfg Config) (*Handler, error) {
@@ -188,6 +199,15 @@ func New(cfg Config) (*Handler, error) {
 			ex, _ := resp.Request.Context().Value(ctxKey{}).(*exchange)
 			if ex == nil {
 				return nil
+			}
+			if ex.backend != nil {
+				// A secondary is another machine: its cookies never reach the
+				// gateway's origin (the monitor lives there) and its redirects are
+				// not passed on (revisão 10.5, S2).
+				resp.Header.Del("Set-Cookie")
+				if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+					return errUpstreamRedirect
+				}
 			}
 			ex.status = resp.StatusCode
 			ex.body = &countingBody{rc: resp.Body, ctx: resp.Request.Context()}
@@ -431,6 +451,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(HeaderQueuePosition, strconv.Itoa(tk.Position))
 
 	ctx := context.WithValue(runCtx, ctxKey{}, ex)
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { ex.connected.Store(true) }})
 	out := r.WithContext(ctx)
 	out.Body = io.NopCloser(bytes.NewReader(body))
 	out.ContentLength = int64(len(body))
@@ -487,8 +508,11 @@ func (h *Handler) result(reqCtx context.Context, tk *queue.Ticket, ex *exchange)
 		if res.HTTPStatus == 0 || res.HTTPStatus < 400 {
 			res.HTTPStatus = 499
 		}
+	case errors.Is(ex.proxyEr, errUpstreamRedirect):
+		res.Status, res.ErrorClass, res.HTTPStatus = queue.StatusError, "upstream_redirect", 502
 	case ex.proxyEr != nil:
 		res.Status, res.ErrorClass, res.HTTPStatus = queue.StatusError, "upstream_unreachable", 502
+		res.AfterConnect = ex.connected.Load()
 	case ex.status >= 400:
 		res.Status, res.ErrorClass = queue.StatusError, "upstream_"+strconv.Itoa(ex.status)
 	case ex.body != nil && !complete && ex.body.readErr == nil:

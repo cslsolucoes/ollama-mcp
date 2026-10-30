@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,12 +93,9 @@ type registryFile struct {
 // is refused. The URL of every backend comes from this file only: no request,
 // header or monitor field can add or change one (no SSRF by the client).
 func LoadFile(path string) ([]Spec, error) {
-	if err := checkPerm(path, "--backends"); err != nil {
-		return nil, err
-	}
-	b, err := readLimited(path, maxRegistryBytes)
+	b, err := readSecret(path, "--backends", maxRegistryBytes)
 	if err != nil {
-		return nil, fmt.Errorf("--backends: %w", err)
+		return nil, err
 	}
 	var f registryFile
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -146,18 +144,37 @@ func CheckMode(path, flagName string, mode os.FileMode, goos string) error {
 	return nil
 }
 
-func readLimited(path string, max int64) ([]byte, error) {
+// readSecret reads a file that holds configuration or a secret: it must be a
+// regular file with mode 0600 (Unix), and the checks are made again on the
+// open descriptor, which must be the same file that was checked by name. A file
+// swapped (rename, symlink) between the check and the open is refused (revisão
+// 10.5, S4: TOCTOU). The name check comes first so a FIFO never blocks the open.
+func readSecret(path, flagName string, max int64) ([]byte, error) {
+	if err := checkPerm(path, flagName); err != nil {
+		return nil, err
+	}
+	pre, _ := os.Stat(path)
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", flagName, err)
 	}
 	defer f.Close()
-	b, err := io.ReadAll(io.LimitReader(f, max+1))
+	fi, err := f.Stat()
 	if err != nil {
+		return nil, fmt.Errorf("%s: %w", flagName, err)
+	}
+	if pre == nil || !os.SameFile(pre, fi) || !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s %s mudou entre a checagem e a leitura", flagName, path)
+	}
+	if err := CheckMode(path, flagName, fi.Mode(), runtime.GOOS); err != nil {
 		return nil, err
 	}
+	b, err := io.ReadAll(io.LimitReader(f, max+1))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", flagName, err)
+	}
 	if int64(len(b)) > max {
-		return nil, errors.New("arquivo grande demais")
+		return nil, fmt.Errorf("%s: arquivo grande demais", flagName)
 	}
 	return b, nil
 }
@@ -216,8 +233,14 @@ func parseURL(raw string) (*url.URL, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
 		return nil, errors.New("url deve ser http(s)://host[:porta]")
 	}
-	if u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery || (u.Path != "" && u.Path != "/") {
 		return nil, errors.New("url sem credenciais, caminho, query ou fragmento")
+	}
+	if p := u.Port(); p != "" { // url.Parse only checks that the port is digits (revisão 10.5, S1)
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 1 || n > 65535 {
+			return nil, errors.New("url com porta inválida (1 a 65535)")
+		}
 	}
 	if ip := net.ParseIP(u.Hostname()); ip != nil && (ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()) {
 		return nil, errors.New("url aponta para um endereço não permitido")
@@ -314,12 +337,9 @@ func Build(specs []Spec, allowed []string, think string, timeout time.Duration, 
 		u, _ := parseURL(s.URL)
 		b := &Backend{Spec: s, URL: u}
 		if s.TokenFile != "" {
-			if err := checkPerm(s.TokenFile, "token_file de "+s.ID); err != nil {
-				return nil, err
-			}
-			raw, err := readLimited(s.TokenFile, maxTokenBytes)
+			raw, err := readSecret(s.TokenFile, "token_file de "+s.ID, maxTokenBytes)
 			if err != nil {
-				return nil, fmt.Errorf("token_file de %s: %v", s.ID, err)
+				return nil, err
 			}
 			tok := strings.TrimSpace(string(raw))
 			if !tokenRe.MatchString(tok) {

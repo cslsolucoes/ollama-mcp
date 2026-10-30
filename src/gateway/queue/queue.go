@@ -205,6 +205,10 @@ type Result struct {
 	LoadMS     int64
 	Responded  bool  // the model returned some answer (text, or embeddings)
 	RespBytes  int64 // bytes of generated text received (0 for embeddings)
+	// AfterConnect (Fase 10.5) marks an upstream_unreachable that happened after
+	// the connection to the backend was made (EOF or reset before the answer).
+	// The record keeps the class; the circuit breaker treats it as neutral.
+	AfterConnect bool
 }
 
 // Record is the metadata row of a request (no text, plan section 5).
@@ -647,13 +651,15 @@ func (t *Ticket) FinalPriority() Priority {
 // or a stream error depends on the request (a malformed or abusive one makes the
 // Ollama answer 500) or on the client leaving, so they are neutral: otherwise one
 // client could open the breaker for everybody and force the hand-over to a
-// secondary. The active health check (/api/version, /api/ps) is the other input
-// of the breaker.
+// secondary. A connection that was made and then closed before the answer
+// (AfterConnect) is neutral too: a request body can cause it (revisão 10.5, B3).
+// The active health check (/api/version, /api/ps) is the other input of the
+// breaker.
 func outcomeOf(r Result) pool.Outcome {
 	switch {
 	case r.Status == "" || r.Status == StatusOK:
 		return pool.OutcomeOK
-	case r.ErrorClass == "upstream_unreachable":
+	case r.ErrorClass == "upstream_unreachable" && !r.AfterConnect:
 		return pool.OutcomeFail
 	}
 	return pool.OutcomeNeutral

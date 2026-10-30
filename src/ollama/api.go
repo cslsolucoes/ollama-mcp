@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -319,9 +320,14 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 		c.debugf("%s %s failed after %dms", method, path, time.Since(start).Milliseconds())
 		terr := c.transportErr(ctx, err, start, false, 0)
 		// Connection error: the primary never saw the request, so the fallback
-		// cannot duplicate work. A timeout or a cut stream is not retried here.
-		if fr, ok := c.tryFallback(ctx, terr, method, path, in, start); ok {
-			return fr, nil
+		// cannot duplicate work. A timeout or a cut stream is not retried here,
+		// and neither is any error after the connection was made (a malformed
+		// answer, an HTTP/2 GOAWAY or stream reset): the primary may have run the
+		// request (revisão 10.5, FB1).
+		if neverSent(err) {
+			if fr, ok := c.tryFallback(ctx, terr, method, path, in, start); ok {
+				return fr, nil
+			}
 		}
 		return nil, terr
 	}
@@ -402,6 +408,14 @@ func (c *Client) tryFallback(ctx context.Context, cause *Error, method, path str
 		p.used.Store(true)
 	}
 	return resp, true
+}
+
+// neverSent tells whether a transport error happened before any byte of the
+// request could reach the server: dialing (DNS, refused, unreachable) or
+// connecting through a proxy.
+func neverSent(err error) bool {
+	var op *net.OpError
+	return errors.As(err, &op) && (op.Op == "dial" || op.Op == "proxyconnect")
 }
 
 // queueFullWait recognises the gateway's "queue full" answer: 503 with a
