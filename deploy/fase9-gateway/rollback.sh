@@ -1,6 +1,7 @@
 #!/bin/bash
 # Fase 9.6 - rollback: volta o nginx direto ao Ollama e o Ollama a escutar na LAN; para o gateway.
-# Uso: bash /tmp/deploy96/rollback.sh <pasta-de-backup-da-etapa2>
+# Uso: bash <pasta-de-backup-da-etapa2>/rollback.sh <pasta-de-backup-da-etapa2>
+# (a etapa 2 guarda uma copia deste script na pasta de backup, que e so do root)
 set -uo pipefail
 B="$1"; NG=/etc/nginx/conf.d/ollama.conf; PERF=/etc/systemd/system/ollama.service.d/10-performance.conf
 test -s "$B/ollama.conf" && cp -p "$B/ollama.conf" "$NG.rb" && mv -f "$NG.rb" "$NG"
