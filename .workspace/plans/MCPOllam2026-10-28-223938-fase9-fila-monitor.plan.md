@@ -796,3 +796,15 @@ Executada com a produção em horário combinado, **uma coisa por vez**, monitor
     1. 9.7: aceite com carga, mais as ações do `/monitor` feitas pelo owner no navegador.
     2. Identificar a máquina `2804:2904:706:da01::4`.
     3. Opcional: importar a CA do Cloudflare nas estações e usar o nome `ia.cslsolucoes.com.br` em vez do IP, para tirar o aviso "Não seguro".
+- 2026-10-30 12:40 — **Conferência do NAT (MK-ESCRITORIO-02) e do Cloudflare, pedida pelo owner** (loop principal; só leitura no roteador até a decisão).
+  - **Achado grave, corrigido (`2a16888`):** o `/monitor` respondia 200 pela internet.
+    - Causa: o túnel `cloudflared` entrega como `::1`, e a `location /monitor` liberava o loopback, o que viola a D9-1.
+    - Pelo mesmo motivo, todos os clientes do túnel apareciam para a fila como `::1`.
+    - Correção: 403 em `/monitor` para qualquer pedido com `CF-Connecting-IP`, e o loopback fora da LAN no `geo`.
+    - Prova: internet `/monitor` 200 → 403; `/api/tags` com token pela internet 200; LAN 200. Backup do nginx no servidor.
+  - **NAT regra 0** (WAN:8443 → servidor, aberta a todos, usada só por varredores que recebiam 400/401 do nginx): o owner decidiu **restringir a `PERMITIDOS`**. Aplicado às 12:38, com o export do NAT salvo antes.
+  - **O IPv6 `…da01::4` é a TV LG Bancada** (`10.100.2.55`).
+  - **Pendências:**
+    1. Atualizar o `cloudflared` (2026.10.3 → 2026.10.6).
+    2. O owner verificar o app de IA na TV LG.
+    3. Endurecimento opcional do nginx: responder 403 antes do 401 para quem está fora da LAN e do Cloudflare.
