@@ -10,6 +10,7 @@
 package monitor
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	_ "embed"
@@ -34,7 +35,13 @@ import (
 )
 
 //go:embed index.html
-var indexHTML []byte
+var rawIndexHTML []byte
+
+// indexHTML is the page with CRLF folded to LF. The HTML parser normalizes
+// newlines before the browser hashes an inline script or style, so a page built
+// from a CRLF checkout would get CSP hashes that never match and the browser
+// would block both (seen live on 2026-10-30: page unstyled, "conectando...").
+var indexHTML = bytes.ReplaceAll(rawIndexHTML, []byte("\r\n"), []byte("\n"))
 
 // Hub fans a "something changed" signal out to the SSE clients. The queue's
 // OnChange hook calls Notify.
