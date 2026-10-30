@@ -1,11 +1,11 @@
 # Instalação do `mcpollama-gateway` (fila + `/monitor`, Fase 9.6) no servidor de IA
 
-O servidor de IA é o `10.100.2.2` (`lx-ai01`, alias SSH `lx-ai01-root`). O manual completo está em `MANUAL.md`.
+O servidor de IA é o `10.100.2.2` (`lx-ai01`, alias SSH `lx-ai01-root`). O manual completo está em [`docs/MANUAL-GATEWAY.md`](../../docs/MANUAL-GATEWAY.md).
 
 ## Instalador (recomendado)
 
 ```powershell
-cd E:\MCPOllam\deploy\fase9-gateway
+cd E:\MCPOllam\deploy\gateway
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1                   # instalação completa
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1 -Modo Atualizar    # só troca o binário
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1 -Modo Senha        # (re)define a senha do admin

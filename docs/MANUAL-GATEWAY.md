@@ -1,7 +1,7 @@
 # Manual de operação do `mcpollama-gateway` (Fase 9)
 
 Para quem opera o servidor de IA da CSL (`10.100.2.2`, `lx-ai01`) por SSH e usa o `/monitor` no navegador.
-Escrito a partir do código (`src/cmd/mcpollama-gateway`, `src/gateway/*`), da pasta `deploy/fase9-gateway/`, do plano
+Escrito a partir do código (`src/cmd/mcpollama-gateway`, `src/gateway/*`), da pasta `deploy/gateway/`, do plano
 e da revisão adversarial da Fase 9. Onde o plano e o código divergem, vale o código (ver "Notas de conferência", no fim).
 
 > **Nota N1 — resolvida em 2026-10-30 10:50.** A conferência deste manual achou que os scripts gravavam o arquivo da senha
@@ -40,7 +40,7 @@ visível, justa e auditável** posta na frente do Ollama, com uma página (`/mon
 cliente (mcpollama, ia-local/OpenClaude, curl)
    │  HTTPS :8443, Authorization: Bearer <TOKEN>   (LAN 10.100.2.0/24 ou Cloudflare Tunnel)
    ▼
-nginx :8443   TLS, Bearer, 600 pedidos/min por IP (rajada 60), 12 simultâneos por IP,
+nginx :8443   TLS, Bearer, 600 pedidos/min por IP (rajada 60), 30 simultâneos por IP,
    │          403 em /api/pull|push|create|delete|copy|blobs, /monitor só da LAN
    ▼
 mcpollama-gateway 127.0.0.1:11500   fila em memória + proxy + SQLite + /monitor
@@ -73,7 +73,7 @@ Pré-requisitos no PC: `go`, `git`, `ssh.exe` e `scp.exe` no PATH e o alias SSH 
 (`ssh lx-ai01-root true`).
 
 ```powershell
-cd E:\MCPOllam\deploy\fase9-gateway
+cd E:\MCPOllam\deploy\gateway
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1                  # instalação completa
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1 -Modo Atualizar   # só troca o binário
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1 -Modo Senha       # (re)define a senha do admin
@@ -138,7 +138,7 @@ Remove-Item Env:GOOS,Env:CGO_ENABLED
 
 ```bash
 # Git Bash
-cd /e/MCPOllam/deploy/fase9-gateway
+cd /e/MCPOllam/deploy/gateway
 P=$(mktemp -d); ARQ="mcpollama-gateway.service ollama.conf stage1.sh stage2.sh rollback.sh mcpgw-definir-senha.sh"
 for f in $ARQ; do sed 's/\r$//' "$f" > "$P/$f"; done      # LF ANTES de calcular os hashes
 cp /d/MCP/mcpollama-gateway "$P/mcpollama-gateway"
@@ -350,9 +350,9 @@ Rótulo válido: `^[A-Za-z0-9._:/@+-]{1,64}$`; fora disso vira `invalido`; vazio
 slot de geração o efeito é pequeno; vale para quando houver mais slots (os prefills não começam no mesmo milissegundo, o
 que atenua os picos de energia que derrubam a fonte de 850 W).
 
-**Camadas de limite** (do cliente para dentro): nginx 600 pedidos/min por IP (rajada 60) e **12 simultâneos** por IP
+**Camadas de limite** (do cliente para dentro): nginx 600 pedidos/min por IP (rajada 60) e **30 simultâneos** por IP
 (excedeu → **429 do nginx**, página HTML, não do gateway) → gateway (limites acima, **503 JSON**) → Ollama. Na prática o
-teto de 12 do nginx é atingido antes do teto de 16 esperando por IP do gateway.
+teto de 30 do nginx só é atingido depois do teto de 16 esperando por IP do gateway.
 
 ---
 
@@ -726,7 +726,7 @@ systemctl is-active mcpollama-gateway; journalctl -u mcpollama-gateway -n 5 --no
 ```
 
 O evento `gateway_config` (tabela `events`) registra a configuração de cada partida. **Replique a mudança** em
-`deploy/fase9-gateway/mcpollama-gateway.service` no repositório: senão, uma reinstalação (`Completo`) sobrescreve a edição.
+`deploy/gateway/mcpollama-gateway.service` no repositório: senão, uma reinstalação (`Completo`) sobrescreve a edição.
 Se a partida falhar por flag inválida, o serviço entra em laço (`Restart=always`): `journalctl` mostra
 `mcpollama-gateway: <erro>`; desfaça a edição.
 
@@ -750,7 +750,7 @@ Se a partida falhar por flag inválida, o serviço entra em laço (`Restart=alwa
 | **403** no `/monitor` | IP fora de `10.100.2.0/24` (inclusive via Cloudflare) | Acessar da LAN; ver `/monitor` por túnel só se o owner decidir |
 | **403** `origem não permitida` / `token CSRF ausente ou inválido` | Ação do monitor feita por outro site/ferramenta, ou sem o header | Usar a página, ou o `curl` da seção 7 |
 | **409** `removido da fila pelo administrador` / `cancelado pelo administrador` | O administrador agiu no `/monitor` | Ver a auditoria (motivo); o cliente pode repetir |
-| **429** (página HTML do nginx) | Mais de 12 pedidos simultâneos do mesmo IP, ou mais de 600/min (rajada 60) | Reduzir a concorrência do cliente; é o nginx, não a fila |
+| **429** (página HTML do nginx) | Mais de 30 pedidos simultâneos do mesmo IP, ou mais de 600/min (rajada 60) | Reduzir a concorrência do cliente; é o nginx, não a fila |
 | **503** JSON `fila do servidor cheia...` + `Retry-After` | Fila do gateway cheia (64) ou cota por IP/rótulo (16) | Esperar o `Retry-After` (o mcpollama repete 1 vez); ver quem ocupa a fila no `/monitor`; diminuir a rajada ou remover pedidos presos |
 | **503** `muitos painéis abertos` | Mais de 4 abas SSE do mesmo IP | Fechar painéis antigos |
 | **502** JSON `Ollama indisponível` | Ollama reiniciando ou parado | `systemctl status ollama`, `ollama ps`; aguardar a recarga (~20 s) |
@@ -866,18 +866,27 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje** tem 2 faixas (geração e embedding), todas na **GPU**, para **um** Ollama (`127.0.0.1:11434`). Não faz **Desde a 10.4**, com `--backends`, repassa o trabalho que ainda não começou a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (seção 16); a faixa CPU local foi **descartada** (D9-C1: o saldo de vazão era ~0).
-roteamento por prioridade entre GPU e CPU, nem repasse a outro servidor.
+**O gateway de hoje (`0.12.0`, em produção desde 2026-10-30)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
+**pool de backends** (seção 16). Em produção o pool tem **um único backend, o `gpu-local`** (o Ollama do próprio servidor,
+`127.0.0.1:11434`): sem `--backends` tudo se comporta como antes da 10.4. Com `--backends`, o gateway repassa o trabalho que
+**ainda não começou** a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (`--overload-wait` e
+`--overload-queue` regulam o repasse).
 
-**PLANEJADO e NÃO implementado** (plano, §11 e §11.9; começa depois do aceite 9.7; nenhuma flag abaixo existe no
-`config.go`):
+**Decidido e descartado**
 
-- **Faixa CPU/RAM** (uma segunda instância `ollama-cpu` e roteamento por pedido): regras R1–R9 (embedding na CPU se aprovado; `alta` sempre GPU; `baixa` na CPU se o tempo estimado couber; `normal` transborda se a espera na GPU passar de 60 s; roubo de trabalho da fila da CPU pela GPU; CPU fora do ar = tudo na GPU), header `X-Mcpollama-Lane`, headers de resposta `X-Lane` e `X-Routing-Reason`, ações do monitor "mover para GPU/CPU".
-- ~~Pool de backends / repasse a um Ollama secundário~~ **implementado na 10.4** (seção 16); falta só ter um secundário de verdade (10.S) e a revisão adversarial (10.5). `--overload-wait` e `--overload-queue` existem, com os padrões abaixo.
+- **Faixa CPU/RAM** (segunda instância `ollama-cpu` com roteamento por pedido): **descartada** pelo owner (D9-C1; Fase 10.1/10.2).
+  A medição deu `qwen3-ia` a ~4,6 tok/s de geração e ~25 tok/s de prefill na CPU, com interferência de -4 a -10% na GPU: o saldo de
+  vazão era ~0. As regras R1 a R9, os headers `X-Mcpollama-Lane`, `X-Lane` e `X-Routing-Reason` e as ações "mover para GPU/CPU"
+  do plano (§11 e §11.9) **não foram implementados** e nenhuma flag deles existe no `config.go`.
+
+**Planejado, sem data**
+
+- **Secundário real:** um segundo servidor com 4 GPUs RTX 2060 está planejado, **sem data** (etapa 10.S). Até lá o pool tem só o
+  `gpu-local`. A revisão adversarial do pool (10.5) já foi feita (seção 16).
 - Etapas 9.9 a 9.16 do plano (medições antes de ligar qualquer coisa).
 
-Hoje, para aguentar mais carga, os únicos botões são `--gen-slots` (inútil enquanto o Ollama atende 1 pedido por vez) e
-cotas/limites da fila.
+Hoje, para aguentar mais carga, os botões são `--gen-slots` (inútil enquanto o Ollama atende 1 pedido por vez), as
+cotas/limites da fila e, quando houver o secundário, o `--backends`.
 
 ---
 
@@ -885,8 +894,8 @@ cotas/limites da fila.
 
 | O quê | Onde |
 | --- | --- |
-| Instalador | `E:\MCPOllam\deploy\fase9-gateway\Instalar-Gateway.ps1` |
-| Pasta de implantação | `E:\MCPOllam\deploy\fase9-gateway\` (`README.md`, `mcpollama-gateway.service`, `ollama.conf`, `stage1.sh`, `stage2.sh`, `rollback.sh`, `mcpgw-definir-senha.sh`) |
+| Instalador | `E:\MCPOllam\deploy\gateway\Instalar-Gateway.ps1` |
+| Pasta de implantação | `E:\MCPOllam\deploy\gateway\` (`README.md`, `mcpollama-gateway.service`, `ollama.conf`, `stage1.sh`, `stage2.sh`, `rollback.sh`, `mcpgw-definir-senha.sh`) |
 | Flags e padrões | `E:\MCPOllam\src\cmd\mcpollama-gateway\config.go`, `main.go` |
 | Fila, proxy, políticas | `E:\MCPOllam\src\gateway\queue\queue.go`, `proxy\proxy.go`, `proxy\policy.go` |
 | Monitor, página, login | `E:\MCPOllam\src\gateway\monitor\monitor.go`, `admin.go`, `index.html` |

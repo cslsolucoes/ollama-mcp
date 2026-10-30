@@ -1,7 +1,7 @@
 # Arquivos de referência do servidor de IA
 
 Cópias dos arquivos de configuração do servidor de IA (`ia.cslsolucoes.com.br`, CentOS Stream 10), **coletadas do servidor em 2026-10-30**.
-Servem para reconstruir o servidor e para comparar com o que está em produção. O passo a passo de uso está em [INSTALACAO.md](../../INSTALACAO.md) (parte B).
+Servem para reconstruir o servidor e para comparar com o que está em produção. O passo a passo de uso está em [INSTALACAO.md](../../docs/INSTALACAO.md) (parte B).
 
 Regras:
 
@@ -41,7 +41,7 @@ por expressão regular `"~*^Bearer[[:space:]]+<TOKEN>$"`, equivalente para o cli
 
 ## Subpasta `nginx/`
 
-Arquivos do nginx coletados na mesma data. O `ollama.conf` do nginx **não** está aqui: está em [`../fase9-gateway/ollama.conf`](../fase9-gateway/ollama.conf), porque o instalador do gateway o implanta.
+Arquivos do nginx coletados na mesma data. O `ollama.conf` do nginx **não** está aqui: está em [`../gateway/ollama.conf`](../gateway/ollama.conf), porque o instalador do gateway o implanta.
 
 | Arquivo | Destino no servidor | Dono / modo | Descrição |
 | --- | --- | --- | --- |

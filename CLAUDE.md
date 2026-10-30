@@ -118,6 +118,11 @@ src/ollama/                 cliente HTTP do Ollama (API nativa /api/*)
 src/tools/                  uma tool (ou família) por arquivo, com *_test.go ao lado
 src/doctext/                extração de .docx, .pptx e .pdf (Fase 7)
 src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído no código)
+src/gateway/                gateway de fila + /monitor + pool de backends (Fases 9 e 10); entrypoint em src/cmd/mcpollama-gateway/
+docs/                       INSTALACAO.md (do zero) e MANUAL-GATEWAY.md (operação do gateway); índice em docs/README.md
+deploy/                     gateway/ (instalador, unit, nginx) e servidor-ia/ (cópias das configs do servidor); índice em deploy/README.md
+CHANGELOG.md · NOTICE.md    histórico de versões (mcpollama e gateway) e aviso de uso proprietário
+TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (não mover: TestCatalogInSync lê ../../TOOLS.md)
 ```
 
 - **Configuração:** flags com fallback para variável de ambiente, como em `TruenasMcp`/`mcpvmware-mcp`:
@@ -134,6 +139,9 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
   `--max-doc-bytes`/`MCPOLLAMA_MAX_DOC_BYTES` (default 32 MiB, só `.docx/.pptx/.pdf`),
   `--pdf-cache-dir`/`MCPOLLAMA_PDF_CACHE_DIR` (absoluto; cache de compilação do motor de PDF, sem ele nada é gravado em disco),
   `--max-line-bytes`/`MCPOLLAMA_MAX_LINE_BYTES`,
+  `--ollama-url-fallback`/`OLLAMA_HOST_FALLBACK` (segundo servidor, tentado **uma vez** em erro de conexão ou 503 de
+  fila cheia; **desligado por padrão**), `--fallback-api-key`/`OLLAMA_FALLBACK_API_KEY` (Bearer do fallback, nunca o do
+  primário), `--fallback-tls-ca`/`OLLAMA_FALLBACK_TLS_CA` (CA PEM do fallback),
   `--ocr-lib`/`MCPOLLAMA_OCR_LIB` (absoluto; liga o OCR, só Windows),
   `--ocr-lib-sha256`/`MCPOLLAMA_OCR_LIB_SHA256` (obrigatório com `--ocr-lib`),
   `--ocr-tessdata`/`MCPOLLAMA_OCR_TESSDATA` (default `<pasta da DLL>\tessdata\best`),
@@ -188,30 +196,38 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
   Desde a fila (2026-10-30), o `ia-local` (`/v1`) chega **sem raciocínio** por padrão; com
   `OPENAI_MODEL=qwen3-ia-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
 - **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
-  `store`, `monitor`, `gpu`, `cpu`, `models`) e `src/cmd/mcpollama-gateway/`. Versão em produção `0.10.1-e0d273c`.
-  Caminho: nginx :8443 → `mcpollama-gateway` 127.0.0.1:11500 → Ollama **só em 127.0.0.1:11434**.
+  `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção:
+  gateway `0.12.0-736c205`** (com o pool de backends). Caminho: nginx :8443 → `mcpollama-gateway`
+  127.0.0.1:11500 → Ollama **só em 127.0.0.1:11434**.
   Monitor em `https://ia.cslsolucoes.com.br:8443/monitor`, **só na LAN**. Pelo túnel do Cloudflare (`::1` +
   `CF-Connecting-IP`), a resposta é 403. Leitura livre; as ações exigem o usuário `admin`. Mostra:
   - fila e execução;
   - GPUs (W / limite);
   - CPU/RAM por thread e núcleo;
   - modelos carregados e disponíveis;
-  - histórico, eventos e auditoria.
+  - quadro Backends (pool), histórico, eventos e auditoria.
 
   A atualização é a cada 1 s, e o SQLite grava a cada 5 s. Aceite 9.7: ordem por prioridade e ações do admin
   (promover, despromover, remover, cancelar) provadas, com auditoria e SQLite.
   **Fase 10 (2026-10-30, em execução):**
   - faixa CPU **descartada** (medida: saldo ~0);
-  - **log de jobs em produção (10.L, gateway `0.11.1-f7975fb`)**: grava **prompt e resposta completos** em
+  - **log de jobs em produção (10.L)**: grava **prompt e resposta completos** em
     `content.db` (0600, 7 dias; texto só para o admin) e um extrato das GPUs a 1 s por job;
-  - o pool para um secundário (10.4) está no ramo `wip/fase10-4-pool`; o secundário planejado é um PC com 4× RTX 2060.
-  - Clock das GPUs travado em 210–1400 MHz desde 2026-10-30, por causa da fonte.
+  - **pool de backends (10.4), revisão adversarial (10.5) e implantação (10.6) concluídas**: o gateway
+    `0.12.0-736c205` está em produção com o pool, que tem um único backend, o `gpu-local` (sem `--backends`).
+    O ramo `wip/fase10-4-pool` foi removido (merge `736c205` no `master`; tag `gateway-v0.12.0`). A **10.7
+    (aceite ao vivo) está em andamento**. O secundário planejado é um PC com 4× RTX 2060, sem data (10.S);
+  - **fallback do mcpollama** (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`): existe no
+    `master`, **desligado por padrão** (ainda não vai em um binário com tag);
+  - clock das GPUs travado em 210–1400 MHz desde 2026-10-30, por causa da fonte.
   - Plano: `.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
-  e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e manual:
-  `deploy/fase9-gateway/` (`Instalar-Gateway.ps1`, `MANUAL.md`). Plano:
+  e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e configs do nginx/unit:
+  `deploy/gateway/` (`Instalar-Gateway.ps1`); manual de operação: `docs/MANUAL-GATEWAY.md`; guia de instalação do
+  zero: `docs/INSTALACAO.md`. Plano da Fase 9:
   `.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`. Mudanças em
   `src/gateway/` exigem rodar de novo os testes de ataque de
-  `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.testes/`.
+  `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.testes/` e, para o pool, os de
+  `.workspace/reports/MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool.testes/`.
 
 ---
 

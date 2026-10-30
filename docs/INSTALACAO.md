@@ -1,7 +1,7 @@
 # Guia de instalação do zero: mcpollama, servidor de IA e gateway
 
 > Para o administrador da CSL que precisa montar tudo de novo (servidor novo ou depois de um desastre) e configurar as
-> estações. Repositório privado: <https://github.com/cslsolucoes/mcpollama>. Visão geral do projeto: [README.md](README.md).
+> estações. Repositório privado: <https://github.com/cslsolucoes/mcpollama>. Visão geral do projeto: [README.md](../README.md).
 >
 > **Sem segredos neste guia.** Onde aparece `<TOKEN>`, `<SENHA>` ou `<IP>`, use o valor real do seu ambiente e **nunca**
 > o grave no git, em chat ou em log. Os segredos de produção ficam só no servidor e nos cofres do owner. O acesso SSH
@@ -74,14 +74,14 @@ Para reproduzir a configuração:
 ## B. Servidor de IA (Linux)
 
 Tudo nesta parte é feito **como root no servidor**. Os arquivos de referência são cópias do servidor de produção
-coletadas em 2026-10-30; estão em [`deploy/servidor-ia/`](deploy/servidor-ia/README.md) (descrição de cada um no README da pasta).
+coletadas em 2026-10-30; estão em [`deploy/servidor-ia/`](../deploy/servidor-ia/README.md) (descrição de cada um no README da pasta).
 
 Para enviá-los do PC (alias SSH do owner, `<ALIAS-SSH>`; **conferir** o alias no seu `~/.ssh/config`):
 
 ```powershell
 scp E:\MCPOllam\deploy\servidor-ia\* <ALIAS-SSH>:/root/servidor-ia/
 scp -r E:\MCPOllam\deploy\servidor-ia\nginx <ALIAS-SSH>:/root/servidor-ia/
-scp E:\MCPOllam\deploy\fase9-gateway\ollama.conf <ALIAS-SSH>:/root/servidor-ia/
+scp E:\MCPOllam\deploy\gateway\ollama.conf <ALIAS-SSH>:/root/servidor-ia/
 ```
 
 No servidor, garanta LF nos arquivos (o repositório usa LF, mas confira se o `scp` não os alterou):
@@ -125,7 +125,7 @@ dependência (`After=`/`Wants=`) dessa unit; ele vem com o pacote do driver (**c
 
 ### B.3 Limite de potência e clock: `nvidia-powercap.service`
 
-Arquivo: [`deploy/servidor-ia/nvidia-powercap.service`](deploy/servidor-ia/nvidia-powercap.service).
+Arquivo: [`deploy/servidor-ia/nvidia-powercap.service`](../deploy/servidor-ia/nvidia-powercap.service).
 
 ```bash
 install -m 0644 /root/servidor-ia/nvidia-powercap.service /etc/systemd/system/nvidia-powercap.service.new
@@ -196,7 +196,7 @@ Esperado no `ollama list`: `qwen3-ia:latest` e `qwen3.5:9b` com o **mesmo ID** (
 é só refazer o alias (ver [G.3](#g3-trocar-o-modelo-alias)), sem mexer em nenhum cliente. O `qwen3.5:9b` raciocina por padrão (não dá para desligar no
 Modelfile): o mcpollama e o gateway mandam `think:false`/`reasoning_effort:"none"`.
 
-**Variáveis do drop-in** [`ollama-10-performance.conf`](deploy/servidor-ia/ollama-10-performance.conf) que importam para o projeto
+**Variáveis do drop-in** [`ollama-10-performance.conf`](../deploy/servidor-ia/ollama-10-performance.conf) que importam para o projeto
 (destino: `/etc/systemd/system/ollama.service.d/10-performance.conf`):
 
 | Variável | Valor | Por que importa |
@@ -214,7 +214,7 @@ As demais linhas do arquivo (`OLLAMA_KV_CACHE_TYPE=q4_0`, `OLLAMA_FLASH_ATTENTIO
 num servidor novo, troque pelos UUIDs de `nvidia-smi -L` (por UUID o índice não muda se a topologia mudar). Depois de editar:
 `systemctl daemon-reload && systemctl restart ollama`.
 
-A unit base [`ollama.service`](deploy/servidor-ia/ollama.service) tem `Restart=always` e um `Environment="PATH=..."` com caminhos de
+A unit base [`ollama.service`](../deploy/servidor-ia/ollama.service) tem `Restart=always` e um `Environment="PATH=..."` com caminhos de
 `/root/.opencode` herdados do servidor de origem; não são necessários para o Ollama (**conferir** antes de reaproveitar tal qual).
 
 Como conferir:
@@ -228,7 +228,7 @@ ollama ps                    # depois do ollama-warm (B.5): qwen3-ia e nomic, PR
 
 ### B.5 Pré-aquecimento: `ollama-warm`
 
-Arquivos: [`ollama-warm.service`](deploy/servidor-ia/ollama-warm.service) e [`ollama-warm.sh`](deploy/servidor-ia/ollama-warm.sh).
+Arquivos: [`ollama-warm.service`](../deploy/servidor-ia/ollama-warm.service) e [`ollama-warm.sh`](../deploy/servidor-ia/ollama-warm.sh).
 
 ```bash
 install -m 0755 /root/servidor-ia/ollama-warm.sh /usr/local/bin/ollama-warm
@@ -267,8 +267,8 @@ Como conferir: `journalctl --disk-usage` e `ls /var/log/journal`; depois de um r
 
 ### B.7 nginx (Linux), completo
 
-O nginx é o **único ponto público**. Arquivos de referência coletados do servidor: [`deploy/servidor-ia/nginx/`](deploy/servidor-ia/nginx/) e,
-para o `ollama.conf`, [`deploy/fase9-gateway/ollama.conf`](deploy/fase9-gateway/ollama.conf).
+O nginx é o **único ponto público**. Arquivos de referência coletados do servidor: [`deploy/servidor-ia/nginx/`](../deploy/servidor-ia/nginx/) e,
+para o `ollama.conf`, [`deploy/gateway/ollama.conf`](../deploy/gateway/ollama.conf).
 
 #### B.7.1 Instalação e serviço
 
@@ -277,7 +277,7 @@ dnf -y install nginx policycoreutils-python-utils
 nginx -v                       # nginx version: nginx/1.26.3 (pacote nginx-1.26.3-15.el10)
 ```
 
-A unit coletada, [`nginx/nginx.service`](deploy/servidor-ia/nginx/nginx.service), é `Type=forking` com `ExecStartPre=/usr/bin/rm -f /run/nginx.pid` (evita falha
+A unit coletada, [`nginx/nginx.service`](../deploy/servidor-ia/nginx/nginx.service), é `Type=forking` com `ExecStartPre=/usr/bin/rm -f /run/nginx.pid` (evita falha
 de contexto SELinux no PID) e `ExecStartPre=/usr/sbin/nginx -t` (não sobe com configuração inválida); `ExecReload=nginx -s reload`; `KillSignal=SIGQUIT`.
 O pacote do EL10 já instala uma unit equivalente em `/usr/lib/systemd/system/nginx.service`; **instale a cópia do repositório só se precisar reproduzi-la**
 (**conferir** se a de produção está em `/etc/systemd/system/` ou em `/usr/lib/systemd/system/`):
@@ -290,7 +290,7 @@ systemctl enable nginx            # NÃO inicie ainda: faltam certificado, token
 
 #### B.7.2 `nginx.conf` principal
 
-Arquivo: [`nginx/nginx.conf`](deploy/servidor-ia/nginx/nginx.conf). É o padrão do pacote com poucos pontos que importam:
+Arquivo: [`nginx/nginx.conf`](../deploy/servidor-ia/nginx/nginx.conf). É o padrão do pacote com poucos pontos que importam:
 
 - `user nginx;` e `worker_processes auto;`;
 - `error_log /var/log/nginx/error.log notice;` e `access_log ... main` (o formato `main` registra `$remote_addr`, `$http_x_forwarded_for`; **não** registra o cabeçalho `Authorization`);
@@ -298,12 +298,12 @@ Arquivo: [`nginx/nginx.conf`](deploy/servidor-ia/nginx/nginx.conf). É o padrão
 - **nenhum listener em texto claro** (porta 80 removida): o host só atende a API por HTTPS na 8443. O bloco `server` TLS de exemplo (porta 443) vem comentado.
 
 Se partir do `nginx.conf` do pacote, apague/comente o `server { listen 80; ... }` padrão e deixe o resto. Em `conf.d/` fica **só o `ollama.conf`**
-(na produção havia também um `ollama.conf.bak-20261023-011207`, [`nginx/conf.d-lista.txt`](deploy/servidor-ia/nginx/conf.d-lista.txt); **backups com final `.conf` são
+(na produção havia também um `ollama.conf.bak-20261023-011207`, [`nginx/conf.d-lista.txt`](../deploy/servidor-ia/nginx/conf.d-lista.txt); **backups com final `.conf` são
 carregados pelo `include` e duplicariam as definições, por isso mantenha cópias fora do `conf.d/` ou com final diferente de `.conf`**).
 
 #### B.7.3 Pastas, certificado e token
 
-Dono e permissões de produção ([`nginx/permissoes.txt`](deploy/servidor-ia/nginx/permissoes.txt)):
+Dono e permissões de produção ([`nginx/permissoes.txt`](../deploy/servidor-ia/nginx/permissoes.txt)):
 
 | Caminho | Dono | Modo |
 | --- | --- | --- |
@@ -343,7 +343,7 @@ umask 077
 openssl rand -hex 32            # 64 caracteres hexadecimais; é o <TOKEN>
 ```
 
-O arquivo [`nginx-auth.conf.modelo`](deploy/servidor-ia/nginx-auth.conf.modelo) é o modelo do `/etc/nginx/ollama/auth.conf`. O `map` compara o cabeçalho
+O arquivo [`nginx-auth.conf.modelo`](../deploy/servidor-ia/nginx-auth.conf.modelo) é o modelo do `/etc/nginx/ollama/auth.conf`. O `map` compara o cabeçalho
 `Authorization` **inteiro**, então o valor real é **`"Bearer <TOKEN>"`** (com o prefixo `Bearer `); o modelo coletado mostra só `"<TOKEN>"`, como placeholder.
 Na instalação à mão:
 
@@ -372,7 +372,7 @@ printf 'API key do Ollama CSL\n%s\n' '<TOKEN>' > /root/API-Key
 
 #### B.7.4 O `ollama.conf`, bloco a bloco
 
-Destino: `/etc/nginx/conf.d/ollama.conf`. Fonte: [`deploy/fase9-gateway/ollama.conf`](deploy/fase9-gateway/ollama.conf) (é o que o `Instalar-Gateway.ps1` instala).
+Destino: `/etc/nginx/conf.d/ollama.conf`. Fonte: [`deploy/gateway/ollama.conf`](../deploy/gateway/ollama.conf) (é o que o `Instalar-Gateway.ps1` instala).
 
 | Bloco | O que faz |
 | --- | --- |
@@ -399,11 +399,11 @@ sed 's#http://127.0.0.1:11500#http://127.0.0.1:11434#' /root/servidor-ia/ollama.
 ```
 
 Nesse modo, `/monitor` não funciona (não há gateway) e a etapa 2 do gateway depois troca para o `ollama.conf` do repositório.
-Se preferir instalar o definitivo já agora, copie o `deploy/fase9-gateway/ollama.conf` e aceite que `/api/*` dá 502 até a parte C.
+Se preferir instalar o definitivo já agora, copie o `deploy/gateway/ollama.conf` e aceite que `/api/*` dá 502 até a parte C.
 
 #### B.7.5 Rotação do token: `ollama-key-rotate`
 
-Cópia do script de produção: [`nginx/ollama-key-rotate.sh`](deploy/servidor-ia/nginx/ollama-key-rotate.sh). **Instalado no servidor como `/usr/local/bin/ollama-key-rotate`**
+Cópia do script de produção: [`nginx/ollama-key-rotate.sh`](../deploy/servidor-ia/nginx/ollama-key-rotate.sh). **Instalado no servidor como `/usr/local/bin/ollama-key-rotate`**
 (caminho informado pelo owner). Instalação num servidor novo:
 
 ```bash
@@ -427,7 +427,7 @@ O token antigo **deixa de valer de imediato** (depois do reload). O script **nã
 
 #### B.7.6 `cloudflare-allow.conf`
 
-Arquivo: [`nginx-cloudflare-allow.conf`](deploy/servidor-ia/nginx-cloudflare-allow.conf) -> `/etc/nginx/ollama/cloudflare-allow.conf` (0644). São as linhas
+Arquivo: [`nginx-cloudflare-allow.conf`](../deploy/servidor-ia/nginx-cloudflare-allow.conf) -> `/etc/nginx/ollama/cloudflare-allow.conf` (0644). São as linhas
 `allow <faixa>;` das redes da borda do Cloudflare (22 faixas, 15 IPv4 e 7 IPv6 na cópia de 2026-10-30). Para atualizar com as listas oficiais:
 
 ```bash
@@ -443,7 +443,7 @@ Como o tráfego pelo túnel chega por loopback, esta lista importa sobretudo par
 
 #### B.7.7 SELinux
 
-Coletado em [`nginx/selinux.txt`](deploy/servidor-ia/nginx/selinux.txt): o SELinux está **Enforcing**, sem módulo local.
+Coletado em [`nginx/selinux.txt`](../deploy/servidor-ia/nginx/selinux.txt): o SELinux está **Enforcing**, sem módulo local.
 
 - **`httpd_can_network_connect` = on**: necessário para o nginx fazer proxy até `127.0.0.1:11500`/`11434`. Se faltar, o sintoma é 502 com `Permission denied` no `error.log`:
 
@@ -458,7 +458,7 @@ Coletado em [`nginx/selinux.txt`](deploy/servidor-ia/nginx/selinux.txt): o SELin
 
 #### B.7.8 logrotate
 
-[`nginx/logrotate-nginx`](deploy/servidor-ia/nginx/logrotate-nginx) -> `/etc/logrotate.d/nginx`: `/var/log/nginx/*.log`, diário, 10 rotações, comprimido com `delaycompress`,
+[`nginx/logrotate-nginx`](../deploy/servidor-ia/nginx/logrotate-nginx) -> `/etc/logrotate.d/nginx`: `/var/log/nginx/*.log`, diário, 10 rotações, comprimido com `delaycompress`,
 arquivos criados `0640 nginx root`, e no `postrotate` manda `USR1` ao nginx para reabrir os logs.
 
 ```bash
@@ -540,7 +540,7 @@ systemctl daemon-reload
 systemctl enable --now cloudflared
 ```
 
-A unit [`cloudflared.service`](deploy/servidor-ia/cloudflared.service): `Type=notify`,
+A unit [`cloudflared.service`](../deploy/servidor-ia/cloudflared.service): `Type=notify`,
 `ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --token-file /etc/cloudflared/token`, `Restart=on-failure`, `RestartSec=5s`, `After=network-online.target`.
 O token vai por **arquivo** (`--token-file`), nunca na linha de comando.
 
@@ -561,15 +561,15 @@ A regra de NAT `WAN:8443 -> 10.100.2.2:8443` (no roteador MikroTik do escritóri
 
 ## C. Gateway de fila e `/monitor`
 
-O gateway é instalado **a partir do PC**, pelo [`deploy/fase9-gateway/Instalar-Gateway.ps1`](deploy/fase9-gateway/Instalar-Gateway.ps1). Detalhes de operação: [`deploy/fase9-gateway/MANUAL.md`](deploy/fase9-gateway/MANUAL.md)
-(não copiados aqui) e [`deploy/fase9-gateway/README.md`](deploy/fase9-gateway/README.md).
+O gateway é instalado **a partir do PC**, pelo [`deploy/gateway/Instalar-Gateway.ps1`](../deploy/gateway/Instalar-Gateway.ps1). Detalhes de operação: [`MANUAL-GATEWAY.md`](MANUAL-GATEWAY.md)
+(não copiados aqui) e [`deploy/gateway/README.md`](../deploy/gateway/README.md).
 
 **Pré-requisitos.** No PC: `go`, `git`, `ssh.exe`, `scp.exe` no PATH e o alias SSH do servidor funcionando (`ssh <ALIAS-SSH> true`; o padrão do instalador é `lx-ai01-root`, e o
 parâmetro `-Servidor` o troca). No servidor: tudo da parte B pronto, `python3` instalado (a etapa 2 o usa para ler JSON) e o token na 2ª linha de `/root/API-Key`
 (a etapa 2 faz uma chamada real pelo nginx). Instale com a **fila vazia**: a etapa 2 reinicia o Ollama.
 
 ```powershell
-cd E:\MCPOllam\deploy\fase9-gateway
+cd E:\MCPOllam\deploy\gateway
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1                  # instalação completa
 ```
 
@@ -600,9 +600,9 @@ este guia, o estado guardado é o da B.7.4 (nginx direto ao Ollama) **se você u
 
 Como conferir (no servidor): `systemctl is-active mcpollama-gateway` (`active`), `/usr/local/bin/mcpollama-gateway --version`, `curl -s http://127.0.0.1:11500/healthz` (`ok`),
 `ss -tlnH | grep -E '11434|11500'` (ambos em 127.0.0.1). Na LAN: `https://ia.cslsolucoes.com.br:8443/monitor` abre o painel.
-Tabela de diagnóstico completa: seção 10 do [MANUAL](deploy/fase9-gateway/MANUAL.md#10-diagnóstico).
+Tabela de diagnóstico completa: seção 10 do [MANUAL](MANUAL-GATEWAY.md#10-diagnóstico).
 
-Nota: o MANUAL cita 12 conexões por IP em alguns pontos; o `ollama.conf` atual usa **30** (`limit_conn ollama_conn 30`, desde 2026-10-30). Vale o arquivo.
+Nota: o limite de conexões simultâneas por IP é **30** (`limit_conn ollama_conn 30` no `ollama.conf`, desde 2026-10-30); o MANUAL do gateway está alinhado com esse valor.
 
 ---
 
@@ -687,7 +687,7 @@ Get-ChildItem D:\MCP\tessdata -Recurse -File | Select-Object FullName, Length
 ```
 
 Tamanhos de referência (cópia atual do owner): `best\por` 8.159.939, `best\osd` 10.562.727, `fast\por` 1.982.756, `fast\osd` 10.562.727 bytes.
-Por padrão o OCR usa `<pasta da DLL>\tessdata\best`. Flags do OCR (padrões em `src/mcpollama-mcp/config.go` e no [CLAUDE.md](CLAUDE.md)): `--ocr-lib`, `--ocr-lib-sha256` (obrigatório com `--ocr-lib`),
+Por padrão o OCR usa `<pasta da DLL>\tessdata\best`. Flags do OCR (padrões em `src/mcpollama-mcp/config.go` e no [CLAUDE.md](../CLAUDE.md)): `--ocr-lib`, `--ocr-lib-sha256` (obrigatório com `--ocr-lib`),
 `--ocr-tessdata`, `--ocr-workers`, `--ocr-page-timeout` (1m), `--ocr-max-pages` (30), `--ocr-max-mem` (1 GiB), `--ocr-max-megapixels` (40), `--ocr-dpi` (300).
 Qualquer problema do OCR na partida (hash divergente, DLL ausente, modelos ausentes) vira `WARNING: OCR disabled: ...` no stderr e o servidor sobe **sem OCR**.
 
@@ -703,7 +703,7 @@ $init, $list, $call | D:\MCP\mcpollama-mcp.exe --ollama-url https://ia.cslsoluco
   --tls-ca "$env:USERPROFILE\.openclaude\certs\cloudflare-origin-ca.pem" --api-key <TOKEN>
 ```
 
-Como conferir: três respostas JSON-RPC; a 1ª com `serverInfo` e `protocolVersion`; a 2ª com as tools (`list_models`, `generate`, `chat`, `embed` e, com `--allow-root`, `summarize_file`, `extract`, `translate`: **7**, catálogo em [TOOLS.md](TOOLS.md));
+Como conferir: três respostas JSON-RPC; a 1ª com `serverInfo` e `protocolVersion`; a 2ª com as tools (`list_models`, `generate`, `chat`, `embed` e, com `--allow-root`, `summarize_file`, `extract`, `translate`: **7**, catálogo em [TOOLS.md](../TOOLS.md));
 a 3ª com `qwen3-ia` e `nomic-embed-text`. Erros: `x509` = CA errada/ausente (D.3); `401` = token errado; timeout = servidor ou rota (seção H). O token não deve ficar no histórico:
 prefira a variável de ambiente `OLLAMA_API_KEY` (`$env:OLLAMA_API_KEY='<TOKEN>'`, só na sessão).
 
@@ -844,7 +844,7 @@ go build -ldflags "-X main.Version=<versao>" -o D:\MCP\mcpollama-mcp.exe ./mcpol
 ```
 
 Reinicie o cliente (Claude Code, Cursor, VS Code); o binário em uso é renomeado para `.exe~` (apague-o depois). Confira com `--version` e `list_models`.
-Mudanças em `src/files/`, `src/doctext/`, `src/ocr/` ou `src/gateway/` exigem rodar de novo os testes de ataque descritos no [CLAUDE.md](CLAUDE.md).
+Mudanças em `src/files/`, `src/doctext/`, `src/ocr/` ou `src/gateway/` exigem rodar de novo os testes de ataque descritos no [CLAUDE.md](../CLAUDE.md).
 
 ### G.2 Trocar o binário do gateway
 
@@ -863,7 +863,7 @@ ollama ps
 ```
 
 Nenhum cliente muda (o nome é `qwen3-ia`). **Confira os pré-requisitos do novo modelo:** se ele raciocina por padrão (`think:false`), se roda em 1 slot, e a VRAM a 64k. Faça um teste de carga antes de adotar (as medidas da Fase 8 estão no
-[report de carga multiagente](.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md)). Remova o alias de backup quando não precisar mais (`ollama rm`).
+[report de carga multiagente](../.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md)). Remova o alias de backup quando não precisar mais (`ollama rm`).
 
 ### G.4 Rotacionar o token
 
@@ -942,7 +942,7 @@ Teste sempre depois de mexer no `ollama.conf`: da internet `/monitor` deve dar 4
 | Modelo recarrega a cada pedido | `ollama-warm` parado, Ollama reiniciado, contexto diferente | `ollama ps`; `systemctl status ollama-warm` |
 | Unit com 0 bytes / "masked" depois de queda de energia | corte seco durante a gravação | reinstale a unit do repositório (B.3: `.new`, `test -s`, `mv`, `sync`) |
 
-Tabela de diagnóstico completa do gateway: [MANUAL, seção 10](deploy/fase9-gateway/MANUAL.md#10-diagnóstico).
+Tabela de diagnóstico completa do gateway: [MANUAL, seção 10](MANUAL-GATEWAY.md#10-diagnóstico).
 
 ### H.5 Pontos marcados "conferir" (resumo)
 

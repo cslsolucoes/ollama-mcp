@@ -70,7 +70,11 @@ Em produção (2026-10-30):
 | Componente | Versão (tag) | Onde |
 | --- | --- | --- |
 | `mcpollama-mcp` | **0.8.1** (`mcpollama-v0.8.1`, desde 2026-10-29 15:11) | `D:\MCP\mcpollama-mcp.exe` (estações) |
-| `mcpollama-gateway` | **0.11.1** (`gateway-v0.11.1`, desde 2026-10-30 18:09) | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
+| `mcpollama-gateway` | **0.12.0** (`gateway-v0.12.0`, `0.12.0-736c205`, desde 2026-10-30 19:43), com o pool de backends | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
+
+Tags no repositório: `mcpollama-v0.8.1`, `gateway-v0.11.1` e `gateway-v0.12.0`. O histórico de versões está no
+[CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5) já está no `master`, mas depois da tag `mcpollama-v0.8.1`:
+ainda não saiu em um binário com tag.
 
 | Fase | Assunto | Estado |
 | --- | --- | --- |
@@ -83,7 +87,7 @@ Em produção (2026-10-30):
 | 7 | Documentos `.docx`, `.pptx`, `.pdf` e OCR (PDF digitalizado, `.png`, `.jpg`) | concluída (OCR opt-in) |
 | 8 | Bake-off de modelos: `qwen3-ia` = `qwen3.5:9b`; argumento `think` por chamada | concluída |
 | 9 | Gateway: fila, políticas, `/monitor`, SQLite, instalador | concluída (2026-10-30) |
-| 10 | Faixa CPU/RAM e pool de backends | **em execução** (detalhes abaixo) |
+| 10 | Log de jobs, pool de backends e fallback (faixa CPU descartada) | **em execução**: 10.4 a 10.6 concluídas, 10.7 (aceite) em andamento |
 
 **Fase 10** ([plano](.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md)):
 
@@ -92,8 +96,11 @@ Em produção (2026-10-30):
 | 10.1 e 10.2: medição da CPU, interferência na GPU e energia | concluídas (qwen3-ia na CPU: ~4,6 tok/s de geração, ~25 tok/s de prefill; saldo de CPU ~0; interferência de -4% a -10% na GPU; pico de energia 392 W) |
 | 10.3: decisão sobre a faixa CPU | **faixa CPU descartada** (decisão do owner); só o pool pronto para secundário |
 | **10.L**: log de jobs com conteúdo completo | **em produção** (gateway 0.11.1), revisada adversarialmente |
-| 10.4: pool de backends | **em revisão** (retomada no ramo `wip/fase10-4-pool`) |
-| 10.5 a 10.8: revisão, implantação, aceite e documentação do pool | pendentes (dependem da 10.4) |
+| 10.4: pool de backends (registro, saúde, disjuntor, repasse por sobrecarga, drenar) e fallback do mcpollama | **concluída** (merge `736c205`; o ramo `wip/fase10-4-pool` foi removido) |
+| 10.5: revisão adversarial do pool | **concluída** (correções `b1d8418`) |
+| 10.6: implantação do pool | **concluída**: gateway `0.12.0` em produção desde 2026-10-30 19:43, com um único backend (`gpu-local`) |
+| 10.7: aceite ao vivo | **em andamento** |
+| 10.8: documentação final e fechamento da fase | pendente |
 | 10.S: secundário 4× RTX 2060 | planejado, **sem data** |
 
 Pendências sem data: segunda fonte para o servidor, backup do `content.db` (excluir ou cifrar) e
@@ -203,6 +210,9 @@ diagnóstico, está no [CLAUDE.md](CLAUDE.md).
 | `--ocr-lib` e `--ocr-lib-sha256` | `MCPOLLAMA_OCR_LIB`, `MCPOLLAMA_OCR_LIB_SHA256` | sem padrão (juntas, ligam o OCR) |
 | `--client-label` | `MCPOLLAMA_CLIENT_LABEL` | `<hostname>/<pid>` (rótulo que aparece no `/monitor`) |
 | `--tools-verbosity` | `MCPOLLAMA_TOOLS_VERBOSITY` | `full` (`compact` encurta o `tools/list`) |
+| `--ollama-url-fallback` | `OLLAMA_HOST_FALLBACK` | sem padrão: **desligado**. Segundo servidor, tentado **uma vez** quando o primário dá erro de conexão ou 503 de fila cheia; a linha `[uso]` ganha `backend=fallback` |
+| `--fallback-api-key` | `OLLAMA_FALLBACK_API_KEY` | sem padrão (Bearer **do fallback**; o token do primário nunca vai para ele; só com `https://` ou loopback) |
+| `--fallback-tls-ca` | `OLLAMA_FALLBACK_TLS_CA` | sem padrão (PEM do fallback, somado ao pool do sistema; o `--insecure` não vale para ele) |
 | `--debug` | `MCPOLLAMA_DEBUG` | `false` (só metadados, nunca argumentos nem token) |
 
 stdout é exclusivo do JSON-RPC; log e debug vão para stderr. O servidor não grava em disco a não ser que uma
@@ -250,14 +260,16 @@ Ver não exige login; as ações exigem o usuário `admin`. Atualiza ao vivo por
   `content.db` (texto dos jobs, 7 dias). O que sobrevive a reinício ou reboot fica marcado como
   `interrompido_reboot` ou `interrompido_gateway`.
 
-**Pool de backends (Fase 10.4, em revisão).** O gateway de hoje fala com **um** Ollama. O pool prepara o repasse a um
-Ollama secundário na LAN em caso de sobrecarga (`backends.json`, disjuntor, histerese, "drenar"), e o mcpollama ganha um
-fallback que fica **desligado** até existir um secundário. Nada disso está em `master` nem em produção: o código vive
-no ramo `wip/fase10-4-pool`. A faixa CPU foi descartada. O
-secundário planejado é um PC com 4× RTX 2060, sem data.
+**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`).** O gateway tem um **registro de backends**
+(`backends.json`, modo 0600, lido só na partida), saúde ativa e passiva, disjuntor, histerese e "drenar" no monitor, e repassa a
+geração que **ainda não começou** a um Ollama secundário da LAN quando o primário está sobrecarregado ou doente. **Hoje o pool
+tem um único backend, o `gpu-local`** (o Ollama do próprio servidor, sem `--backends`): o comportamento é o mesmo de antes do
+pool. O mcpollama ganhou um **fallback opcional** (seção 5), **desligado por padrão**, para o caso de o servidor inteiro cair. A
+faixa CPU foi **descartada** (medição 10.1/10.2: saldo ~0). O secundário planejado é um PC com 4× RTX 2060, **sem data**.
+A revisão adversarial do pool (10.5) está feita.
 
 Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico, rollback e segurança):
-[deploy/fase9-gateway/MANUAL.md](deploy/fase9-gateway/MANUAL.md).
+[docs/MANUAL-GATEWAY.md](docs/MANUAL-GATEWAY.md).
 
 ## 7. Servidor de IA
 
@@ -285,7 +297,7 @@ Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico
 ## 8. Instalação e atualização
 
 > **Guia completo do zero:** para montar o servidor de IA, o gateway, as estações e os clientes do começo, ou depois de um desastre, siga o
-> **[INSTALACAO.md](INSTALACAO.md)** (passo a passo com comandos, saída esperada e conferência). Os arquivos de referência do servidor estão em
+> **[docs/INSTALACAO.md](docs/INSTALACAO.md)** (passo a passo com comandos, saída esperada e conferência). Os arquivos de referência do servidor estão em
 > [`deploy/servidor-ia/`](deploy/servidor-ia/README.md). O resumo abaixo cobre só a instalação e a atualização do dia a dia.
 
 **mcpollama (estação Windows).** Os fontes ficam em `src/`; o executável vai para `D:\MCP`. Binários não são versionados.
@@ -303,7 +315,7 @@ Depois, **reinicie a sessão do Claude Code** e confira com `D:\MCP\mcpollama-mc
 SSH `lx-ai01-root`):
 
 ```powershell
-cd E:\MCPOllam\deploy\fase9-gateway
+cd E:\MCPOllam\deploy\gateway
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1                  # instalação completa
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1 -Modo Atualizar   # só troca o binário e reinicia o gateway
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Instalar-Gateway.ps1 -Modo Senha       # (re)define a senha do admin
@@ -329,6 +341,19 @@ apaga usuário, binário, unit, senha nem banco. Para voltar só o binário, vej
 
 ## 9. Desenvolvimento
 
+**Layout do repositório**
+
+```
+README.md  CHANGELOG.md  NOTICE.md  CLAUDE.md  TOOLS.md   visão geral, versões, aviso de uso, guia do Claude Code, catálogo das tools
+docs/                      INSTALACAO.md, MANUAL-GATEWAY.md e o índice (README.md)
+deploy/gateway/            instalador, unit do systemd, ollama.conf do nginx e scripts de etapa do gateway
+deploy/servidor-ia/        cópias das configurações do servidor de IA (sem segredos)
+src/                       código Go (módulo único)
+.workspace/                planos e reports históricos
+```
+
+`TOOLS.md` fica na raiz de propósito: é gerado por `src/cmd/dumptools` e conferido por `TestCatalogInSync`.
+
 **Layout de `src/`** (módulo Go `github.com/cslsoftwares/mcpollama`, `go 1.26.0`; toolchain local go1.27.0)
 
 | Pasta | Conteúdo |
@@ -341,7 +366,7 @@ apaga usuário, binário, unit, senha nem banco. Para voltar só o binário, vej
 | `doctext/` | extração de `.docx`, `.pptx` e `.pdf` (go-pdfium em WASM/wazero, sem cgo) |
 | `ocr/` | OCR de PDF digitalizado e imagens (Tesseract em processos filhos) |
 | `redact/` | redação do token em mensagens e logs |
-| `gateway/` | `queue`, `proxy`, `store`, `monitor`, `gpu`, `cpu`, `models`, `content`, `joblog` |
+| `gateway/` | `queue`, `proxy`, `pool`, `store`, `monitor`, `gpu`, `cpu`, `models`, `content`, `joblog` |
 | `cmd/` | `mcpollama-gateway`, `dumptools` (gera o `TOOLS.md`) e `bakeoff` |
 
 **Comandos** (dentro de `src/`)
@@ -369,7 +394,7 @@ ataque da revisão adversarial correspondente antes de dar por pronto:
 | --- | --- |
 | `src/files/` | [`...fase4-arquivos.testes`](.workspace/reports/MCPOllam2026-10-23-2130-revisao-adversarial-fase4-arquivos.testes) |
 | `src/doctext/` | [`...revisao-adversarial-fase7.testes`](.workspace/reports/MCPOllam2026-10-28-161147-revisao-adversarial-fase7.testes) |
-| `src/gateway/` | [`...revisao-adversarial-fase9.testes`](.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.testes) e [`...revisao-adversarial-10L.testes`](.workspace/reports/MCPOllam2026-10-30-173000-revisao-adversarial-10L.testes) |
+| `src/gateway/` | [`...revisao-adversarial-fase9.testes`](.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.testes), [`...revisao-adversarial-10L.testes`](.workspace/reports/MCPOllam2026-10-30-173000-revisao-adversarial-10L.testes) e [`...revisao-adversarial-10-5-pool.testes`](.workspace/reports/MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool.testes) |
 | `src/ocr/` | `go test -tags ocr ./...` com a DLL real |
 
 **Convenções**
@@ -405,7 +430,7 @@ ataque da revisão adversarial correspondente antes de dar por pronto:
 | Fase 9.5 (gateway) | 30 vetores, 0 Altos, todos os achados corrigidos | [report](.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md) |
 | 10.L (log de jobs) | 0 Altos, 5 Médios e 5 Baixos, todos corrigidos | [report](.workspace/reports/MCPOllam2026-10-30-173000-revisao-adversarial-10L.report.md) |
 
-Riscos residuais conhecidos estão na seção 12 do [MANUAL](deploy/fase9-gateway/MANUAL.md) (por exemplo: o rótulo do
+Riscos residuais conhecidos estão na seção 12 do [MANUAL](docs/MANUAL-GATEWAY.md) (por exemplo: o rótulo do
 cliente é livre, há um único administrador compartilhado e a LAN inteira pode pedir prioridade `alta`).
 
 ## 11. Documentação e planos
@@ -414,9 +439,12 @@ cliente é livre, há um único administrador compartilhado e a LAN inteira pode
 | --- | --- |
 | [CLAUDE.md](CLAUDE.md) | estado das fases, servidor, configuração completa, comandos e segredos |
 | [TOOLS.md](TOOLS.md) | catálogo das 7 tools (esquemas), gerado do código |
-| [deploy/fase9-gateway/MANUAL.md](deploy/fase9-gateway/MANUAL.md) | operação do gateway: instalação, flags, fila, políticas, monitor, API, SQLite, diagnóstico, rollback, segurança |
-| [deploy/fase9-gateway/README.md](deploy/fase9-gateway/README.md) | instalador e arquivos de `deploy/` |
-| [INSTALACAO.md](INSTALACAO.md) | guia completo de instalação do zero: servidor, gateway, estação e clientes |
+| [docs/MANUAL-GATEWAY.md](docs/MANUAL-GATEWAY.md) | operação do gateway: instalação, flags, fila, políticas, monitor, API, SQLite, diagnóstico, rollback, segurança |
+| [deploy/gateway/README.md](deploy/gateway/README.md) | instalador e arquivos de `deploy/` |
+| [docs/INSTALACAO.md](docs/INSTALACAO.md) | guia completo de instalação do zero: servidor, gateway, estação e clientes |
+| [docs/README.md](docs/README.md) e [deploy/README.md](deploy/README.md) | índices das pastas `docs/` e `deploy/` |
+| [CHANGELOG.md](CHANGELOG.md) | histórico de versões do mcpollama e do mcpollama-gateway |
+| [NOTICE.md](NOTICE.md) | aviso de uso proprietário e componentes de terceiros |
 | [deploy/servidor-ia/](deploy/servidor-ia/README.md) | cópias dos arquivos do servidor de IA (Ollama, powercap, nginx, cloudflared), coletadas em 2026-10-30 |
 | [Plano de implementação (Fases 0 a 6)](.workspace/plans/MCPOllam2026-10-23-150845-mcpollama-implementacao.plan.md) | decisões e changelog das fases iniciais |
 | [Plano da Fase 7 (extração de documentos)](.workspace/plans/MCPOllam2026-10-28-132000-extracao-docx-pdf-pptx.brief.md) | brief de `.docx`, `.pdf` e `.pptx` |
@@ -455,3 +483,4 @@ O brief das referências está em [`referencias/Brief_Referencias/`](referencias
 credenciais reais: não copie configs dali.
 
 **Licença.** O repositório não tem arquivo de licença: é **software proprietário de uso interno da CSL**. Não redistribua.
+Os avisos de uso e os componentes de terceiros estão no [NOTICE.md](NOTICE.md).
