@@ -1,6 +1,6 @@
 # Plano — Fase 10: faixa CPU/RAM (segundo Ollama) e pool de backends com repasse por sobrecarga
 
-> **Estado:** **EM EXECUÇÃO** desde 2026-10-30 14:48. O owner pediu: "já pode executar, ao concluir 100%".
+> **Estado:** 🧊 **CONGELADA** (2026-10-30, decisão explícita do owner — "finalizar a fase até onde é possível, e congelar o plano"). 10.1 a 10.8 concluídas; 10.S (secundário) pendente, sem data. Arquivo movido para `.workspace/plans/congelados/`. Execução iniciada em 2026-10-30 14:48 ("já pode executar, ao concluir 100%"). Pendências ao descongelar: seção "Pendências sem data (ao descongelar)" no fim deste arquivo; relatório final: `.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md`.
 > **Desenho (fonte única):** a **§11 do plano da Fase 9** (`MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`):
 > §11.1–11.8 tratam da faixa CPU e §11.9 do pool de backends e do repasse por sobrecarga. Este plano não repete o desenho;
 > registra a execução, as decisões e o estado.
@@ -24,12 +24,13 @@
 | --- | --- | --- | --- | --- |
 | 10.1 | 9.9 | Inventário + **spike de medição** com uma `ollama-cpu` **temporária** (porta 11435, sem tráfego de produção): prefill e geração por modelo e por `num_thread`, carga a frio, RAM, embed do `nomic` na CPU × GPU, qualidade S2/S3 na CPU × GPU | opus | **concluída** (2026-10-30 16:19; report `MCPOllam2026-10-30-161904-fase10-1-medicao-cpu.report.md`) |
 | 10.2 | 9.10 | **Interferência e energia:** carga na CPU junto com carga na GPU; queda de vazão da GPU, temperatura e potência (GPU por `nvidia-smi` + CPU por RAPL como root); define `CPUAffinity`, `CPUQuota` e `num_thread` | opus (mesmo agente da 10.1) | **concluída** (2026-10-30 16:19; mesmo report) |
-| 10.3 | 9.11 | **Decisões D9-C1..C5 com o owner**, a partir dos números (ligar a faixa?, `nomic` na CPU?, modelo e limites) | loop principal | pendente |
-| 10.4 | 9.12 | **Código:** pool de backends (`gpu-local`/`cpu-local`/remotos por `backends.json`), regras R1–R9 e F1–F8, EWMA, estimador de tokens, roubo de trabalho, disjuntor, histerese, "drenar"; monitor por faixa e quadro Backends; store; mcpollama (`lane`/`rota`/fallback). Testes com 3 Ollama falsos | sonnet (worktree) | **código concluído** (ramo `worktree-agent-a9532e3414358d795`, 2026-10-30 18:55; sem merge, sem implantação) |
+| 10.3 | 9.11 | **Decisões D9-C1..C5 com o owner**, a partir dos números (ligar a faixa?, `nomic` na CPU?, modelo e limites) | loop principal | **concluída** (decisão do owner: faixa CPU descartada, só o pool pronto para secundário; ver o changelog deste plano) |
+| 10.4 | 9.12 | **Código:** pool de backends (`gpu-local`/`cpu-local`/remotos por `backends.json`), regras R1–R9 e F1–F8, EWMA, estimador de tokens, roubo de trabalho, disjuntor, histerese, "drenar"; monitor por faixa e quadro Backends; store; mcpollama (`lane`/`rota`/fallback). Testes com 3 Ollama falsos | sonnet (worktree) | **código concluído** (ramo `worktree-agent-a9532e3414358d795`, 2026-10-30 18:55; sem merge, sem implantação) → **mergeada** em `736c205` e **concluída** |
 | 10.5 | 9.13 | **Revisão adversarial** da faixa e do pool + reexecução dos ataques da 9.5 | opus | **concluída no código** (ramo `worktree-agent-a9532e3414358d795`, 2026-10-30 19:45; fix `b1d8418`; report `MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool`; sem merge, sem implantação; falta a rodada Linux dos testes de modo) |
-| 10.6 | 9.14 | **Implantação:** `ollama-cpu.service` + `ollama-cpu-warm` definitivos; gateway com o pool; backups e rollback ensaiado | loop principal | pendente |
+| 10.6 | 9.14 | **Implantação:** `ollama-cpu.service` + `ollama-cpu-warm` definitivos; gateway com o pool; backups e rollback ensaiado | loop principal | **concluída** (2026-10-30 19:43; gateway `0.12.0-736c205`; registrada no changelog de 20:09) |
 | 10.7 | 9.15 | **Aceite ao vivo:** carga mista (GPU + baixa na CPU), transbordo, roubo de trabalho, queda da `ollama-cpu` → R9, qualidade igual, potência dentro do teto; 2ª via no SQLite | opus | **concluída** (aceite do **pool** numa instância de teste, 2026-10-30 20:04; report `MCPOllam2026-10-30-200400-fase10-7-aceite-pool`; carga mista/roubo de trabalho da faixa CPU fora do escopo, que depende da 10.3) |
-| 10.8 | 9.16 | Documentação (`MANUAL`, `CONEXAO-IA`, `CLAUDE.md`), report final e plano fechado | sonnet + loop principal | pendente |
+| 10.8 | 9.16 | Documentação (`MANUAL`, `CONEXAO-IA`, `CLAUDE.md`), report final e plano fechado | sonnet + loop principal | **concluída** (2026-10-30 20:50; implantação `0.12.1-c4031f7` às 20:46, build mcpollama `0.9.0-c4031f7`, relatório final, plano congelado) |
+| 10.S | — | Secundário i5-10500T + 4× RTX 2060 6 GB como backend do pool (IP/SSH do owner, mesmo digest do `qwen3-ia`) | loop principal | **pendente, sem data** (ver "Pendências sem data") |
 
 **Regras de segurança da execução** (as mesmas da 8.9/9.7):
 - 1 bloco por vez, conferindo o uptime antes de cada um;
@@ -410,3 +411,32 @@
 "` virou newline); `gofmt` acusou, corrigi antes de rodar.
   - **Documentação:** `CHANGELOG.md` (gateway e mcpollama, "Não lançado"), `docs/MANUAL-GATEWAY.md` (fórmula da S1 e da S2).
   - **Pendências:** (1) implantar gateway `0.12.1` e mcpollama `0.9.0` (loop principal); (2) 10.8, 10.S e as herdadas da 10.7 §6.5.
+- 2026-10-30 20:50 — **10.8 e congelamento** (loop principal; sem push, sem tags nesta etapa; tags `gateway-v0.12.1` e `mcpollama-v0.9.0` criadas depois pelo coordenador em `c4031f7`).
+  - **Estado:** 10.1 a 10.8 **concluídas**; plano **🧊 congelado** a pedido do owner. 10.S pendente, sem data.
+  - **O que deu certo:**
+    1. **Gate no `master` `c4031f7`:** `go build` e `go vet` ok, `gofmt` limpo, `go test -count=1 ./...` com 20 pacotes ok e 0 FAIL (o agente de correções já tinha feito 3 rodadas, `-race`, build Linux e os ataques 9.5/10.L/10.5 PASS).
+    2. **Implantação do gateway `0.12.1-c4031f7` às 20:46** por `deploy/gateway/Instalar-Gateway.ps1 -Modo Atualizar`: `gateway_api_version=200`, `gateway_monitor=200`; `/monitor/api/state` relata `version 0.12.1-c4031f7`.
+    3. **Build do mcpollama `0.9.0-c4031f7`** em `D:\MCP\mcpollama-mcp.exe` (`--version` confere). Traz o fallback (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`, desligado por padrão) e as correções pós-aceite (`4a54c8e`: S1/S2 sem contar o próprio pedido, achado 10.7-1; `c4031f7`: último erro limpo ao ficar saudável, eventos `breaker_open`/`breaker_close` limitados a 1/min por backend com contagem de suprimidos, 403 "modelo não permitido pelo servidor" -> `ollama.ErrModelNotAllowed`, `TestConnectionDroppedMidStream` determinístico + `TestConnectionClosedMidStreamKeepsPartial`). **Precisa reiniciar as sessões do Claude Code** para carregar.
+    4. **2ª via independente da produção (20:5x, pelo alias `lx-ai01-root`):** boot ainda **2026-10-30 16:42:03** (sem reboot), `mcpollama-gateway`, `nginx` e `ollama` active, `mcpollama-gateway --version` = `0.12.1-c4031f7`, `qwen3-ia` e `nomic-embed-text` residentes, power limit 100 W.
+    5. **Limpeza (coordenador):** worktree `agent-a9532…` removido; ramo `wip/fase10-4-pool` apagado (commit `d38fb61` preservado na tag **só local** `archive/wip-fase10-4-pool`).
+  - **O que NÃO deu certo e a solução (erro de processo meu, registrado sem embelezar):**
+    1. **Incidente de SSH:** logo após a instalação, o SSH ao 10.100.2.2 passou a falhar/travar (inicialmente lido como "banner exchange: Unknown error", com a porta 22 aberta e o HTTPS ok). **Hipótese inicial errada:** throttling do sshd/fail2ban por várias conexões seguidas. **Causa real:** eu usei `ssh root@10.100.2.2` direto, em vez do alias `lx-ai01-root` do `~/.ssh/config`, que é o que tem a chave; sem a chave o ssh caiu no prompt de senha e travou. **Solução:** usar sempre o alias; pelo alias a 2ª via (item 4) funcionou de primeira. Não houve ban nem reboot. **Lição:** conferir o alias antes de concluir que o servidor limita o SSH; não atribuir a causa a fail2ban sem prova.
+  - **Números:** gateway `0.12.0-736c205` -> `0.12.1-c4031f7` (instalação 20:46); mcpollama `0.8.1` -> `0.9.0-c4031f7`; 20 pacotes de teste ok, 0 FAIL.
+  - **Documentação atualizada:** `CHANGELOG.md` ("Não lançado" virou gateway 0.12.1 e mcpollama 0.9.0), `README.md`, `CLAUDE.md`, `docs/MANUAL-GATEWAY.md`, plano geral (Fase 10 congelada) e o relatório final `MCPOllam2026-10-30-205000-fase10-final.report.md`. `docs/INSTALACAO.md` e `deploy/README.md` não citam versão do gateway/mcpollama nem o estado da Fase 10: sem mudança.
+  - **Decisão do owner:** finalizar a fase até onde é possível e congelar o plano. Este arquivo foi movido para `.workspace/plans/congelados/`.
+
+## Pendências sem data (ao descongelar)
+
+1. **10.S: secundário i5-10500T + 4× RTX 2060 6 GB.** Aguarda IP/SSH do owner. Passos: Ollama 0.40.8 + `qwen3.5:9b` com alias `qwen3-ia` e o **mesmo digest** do primário; nginx com TLS e **token próprio**; entrada no `backends.json` (modo 0600, `token_file` próprio, `tipo` do hardware real); ligar `--ollama-url-fallback` nos `.mcp.json`; aceite com carga real. Inclui medir a **carga a frio do primário (GPU) e o `/api/ps` durante ela** (pendência 2 da 10.7, não medida porque descarregar o modelo de produção foi proibido).
+2. **Segunda fonte.** O owner comprou o acionador para duas fontes. Ao instalar: revalidar 130–150 W por GPU e avaliar tirar a trava de clock (`nvidia-smi -rgc`; hoje 210–1400 MHz), com teste de carga que **para no 1º reboot**.
+3. **Backup do `content.db`.** Se houver backup do servidor, excluir `content.db*` ou cifrar (guarda prompt e resposta completos).
+4. **Divisão da RAM:** 64 GB (PC1) / 32 GB (PC2).
+5. **Opcional:** arredondar os contadores de tokens nas rotas abertas do monitor (hoje exatos; os bytes já saem em KiB).
+6. **Herdadas da 10.5/10.7 que seguem abertas:**
+   - decisão sobre `max_prompt_tokens` por bytes ÷ 3 (estimativa manipulável; pendência 2 da 10.5, 10.7 §6.5);
+   - decisão sobre mostrar `host:porta` do backend no monitor aberto, ou só com login (pendência 3 da 10.5, 10.7 §6.5);
+   - **S4** (energia) ligado ao teto de potência da §11.3 do plano da Fase 9: hoje só o gancho (pendência 7 da 10.4);
+   - opcional: contar 5xx na passiva só com >= 2 IPs distintos e confirmação da checagem ativa (alternativa (b), pendência 8 da 10.4);
+   - MANUAL §16.1: reforçar que o `tipo` do backend tem de ser o do hardware real (10.7 §6, item 3; o MANUAL §16.1 ainda não diz isso);
+   - backup do `gateway.db` antes de qualquer migração futura (pendência 6 da 10.4);
+   - comportamento de backend morto: alterna aberto/meio-aberto a cada ~20–25 s (10.7 achado 5; os eventos já são limitados a 1/min).

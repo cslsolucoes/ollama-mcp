@@ -866,7 +866,7 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje (`0.12.0`, em produção desde 2026-10-30)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
+**O gateway de hoje (`0.12.1`, em produção desde 2026-10-30 20:46)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
 **pool de backends** (seção 16). Em produção o pool tem **um único backend, o `gpu-local`** (o Ollama do próprio servidor,
 `127.0.0.1:11434`): sem `--backends` tudo se comporta como antes da 10.4. Com `--backends`, o gateway repassa o trabalho que
 **ainda não começou** a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (`--overload-wait` e
@@ -1115,4 +1115,4 @@ Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primári
 - Digest igual não prova tempo igual: um secundário com outra GPU responde mais devagar; `max_prompt_tokens` e `classes` são os botões.
 - O gateway roda **no servidor primário**: se ele cair, não repassa. Para isso existe o fallback do cliente.
 - **Revisão adversarial do pool (10.5) feita** em 2026-10-30 (report `MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool`).
-  Falta o aceite numa instância de teste (10.7) e a rodada Linux dos testes de modo de arquivo. Ver o plano da Fase 10.
+  O aceite numa instância de teste (10.7) foi feito, com todos os cenários PASS; o plano da Fase 10 está congelado (2026-10-30) e lista as pendências sem data.

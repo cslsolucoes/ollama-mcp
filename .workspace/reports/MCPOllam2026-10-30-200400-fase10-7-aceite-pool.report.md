@@ -1,7 +1,7 @@
 # Report — Fase 10.7: aceite ao vivo do pool de backends (instância de teste)
 
 - **Data/hora:** 2026-10-30, 19:44–20:04 (hora do servidor e da estação).
-- **Executor:** subagente Opus 5.5 (etapa 10.7 do plano `MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`).
+- **Executor:** subagente Opus 5.5 (etapa 10.7 do plano `congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`).
 - **Código sob teste:** `master` `736c205`. O gateway de teste usou **o mesmo binário da produção**
   (`/usr/local/bin/mcpollama-gateway`, `0.12.0-736c205`). O `mcpollama-mcp` foi compilado do HEAD numa cópia no scratchpad.
 - **Produção:** **intacta**. Unit, nginx, drop-ins, gateway na 11500, `D:\MCP` e `.mcp.json` não foram tocados; a prova está na §5.

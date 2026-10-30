@@ -1,7 +1,7 @@
 # Report: Fase 10.1 e 10.2, medição da faixa CPU/RAM (segunda instância do Ollama) antes do código
 
 > **Data:** 2026-10-30, das 14:58 às 16:19. **Executor:** agente Opus 5.5.
-> **Planos:** `.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md` (execução) e a §11 de
+> **Planos:** `.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md` (execução) e a §11 de
 > `.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md` (desenho).
 > **Estado:** executado. Nenhum reboot (boot 2026-10-28 21:10:46 conferido antes e depois de cada bloco e de cada fase: 17 checagens).
 > Nenhuma queda de conexão. A instância temporária foi removida e a produção foi provada intacta às 16:18:54. Sem commit.

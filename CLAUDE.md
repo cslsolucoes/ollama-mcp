@@ -16,7 +16,7 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-30: **Fases 1 a 9 concluídas** (8: modelo `qwen3-ia` = `qwen3.5:9b` e `think` por
+Estado em 2026-10-30: **Fases 1 a 9 concluídas** e **Fase 10 congelada** (10.1 a 10.8 concluídas; 10.S, o secundário, pendente sem data) (8: modelo `qwen3-ia` = `qwen3.5:9b` e `think` por
 chamada; 9: fila + `/monitor` em produção; ver "Servidor Ollama"). Base, em 2026-10-28: **Fases 1 a 4 e 7 concluídas** (tools base `list_models`, `generate`,
 `chat` e `embed`; tools de arquivo `summarize_file`, `extract` e `translate`, que só existem
 com `--allow-root` e passam pelo guard de `src/files/`; catálogo em `TOOLS.md`, gerado por
@@ -197,7 +197,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   `OPENAI_MODEL=qwen3-ia-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
 - **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
   `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção:
-  gateway `0.12.0-736c205`** (com o pool de backends). Caminho: nginx :8443 → `mcpollama-gateway`
+  gateway `0.12.1-c4031f7`** (com o pool de backends; desde 2026-10-30 20:46). Caminho: nginx :8443 → `mcpollama-gateway`
   127.0.0.1:11500 → Ollama **só em 127.0.0.1:11434**.
   Monitor em `https://ia.cslsolucoes.com.br:8443/monitor`, **só na LAN**. Pelo túnel do Cloudflare (`::1` +
   `CF-Connecting-IP`), a resposta é 403. Leitura livre; as ações exigem o usuário `admin`. Mostra:
@@ -209,18 +209,19 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
 
   A atualização é a cada 1 s, e o SQLite grava a cada 5 s. Aceite 9.7: ordem por prioridade e ações do admin
   (promover, despromover, remover, cancelar) provadas, com auditoria e SQLite.
-  **Fase 10 (2026-10-30, em execução):**
+  **Fase 10 (2026-10-30, 10.1 a 10.8 concluídas; plano congelado):**
   - faixa CPU **descartada** (medida: saldo ~0);
   - **log de jobs em produção (10.L)**: grava **prompt e resposta completos** em
     `content.db` (0600, 7 dias; texto só para o admin) e um extrato das GPUs a 1 s por job;
-  - **pool de backends (10.4), revisão adversarial (10.5) e implantação (10.6) concluídas**: o gateway
-    `0.12.0-736c205` está em produção com o pool, que tem um único backend, o `gpu-local` (sem `--backends`).
-    O ramo `wip/fase10-4-pool` foi removido (merge `736c205` no `master`; tag `gateway-v0.12.0`). A **10.7
-    (aceite ao vivo) está em andamento**. O secundário planejado é um PC com 4× RTX 2060, sem data (10.S);
-  - **fallback do mcpollama** (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`): existe no
-    `master`, **desligado por padrão** (ainda não vai em um binário com tag);
+  - **pool de backends (10.4), revisão adversarial (10.5), implantação (10.6), aceite em instância de teste
+    (10.7, todos PASS) e correções pós-aceite concluídos**: o gateway `0.12.1-c4031f7` (tag `gateway-v0.12.1`) está
+    em produção com o pool, que tem um único backend, o `gpu-local` (sem `--backends`). O ramo `wip/fase10-4-pool`
+    foi removido (merge `736c205`; o commit `d38fb61` está só na tag local `archive/wip-fase10-4-pool`). O
+    secundário planejado é um PC com 4× RTX 2060, sem data (10.S);
+  - **fallback do mcpollama** (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`): vai no binário
+    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`; vale após reiniciar o Claude Code), **desligado por padrão**;
   - clock das GPUs travado em 210–1400 MHz desde 2026-10-30, por causa da fonte.
-  - Plano: `.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
+  - Plano (congelado, com as pendências ao descongelar): `.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`; relatório final: `.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
   e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e configs do nginx/unit:
   `deploy/gateway/` (`Instalar-Gateway.ps1`); manual de operação: `docs/MANUAL-GATEWAY.md`; guia de instalação do
   zero: `docs/INSTALACAO.md`. Plano da Fase 9:

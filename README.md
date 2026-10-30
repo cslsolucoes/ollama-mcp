@@ -69,12 +69,11 @@ Em produção (2026-10-30):
 
 | Componente | Versão (tag) | Onde |
 | --- | --- | --- |
-| `mcpollama-mcp` | **0.8.1** (`mcpollama-v0.8.1`, desde 2026-10-29 15:11) | `D:\MCP\mcpollama-mcp.exe` (estações) |
-| `mcpollama-gateway` | **0.12.0** (`gateway-v0.12.0`, `0.12.0-736c205`, desde 2026-10-30 19:43), com o pool de backends | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
+| `mcpollama-mcp` | **0.9.0** (`mcpollama-v0.9.0`, `0.9.0-c4031f7`, gerado em 2026-10-30; vale após reiniciar o Claude Code) | `D:\MCP\mcpollama-mcp.exe` (estações) |
+| `mcpollama-gateway` | **0.12.1** (`gateway-v0.12.1`, `0.12.1-c4031f7`, desde 2026-10-30 20:46), com o pool de backends | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
 
-Tags no repositório: `mcpollama-v0.8.1`, `gateway-v0.11.1` e `gateway-v0.12.0`. O histórico de versões está no
-[CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5) já está no `master`, mas depois da tag `mcpollama-v0.8.1`:
-ainda não saiu em um binário com tag.
+Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `gateway-v0.11.1`, `gateway-v0.12.0` e `gateway-v0.12.1`. O histórico de versões está no
+[CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5) vai no binário `0.9.0`, **desligado por padrão**.
 
 | Fase | Assunto | Estado |
 | --- | --- | --- |
@@ -87,9 +86,9 @@ ainda não saiu em um binário com tag.
 | 7 | Documentos `.docx`, `.pptx`, `.pdf` e OCR (PDF digitalizado, `.png`, `.jpg`) | concluída (OCR opt-in) |
 | 8 | Bake-off de modelos: `qwen3-ia` = `qwen3.5:9b`; argumento `think` por chamada | concluída |
 | 9 | Gateway: fila, políticas, `/monitor`, SQLite, instalador | concluída (2026-10-30) |
-| 10 | Log de jobs, pool de backends e fallback (faixa CPU descartada) | **em execução**: 10.4 a 10.6 concluídas, 10.7 (aceite) em andamento |
+| 10 | Log de jobs, pool de backends e fallback (faixa CPU descartada) | **10.1 a 10.8 concluídas; plano congelado em 2026-10-30**; 10.S (secundário) pendente, sem data |
 
-**Fase 10** ([plano](.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md)):
+**Fase 10** ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md), congelado):
 
 | Etapa | Estado |
 | --- | --- |
@@ -99,8 +98,8 @@ ainda não saiu em um binário com tag.
 | 10.4: pool de backends (registro, saúde, disjuntor, repasse por sobrecarga, drenar) e fallback do mcpollama | **concluída** (merge `736c205`; o ramo `wip/fase10-4-pool` foi removido) |
 | 10.5: revisão adversarial do pool | **concluída** (correções `b1d8418`) |
 | 10.6: implantação do pool | **concluída**: gateway `0.12.0` em produção desde 2026-10-30 19:43, com um único backend (`gpu-local`) |
-| 10.7: aceite ao vivo | **em andamento** |
-| 10.8: documentação final e fechamento da fase | pendente |
+| 10.7: aceite em instância de teste | **concluída** (todos os cenários PASS); correções pós-aceite em `4a54c8e` e `c4031f7` |
+| 10.8: implantação 0.12.1/0.9.0, documentação final e congelamento | **concluída** (gateway `0.12.1-c4031f7` em produção às 20:46; [relatório final](.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md)) |
 | 10.S: secundário 4× RTX 2060 | planejado, **sem data** |
 
 Pendências sem data: segunda fonte para o servidor, backup do `content.db` (excluir ou cifrar) e
@@ -260,13 +259,13 @@ Ver não exige login; as ações exigem o usuário `admin`. Atualiza ao vivo por
   `content.db` (texto dos jobs, 7 dias). O que sobrevive a reinício ou reboot fica marcado como
   `interrompido_reboot` ou `interrompido_gateway`.
 
-**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`).** O gateway tem um **registro de backends**
+**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`; `0.12.1` desde 2026-10-30 20:46).** O gateway tem um **registro de backends**
 (`backends.json`, modo 0600, lido só na partida), saúde ativa e passiva, disjuntor, histerese e "drenar" no monitor, e repassa a
 geração que **ainda não começou** a um Ollama secundário da LAN quando o primário está sobrecarregado ou doente. **Hoje o pool
 tem um único backend, o `gpu-local`** (o Ollama do próprio servidor, sem `--backends`): o comportamento é o mesmo de antes do
 pool. O mcpollama ganhou um **fallback opcional** (seção 5), **desligado por padrão**, para o caso de o servidor inteiro cair. A
 faixa CPU foi **descartada** (medição 10.1/10.2: saldo ~0). O secundário planejado é um PC com 4× RTX 2060, **sem data**.
-A revisão adversarial do pool (10.5) está feita.
+A revisão adversarial do pool (10.5) e o aceite em instância de teste (10.7) estão feitos; o plano da Fase 10 está congelado.
 
 Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico, rollback e segurança):
 [docs/MANUAL-GATEWAY.md](docs/MANUAL-GATEWAY.md).
@@ -450,7 +449,7 @@ cliente é livre, há um único administrador compartilhado e a LAN inteira pode
 | [Plano da Fase 7 (extração de documentos)](.workspace/plans/MCPOllam2026-10-28-132000-extracao-docx-pdf-pptx.brief.md) | brief de `.docx`, `.pdf` e `.pptx` |
 | [Plano da Fase 8 (bake-off)](.workspace/plans/MCPOllam2026-10-28-193200-fase8-bakeoff-modelos.plan.md) | escolha do modelo |
 | [Plano da Fase 9 (fila e monitor)](.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md) | decisões D9-* e changelog |
-| [Plano da Fase 10 (pool)](.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md) | em execução |
+| [Plano da Fase 10 (pool)](.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md) | congelado em 2026-10-30 |
 | [Plano do brief de referências](.workspace/plans/MCPOllam2026-10-23-153853-brief-referencias.plan.md) | ondas B0 a B7 |
 
 Reports principais (em [`.workspace/reports/`](.workspace/reports/)):
@@ -462,7 +461,7 @@ Reports principais (em [`.workspace/reports/`](.workspace/reports/)):
 | Documentos e OCR (Fase 7) | [extração](.workspace/reports/MCPOllam2026-10-28-191530-fase7-extracao-documentos.report.md), [aceite ao vivo](.workspace/reports/MCPOllam2026-10-28-155000-fase7-ao-vivo-aceite.report.md), [OCR](.workspace/reports/MCPOllam2026-10-28-183855-fase7-9-ocr.report.md) |
 | Modelo (Fase 8) | [bake-off](.workspace/reports/MCPOllam2026-10-28-220428-fase8-bakeoff-modelos.report.md), [carga multiagente](.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md) |
 | Gateway (Fase 9) | [report final](.workspace/reports/MCPOllam2026-10-30-142900-fase9-fila-monitor-final.report.md) |
-| Fase 10 | [medição da CPU](.workspace/reports/MCPOllam2026-10-30-161904-fase10-1-medicao-cpu.report.md) |
+| Fase 10 | [relatório final](.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md), [medição da CPU](.workspace/reports/MCPOllam2026-10-30-161904-fase10-1-medicao-cpu.report.md) |
 
 O brief das referências está em [`referencias/Brief_Referencias/`](referencias/Brief_Referencias/).
 

@@ -10,15 +10,15 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 ## mcpollama
 
-### [Não lançado]
+### [0.9.0] - 2026-10-30 (tag `mcpollama-v0.9.0`)
 
-Já no `master`, depois da tag `mcpollama-v0.8.1`; ainda não saiu em um binário com tag.
+Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; vale após reiniciar as sessões do Claude Code.
 
 #### Corrigido
 - Mensagem do 403 da lista de modelos do gateway: um 403 com JSON `... não permitido neste servidor` agora diz **"modelo não
   permitido pelo servidor"** em vez de "endpoint bloqueado pelo nginx" (o 403 HTML do nginx não mudou). Nova classe de erro
   `ErrModelNotAllowed` (também é `ErrForbidden`); sem mudança nas descrições das tools nem no `tools/list`.
-- Teste `TestConnectionDroppedMidStream` (Fase 2) determinístico: só o teste mudou, não o código do cliente.
+- Teste `TestConnectionDroppedMidStream` (Fase 2) determinístico (e novo `TestConnectionClosedMidStreamKeepsPartial`): só testes mudaram, não o código do cliente.
 
 #### Adicionado
 - Fallback opcional para um segundo servidor (`5a77853`, 2026-10-30): flags `--ollama-url-fallback`, `--fallback-api-key` e
@@ -85,9 +85,10 @@ Já no `master`, depois da tag `mcpollama-v0.8.1`; ainda não saiu em um binári
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
-### [Não lançado]
+### [0.12.1] - 2026-10-30 (tag `gateway-v0.12.1`)
 
-Já no `master`, depois da tag `gateway-v0.12.0` (correções pós-aceite da Fase 10.7).
+Em produção desde 20:46 (`0.12.1-c4031f7`, instalado por `Instalar-Gateway.ps1 -Modo Atualizar`; correções pós-aceite da
+Fase 10.7).
 
 #### Corrigido
 - **Sobrecarga S1 não conta mais o próprio pedido** (10.7-1): a espera estimada passa a ser EWMA × (esperando à frente +
@@ -181,7 +182,7 @@ Primeira versão em produção, às 12:12:40 (`0.9.0-2cb599d`; etapa 2 do instal
 
 - 2026-10-30 14:45: `limit_conn` do nginx de 12 para **30** por IP (`339517e`).
 
-[Não lançado]: https://github.com/cslsolucoes/mcpollama/compare/mcpollama-v0.8.1...master
+[0.12.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.1
 [0.12.0]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.0
 [0.11.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.11.1
 [0.8.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/mcpollama-v0.8.1
