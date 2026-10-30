@@ -1,0 +1,200 @@
+== 2026-10-30 19:53:04 rodada A; boot=2026-10-30 16:42:03
+-- producao antes:
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL   
+qwen3-ia:latest    56671c2ab938    13 GB    100% GPU     65536      llamacpp    Forever    
+active
+active
+   11435/11436/11599 livres
+Running as unit: ollama-sec-test.service; invocation ID: 8a14e014c8f940fe8c89c2f4fed7ac7f
+sec: {"version":"0.40.8"} ativo=active
+-- journal inference compute:
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="86.7 GiB"
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+-- ollama ps 11435:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    RUNNER    UNTIL 
+-- /dev/nvidia* abertos pelos processos da unidade:
+   pid 51618: 0
+   total=0
+-- cgroup: CPUQuotaPerSecUSec=3s DevicePolicy=closed CPUAffinity=2-5 8-11 
+-- nvidia-smi compute apps:
+3455, /usr/local/lib/ollama/llama-server, 4554 MiB
+3455, /usr/local/lib/ollama/llama-server, 2974 MiB
+3455, /usr/local/lib/ollama/llama-server, 2982 MiB
+3455, /usr/local/lib/ollama/llama-server, 3680 MiB
+Running as unit: mcpgw-aceite107.service; invocation ID: b83bdd15ba6a45b3b75aaa52b4945336
+gwA: ativo=active tipo_sec=cpu
+   total 412
+   -rw-------. 1 mcpgw mcpgw     95 out 30 19:53 admin
+   -rw-------. 1 mcpgw mcpgw    203 out 30 19:53 backends.json
+   -rw-------. 1 mcpgw mcpgw   4096 out 30 19:53 content.db
+   -rw-------. 1 mcpgw mcpgw  32768 out 30 19:53 content.db-shm
+   -rw-------. 1 mcpgw mcpgw  28872 out 30 19:53 content.db-wal
+   -rw-------. 1 mcpgw mcpgw   4096 out 30 19:53 gw.db
+   -rw-------. 1 mcpgw mcpgw  32768 out 30 19:53 gw.db-shm
+   -rw-------. 1 mcpgw mcpgw 304912 out 30 19:53 gw.db-wal
+   Started mcpgw-aceite107.service - 10.7 aceite: gateway de teste 11599.
+   2026/10/30 19:53:06 backend secundário sec-cpu (cpu) em 127.0.0.1:11435, 1 slot(s)
+   2026/10/30 19:53:06 backend secundário morto (cpu) em 127.0.0.1:11436, 1 slot(s)
+   2026/10/30 19:53:06 mcpollama-gateway 0.12.0-736c205 em 127.0.0.1:11599 -> Ollama 127.0.0.1:11434 (geracao=1 embed=1 fila=64 por-ip=16) boot=8886b162-c7be-4322-8782-6235db648193
+   2026/10/30 19:53:06 store: retenção removeu 0 pedidos e 0 amostras de GPU
+   2026/10/30 19:53:06 models: ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: connect: connection refused; tags: Get "http://127.0.0.1:11436/api/tags": dial tcp 127.0.0.1:11436: connect: connection refused
+19:53:06 == rodada A boot_id ok; uptime -s 2026-10-30 16:42:03
+19:53:06 QUADRO inicial: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:06   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:06 DIGEST qwen3-ia 11434=56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90 11435=56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90 iguais=True
+19:53:06   EVENTO 19:53:06 boot_novo boot_id=8886b162-c7be-4322-8782-6235db648193
+19:53:06   EVENTO 19:53:06 gateway_inicio boot_id=8886b162-c7be-4322-8782-6235db648193
+19:53:06   EVENTO 19:53:06 gateway_pool backends=gpu-local,sec-cpu,morto overload_wait=3s overload_queue=2 hold=10s health=5s breaker=3/20s
+19:53:06   EVENTO 19:53:06 gateway_config gen=1 embed=1 queue=64 per_client=16 per_ip=16 labels=16 stagger=300ms max_wait=10m0s run_timeout=10m0s max_rows=3000000 log_content=true co
+19:53:06   EVENTO 19:53:06 backend_down morto: ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: connect: connection refused; tags: Get "http://127.0.0.1:11436/api
+19:53:07 GEN {"tag": "w1", "prio": "normal", "status": 200, "rid": "bc4daae61e15871167a14395d0cbfd19", "model": "qwen3-ia", "eval": 24, "load_ms": 0, "dur_s": 0.7, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:53:07   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:07 GEN {"tag": "w2", "prio": "normal", "status": 200, "rid": "206ff35d0bcde801c9cb08dbb61946a7", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 0.7, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:53:08   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:09   SQLITE w1 id=bc4daae6 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=24 run_ms=683 wait_ms=0
+19:53:09   SQLITE w2 id=206ff35d prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=652 wait_ms=9
+19:53:09   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:10 GEN {"tag": "a1", "prio": "normal", "status": 200, "rid": "b45068637cd2622562f56dbdc4a202c1", "model": "qwen3-ia", "eval": 24, "load_ms": 0, "dur_s": 0.6, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:53:10   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=1:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:10 GEN {"tag": "a2", "prio": "normal", "status": 200, "rid": "e163fdea9cf73644b2d8439be7af58c2", "model": "qwen3-ia", "eval": 25, "load_ms": 1, "dur_s": 0.9, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:53:11 GEN {"tag": "a3", "prio": "normal", "status": 200, "rid": "17af87dac6a0756747199e35bf91208f", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 1.1, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:53:11   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:12   SQLITE a1 id=b4506863 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=24 run_ms=631 wait_ms=0
+19:53:12   SQLITE a2 id=e163fdea prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=652 wait_ms=231
+19:53:12   SQLITE a3 id=17af87da prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=650 wait_ms=483
+19:53:12 VEREDITO|a|FALHA|0 de 3 no sec-cpu com regra []; todos 200 e model=qwen3-ia; digest igual
+19:53:16   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:36   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:53:41   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:12   TIMEOUT esperando overload_off (60s)
+19:54:12 QUADRO apos a volta: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:13 GEN {"tag": "b1", "prio": "normal", "status": 200, "rid": "6045efff8bd303d9cb6365d54d5941f0", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 0.7, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:54:13   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:14   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:15   SQLITE b1 id=6045efff prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=690 wait_ms=0
+19:54:15 VEREDITO|b|FALHA|overload_off - s depois do fim do ultimo pedido (hold=10s); b1 em gpu-local regra=''
+19:54:15   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:15 GEN {"tag": "e1", "prio": "alta", "status": 200, "rid": "376d672eb12a306368674255af040d17", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 0.7, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:54:16 GEN {"tag": "e2", "prio": "alta", "status": 200, "rid": "9b17162edb96a40189d9868ba8dc1c75", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 0.9, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:54:16   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:17 GEN {"tag": "e3", "prio": "alta", "status": 200, "rid": "80609c87f35ad11890e0d82c189a5ac9", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 1.2, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:54:17   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:18   SQLITE e1 id=376d672e prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=652 wait_ms=0
+19:54:18   SQLITE e2 id=9b17162e prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=650 wait_ms=252
+19:54:18   SQLITE e3 id=80609c87 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=650 wait_ms=502
+19:54:18 VEREDITO|e|FALHA|3 alta: backends=['gpu-local', 'gpu-local', 'gpu-local'] prio=['alta', 'alta', 'alta'] com sobrecarga ligada=False
+19:54:21   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:26   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:46   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:54:51   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:18   TIMEOUT esperando overload_off (e) (60s)
+19:55:18   LOGIN http=200 cookie=sim csrf=sim
+19:55:18   NEGATIVOS {'sem_sessao': 401, 'sem_csrf': 403, 'origem_alheia': 403, 'csrf_errado': 403, 'id_desconhecido': 404}
+19:55:18   DRAIN sec-cpu 200 {"acao":"drain","antes":"ativo","depois":"drenado","id":"sec-cpu","ok":true}
+
+19:55:18 QUADRO drenado: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:19 GEN {"tag": "d1", "prio": "normal", "status": 200, "rid": "dadd21a44e206032a498be248b49b36e", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 0.7, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:55:19   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:20 GEN {"tag": "d2", "prio": "normal", "status": 200, "rid": "19008052f6d5c001af53924967ab6631", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 0.9, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:55:20 GEN {"tag": "d3", "prio": "normal", "status": 200, "rid": "41864f34661a23ffeec56c5f92f9ea8d", "model": "qwen3-ia", "eval": 25, "load_ms": 0, "dur_s": 1.2, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:55:21   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:22   SQLITE d1 id=dadd21a4 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=687 wait_ms=0
+19:55:22   SQLITE d2 id=19008052 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=651 wait_ms=286
+19:55:22   SQLITE d3 id=41864f34 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=25 run_ms=652 wait_ms=537
+19:55:22   UNDRAIN sec-cpu 200 {"acao":"undrain","antes":"drenado","depois":"ativo","id":"sec-cpu","ok":true}
+
+19:55:22 QUADRO retomado: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:22   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:31   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:36   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:55:56   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:01   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:21   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:22   TIMEOUT esperando overload_off (d) (60s)
+19:56:22   DRAIN gpu-local 200 {"acao":"drain","antes":"ativo","depois":"drenado","id":"gpu-local","ok":true}
+
+19:56:22   QUADRO gpu-local:gpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:26   QUADRO gpu-local:gpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:31   QUADRO gpu-local:gpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:42 GEN {"tag": "d4", "prio": "normal", "status": 200, "rid": "9fffb1f1196e0fffdc9febc388429487", "model": "qwen3-ia", "eval": 25, "load_ms": 6076, "dur_s": 20.5, "err": null, "resp": "O mar é um vasto e profundo oceano de água salgada que cobre"}
+19:56:43   QUADRO gpu-local:gpu:drenado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:44   SQLITE d4 id=9fffb1f1 prio=normal backend=sec-cpu failover_rule='F2:S3' status=ok http=200 eval=25 run_ms=20459 wait_ms=0
+19:56:44   UNDRAIN gpu-local 200
+19:56:44   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:45   AUDIT 19:55:18 user=aceite ip=127.0.0.1 acao=drain alvo=sec-cpu ativo->drenado motivo=aceite 10.7
+19:56:45   AUDIT 19:55:22 user=aceite ip=127.0.0.1 acao=undrain alvo=sec-cpu drenado->ativo motivo=aceite 10.7
+19:56:45   AUDIT 19:56:22 user=aceite ip=127.0.0.1 acao=drain alvo=gpu-local ativo->drenado motivo=aceite 10.7 primario
+19:56:45   AUDIT 19:56:44 user=aceite ip=127.0.0.1 acao=undrain alvo=gpu-local drenado->ativo motivo=aceite 10.7 primario
+19:56:45   EVENTO 19:55:18 backend_drenado sec-cpu
+19:56:45   EVENTO 19:55:22 backend_retomado sec-cpu
+19:56:45   EVENTO 19:56:22 backend_drenado gpu-local
+19:56:45   EVENTO 19:56:22 overload_on S3 espera_estimada=0s fila=0
+19:56:45   EVENTO 19:56:44 backend_retomado gpu-local
+19:56:45 VEREDITO|d|PASS|login 200; negativos {'sem_sessao': 401, 'sem_csrf': 403, 'origem_alheia': 403, 'csrf_errado': 403, 'id_desconhecido': 404}; sec-cpu drenado=drenado e 0/3 pedidos nele; retomado; primario drenado -> d4 em sec-cpu regra 'F2:S3'; auditoria 4 linhas
+19:56:45   morto (127.0.0.1:11436) desde a partida:
+19:56:45   EVENTO 19:53:06 backend_down morto: ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: connect: connection refused; tags: Get "http://127.0.0.1:11436/api
+19:56:45   EVENTO 19:53:16 breaker_open morto: 3 falhas seguidas
+19:56:45   EVENTO 19:53:41 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:54:01 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:54:26 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:54:51 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:55:11 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:55:36 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:56:01 breaker_open morto: falhou no meio-aberto
+19:56:45   EVENTO 19:56:26 breaker_open morto: falhou no meio-aberto
+19:56:45 QUADRO: gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:45   SEC sec: parado (inactive)
+19:56:46   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:fora:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:51   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:fora:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:55   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:fora:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:56 QUADRO sec parado: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:fora:br=aberto:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:56:56   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:fora:br=aberto:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:00   SEC sec: {"version":"0.40.8"} ativo=active
+19:57:01   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:disjuntor_aberto:br=aberto:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:11   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:disjuntor_aberto:br=aberto:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:16 QUADRO sec de volta: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err=ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: con | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:16   EVENTO 19:56:46 backend_down sec-cpu: ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: connect: connection refused; tags: Get "http://127.0.0.1:11435/a
+19:57:16   EVENTO 19:56:51 breaker_open morto: falhou no meio-aberto
+19:57:16   EVENTO 19:56:56 breaker_open sec-cpu: 3 falhas seguidas
+19:57:16   EVENTO 19:57:01 backend_up sec-cpu
+19:57:16   EVENTO 19:57:16 breaker_open morto: falhou no meio-aberto
+19:57:16   EVENTO 19:57:16 breaker_close sec-cpu: a checagem ativa deu certo
+19:57:16 VEREDITO|c|PASS|morto: down + aberto por 3 falhas + reaberto no meio-aberto, nunca fechou=True; sec-cpu parado -> breaker_open 'sec-cpu: 3 falhas seguidas' -> volta -> breaker_close apos 20.002 s (breaker-open=20s)
+19:57:16 == (g) tempos das leituras da checagem ativa (ms), por fase
+19:57:16   PS A0-partida: ps11434 n=1 p50=10.4 max=10.4 falhas=0 ; tags11434 n=1 p50=2.9 max=2.9 falhas=0 ; ver11434 n=1 p50=0.5 max=0.5 falhas=0 ; ps11435 n=1 p50=0.3 max=0.3 falhas=0
+19:57:16   PS A1-aquecimento: ps11434 n=2 p50=0.5 max=0.5 falhas=0 ; tags11434 n=2 p50=2.2 max=2.2 falhas=0 ; ver11434 n=2 p50=0.4 max=0.4 falhas=0 ; ps11435 n=2 p50=0.4 max=0.4 falhas=0
+19:57:16   PS a-repasse: ps11434 n=4 p50=0.6 max=0.6 falhas=0 ; tags11434 n=4 p50=2.5 max=2.8 falhas=0 ; ver11434 n=4 p50=0.3 max=0.4 falhas=0 ; ps11435 n=4 p50=0.4 max=0.4 falhas=0
+19:57:16   PS b-histerese: ps11434 n=62 p50=0.6 max=0.7 falhas=0 ; tags11434 n=62 p50=2.2 max=3.1 falhas=0 ; ver11434 n=62 p50=0.3 max=0.5 falhas=0 ; ps11435 n=62 p50=0.4 max=0.5 falhas=0
+19:57:16   PS e-alta-cpu: ps11434 n=63 p50=0.6 max=0.8 falhas=0 ; tags11434 n=63 p50=2.3 max=3.0 falhas=0 ; ver11434 n=63 p50=0.4 max=0.5 falhas=0 ; ps11435 n=63 p50=0.4 max=0.5 falhas=0
+19:57:16   PS d-drenar: ps11434 n=87 p50=0.6 max=0.9 falhas=0 ; tags11434 n=87 p50=2.2 max=3.2 falhas=0 ; ver11434 n=87 p50=0.4 max=0.5 falhas=0 ; ps11435 n=87 p50=0.4 max=6.4 falhas=0
+19:57:16   PS c-disjuntor: ps11434 n=31 p50=0.6 max=0.9 falhas=0 ; tags11434 n=31 p50=2.2 max=3.6 falhas=0 ; ver11434 n=31 p50=0.4 max=0.6 falhas=0 ; ps11435 n=17 p50=0.4 max=524.7 falhas=14
+19:57:16 == (g) maior tempo de leitura no primario (ps/tags/version): 10.4 ms; passa de 3 s: False
+19:57:16 == VEREDITOS
+19:57:16    a|FALHA|0 de 3 no sec-cpu com regra []; todos 200 e model=qwen3-ia; digest igual
+19:57:16    b|FALHA|overload_off - s depois do fim do ultimo pedido (hold=10s); b1 em gpu-local regra=''
+19:57:16    e|FALHA|3 alta: backends=['gpu-local', 'gpu-local', 'gpu-local'] prio=['alta', 'alta', 'alta'] com sobrecarga ligada=False
+19:57:16    d|PASS|login 200; negativos {'sem_sessao': 401, 'sem_csrf': 403, 'origem_alheia': 403, 'csrf_errado': 403, 'id_desconhecido': 404}; sec-cpu drenado=drenado e 0/3 pedidos nele; retomado; primario drenado -> d4 em sec-cpu regra 'F2:S3'; auditoria 4 linhas
+19:57:16    c|PASS|morto: down + aberto por 3 falhas + reaberto no meio-aberto, nunca fechou=True; sec-cpu parado -> breaker_open 'sec-cpu: 3 falhas seguidas' -> volta -> breaker_close apos 20.002 s (breaker-open=20s)
+-- secundario depois da rodada A:
+-- journal inference compute:
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="86.7 GiB"
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+time=2026-10-30T19:57:00.181-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="85.7 GiB"
+time=2026-10-30T19:57:00.181-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+-- ollama ps 11435:
+NAME    ID    SIZE    PROCESSOR    CONTEXT    RUNNER    UNTIL 
+-- /dev/nvidia* abertos pelos processos da unidade:
+   pid 52355: 0
+   total=0
+-- cgroup: CPUQuotaPerSecUSec=3s DevicePolicy=closed CPUAffinity=2-5 8-11 
+-- nvidia-smi compute apps:
+3455, /usr/local/lib/ollama/llama-server, 4554 MiB
+3455, /usr/local/lib/ollama/llama-server, 2974 MiB
+3455, /usr/local/lib/ollama/llama-server, 2982 MiB
+3455, /usr/local/lib/ollama/llama-server, 3680 MiB
+-- producao depois:
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL   
+qwen3-ia:latest    56671c2ab938    13 GB    100% GPU     65536      llamacpp    Forever    
+boot=2026-10-30 16:42:03
+
+[exited with code 0]

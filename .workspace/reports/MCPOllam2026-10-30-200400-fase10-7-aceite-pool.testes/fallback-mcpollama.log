@@ -1,0 +1,47 @@
+# (f) fallback do mcpollama, 2026-10-30 20:02 (estação Windows). mcpollama-mcp.exe compilado do HEAD 736c205 numa cópia
+# no scratchpad (rótulo de versão "0.12.0-736c205-aceite107"; D:\MCP intocado). Túnel ssh -N -L 11599:127.0.0.1:11599
+# para o gateway de teste (rodada B). Contador fbcount em 127.0.0.1:11598 (responde 500 e registra cada pedido).
+# Acentos aparecem trocados (console cp1252); o conteúdo é o original.
+
+##### f1: primario morto (127.0.0.1:9) -> fallback = gateway de teste (tunel 11599)
+=== f1 (0.4s) init=ok
+isError: None _meta: {"mcpollama/usage": {"backend": "fallback", "done_reason": "stop", "eval_count": 10, "load_ms": 0, "model": "qwen3-ia", "prompt_eval_count": 22, "queue_ms": 0, "total_ms": 392}}
+content: Olá! Como posso ajudar você hoje?
+
+[uso] modelo=qwen3-ia prompt_eval_count=22 eval_count=10 total_ms=392 load_ms=0 queue_ms=0 fim=stop backend=fallback
+--- stderr do mcpollama:
+   debug: config url=http://127.0.0.1:9 model=qwen3-ia ... api_key_set=false ...
+   debug: method=tools/call req_bytes=158 dispatched
+   debug: POST /api/generate failed after 2ms
+   debug: POST /api/generate: primário indisponível (cannot connect), tentando o fallback uma vez
+   debug: POST /api/generate status=200 headers_after=228ms
+   debug: POST /api/generate stream done bytes=1342 total=411ms
+   method=tools/call tool=generate status=ok dur=412.2558ms prompt_eval_count=22 eval_count=10 total_ms=392 load_ms=0 queue_ms=0
+
+##### f2: primario vivo (tunel 11599) responde 403 (modelo fora da allowlist do gateway) -> fallback = contador 11598
+=== f2 (0.0s) init=ok
+isError: True _meta: null
+content: endpoint bloqueado pelo nginx [HTTP 403 POST /api/generate]: modelo "qwen3-x" não permitido neste servidor
+--- stderr do mcpollama:
+   debug: config url=http://127.0.0.1:11599 ...
+   debug: POST /api/generate status=403 headers_after=3ms
+   method=tools/call tool=generate status=tool_error dur=4.3505ms
+   (nenhuma linha "tentando o fallback")
+
+##### f3 (controle do contador): primario morto -> fallback = contador 11598
+=== f3 (0.0s) init=ok
+isError: True _meta: null
+content: não foi possível falar com http://127.0.0.1:9: dial tcp 127.0.0.1:9: connectex: ... recusou ativamente.
+--- stderr do mcpollama:
+   debug: POST /api/generate failed after 2ms
+   debug: POST /api/generate: primário indisponível (cannot connect), tentando o fallback uma vez
+   debug: POST /api/generate status=500 headers_after=6ms
+   debug: POST /api/generate: o fallback também falhou
+   method=tools/call tool=generate status=tool_error dur=7.1734ms
+
+##### contador 11598 (fbcount):
+20:02:13.306 HIT GET /sonda            <- sonda manual antes dos testes
+20:02:28.987 HIT POST /api/generate    <- f3 (controle); f2 NÃO aparece: 0 pedidos ao fallback no 403
+
+##### 2ª via (SQLite do gateway de teste, gwB/gw.db, consultado às 20:03):
+('618e7676d25a10cc8bc020e6e8e2420f', '002-1985/40372', '/api/generate', 'qwen3-ia', 'gpu-local', 'ok', 200, 10)   <- o f1 chegou ao gateway pelo fallback, rodou no primário, eval_count=10 (igual ao [uso])

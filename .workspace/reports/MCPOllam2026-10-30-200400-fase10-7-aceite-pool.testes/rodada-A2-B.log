@@ -1,0 +1,215 @@
+== 2026-10-30 19:57:43 rodada A2 (a,b,e); boot=2026-10-30 16:42:03
+gw: parado (inactive)
+Running as unit: mcpgw-aceite107.service; invocation ID: 5b168a093076460ea92d29fdd2844412
+gwA2: ativo=active tipo_sec=cpu
+   total 412
+   -rw-------. 1 mcpgw mcpgw     95 out 30 19:57 admin
+   -rw-------. 1 mcpgw mcpgw    203 out 30 19:57 backends.json
+   -rw-------. 1 mcpgw mcpgw   4096 out 30 19:57 content.db
+   -rw-------. 1 mcpgw mcpgw  32768 out 30 19:57 content.db-shm
+   -rw-------. 1 mcpgw mcpgw  28872 out 30 19:57 content.db-wal
+   -rw-------. 1 mcpgw mcpgw   4096 out 30 19:57 gw.db
+   -rw-------. 1 mcpgw mcpgw  32768 out 30 19:57 gw.db-shm
+   -rw-------. 1 mcpgw mcpgw 304912 out 30 19:57 gw.db-wal
+   Started mcpgw-aceite107.service - 10.7 aceite: gateway de teste 11599.
+   2026/10/30 19:53:06 backend secundário sec-cpu (cpu) em 127.0.0.1:11435, 1 slot(s)
+   2026/10/30 19:53:06 backend secundário morto (cpu) em 127.0.0.1:11436, 1 slot(s)
+   2026/10/30 19:53:06 mcpollama-gateway 0.12.0-736c205 em 127.0.0.1:11599 -> Ollama 127.0.0.1:11434 (geracao=1 embed=1 fila=64 por-ip=16) boot=8886b162-c7be-4322-8782-6235db648193
+   2026/10/30 19:53:06 store: retenção removeu 0 pedidos e 0 amostras de GPU
+   2026/10/30 19:53:06 models: ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: connect: connection refused; tags: Get "http://127.0.0.1:11436/api/tags": dial tcp 127.0.0.1:11436: connect: connection refused
+   2026/10/30 19:53:07 req bc4daae61e15871167a14395d0cbfd19 geracao /api/generate status=200 class= wait_ms=0
+   2026/10/30 19:53:07 req 206ff35d0bcde801c9cb08dbb61946a7 geracao /api/generate status=200 class= wait_ms=9
+   2026/10/30 19:53:10 req b45068637cd2622562f56dbdc4a202c1 geracao /api/generate status=200 class= wait_ms=0
+   2026/10/30 19:53:10 req e163fdea9cf73644b2d8439be7af58c2 geracao /api/generate status=200 class= wait_ms=231
+   2026/10/30 19:53:11 req 17af87dac6a0756747199e35bf91208f geracao /api/generate status=200 class= wait_ms=483
+   2026/10/30 19:54:13 req 6045efff8bd303d9cb6365d54d5941f0 geracao /api/generate status=200 class= wait_ms=0
+19:57:44 == rodada A2 boot_id ok; uptime -s 2026-10-30 16:42:03
+19:57:44 QUADRO inicial: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:44   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:44 DIGEST qwen3-ia 11434=56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90 11435=56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90 iguais=True
+19:57:44   EVENTO 19:57:43 boot_novo boot_id=8886b162-c7be-4322-8782-6235db648193
+19:57:44   EVENTO 19:57:43 gateway_inicio boot_id=8886b162-c7be-4322-8782-6235db648193
+19:57:44   EVENTO 19:57:43 gateway_pool backends=gpu-local,sec-cpu,morto overload_wait=3s overload_queue=2 hold=10s health=5s breaker=3/20s
+19:57:44   EVENTO 19:57:43 gateway_config gen=1 embed=1 queue=64 per_client=16 per_ip=16 labels=16 stagger=300ms max_wait=10m0s run_timeout=10m0s max_rows=3000000 log_content=true co
+19:57:44   EVENTO 19:57:43 backend_down morto: ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: connect: connection refused; tags: Get "http://127.0.0.1:11436/api
+19:57:45   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:47 GEN {"tag": "w1", "prio": "normal", "status": 200, "rid": "1a65835b7e15a48088c0cc5fb5a2d1c3", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:57:48   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:51 GEN {"tag": "w2", "prio": "normal", "status": 200, "rid": "f8f56c4c9e2021315d0f0f661c362c3a", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:57:51   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:52   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:52   SQLITE w1 id=1a65835b prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3345 wait_ms=0
+19:57:52   SQLITE w2 id=f8f56c4c prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3334 wait_ms=0
+19:57:53   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:54   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:55 GEN {"tag": "a1", "prio": "normal", "status": 200, "rid": "6327592803785a6ef545877c65e29413", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.4, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:57:56   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:57:59 GEN {"tag": "a3", "prio": "normal", "status": 200, "rid": "ea5d876d07aa3c3426da80d77ed142ea", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 6.1, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:58:00   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:58:04   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:58:11   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:58:34   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:58:39   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:19 GEN {"tag": "a2", "prio": "normal", "status": 200, "rid": "8c37a0001169183dcbf84168407a7c92", "model": "qwen3-ia", "eval": 160, "load_ms": 6623, "dur_s": 86.2, "err": null, "resp": "O mar é uma entidade viva e pulsante que transcende a simple"}
+19:59:19   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:20   SQLITE a1 id=63275928 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3424 wait_ms=0
+19:59:20   SQLITE a2 id=8c37a000 prio=normal backend=sec-cpu failover_rule='F2:S1' status=ok http=200 eval=160 run_ms=86196 wait_ms=0
+19:59:20   SQLITE a3 id=ea5d876d prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3485 wait_ms=2623
+19:59:20   EVENTO 19:58:10 overload_off carga abaixo de 50% dos limiares por 10s
+19:59:20 VEREDITO|a|FALHA|1 de 3 no sec-cpu com regra ['F2:S1']; todos 200 e model=qwen3-ia; digest igual
+19:59:20   EVENTO 19:58:10 overload_off carga abaixo de 50% dos limiares por 10s
+19:59:20 QUADRO apos a volta: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:21   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:24 GEN {"tag": "b1", "prio": "normal", "status": 200, "rid": "32d55bf1085a0a963d355b2214c3c49c", "model": "qwen3-ia", "eval": 160, "load_ms": 1, "dur_s": 3.4, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:59:24   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:25   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:25   SQLITE b1 id=32d55bf1 prio=normal backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3389 wait_ms=0
+19:59:25 VEREDITO|b|PASS|overload_off 11.34 s depois do fim do ultimo pedido (hold=10s); b1 em gpu-local regra=''
+19:59:26   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=2:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:28 GEN {"tag": "e1", "prio": "alta", "status": 200, "rid": "93d3c130e091c5f06ee92995251d6936", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:59:29   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:32 GEN {"tag": "e2", "prio": "alta", "status": 200, "rid": "9871113c817139b758a0e2aa6bbf9c88", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 6.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:59:32   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:35 GEN {"tag": "e3", "prio": "alta", "status": 200, "rid": "635e9db092f657e8eff49c573e148188", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 9.2, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:59:36   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:37   SQLITE e1 id=93d3c130 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3337 wait_ms=0
+19:59:37   SQLITE e2 id=9871113c prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3339 wait_ms=2937
+19:59:37   SQLITE e3 id=635e9db0 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3331 wait_ms=5876
+19:59:37 VEREDITO|e|FALHA|3 alta: backends=['gpu-local', 'gpu-local', 'gpu-local'] prio=['alta', 'alta', 'alta'] com sobrecarga ligada=False
+19:59:44   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:cpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err= | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:47 == (g) tempos das leituras da checagem ativa (ms), por fase
+19:59:47   PS A0-partida: ps11434 n=1 p50=10.0 max=10.0 falhas=0 ; tags11434 n=1 p50=2.6 max=2.6 falhas=0 ; ver11434 n=1 p50=0.6 max=0.6 falhas=0 ; ps11435 n=1 p50=0.3 max=0.3 falhas=0
+19:59:47   PS A1-aquecimento: ps11434 n=8 p50=0.6 max=0.6 falhas=0 ; tags11434 n=8 p50=2.7 max=3.0 falhas=0 ; ver11434 n=8 p50=0.3 max=0.4 falhas=0 ; ps11435 n=8 p50=0.4 max=0.5 falhas=0
+19:59:47   PS a-repasse: ps11434 n=88 p50=0.8 max=4.5 falhas=0 ; tags11434 n=88 p50=3.0 max=3.9 falhas=0 ; ver11434 n=88 p50=0.4 max=2.8 falhas=0 ; ps11435 n=88 p50=0.4 max=1.3 falhas=0
+19:59:47   PS b-histerese: ps11434 n=5 p50=0.5 max=0.7 falhas=0 ; tags11434 n=5 p50=2.5 max=3.0 falhas=0 ; ver11434 n=5 p50=0.4 max=0.4 falhas=0 ; ps11435 n=5 p50=0.4 max=0.4 falhas=0
+19:59:47   PS e-alta-cpu: ps11434 n=21 p50=0.6 max=0.8 falhas=0 ; tags11434 n=21 p50=2.4 max=3.0 falhas=0 ; ver11434 n=21 p50=0.3 max=0.4 falhas=0 ; ps11435 n=21 p50=0.4 max=0.4 falhas=0
+19:59:47 == (g) maior tempo de leitura no primario (ps/tags/version): 10.0 ms; passa de 3 s: False
+19:59:47 == VEREDITOS
+19:59:47    a|FALHA|1 de 3 no sec-cpu com regra ['F2:S1']; todos 200 e model=qwen3-ia; digest igual
+19:59:47    b|PASS|overload_off 11.34 s depois do fim do ultimo pedido (hold=10s); b1 em gpu-local regra=''
+19:59:47    e|FALHA|3 alta: backends=['gpu-local', 'gpu-local', 'gpu-local'] prio=['alta', 'alta', 'alta'] com sobrecarga ligada=False
+-- secundario depois da A2:
+-- journal inference compute:
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="86.7 GiB"
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+time=2026-10-30T19:57:00.181-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="85.7 GiB"
+time=2026-10-30T19:57:00.181-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+-- ollama ps 11435:
+NAME               ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL              
+qwen3-ia:latest    56671c2ab938    6.5 GB    100% CPU     8192       llamacpp    9 minutes from now    
+-- /dev/nvidia* abertos pelos processos da unidade:
+   pid 52355: 0
+   pid 52738: 0
+   total=0
+-- cgroup: CPUQuotaPerSecUSec=3s DevicePolicy=closed CPUAffinity=2-5 8-11 
+-- nvidia-smi compute apps:
+3455, /usr/local/lib/ollama/llama-server, 4554 MiB
+3455, /usr/local/lib/ollama/llama-server, 2974 MiB
+3455, /usr/local/lib/ollama/llama-server, 2982 MiB
+3455, /usr/local/lib/ollama/llama-server, 3680 MiB
+== 2026-10-30 19:59:47 rodada B (remoto); descarregando o modelo do secundario
+{"model":"qwen3-ia","created_at":"2026-10-30T22:59:47.16434292Z","response":"","done":true,"done_reason":"unload"}
+NAME    ID    SIZE    PROCESSOR    CONTEXT    RUNNER    UNTIL 
+gw: parado (inactive)
+Running as unit: mcpgw-aceite107.service; invocation ID: e65b40eba9844dc2a2ff96acba396efb
+gwB: ativo=active tipo_sec=remoto
+   total 412
+   -rw-------. 1 mcpgw mcpgw     95 out 30 19:59 admin
+   -rw-------. 1 mcpgw mcpgw    206 out 30 19:59 backends.json
+   -rw-------. 1 mcpgw mcpgw   4096 out 30 19:59 content.db
+   -rw-------. 1 mcpgw mcpgw  32768 out 30 19:59 content.db-shm
+   -rw-------. 1 mcpgw mcpgw  28872 out 30 19:59 content.db-wal
+   -rw-------. 1 mcpgw mcpgw   4096 out 30 19:59 gw.db
+   -rw-------. 1 mcpgw mcpgw  32768 out 30 19:59 gw.db-shm
+   -rw-------. 1 mcpgw mcpgw 304912 out 30 19:59 gw.db-wal
+   Started mcpgw-aceite107.service - 10.7 aceite: gateway de teste 11599.
+   2026/10/30 19:53:06 backend secundário sec-cpu (cpu) em 127.0.0.1:11435, 1 slot(s)
+   2026/10/30 19:53:06 backend secundário morto (cpu) em 127.0.0.1:11436, 1 slot(s)
+   2026/10/30 19:53:06 mcpollama-gateway 0.12.0-736c205 em 127.0.0.1:11599 -> Ollama 127.0.0.1:11434 (geracao=1 embed=1 fila=64 por-ip=16) boot=8886b162-c7be-4322-8782-6235db648193
+   2026/10/30 19:53:06 store: retenção removeu 0 pedidos e 0 amostras de GPU
+   2026/10/30 19:53:06 models: ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: connect: connection refused; tags: Get "http://127.0.0.1:11436/api/tags": dial tcp 127.0.0.1:11436: connect: connection refused
+   2026/10/30 19:53:07 req bc4daae61e15871167a14395d0cbfd19 geracao /api/generate status=200 class= wait_ms=0
+   2026/10/30 19:53:07 req 206ff35d0bcde801c9cb08dbb61946a7 geracao /api/generate status=200 class= wait_ms=9
+   2026/10/30 19:53:10 req b45068637cd2622562f56dbdc4a202c1 geracao /api/generate status=200 class= wait_ms=0
+   2026/10/30 19:53:10 req e163fdea9cf73644b2d8439be7af58c2 geracao /api/generate status=200 class= wait_ms=231
+   2026/10/30 19:53:11 req 17af87dac6a0756747199e35bf91208f geracao /api/generate status=200 class= wait_ms=483
+   2026/10/30 19:54:13 req 6045efff8bd303d9cb6365d54d5941f0 geracao /api/generate status=200 class= wait_ms=0
+19:59:50 == rodada B boot_id ok; uptime -s 2026-10-30 16:42:03
+19:59:50 QUADRO inicial (sec tipo remoto, modelo nao residente): gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:50   QUADRO gpu-local:gpu:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:53 GEN {"tag": "bw1", "prio": "alta", "status": 200, "rid": "a74018b603794178d39d593e7ba3edb7", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.4, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:59:54   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:56 GEN {"tag": "bw2", "prio": "alta", "status": 200, "rid": "5f49e1c481482131d51f10490c88beac", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+19:59:57   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:58   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:remoto:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+19:59:58   SQLITE bw1 id=a74018b6 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3351 wait_ms=0
+19:59:58   SQLITE bw2 id=5f49e1c4 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3337 wait_ms=0
+19:59:59   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:ok:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=fechado:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:00   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:ok:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:01 GEN {"tag": "B1", "prio": "alta", "status": 200, "rid": "156f2ca0969634f78513cdf97e1dcd88", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.4, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+20:00:02   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:05 GEN {"tag": "B3", "prio": "alta", "status": 200, "rid": "ec47af3c5a7b621a1f1a56379885eee1", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 6.1, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+20:00:06   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:remoto:ok:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=-:rules=:err= | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:10   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:17   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:20   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:25   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:45   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:00:50   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:10   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=meio_aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:15   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:24 GEN {"tag": "B2", "prio": "alta", "status": 200, "rid": "c65a41cf44bf8e38811557522a288029", "model": "qwen3-ia", "eval": 160, "load_ms": 6904, "dur_s": 85.7, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+20:01:25   QUADRO gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:25   SQLITE B1 id=156f2ca0 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3407 wait_ms=0
+20:01:25   SQLITE B2 id=c65a41cf prio=alta backend=sec-cpu failover_rule='F2:S1' status=ok http=200 eval=160 run_ms=85687 wait_ms=0
+20:01:25   SQLITE B3 id=ec47af3c prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3482 wait_ms=2606
+20:01:25   EVENTO 20:00:16 overload_off carga abaixo de 50% dos limiares por 10s
+20:01:25 VEREDITO|e2-alta-remoto|PASS|alta com tipo remoto: 1 no sec-cpu regra ['F2:S1']
+20:01:32 QUADRO depois da carga no secundario remoto: gpu-local:gpu:ok:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:33   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:34   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=2:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:36 GEN {"tag": "B4", "prio": "alta", "status": 200, "rid": "f1274f61be7352a2ea6f6c69a78107f9", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 3.4, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+20:01:37   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=1:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:39 GEN {"tag": "B5", "prio": "alta", "status": 200, "rid": "a22166ba3768ed19af1abaaaa4283dcf", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 6.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+20:01:40   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=1/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:42 GEN {"tag": "B6", "prio": "alta", "status": 200, "rid": "e997584a3c03639571edecc92aea819a", "model": "qwen3-ia", "eval": 160, "load_ms": 0, "dur_s": 9.3, "err": null, "resp": "O mar é uma entidade vasta e misteriosa que cobre a maior pa"}
+20:01:43   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=S1:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:44   QUADRO gpu-local:gpu:sobrecarregado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% GPU:rules=hist:err= | sec-cpu:remoto:degradado:br=fechado:used=0/1:fila=0:dig=56671c2ab938:proc=100% CPU:rules=:err=modelo qwen3-ia:latest fora de 100% GPU: 100% CPU | morto:cpu:fora:br=aberto:used=0/1:fila=0:dig=:proc=-:rules=:err=ps: Get "http://127.0.0.1:11436/api/ps": dial tcp 127.0.0.1:11436: con
+20:01:44   SQLITE B4 id=f1274f61 prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3396 wait_ms=0
+20:01:44   SQLITE B5 id=a22166ba prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3349 wait_ms=2996
+20:01:44   SQLITE B6 id=e997584a prio=alta backend=gpu-local failover_rule='' status=ok http=200 eval=160 run_ms=3348 wait_ms=5945
+20:01:44 VEREDITO|e2-remoto-degradado|PASS|secundario 'remoto' com o modelo a 100% CPU fica degradado; nova rajada alta: ['gpu-local', 'gpu-local', 'gpu-local']
+20:01:44 == (g) tempos das leituras da checagem ativa (ms), por fase
+20:01:44   PS B1-aquecimento: ps11434 n=9 p50=0.6 max=10.0 falhas=0 ; tags11434 n=9 p50=2.4 max=3.1 falhas=0 ; ver11434 n=9 p50=0.3 max=0.4 falhas=0 ; ps11435 n=9 p50=0.4 max=0.4 falhas=0
+20:01:44   PS B2-alta-remoto: ps11434 n=94 p50=0.8 max=1.9 falhas=0 ; tags11434 n=94 p50=2.4 max=4.2 falhas=0 ; ver11434 n=94 p50=0.4 max=0.6 falhas=0 ; ps11435 n=94 p50=0.4 max=49.9 falhas=0
+20:01:44   PS B3-remoto-degradado: ps11434 n=12 p50=0.5 max=0.7 falhas=0 ; tags11434 n=12 p50=2.4 max=3.2 falhas=0 ; ver11434 n=12 p50=0.3 max=0.4 falhas=0 ; ps11435 n=12 p50=0.4 max=0.4 falhas=0
+20:01:44 == (g) maior tempo de leitura no primario (ps/tags/version): 10.0 ms; passa de 3 s: False
+20:01:44 == VEREDITOS
+20:01:44    e2-alta-remoto|PASS|alta com tipo remoto: 1 no sec-cpu regra ['F2:S1']
+20:01:44    e2-remoto-degradado|PASS|secundario 'remoto' com o modelo a 100% CPU fica degradado; nova rajada alta: ['gpu-local', 'gpu-local', 'gpu-local']
+-- secundario depois da B:
+-- journal inference compute:
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="86.7 GiB"
+time=2026-10-30T19:53:05.625-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+time=2026-10-30T19:57:00.181-03:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="93.7 GiB" available="85.7 GiB"
+time=2026-10-30T19:57:00.181-03:00 level=INFO source=routes.go:2562 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+-- ollama ps 11435:
+NAME               ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL              
+qwen3-ia:latest    56671c2ab938    6.5 GB    100% CPU     8192       llamacpp    9 minutes from now    
+-- /dev/nvidia* abertos pelos processos da unidade:
+   pid 52355: 0
+   pid 53155: 0
+   total=0
+-- cgroup: CPUQuotaPerSecUSec=3s DevicePolicy=closed CPUAffinity=2-5 8-11 
+-- nvidia-smi compute apps:
+3455, /usr/local/lib/ollama/llama-server, 4554 MiB
+3455, /usr/local/lib/ollama/llama-server, 2974 MiB
+3455, /usr/local/lib/ollama/llama-server, 2982 MiB
+3455, /usr/local/lib/ollama/llama-server, 3680 MiB
+-- producao depois:
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL   
+qwen3-ia:latest    56671c2ab938    13 GB    100% GPU     65536      llamacpp    Forever    
+active
+boot=2026-10-30 16:42:03
+
+[exited with code 0]

@@ -1,0 +1,36 @@
+# Saída do t1.sh no servidor (copiada do terminal em 2026-10-30 19:52; binários de teste GOOS=linux CGO_ENABLED=0
+# do HEAD 736c205 + os arquivos .testes da 10.5/10.L, rodados como mcpgw em /var/tmp/aceite107/tests, TMPDIR próprio).
+# Observação: a listagem "--- SKIP -A2" teve um erro de ordem de argumentos do grep no meu script (só afetou a listagem).
+== inicio 2026-10-30 19:52:39 boot=2026-10-30 16:42:03 boot_id_ok=sim
+== pool selecionados rc=0
+   === RUN   TestAdv5S4FileModesLinux
+       fase105_adv_test.go:853: VEC|S4-modo-symlink-dono|Baixa|gateway/pool/registry.go:149|OK: 0644, 0640, symlink para 0644 e token_file 0644 recusados
+   --- PASS: TestAdv5S4FileModesLinux (0.00s)
+   === RUN   TestRegistryWrongModeIsRefused
+   --- PASS: TestRegistryWrongModeIsRefused (0.00s)
+   PASS
+== content selecionados rc=0
+   === RUN   TestAdvLPermissions
+       fase10l_adv_test.go:185: VEC|P1-permissoes|Media|gateway/content/content.go:89|OK: content.db/-wal/-shm 0600, inclusive arquivo pre-existente 0644 e -wal/-shm recriados
+   --- PASS: TestAdvLPermissions (0.01s)
+   === RUN   TestRegress10LExistingFileBecomesPrivate
+   --- PASS: TestRegress10LExistingFileBecomesPrivate (0.01s)
+   PASS
+== joblog selecionados rc=0
+   === RUN   TestAdvLKillChild
+   --- SKIP: TestAdvLKillChild (0.00s)
+   === RUN   TestAdvLKilledMidStream
+       fase10l_adv_test.go:137: VEC|K1-sigkill-no-stream|Alta|gateway/store/jobs.go:94|OK (processo filho morto por SIGKILL): boot-A->boot-A: interrompido_gateway responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true | boot-A->boot-B: interrompido_reboot responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true
+   --- PASS: TestAdvLKilledMidStream (0.10s)
+   PASS
+== pool suite completa (-short) rc=0: PASS=54 FAIL=0 SKIP=0
+   PASS
+== content suite completa (-short) rc=0: PASS=20 FAIL=0 SKIP=0
+   PASS
+== joblog suite completa (-short) rc=0: PASS=7 FAIL=0 SKIP=3
+   --- SKIP: TestAdvLKillChild (0.00s)        (helper: só roda como filho do K1)
+   --- SKIP: TestAdvLFsyncBurst (0.00s)       ("lento", pulado com -short)
+   --- SKIP: TestAdvLMemoryBigPrompt (0.00s)  ("lento", pulado com -short)
+   PASS
+== quem rodou: mcpgw 700
+== fim 2026-10-30 19:52:55 boot=2026-10-30 16:42:03

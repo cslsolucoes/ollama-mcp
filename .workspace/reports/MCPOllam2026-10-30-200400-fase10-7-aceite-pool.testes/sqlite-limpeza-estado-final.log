@@ -1,0 +1,66 @@
+# Última conexão SSH, 2026-10-30 20:03:31: 2ª via no SQLite dos 3 gateways de teste, limpeza e estado final da produção.
+-- gwA backend/regra/prioridade:
+   ('gpu-local', '', 'alta', 'ok', 200, 3)
+   ('gpu-local', '', 'normal', 'ok', 200, 9)
+   ('sec-cpu', 'F2:S3', 'normal', 'ok', 200, 1)
+-- gwA eventos do pool:
+   19:55:18 backend_drenado sec-cpu
+   19:55:22 backend_retomado sec-cpu
+   19:56:22 backend_drenado gpu-local
+   19:56:22 overload_on S3 espera_estimada=0s fila=0
+   19:56:44 backend_retomado gpu-local
+   19:56:46 backend_down sec-cpu: ps: Get "http://127.0.0.1:11435/api/ps": dial tcp 127.0.0.1:11435: connect: conne
+   19:56:55 overload_off carga abaixo de 50% dos limiares por 10s
+   19:56:56 breaker_open sec-cpu: 3 falhas seguidas
+   19:57:01 backend_up sec-cpu
+   19:57:16 breaker_close sec-cpu: a checagem ativa deu certo
+-- gwA backend_samples: [(165, 'gpu-local,sec-cpu,morto', 'ok,fora,drenado,sobrecarregado,disjuntor_aberto')]
+-- gwA2 backend/regra/prioridade:
+   ('gpu-local', '', 'alta', 'ok', 200, 3)
+   ('gpu-local', '', 'normal', 'ok', 200, 5)
+   ('sec-cpu', 'F2:S1', 'normal', 'ok', 200, 1)
+-- gwA2 eventos do pool:
+   19:57:47 overload_on S1 espera_estimada=7s fila=1
+   19:58:10 overload_off carga abaixo de 50% dos limiares por 10s
+   19:59:20 overload_on S1 espera_estimada=7s fila=1
+   19:59:46 overload_off carga abaixo de 50% dos limiares por 10s
+-- gwA2 backend_samples: [(75, 'gpu-local,sec-cpu,morto', 'sobrecarregado,ok,fora')]
+-- gwB backend/regra/prioridade:
+   ('gpu-local', '', 'alta', 'ok', 200, 7)
+   ('gpu-local', '', 'normal', 'ok', 200, 1)
+   ('sec-cpu', 'F2:S1', 'alta', 'ok', 200, 1)
+-- gwB eventos do pool:
+   19:59:53 overload_on S1 espera_estimada=7s fila=1
+   20:00:16 overload_off carga abaixo de 50% dos limiares por 10s
+   20:01:32 overload_on S1 espera_estimada=7s fila=1
+   20:01:53 overload_off carga abaixo de 50% dos limiares por 10s
+   20:02:27 overload_on S1 espera_estimada=7s fila=1      <- disparado pelo pedido ISOLADO do f1 (mcpollama), primário livre
+   20:02:39 overload_off carga abaixo de 50% dos limiares por 10s
+-- gwB backend_samples: [(132, 'gpu-local,sec-cpu,morto', 'sobrecarregado,ok,fora,degradado')]
+== limpeza
+gw: parado (inactive)
+sec: parado (inactive)
+   unidades de teste: nenhuma
+   (pgrep só casou com o próprio bash da sessão SSH: nenhum processo de teste)
+ls: não foi possível acessar '/var/tmp/aceite107': Arquivo ou diretório inexistente
+== estado final da producao
+boot=2026-10-30 16:42:03 boot_id_igual=sim
+mcpollama-gateway version 0.12.0-736c205
+active
+active
+MainPID=49814
+NRestarts=0
+ActiveEnterTimestamp=Fri 2026-10-30 19:43:53 -03
+LISTEN 0      4096       127.0.0.1:11434      0.0.0.0:*    users:(("ollama",pid=1806,fd=4))
+LISTEN 0      4096       127.0.0.1:11500      0.0.0.0:*    users:(("mcpollama-gatew",pid=49814,fd=14))
+NAME               ID              SIZE     PROCESSOR    CONTEXT    RUNNER      UNTIL
+qwen3-ia:latest    56671c2ab938    13 GB    100% GPU     65536      llamacpp    Forever
+  ps: qwen3-ia:latest 100% GPU
+3455, /usr/local/lib/ollama/llama-server, 4554 MiB
+3455, /usr/local/lib/ollama/llama-server, 2974 MiB
+3455, /usr/local/lib/ollama/llama-server, 2982 MiB
+3455, /usr/local/lib/ollama/llama-server, 3680 MiB
+93bd5c05e04fce16a8e7f00fd49a616c  -    (md5 do systemctl cat mcpollama-gateway)
+-rw-r--r--. 1 root root 1091 2026-10-30_12:12:39 /etc/systemd/system/mcpollama-gateway.service
+-rw-r--r--. 1 root root  375 2026-10-22_16:41:22 /etc/systemd/system/ollama.service
+/etc/systemd/system/ollama.service.d: 10-performance.conf 2026-10-30_12:12:42 (+ .bak de 2026-10-22)

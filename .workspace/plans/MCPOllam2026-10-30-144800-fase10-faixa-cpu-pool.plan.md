@@ -28,7 +28,7 @@
 | 10.4 | 9.12 | **Código:** pool de backends (`gpu-local`/`cpu-local`/remotos por `backends.json`), regras R1–R9 e F1–F8, EWMA, estimador de tokens, roubo de trabalho, disjuntor, histerese, "drenar"; monitor por faixa e quadro Backends; store; mcpollama (`lane`/`rota`/fallback). Testes com 3 Ollama falsos | sonnet (worktree) | **código concluído** (ramo `worktree-agent-a9532e3414358d795`, 2026-10-30 18:55; sem merge, sem implantação) |
 | 10.5 | 9.13 | **Revisão adversarial** da faixa e do pool + reexecução dos ataques da 9.5 | opus | **concluída no código** (ramo `worktree-agent-a9532e3414358d795`, 2026-10-30 19:45; fix `b1d8418`; report `MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool`; sem merge, sem implantação; falta a rodada Linux dos testes de modo) |
 | 10.6 | 9.14 | **Implantação:** `ollama-cpu.service` + `ollama-cpu-warm` definitivos; gateway com o pool; backups e rollback ensaiado | loop principal | pendente |
-| 10.7 | 9.15 | **Aceite ao vivo:** carga mista (GPU + baixa na CPU), transbordo, roubo de trabalho, queda da `ollama-cpu` → R9, qualidade igual, potência dentro do teto; 2ª via no SQLite | opus | pendente |
+| 10.7 | 9.15 | **Aceite ao vivo:** carga mista (GPU + baixa na CPU), transbordo, roubo de trabalho, queda da `ollama-cpu` → R9, qualidade igual, potência dentro do teto; 2ª via no SQLite | opus | **concluída** (aceite do **pool** numa instância de teste, 2026-10-30 20:04; report `MCPOllam2026-10-30-200400-fase10-7-aceite-pool`; carga mista/roubo de trabalho da faixa CPU fora do escopo, que depende da 10.3) |
 | 10.8 | 9.16 | Documentação (`MANUAL`, `CONEXAO-IA`, `CLAUDE.md`), report final e plano fechado | sonnet + loop principal | pendente |
 
 **Regras de segurança da execução** (as mesmas da 8.9/9.7):
@@ -330,3 +330,63 @@
     5. Opcional: limitar eventos `backend_down`/`up` de flapping a 1 por minuto por backend.
     6. Com o primário fora **já na partida**, o digest é desconhecido e nada é elegível (seguro, mas o pool não ajuda nesse caso).
     7. Herdadas da 10.4: 10.S, backup antes da migração do `gateway.db`, S4 (energia), alternativa (b) do 5xx com 2 IPs.
+- 2026-10-30 19:44–20:04 — **10.7 aceite ao vivo do pool** (subagente Opus 5.5). Instância de teste no servidor, produção intocada. Report: `.workspace/reports/MCPOllam2026-10-30-200400-fase10-7-aceite-pool.report.md`; logs e scripts em `…aceite-pool.testes/`. **Sem commit e sem push.**
+  - **Montagem:**
+    - secundário temporário `ollama-sec-test` (`systemd-run`, User=ollama, `DevicePolicy=closed`, `CPUAffinity=2-5 8-11`, `CPUQuota=300%`, 127.0.0.1:11435, `CUDA_VISIBLE_DEVICES=-1`, modelos da produção, `KEEP_ALIVE=10m`);
+    - gateway de teste `mcpgw-aceite107` com o binário de produção `0.12.0-736c205`, como `mcpgw`, em 127.0.0.1:11599, primário = Ollama 11434;
+    - `backends.json` 0600 com `sec-cpu` (11435; tipo `cpu` nas rodadas A/A2 e `remoto` na B; **CPU de verdade sempre**) e `morto` (11436);
+    - limiares `--overload-wait 3s`, `--overload-queue 2`, `--overload-hold 10s`, `--breaker-open 20s`;
+    - no máximo 3 pedidos simultâneos e prompts de ~30 tokens; 7 conexões SSH; boot `16:42:03` igual do começo ao fim.
+  - **O que deu CERTO (todos PASS, com 2ª via no SQLite):**
+    1. **Testes Linux como `mcpgw`:** `TestAdv5S4FileModesLinux`, `TestRegistryWrongModeIsRefused`, `TestAdvLPermissions`, `TestRegress10LExistingFileBecomesPrivate` e K1 (`TestAdvLKilledMidStream` com o filho `TestAdvLKillChild`, SIGKILL real) **PASS**. Suítes `-short`: pool 54/0, content 20/0, joblog 7/0 (3 SKIP: o helper e 2 marcados "lento"). Pendência 1 da 10.5 e 3 da 10.4 resolvidas.
+    2. **Secundário 100% CPU:** `id=cpu library=cpu`, `total_vram="0 B"`, `ollama ps` 100% CPU, 0 descritores `/dev/nvidia*`, `nvidia-smi` só com o runner 3455 da produção.
+    3. **(a) Repasse:** `a2` → `sec-cpu` com `F2:S1`. Os 3 pedidos com 200 e `model=qwen3-ia`. Digest `56671c2ab938…` igual nas duas instâncias.
+    4. **(b) Histerese:** `overload_off` 11,3 s depois do último pedido no primário (hold 10 s); o pedido seguinte foi ao `gpu-local`.
+    5. **(c) Disjuntor:** `morto` aberto por 3 falhas e reaberto no meio-aberto, sem fechar nunca; `sec-cpu` parado abriu com 3 falhas e fechou com `breaker_close: a checagem ativa deu certo` exatamente 20,0 s depois da abertura.
+    6. **(d) Drenar/retomar pela API:**
+       - negativos: 401 sem sessão, 403 sem CSRF, 403 com Origin alheia, 403 com CSRF errado, 404 com id desconhecido;
+       - drenado = 0 pedidos;
+       - primário drenado → `F2:S3` no secundário;
+       - 4 linhas de `audit` e 4 eventos.
+    7. **(e) `alta` com `cpu`:** com a sobrecarga ligada, 0 no secundário. Com `remoto`: `alta` → `F2:S1`.
+    8. **(f) Fallback do mcpollama:**
+       - erro de conexão → `[uso] … backend=fallback`, e o pedido aparece no SQLite do gateway de teste;
+       - 403 → 0 pedidos ao fallback (contador local);
+       - controle: o contador recebe 1 pedido quando o primário está morto.
+    9. **(g) Checagem ativa:** com a GPU gerando, `/api/ps` máx 10 ms (p50 0,6–0,8 ms), `/api/tags` máx 4,2 ms, `/api/version` máx 2,8 ms. Na CPU durante a carga a frio, `/api/ps` máx 49,9 ms. **Nada perto de 3 s** (pendência 4 da 10.5, exceto a carga a frio da GPU, abaixo).
+    10. **Limpeza provada:**
+        - unidades, `/var/tmp/aceite107`, túnel, contador e binários de teste removidos;
+        - produção: `0.12.0-736c205` ativa (MainPID 49814, `NRestarts=0`), `qwen3-ia` 100% GPU com o mesmo runner;
+        - 11435, 11436 e 11599 livres; arquivos de unit e drop-in com datas anteriores ao teste.
+  - **O que NÃO deu certo (e a solução):**
+    1. **Rodada A, cenários a, b e e: teste inválido, erro meu.** O prompt curto fazia o modelo parar em 25 tokens (0,65 s), e a sobrecarga nunca ligava. **Solução:** `num_predict` 160 com texto longo e um gateway novo (A2), onde passaram. Os cenários d e c da rodada A valem.
+    2. **Critério automático do meu driver nos cenários a e e da A2.** Ele procurava o `overload_on` só depois do t0, mas o evento tinha saído antes, disparado pelo pedido anterior. **Solução:** conferido pelo quadro de 1 Hz e pelos eventos no SQLite; os dois passam (detalhes no report §3).
+    3. **O `TaskStop` não matou o `ssh.exe` do túnel.** Encerrei com `Stop-Process` e conferi as portas.
+  - **Achados (report §4):**
+    1. **(Baixa)** S1 conta o próprio pedido em despacho. Um pedido **isolado** com o primário livre liga `overload_on S1 espera=7s fila=1` (EWMA × 2). Em produção, com 60 s e 1 slot, isso ocorre quando a EWMA passa de 30 s. Gera eventos e estado espúrios; o roteamento segue no primário. Hoje não tem efeito: sem secundário, o `Evaluate` nem roda.
+    2. Um `remoto` que roda em CPU fica `degradado` depois do primeiro pedido (desenho §16.3).
+    3. O "último erro" não é limpo no `backend_up`.
+    4. O mcpollama mostra "bloqueado pelo nginx" para o 403 da allowlist do gateway.
+    5. O backend morto gera 1 `breaker_open` a cada ~20–25 s.
+  - **Pendências (numeradas):**
+    1. Corrigir o achado 1 (descontar o pedido em despacho, com teste) antes da 10.S.
+    2. Carga a frio do primário (GPU) e o `/api/ps` durante ela: não medido (descarregar o modelo de produção é proibido); medir em janela de manutenção ou na 10.S.
+    3. MANUAL §16.1: o `tipo` tem de ser o do hardware real.
+    4. Cosméticos 3, 4 e 5 (com a pendência 5 da 10.5).
+    5. Herdadas: 10.S, `max_prompt_tokens`, `host:porta` no monitor aberto, backup do `gateway.db`, S4.
+    6. Este changelog não tem a entrada da **10.6** (a produção já roda `0.12.0-736c205`, ativa desde 19:43:53); registrar.
+    7. O `nomic-embed-text` não estava residente na produção já no início (só o `qwen3-ia`). Não foi carregado por mim, e o estado final é igual ao inicial.
+- 2026-10-30 20:09 — **10.6 registrada e pós-10.7** (loop principal).
+  - **10.6 (feita às 19:43):**
+    - backup do `gateway.db` e do `content.db` pela API de backup do SQLite em `/root/srv-backup-20261028/gateway-db-antes-0.12-*`;
+    - gateway `0.12.0-736c205` pelo instalador (`-Modo Atualizar`);
+    - conferido: pool com um único `gpu-local` (ok, disjuntor fechado, digest `56671c2ab938`, 100% GPU), pedido real 200 com `backend=gpu-local`, migração (`failover_rule`, `backend_samples`) aplicada;
+    - tag `gateway-v0.12.0` enviada.
+  - **Merge `736c205`:** o conflito era só no changelog do plano. O gate pegou 1 falha intermitente em `TestConnectionDroppedMidStream` (teste da Fase 2, disputa de tempo sob carga): isolado passou 20/20, o pacote 5/5 e a suíte inteira na segunda rodada. Fica como pendência deixá-lo determinístico.
+  - **Depois da 10.7:** `nomic-embed-text` recarregado às 20:08. Ele estava fora desde os reboots das 16:40/16:41, porque o `ollama-warm` só carrega o `qwen3-ia`.
+  - **Estrutura reorganizada (`8198e74`):**
+    - `deploy/gateway` (era `fase9-gateway`);
+    - `docs/` com `INSTALACAO` e `MANUAL-GATEWAY`;
+    - `CHANGELOG.md` e `NOTICE.md`;
+    - 144 links, 0 quebrados.
+  - **Próximo:** correção 10.7-1 (sobrecarga que conta o próprio pedido) + cosméticos + teste instável → gateway `0.12.1` e mcpollama `0.9.0` em `D:\MCP` → 10.8 → congelar.
