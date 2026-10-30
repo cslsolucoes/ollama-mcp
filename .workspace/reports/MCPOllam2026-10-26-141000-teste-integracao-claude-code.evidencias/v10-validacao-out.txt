@@ -1,0 +1,27 @@
+serverInfo={"name": "mcpollama", "version": "0.5.2-10e879a"}
+tools=7 nomes=chat,embed,extract,generate,list_models,summarize_file,translate bytes_tools_list=7548
+R2 frase no generate: True
+P1 aviso no embed: True
+CONTA direta 17*23 + 144/12 esperado=403 obtido=415 ERRO
+CONTA passo  17*23 + 144/12 esperado=403 obtido=403 OK | [uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=147 total_ms=1577 load_ms=0 queue_ms=0 fim=stop
+CONTA direta 48*12 - 96/8 esperado=564 obtido=552 ERRO
+CONTA passo  48*12 - 96/8 esperado=564 obtido=564 OK | [uso] modelo=qwen3-ia prompt_eval_count=44 eval_count=143 total_ms=1543 load_ms=0 queue_ms=0 fim=stop
+CONTA direta 36*27 - 512/16 esperado=940 obtido=896 ERRO
+CONTA passo  36*27 - 512/16 esperado=940 obtido=940 OK | [uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=147 total_ms=1586 load_ms=0 queue_ms=0 fim=stop
+CONTA direta 19*19 + 210/14 esperado=376 obtido=241 ERRO
+CONTA passo  19*19 + 210/14 esperado=376 obtido=376 OK | [uso] modelo=qwen3-ia prompt_eval_count=46 eval_count=108 total_ms=1189 load_ms=0 queue_ms=0 fim=stop
+RESUMO contas: direta 0/4, passo a passo 4/4
+CONTAGEM pack-rules-manifest_V1.11.0.md esperado=19 listar=19 contar=18
+CONTAGEM pack-rules-manifest_V1.11.0.md esperado=19 listar=19 contar=18
+CONTAGEM pack-rules-manifest_V1.11.0.md esperado=19 listar=19 contar=18
+RESUMO contagem pack-rules-manifest_V1.11.0.md: listar 3/3, contar direto 0/3
+CONTAGEM TOOLS.md esperado=7 listar=7 contar=7
+CONTAGEM TOOLS.md esperado=7 listar=7 contar=7
+CONTAGEM TOOLS.md esperado=7 listar=7 contar=7
+RESUMO contagem TOOLS.md: listar 3/3, contar direto 3/3
+EMBED [uso] modelo=nomic-embed-text prompt_eval_count=33 total_ms=24 load_ms=0 queue_ms=0
+GENERATE apos embed: Brasília | [uso] modelo=qwen3-ia prompt_eval_count=21 eval_count=4 total_ms=131 load_ms=0 queue_ms=0 fim=stop
+RESUMO README: frases 'concepção/fase inicial' em 0/6
+P5 leitura GestorERP: erro=False {"folderVersion": "1.11.0", "data": "21/10/2026"}
+P5 .mcp.json: erro=True acesso negado: o arquivo está na lista fixa de nomes sensíveis (.env, chaves, credenciais, .git...) e não pode
+P5 fora da raiz: erro=True arquivo não encontrado ou fora das raízes permitidas (--allow-root)

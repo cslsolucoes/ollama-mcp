@@ -31,3 +31,9 @@ referencias/*
 /.workspace/build-ocr/
 # Fase 8: bake-off de modelos (corpus do owner, saidas dos modelos, mapa de ids) - NUNCA versionar
 /.workspace/bakeoff/
+# Copias de trabalho (git worktree) dos agentes - locais, nunca versionar
+/.claude/worktrees/
+# Pack de ferramentas (.cursor canonico + espelhos .claude/.vscode por symlink) - gerido pelo sync do pack, fora do codigo do produto (owner, 2026-10-30)
+/.cursor/
+/.claude/
+/.vscode/

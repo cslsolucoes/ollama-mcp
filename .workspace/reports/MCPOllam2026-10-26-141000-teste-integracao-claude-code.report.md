@@ -573,3 +573,84 @@ cada modo, com 1 s entre chamadas. O gabarito é calculado no script.
 | R3 | não determinismo com `temperature 0` | explicado em parte (§9.1) |
 | R4.2 | cofre / CLAUDE.md do GestorERP | **aberto**, com o owner |
 | R4.3 | link PCIe `00:1b.4` | **aberto**, reparo físico |
+
+---
+
+## 10. Validação das correções no binário 0.5.2 (sessão do GestorERP, 2026-10-26 14:52–14:54)
+
+> **De:** a sessão do Claude Code no GestorERP (Opus 5.5). Pedido do owner: "pode repetir o teste
+> para validar as correções" e depois "registre a validação".
+> **Por que não pelas tools da sessão:** a sessão GestorERP ainda roda o **0.5.1**. A descrição do
+> `generate` carregada nela não tem a frase do R2, e o binário novo só entra ao reiniciar o Claude
+> Code. Para validar o **0.5.2** sem reiniciar, usei um cliente MCP stdio próprio, que inicia o
+> `D:\MCP\mcpollama-mcp.exe` com os **mesmos `args` do `.mcp.json` do GestorERP** (lidos do arquivo;
+> o token não é impresso e passa por scrub na saída).
+> **Evidências:** `…evidencias/v10-validacao-drv.py` (o cliente) e `…evidencias/v10-validacao-out.txt`
+> (a saída). Varredura do token nos dois: 0 ocorrências.
+> **Execução:** 31 `tools/call` em 81 s, com 1 s entre chamadas por causa do limite de taxa do nginx
+> (§7.3). Nenhum HTTP 429.
+
+### 10.1 Identificação
+
+- `mcpollama-mcp.exe --version` = `0.5.2-10e879a`; o `serverInfo` do `initialize` também diz
+  `{"name": "mcpollama", "version": "0.5.2-10e879a"}`.
+- `tools/list`: 7 tools (`chat`, `embed`, `extract`, `generate`, `list_models`, `summarize_file`,
+  `translate`).
+
+### 10.2 Resultados por correção
+
+| Correção | Teste | Esperado | Obtido | Veredito |
+| --- | --- | --- | --- | --- |
+| **R2** (frase no `generate`) | descrição do `generate` no `tools/list` | contém "Counts and arithmetic are unreliable" | contém | ✅ |
+| **P1** (aviso no `embed`) | descrição do `embed` no `tools/list` | contém "evicts the generation model" | contém | ✅ |
+| **P1** (2 residentes) | `embed` (3 textos) e logo depois `generate` | `load_ms` = 0 nos dois | `embed` `total_ms=24 load_ms=0`; `generate` "Brasília" `total_ms=131 load_ms=0` | ✅ |
+| **P3/R2** (contas) | 4 contas, direto (`temperature 0`) | 403, 564, 940, 376 | 415, 552, 896, 241 → **0/4** | ❌ limite do modelo, como medido no §7.4 |
+| **P3/R2** (contas) | as mesmas 4, "passo a passo + `RESULTADO:`" | idem | 403, 564, 940, 376 → **4/4** | ✅ (`eval_count` 108–147, `total_ms` 1.189–1.586) |
+| **R1** (contagem) | `extract` no manifesto de rules do GestorERP, 3×: listar em array JSON (o script conta) × contar direto | 19 | listar 19, 19, 19 → **3/3**; contar 18, 18, 18 → **0/3** | ✅ listar · ❌ contar |
+| **R1** (contagem) | `extract` no `TOOLS.md`, 3×, os mesmos 2 modos | 7 | listar **3/3**; contar **3/3** | ✅ |
+| **P2** (README) | `summarize_file` do README, 3× com `focus` e 3× sem | 0 frases "concepção/fase inicial" | **0/6** | ✅ |
+| **P5** (raiz do GestorERP) | `extract` de FolderVersion/Data do manifesto | `1.11.0`, `21/10/2026` | `{"folderVersion": "1.11.0", "data": "21/10/2026"}` | ✅ |
+| **P5** (sensível) | `summarize_file` do `.mcp.json` do GestorERP | recusa | `isError`: "acesso negado: o arquivo está na lista fixa de nomes sensíveis…" | ✅ |
+| **P5** (fora da raiz) | `summarize_file` de `D:\Users\claiton.linhares\.claude\CLAUDE.md` | recusa | `isError`: "arquivo não encontrado ou fora das raízes permitidas (--allow-root)" | ✅ |
+
+**Gabaritos calculados fora do modelo:** as contas pela aritmética; a contagem de 19 pelo `awk` do §8.1
+e a de 7 pelo `grep` do §3.
+
+### 10.3 Leitura
+
+1. **Todas as correções do §7 e do §9 estão presentes e funcionando no 0.5.2:** P1 (descrição e
+   residência), R2 (descrição), P2 (README) e P5 (raiz, bloqueio de sensível, bloqueio fora da raiz).
+2. **Os limites do modelo continuam iguais, e as recomendações documentadas os contornam:**
+   - contas: direto 0/4, passo a passo 4/4;
+   - contagens: contar direto 3/6, listar 6/6.
+   - O caso das 19 rules errou **sempre** na contagem direta (18, 18, 18), coerente com o §9.4 (3/5).
+3. **A contagem direta errou de forma estável nesta rodada** (18 nas 3 vezes, mesmo com
+   `fileTemperature = 0.2`). O §9.4 viu 18 ou 19. Isso reforça a recomendação de listar em vez de
+   contar.
+
+### 10.4 Divergência a esclarecer: tamanho do `tools/list`
+
+- O cliente deste §10 mediu o `result` do `tools/list` serializado como JSON compacto
+  (`separators=(",", ":")`, `ensure_ascii=False`, UTF-8): **7.548 bytes**.
+- O §9.4 registra o `TestToolsListBudget` com **4.390 de 4.400**.
+- Os números não batem, então a métrica deve ser outra. Pode ser que o teste meça só nomes e
+  descrições, sem os `inputSchema`, ou outro nível de `--tools-verbosity`. **Não investiguei.**
+- **Pendência:** antes de rever o teto (`toolsListBudget`), confirmar no
+  `src/tools/*_test.go` o que o teste mede e registrar aqui. Isso evita decidir o orçamento com uma
+  base errada.
+
+### 10.5 Estado consolidado (14:54)
+
+| # | Item | Estado |
+| --- | --- | --- |
+| P1 | `embed` descarrega o modelo | **fechado**, confirmado por 3 execuções (§7.2, §8.2, §10.2) |
+| P2 | resumo "inventado" | **fechado**: 0/20 (§7.3) + 1/1 (§8) + 0/6 (§10) |
+| P3/R2 | aritmética | **fechado como limite documentado**: frase no `generate` confirmada no 0.5.2; passo a passo 4/4 |
+| P4 | embeddings | aprovado (§7.5); não repetido |
+| P5 | raiz do GestorERP | **fechado**, confirmado no §8 e no §10 |
+| R1 | contagem no `extract` | **fechado como limite documentado**: listar 6/6 × contar 3/6 (§10) e 15/15 × 15/30 (§9.4) |
+| R3 | não determinismo com `temperature 0` | explicado em parte (§9.1); sem impacto prático |
+| R4.2 | cofre / CLAUDE.md do GestorERP | **aberto**, com o owner |
+| R4.3 | link PCIe `00:1b.4` | **aberto**, reparo físico |
+| novo | métrica do `TestToolsListBudget` × 7.548 bytes medidos | **aberto**, só esclarecer (§10.4) |
+| — | sessão GestorERP no 0.5.1 | reiniciar o Claude Code para os clientes carregarem o 0.5.2 |
