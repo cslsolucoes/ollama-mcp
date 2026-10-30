@@ -282,7 +282,7 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--retention-job-gpu D` | `MCPGW_RETENTION_JOB_GPU` | `168h` (7 dias) | Quanto tempo fica o extrato de GPU segundo a segundo de cada job (`job_gpu_samples`) | padrão |
 | `--monitor-keep-done D` | `MCPGW_MONITOR_KEEP_DONE` | `5m` | Quanto tempo um pedido concluído continua **visível** no `/monitor` ("Concluídos nos últimos 5 min"). Só exibição: não ocupa vaga nem entra nos limites. `0` esconde a lista | padrão |
 | `--backends FILE` | `MCPGW_BACKENDS` | vazio | **Pool de backends (10.4).** JSON dos Ollamas **secundários**, modo **`0600`** (senão a partida é recusada, código 2, como o `--admin-file`). Formato e regras na seção 16. **Sem ele o pool é um só backend, `gpu-local` = `--ollama`, e o gateway se comporta como antes** | não usado (sem secundário) |
-| `--overload-wait D` | `MCPGW_OVERLOAD_WAIT` | `1m` | **S1**: o primário está sobrecarregado quando a espera estimada de um pedido novo passa disso (EWMA da duração de uma geração × lugares à frente ÷ slots). Só age com secundário | padrão |
+| `--overload-wait D` | `MCPGW_OVERLOAD_WAIT` | `1m` | **S1**: o primário está sobrecarregado quando a espera estimada de um pedido novo passa disso (EWMA da duração de uma geração × (esperando à frente + executando) ÷ slots, sem contar o próprio pedido). Só age com secundário | padrão |
 | `--overload-queue N` | `MCPGW_OVERLOAD_QUEUE` | `0` (= 75% de `--queue-max`) | **S2**: sobrecarga quando MAIS de N pedidos de geração esperam. Não pode passar de `--queue-max` | padrão |
 | `--overload-hold D` | `MCPGW_OVERLOAD_HOLD` | `30s` | Histerese: o primário só retoma o trabalho depois de a carga ficar abaixo de **50%** dos dois limites, e o primário saudável, por esse tempo | padrão |
 | `--health-interval D` | `MCPGW_HEALTH_INTERVAL` | `5s` | Checagem ativa de cada backend: `/api/version`, `/api/ps` (modelo residente, saiu de 100% GPU?) e `/api/tags` (digests). Também é a leitura do quadro "Modelos" | padrão |
@@ -1041,8 +1041,8 @@ O primário está **sobrecarregado** quando qualquer um vale (só avaliado com s
 
 | Gatilho | Condição |
 | --- | --- |
-| **S1** | espera estimada de um pedido novo > `--overload-wait` (60 s). Estimativa = EWMA (α = 0,2) da duração das gerações que terminaram bem no primário × (esperando + 1) ÷ slots do primário; 0 enquanto houver slot livre e ninguém esperando, ou sem amostras |
-| **S2** | mais de `--overload-queue` (75% de `--queue-max`) gerações esperando |
+| **S1** | espera estimada de um pedido novo > `--overload-wait` (60 s). Estimativa = EWMA (α = 0,2) da duração das gerações que terminaram bem no primário × (esperando à frente + executando no primário) ÷ slots do primário, **sem contar o próprio pedido** (esperando à frente = esperando − 1); 0 enquanto o pedido couber num slot livre, ou sem amostras. Exemplo: 1 slot, EWMA 40 s, primário livre e 1 pedido chegando: espera 0; primário ocupado e ninguém à frente: 40 s; 2 à frente e 1 executando: 120 s |
+| **S2** | mais de `--overload-queue` (75% de `--queue-max`) gerações **na fila de verdade**: as que esperam e não cabem nos slots livres do primário (esperando − slots livres) |
 | **S3** | primário sem saúde: checagem ativa falhando, modelo fora de 100% GPU, disjuntor aberto ou meio-aberto, ou drenado |
 | **S4** | energia: **só o gancho**, desligado (`EnergyHook` nulo). Ligado, seguraria novos inícios no primário e repassaria |
 

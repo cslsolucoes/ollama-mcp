@@ -318,15 +318,31 @@ type Overload struct {
 // unhealthy is the soft health of a backend (not the hard gate of CanStart).
 func (b *Backend) unhealthy() bool { return b.checkFailed || b.degraded || b.br != brClosed }
 
-// estWait is the estimated wait of a request that arrives now: EWMA of the
-// duration of a primary generation times the places ahead of it, spread over
-// the primary slots. It is 0 while a slot is free and nobody waits.
+// queued is the real queue seen by the dispatcher: the waiting generation
+// requests that do not fit in the free slots of the primary. A request that is
+// about to start (it is in the line only because the dispatcher is looking at
+// it) is not queued.
+func (p *Pool) queued(in LoadInput) int {
+	free := p.primary.Slots - in.PrimaryUsed
+	if free < 0 {
+		free = 0
+	}
+	if q := in.WaitingGen - free; q > 0 {
+		return q
+	}
+	return 0
+}
+
+// estWait is the estimated wait of the newest waiting request: EWMA of the
+// duration of a primary generation times the requests ahead of it (the waiting
+// ones before it and the ones running), spread over the primary slots. The
+// request itself is not counted. It is 0 while it fits in a free slot.
 func (p *Pool) estWait(in LoadInput) time.Duration {
-	slots := p.primary.Slots
-	if (in.WaitingGen == 0 && in.PrimaryUsed < slots) || p.primary.ewma == 0 {
+	if p.queued(in) == 0 || p.primary.ewma == 0 {
 		return 0
 	}
-	return time.Duration(p.primary.ewma * float64(in.WaitingGen+1) / float64(slots) * float64(time.Millisecond))
+	ahead := in.WaitingGen - 1 + in.PrimaryUsed
+	return time.Duration(p.primary.ewma * float64(ahead) / float64(p.primary.Slots) * float64(time.Millisecond))
 }
 
 // Evaluate computes the overload state of the primary (S1..S4) with hysteresis:
@@ -342,7 +358,8 @@ func (p *Pool) Evaluate(now time.Time, in LoadInput) Overload {
 	est := p.estWait(in)
 	o := Overload{EstWait: est}
 	o.S1 = est > p.cfg.OverloadWait
-	o.S2 = in.WaitingGen > p.cfg.OverloadQueue
+	q := p.queued(in)
+	o.S2 = q > p.cfg.OverloadQueue
 	pr := p.primary
 	p.advance(pr, now)
 	o.S3 = pr.unhealthy() || pr.drained
@@ -360,9 +377,9 @@ func (p *Pool) Evaluate(now time.Time, in LoadInput) Overload {
 	switch {
 	case !p.over && trig:
 		p.over, p.overWhy, p.calm = true, strings.Join(rules, "+"), time.Time{}
-		p.emit("overload_on", strings.Join(rules, "+")+" espera_estimada="+est.Round(time.Second).String()+" fila="+itoa(in.WaitingGen))
+		p.emit("overload_on", strings.Join(rules, "+")+" espera_estimada="+est.Round(time.Second).String()+" fila="+itoa(q))
 	case p.over && !trig:
-		calm := est < p.cfg.OverloadWait/2 && in.WaitingGen*2 < p.cfg.OverloadQueue
+		calm := est < p.cfg.OverloadWait/2 && q*2 < p.cfg.OverloadQueue
 		switch {
 		case !calm:
 			p.calm = time.Time{}
