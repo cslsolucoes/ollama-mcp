@@ -38,6 +38,10 @@ svg text{fill:var(--mut);font-size:9px}
 #status{font-size:12px;color:var(--mut)}
 #msg{min-height:1.2em;color:var(--warn)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 10px}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc);font-weight:600}
+.tabs button:hover{color:var(--fg)}
 </style>
 </head>
 <body>
@@ -52,9 +56,15 @@ svg text{fill:var(--mut);font-size:9px}
   <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div></section>
   <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
   <section><h2>Última hora</h2><div class="charts" id="charts"></div></section>
-  <section><h2>Concluídos recentes</h2><div class="wrap"><table id="recent"></table></div></section>
+  <section>
+    <div class="tabs" role="tablist" aria-label="Histórico">
+      <button type="button" role="tab" id="tabbtn-recent" data-tab="recent" aria-controls="tab-recent" aria-selected="true">Concluídos recentes</button>
+      <button type="button" role="tab" id="tabbtn-events" data-tab="events" aria-controls="tab-events" aria-selected="false">Eventos</button>
+    </div>
+    <div role="tabpanel" id="tab-recent" aria-labelledby="tabbtn-recent"><div class="wrap"><table id="recent"></table></div></div>
+    <div role="tabpanel" id="tab-events" aria-labelledby="tabbtn-events" hidden><div class="wrap"><table id="events"></table></div></div>
+  </section>
   <section><h2>Auditoria (ações do administrador)</h2><div class="wrap"><table id="audit"></table></div></section>
-  <section><h2>Eventos</h2><div class="wrap"><table id="events"></table></div></section>
 </main>
 <script>
 "use strict";
@@ -230,6 +240,20 @@ function connect() {
 }
 function startPolling() { if (!pollTimer) { poll(); pollTimer = setInterval(poll, 2000); } }
 function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+// Tabs for "Concluídos recentes" / "Eventos"; the chosen tab is remembered per browser.
+function showTab(name) {
+  ["recent", "events"].forEach(function (n) {
+    var on = n === name;
+    $("tabbtn-" + n).setAttribute("aria-selected", on ? "true" : "false");
+    $("tab-" + n).hidden = !on;
+  });
+  try { localStorage.setItem("monitor.tab", name); } catch (x) {}
+}
+Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
+  b.addEventListener("click", function () { showTab(b.getAttribute("data-tab")); });
+});
+(function () { var t = "recent"; try { t = localStorage.getItem("monitor.tab") || "recent"; } catch (x) {} showTab(t === "events" ? "events" : "recent"); })();
 
 fetch("/monitor/api/session", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
   adminEnabled = !!j.admin_enabled; loggedIn = !!j.logged_in; csrf = j.csrf || ""; renderAuth();
