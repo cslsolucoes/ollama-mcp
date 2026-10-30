@@ -16,7 +16,8 @@ NG=/etc/nginx/conf.d/ollama.conf; PERF=/etc/systemd/system/ollama.service.d/10-p
 B=/root/srv-backup-20261028/fase96-ativacao-$(date +%Y%m%d-%H%M%S); mkdir -m 0700 -p "$B"
 echo "boot: $(uptime -s)"
 test -s /etc/mcpollama-gateway/admin || { echo "FALTA /etc/mcpollama-gateway/admin (bash /root/mcpgw-definir-senha.sh)"; exit 1; }
-chown root:mcpgw /etc/mcpollama-gateway/admin; chmod 0640 /etc/mcpollama-gateway/admin
+# o gateway (usuario mcpgw) le o arquivo e recusa qualquer permissao de grupo/outros (admin.go: 0600)
+chown mcpgw:mcpgw /etc/mcpollama-gateway/admin; chmod 0600 /etc/mcpollama-gateway/admin
 cp -p "$NG" "$B/ollama.conf"; cp -p "$PERF" "$B/10-performance.conf"; cp -p "$D/rollback.sh" "$B/rollback.sh"; sync
 test -s "$B/ollama.conf"; test -s "$B/10-performance.conf"; test -s "$B/rollback.sh"
 echo "backups em $B"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fase 9.6 (2026-10-30): define a senha do administrador do /monitor (usuario "admin").
 # A senha e lida sem eco, nao vai para o historico nem para argumentos de comando;
-# so o hash PBKDF2 e gravado em /etc/mcpollama-gateway/admin (root:mcpgw, 0640).
+# so o hash PBKDF2 e gravado em /etc/mcpollama-gateway/admin (mcpgw:mcpgw, 0600: o gateway recusa grupo/outros).
 set -euo pipefail
 umask 077
 F=/etc/mcpollama-gateway/admin
@@ -15,5 +15,5 @@ unset PW2
 printf "%s\n" "$PW" | /usr/local/bin/mcpollama-gateway hash-password -user admin > "$F.new"
 unset PW
 test -s "$F.new"
-chown root:mcpgw "$F.new"; chmod 0640 "$F.new"; mv -f "$F.new" "$F"; sync
+chown mcpgw:mcpgw "$F.new"; chmod 0600 "$F.new"; mv -f "$F.new" "$F"; sync   # 0600 do mcpgw: o gateway recusa grupo/outros
 echo "ok: $F gravado ($(wc -c < "$F") bytes, so o hash). Usuario: admin"
