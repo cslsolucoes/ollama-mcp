@@ -28,6 +28,7 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/joblog"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/monitor"
+	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
@@ -111,7 +112,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	} else {
 		logf("--log-content=false: o texto dos jobs não é gravado")
 	}
-	jr := &joblog.Journal{Store: st, Content: cs, Backend: proxy.DefaultBackend, Logf: logf}
+	jr := &joblog.Journal{Store: st, Content: cs, Backend: pool.DefaultPrimaryID, Logf: logf}
 	jr.RecoverResponses(context.Background())
 	if rec := st.Recovered(); len(rec) > 0 {
 		logf("%d job(s) do processo anterior ficaram em andamento e foram marcados como interrompidos", len(rec))
@@ -119,7 +120,55 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 
 	hub := monitor.NewHub()
 	var mon *monitor.Handler
-	q := queue.New(queue.Config{
+	var q *queue.Manager
+
+	// The Ollama is asked directly (loopback), outside the queue and the proxy.
+	// The pool drives this collector (its first reading is also the health check
+	// of the primary), so the "Modelos" board and the health share one reading.
+	mcol := &models.Collector{
+		Upstream: cfg.Ollama, Allowed: cfg.AllowedModels, ThinkSuffix: cfg.ThinkSuffix, Logf: logf,
+		OnChange: func(loaded, unloaded []string) {
+			for _, n := range loaded {
+				st.Event("modelo_carregado", n)
+			}
+			for _, n := range unloaded {
+				st.Event("modelo_descarregado", n)
+			}
+		},
+	}
+
+	// Backend pool (Fase 10.4). Without --backends it is the single gpu-local.
+	var specs []pool.Spec
+	if cfg.Backends != "" {
+		specs, err = pool.LoadFile(cfg.Backends)
+		if err != nil {
+			fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
+			return 2
+		}
+	}
+	secs, err := pool.Build(specs, cfg.AllowedModels, cfg.ThinkSuffix, 3*time.Second, logf)
+	if err != nil {
+		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
+		return 2
+	}
+	pl := pool.New(pool.Config{
+		PrimarySlots: cfg.GenSlots, PrimaryURL: cfg.Ollama, PrimaryCollector: mcol, Secondaries: secs,
+		QueueMax: cfg.QueueMax, OverloadWait: cfg.OverloadWait, OverloadQueue: cfg.OverloadQueue, Hold: cfg.OverloadHold,
+		CheckEvery: cfg.HealthEvery, BreakerFails: cfg.BreakerFails, BreakerOpen: cfg.BreakerOpen, Logf: dbg,
+		OnEvent: func(kind, detail string) { st.Event(kind, detail) },
+		OnChange: func() {
+			hub.Notify()
+			if q != nil {
+				q.Poke()
+			}
+		},
+	})
+	for _, b := range secs {
+		logf("backend secundário %s (%s) em %s, %d slot(s)%s", b.ID, b.Tipo, b.Host(), b.Slots, map[bool]string{true: ", com token próprio", false: ""}[b.Token() != ""])
+	}
+
+	q = queue.New(queue.Config{
+		Pool:     pl,
 		GenSlots: cfg.GenSlots, EmbedSlots: cfg.EmbedSlots, QueueMax: cfg.QueueMax,
 		PerClient: cfg.PerClient, PerIP: cfg.PerIP, LabelsPerIP: cfg.LabelsPerIP,
 		MaxWait: cfg.MaxWait, AgeAfter: cfg.AgeAfter, StartStagger: cfg.StartStagger,
@@ -194,26 +243,13 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		}
 	}
 
-	// The Ollama is asked directly (loopback), outside the queue and the proxy.
-	mcol := &models.Collector{
-		Upstream: cfg.Ollama, Allowed: cfg.AllowedModels, ThinkSuffix: cfg.ThinkSuffix, Logf: logf,
-		OnChange: func(loaded, unloaded []string) {
-			for _, n := range loaded {
-				st.Event("modelo_carregado", n)
-			}
-			for _, n := range unloaded {
-				st.Event("modelo_descarregado", n)
-			}
-		},
-	}
-
-	mon, err = monitor.New(monitor.Config{Models: mcol, Queue: q, Store: st, Content: cs, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
+	mon, err = monitor.New(monitor.Config{Pool: pl, Models: mcol, Queue: q, Store: st, Content: cs, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
 		return 1
 	}
 	px, err := proxy.New(proxy.Config{
-		Journal: jr, Backend: proxy.DefaultBackend,
+		Journal: jr, Backend: pool.DefaultPrimaryID, Pool: pl,
 		Upstream: cfg.Ollama, Queue: q, PriorityNets: cfg.PriorityNets, AllowedModels: cfg.AllowedModels,
 		MaxBodyBytes: cfg.MaxBodyBytes, RunTimeout: cfg.RunTimeout, Logf: dbg,
 		DefaultThink: cfg.DefaultThink, ThinkSuffix: cfg.ThinkSuffix,
@@ -259,10 +295,18 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	if ccol != nil {
 		start(func() { ccol.RunLoop(bg) })
 	}
-	start(func() { mcol.RunLoop(bg) })
+	start(func() { pl.Run(bg) })
+	start(func() { pokeLoop(bg, q) })
+	start(func() { backendSamples(bg, pl, q, st, cfg.SampleStore) })
 
 	logf("mcpollama-gateway %s em %s -> Ollama %s (geracao=%d embed=%d fila=%d por-ip=%d) boot=%s",
 		Version, ln.Addr(), cfg.Ollama.Host, cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerIP, bootID)
+	ids := []string{pool.DefaultPrimaryID}
+	for _, b := range secs {
+		ids = append(ids, b.ID)
+	}
+	st.Event("gateway_pool", fmt.Sprintf("backends=%s overload_wait=%s overload_queue=%d hold=%s health=%s breaker=%d/%s",
+		strings.Join(ids, ","), cfg.OverloadWait, cfg.OverloadQueue, cfg.OverloadHold, cfg.HealthEvery, cfg.BreakerFails, cfg.BreakerOpen))
 	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s run_timeout=%s max_rows=%d log_content=%v content_max=%d content_max_job=%d ret_content=%s ret_job_gpu=%s default_think=%v think_suffix=%q allow_keepalive=%v allow_num_ctx=%v strip=%s",
 		cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerClient, cfg.PerIP, cfg.LabelsPerIP, cfg.StartStagger, cfg.MaxWait, cfg.RunTimeout, cfg.MaxReqRows,
 		cfg.LogContent, cfg.ContentMax, cfg.ContentMaxJob, cfg.RetentionCont, cfg.RetentionJobGP,
@@ -293,6 +337,40 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	st.Event("gateway_parada", "")
 	st.Flush()
 	return code
+}
+
+// pokeLoop wakes the dispatcher every second: the hysteresis of the overload and
+// the open breaker depend on time, not only on queue events.
+func pokeLoop(ctx context.Context, q *queue.Manager) {
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			q.Poke()
+		}
+	}
+}
+
+// backendSamples writes one row per backend every period into SQLite.
+func backendSamples(ctx context.Context, pl *pool.Pool, q *queue.Manager, st *store.Store, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			sts := q.PoolStatus()
+			rows := make([]store.BackendRow, 0, len(sts))
+			for _, s := range sts {
+				rows = append(rows, store.BackendRow{TS: now, BackendID: s.ID, State: s.State, SlotsUsed: s.Used, Queue: s.Queue, P50MS: s.P50MS})
+			}
+			st.Backends(rows)
+		}
+	}
 }
 
 func sweepLoop(ctx context.Context, q *queue.Manager) {

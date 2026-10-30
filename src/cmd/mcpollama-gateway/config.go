@@ -90,6 +90,21 @@ environment variable; the flag wins.
   --retention-content D   job text kept for                  (MCPGW_RETENTION_CONTENT, default 168h = 7 days)
   --retention-job-gpu D   per-second GPU extract of each job kept for
                                                              (MCPGW_RETENTION_JOB_GPU, default 168h = 7 days)
+  --backends FILE         registry of secondary Ollamas (JSON, mode 0600; see MANUAL "Pool de backends");
+                          without it the pool is the single gpu-local = --ollama, as before
+                                                             (MCPGW_BACKENDS)
+  --overload-wait D       the primary is overloaded (S1) when the estimated wait of a new request exceeds this
+                                                             (MCPGW_OVERLOAD_WAIT, default 1m)
+  --overload-queue N      the primary is overloaded (S2) when more than N requests wait; 0 = 75% of --queue-max
+                                                             (MCPGW_OVERLOAD_QUEUE, default 0)
+  --overload-hold D       the primary takes work back after the load stayed under half of both limits, and the
+                          primary stayed healthy, for this long   (MCPGW_OVERLOAD_HOLD, default 30s)
+  --health-interval D     active health check of each backend (/api/version, /api/ps, /api/tags)
+                                                             (MCPGW_HEALTH_INTERVAL, default 5s)
+  --breaker-failures N    consecutive failures that open a backend's circuit breaker
+                                                             (MCPGW_BREAKER_FAILURES, default 3)
+  --breaker-open D        how long an open breaker stays open before the single probe request
+                                                             (MCPGW_BREAKER_OPEN, default 30s)
   --non-loopback-listen   allow --listen outside the loopback (MCPGW_NON_LOOPBACK_LISTEN; not recommended)
   --debug                 log one line per request           (MCPGW_DEBUG)
   --version               print the version and exit
@@ -136,6 +151,13 @@ type Config struct {
 	RetentionCont  time.Duration
 	RetentionJobGP time.Duration
 	NonLoopback    bool
+	Backends       string
+	OverloadWait   time.Duration
+	OverloadQueue  int
+	OverloadHold   time.Duration
+	HealthEvery    time.Duration
+	BreakerFails   int
+	BreakerOpen    time.Duration
 	Debug          bool
 	ShowVersion    bool
 }
@@ -184,6 +206,13 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fRetCont = fs.Duration("retention-content", 0, "")
 		fRetJob  = fs.Duration("retention-job-gpu", 0, "")
 		fNonLoop = fs.Bool("non-loopback-listen", false, "")
+		fBackend = fs.String("backends", "", "")
+		fOvWait  = fs.Duration("overload-wait", 0, "")
+		fOvQueue = fs.Int("overload-queue", 0, "")
+		fOvHold  = fs.Duration("overload-hold", 0, "")
+		fHealth  = fs.Duration("health-interval", 0, "")
+		fBrFails = fs.Int("breaker-failures", 0, "")
+		fBrOpen  = fs.Duration("breaker-open", 0, "")
 		fDebug   = fs.Bool("debug", false, "")
 		fVersion = fs.Bool("version", false, "")
 	)
@@ -298,6 +327,13 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		RetentionCont:  dur("retention-content", "MCPGW_RETENTION_CONTENT", 7*24*time.Hour, fRetCont),
 		RetentionJobGP: dur("retention-job-gpu", "MCPGW_RETENTION_JOB_GPU", 7*24*time.Hour, fRetJob),
 		NonLoopback:    boolean("non-loopback-listen", "MCPGW_NON_LOOPBACK_LISTEN", fNonLoop),
+		Backends:       str("backends", "MCPGW_BACKENDS", "", fBackend),
+		OverloadWait:   dur("overload-wait", "MCPGW_OVERLOAD_WAIT", time.Minute, fOvWait),
+		OverloadQueue:  integer("overload-queue", "MCPGW_OVERLOAD_QUEUE", 0, fOvQueue),
+		OverloadHold:   dur("overload-hold", "MCPGW_OVERLOAD_HOLD", 30*time.Second, fOvHold),
+		HealthEvery:    dur("health-interval", "MCPGW_HEALTH_INTERVAL", 5*time.Second, fHealth),
+		BreakerFails:   integer("breaker-failures", "MCPGW_BREAKER_FAILURES", 3, fBrFails),
+		BreakerOpen:    dur("breaker-open", "MCPGW_BREAKER_OPEN", 30*time.Second, fBrOpen),
 		Debug:          boolean("debug", "MCPGW_DEBUG", fDebug),
 		ShowVersion:    *fVersion,
 
@@ -447,6 +483,12 @@ func (c Config) validate() error {
 	}
 	if c.DB == "" {
 		return errors.New("--db is required")
+	}
+	if c.OverloadWait <= 0 || c.OverloadHold <= 0 || c.HealthEvery <= 0 || c.BreakerOpen <= 0 || c.BreakerFails < 1 || c.OverloadQueue < 0 {
+		return errors.New("--overload-wait, --overload-hold, --health-interval, --breaker-failures and --breaker-open must be positive; --overload-queue must not be negative")
+	}
+	if c.OverloadQueue > c.QueueMax {
+		return errors.New("--overload-queue above --queue-max would never trigger")
 	}
 	if c.KeepDone < 0 {
 		return errors.New("--monitor-keep-done must not be negative")

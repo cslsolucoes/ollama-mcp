@@ -32,6 +32,7 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
+	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
@@ -93,6 +94,7 @@ type Config struct {
 	CPU     *cpu.Collector    // may be nil (board shows "coletor desligado")
 	Models  *models.Collector // may be nil (no "models" in the state)
 	Hub     *Hub
+	Pool    *pool.Pool     // may be nil: no drain action (the board still shows the queue's own pool)
 	Content *content.Store // may be nil: the text of the jobs is not recorded (Fase 10.L)
 	Admin   *Credentials   // nil disables the actions
 	Version string
@@ -226,6 +228,8 @@ func (h *Handler) routes() {
 	m.HandleFunc("POST /monitor/api/queue/{id}/demote", h.action("demote"))
 	m.HandleFunc("POST /monitor/api/queue/{id}/remove", h.action("remove"))
 	m.HandleFunc("POST /monitor/api/running/{id}/cancel", h.action("cancel"))
+	m.HandleFunc("POST /monitor/api/backends/{id}/drain", h.backendAction("drain"))
+	m.HandleFunc("POST /monitor/api/backends/{id}/undrain", h.backendAction("undrain"))
 }
 
 // ServeHTTP implements http.Handler.
@@ -292,6 +296,7 @@ type State struct {
 	GPU       *gpu.Snapshot    `json:"gpu,omitempty"`
 	CPU       *cpu.Sample      `json:"cpu,omitempty"`
 	Models    *models.Snapshot `json:"models,omitempty"`
+	Backends  []pool.Status    `json:"backends"` // Fase 10.4: the "Backends" board
 	Cards     Cards            `json:"cards"`
 	Recent    []store.Row      `json:"recent"`
 	Events    []store.Event    `json:"events"`
@@ -351,6 +356,7 @@ func (h *Handler) state(ctx context.Context) State {
 		AdminEnabled: h.cfg.Admin != nil, Jobs: h.liveJobs(ctx), JobsLimit: liveJobsLimit, RecentDone: h.recentDone(ctx), KeepDoneMS: h.cfg.KeepDone.Milliseconds(), ContentOn: h.cfg.Content != nil,
 	}
 	st.Cards.Running, st.Cards.Waiting = len(snap.Running), len(snap.Waiting)
+	st.Backends = h.cfg.Queue.PoolStatus()
 	if h.cfg.GPU != nil {
 		g := h.cfg.GPU.Latest()
 		st.GPU = &g
