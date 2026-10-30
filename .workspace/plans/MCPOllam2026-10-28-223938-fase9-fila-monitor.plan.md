@@ -1,6 +1,6 @@
 # Plano — Fase 9: fila de espera na retaguarda (gateway) e monitor `/monitor` com SQLite
 
-> **Estado:** **9.1–9.5 CONCLUÍDAS** (9.5, revisão adversarial, em 2026-10-29 00:15: 12 achados, 0 Alto, todos corrigidos; report `.workspace/reports/MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md`). **Próximo: 9.6 (implantação, com autorização)**, que só vem depois da 8.9 da Fase 8.
+> **Estado:** **CONCLUÍDA em 2026-10-30 (9.1–9.8).** Em produção desde 2026-10-30 12:12:40 (versão `0.10.1-e0d273c`); aceite 9.7 feito em 2026-10-30; revisão adversarial 9.5 com 12 achados, 0 Alto, todos corrigidos. Report final: `.workspace/reports/MCPOllam2026-10-30-142900-fase9-fila-monitor-final.report.md`. A **§11 (faixa CPU/RAM com segundo Ollama e repasse a secundário) NÃO foi implementada** e passa a ser a **Fase 10 (futura)**, por decisão do owner de 2026-10-30 (fechar a Fase 9 antes dela); as etapas 9.9–9.16 da §11.6 serão renumeradas como 10.x. Os textos "9.1–9.5 concluídas" e "próximo: 9.6" que aparecem em entradas antigas do Changelog são o histórico da época.
 > **Decisões do owner (AskUserQuestion, 22:43):**
 > - **D9-1:** `/monitor` **só na LAN, ver sem login**. As **ações** (promover, despromover, remover, cancelar) **exigem login** do administrador.
 > - **D9-2:** **Ollama só no loopback** (127.0.0.1); todo o tráfego passa pela fila.
@@ -851,3 +851,40 @@ Executada com a produção em horário combinado, **uma coisa por vez**, monitor
     3. Conferir no navegador do owner a aparência dos quadros novos (a página só foi verificada por testes de conteúdo e CSP, não renderizada).
     4. Com o SSE a 1 s, cada painel aberto serializa o state a cada segundo (até 32 painéis); observar a CPU do gateway.
     5. `power_max_w` só aparece ao vivo (no `title` da barra); não é gravado.
+- 2026-10-30 14:30 — **9.7 aceite e 9.8 encerramento: FASE 9 CONCLUÍDA** (agente de documentação, Sonnet 5.5; fatos do aceite registrados pelo loop principal). Report final: `.workspace/reports/MCPOllam2026-10-30-142900-fase9-fila-monitor-final.report.md`. Sem commit.
+  - **Resumo:** gateway (fila + `/monitor` + SQLite) em produção desde 12:12:40, versão `0.10.1-e0d273c`; aceite com 2 cargas reais pela rota nginx → gateway → Ollama; as 4 ações do administrador provadas numa instância de teste; a §11 passa a ser a Fase 10 (futura).
+  - **9.7, carga 1 (12:44–12:49):** 12 agentes (05 e 11 `alta`; 03 e 07 `baixa`; os demais `normal`).
+    - Ordem de atendimento: 01 (chegou primeiro) → 05, 11 (21 s e 41 s) → 02, 04, 06, 08, 09, 10 (68–178 s) → 03, 07 (204 s e 225 s).
+    - 11 respostas 200 com 1.200 tokens cada.
+    - O agente-12 recebeu **429 do nginx** (`limit_conn 12` por IP): 11 agentes mais o `/monitor` aberto na mesma estação somaram 12 conexões.
+  - **9.7, carga 2 (14:05–14:10):** 11 agentes, `num_predict` 3000 (o modelo parou em ~1.400–2.000 tokens). Mesma ordem de prioridade, 11×200, espera de até 303 s. O owner não usou os botões a tempo, e a auditoria da produção ficou com 0 ações.
+  - **9.7, ações do administrador (14:13), instância de teste** (127.0.0.1:11599, banco e senha temporários e aleatórios, nunca exibidos; produção e senha do owner intactas; 8 agentes):
+    - login pela API 200;
+    - promover (07: baixa → normal) passou à frente do 06; despromover (06: normal → baixa) foi atendido por último;
+    - remover (08): o cliente recebeu **409** "removido da fila pelo administrador"; cancelar em execução (01): **409** "cancelado pelo administrador";
+    - sem sessão **401**; sem CSRF **403**; auditoria com as 4 ações (usuário, IP, antes → depois, motivo);
+    - 2ª via, SQLite: `cancelado_admin`, `removido`, `priority_in`/`priority_final` corretos e os demais `ok`; instância apagada e porta 11599 liberada.
+  - **Ajustes de 2026-10-30 depois da implantação (commits):** CSP/CRLF `7a86350`; instalador `1e5e70c`; abas Concluídos recentes/Eventos `9d90ba6`; quadro CPU/RAM por thread, limite de W das GPUs, quadro Modelos e atualização a 1 s `ea4b4dc`; "permanente" no lugar de uma data de 2319 `e0d273c`.
+    - Medido no servidor: `nvidia-smi` 0,10 s por leitura; gateway com 0,7% de CPU e 24 MB; SSE com 1 mensagem/s; 12 threads e 6 núcleos com temperatura; limite de 100 W nas 4 GPUs; modelos carregados e instalados com "permitido".
+  - **NAT e Cloudflare:** `/monitor` exposto pela internet via túnel (chegava como `::1`), corrigido em `2a16888` (403 com `CF-Connecting-IP`); regra 0 do MK-ESCRITORIO-02 restrita a PERMITIDOS; IPv6 `::4` = TV LG Bancada. Documentação: `dfc38ac` e `32b40ac`.
+  - **Senha do admin:** trocada pelo owner (15 caracteres); login certo 200, errado 401; `/root/mcpgw_password.txt` mantido por decisão do owner.
+  - **Commits da Fase 9 (em ordem):** `ced50f8` (plano), `eb920e2` (§11), `418b028` e `75a1999` (9.1), `b47d763` (9.2), `f6a9b9c` (9.3), `315f996` (9.4), `3146afd`, `8814d7a`, `2f70849` e merge `fa8c95e` (9.5), `6d51d48` (9.6a), `2cb599d`, `7e47707`, `f2d0162`, `6f7c4c2` (9.6), `7a86350`, `1e5e70c`, `00cf311`, `2a16888`, `dfc38ac`, `32b40ac`, `9d90ba6`, `ea4b4dc`, `e0d273c` (ajustes).
+  - **O que deu certo:** a ordem de prioridade (`alta` → `normal` → `baixa`, FIFO dentro de cada nível) nas duas cargas; 22 respostas 200 em 2 cargas; promover, despromover, remover e cancelar com 401/403 nas negativas e auditoria; custo do monitor desprezível (0,7% de CPU).
+  - **O que não deu certo e a solução:**
+    1. 12º agente da mesma estação com 429: é o `limit_conn 12` do nginx. Solução: decisão do owner (pendência 3).
+    2. O owner não usou os botões na carga 2: ações provadas por automação numa instância de teste (limite assumido: não foram exercidas pelo owner no navegador da produção).
+    3. Sem evidência registrada nesta rodada: gateway reiniciado no meio da carga e pico de W com e sem escalonamento (itens (e) e (f) do desenho da 9.7); entram na pendência 9.
+  - **9.8:** este registro, o report final, o plano geral (Fases 7, 8, 9 e 10 futura) e o `MANUAL.md`/`README.md` de `deploy/fase9-gateway/`. O `CLAUDE.md` já traz a Fase 9 como CONCLUÍDA (modificação ainda sem commit no working tree); o `CONEXAO-IA.md` não foi conferido nesta tarefa (pendência 11).
+  - **Estado:** 9.1–9.8 concluídas. **Fase 10 (futura):** a §11 (faixa CPU/RAM com segundo Ollama) e a §11.9 (repasse a secundário), não implementadas.
+  - **Pendências (numeradas):**
+    1. Atualizar o `cloudflared` (2026.10.3 → 2026.10.6).
+    2. O owner verificar o app de IA na TV LG (`10.100.2.55`).
+    3. Decidir se sobe o `limit_conn` do nginx (12 por IP).
+    4. Trocar a fonte (para voltar a 130–150 W).
+    5. Opcional: importar a CA Cloudflare nas estações.
+    6. Opcional: nginx 403 antes do 401 para quem está fora da LAN e do Cloudflare.
+    7. Os testes RAPL (`gateway/cpu`) rodam só em Linux (`Skip` no Windows).
+    8. Fase 10 futura (§11 e §11.9).
+    9. Opcional: reinício do gateway no meio da carga, pico de W com e sem escalonamento, e teto de 3 milhões de linhas e `--run-timeout` de 10 min com volume real (9.5-7).
+    10. Opcional: pendências herdadas de baixo risco da 9.1–9.5 (ver §9, item 10, do report final).
+    11. Conferir o `CONEXAO-IA.md` e commitar o `CLAUDE.md`.

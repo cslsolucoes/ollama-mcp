@@ -16,7 +16,8 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-28: **Fases 1 a 4 e 7 concluídas** (tools base `list_models`, `generate`,
+Estado em 2026-10-30: **Fases 1 a 9 concluídas** (8: modelo `qwen3-ia` = `qwen3.5:9b` e `think` por
+chamada; 9: fila + `/monitor` em produção; ver "Servidor Ollama"). Base, em 2026-10-28: **Fases 1 a 4 e 7 concluídas** (tools base `list_models`, `generate`,
 `chat` e `embed`; tools de arquivo `summarize_file`, `extract` e `translate`, que só existem
 com `--allow-root` e passam pelo guard de `src/files/`; catálogo em `TOOLS.md`, gerado por
 `src/cmd/dumptools`). Qualquer mudança em `src/files/` exige rodar de novo os testes de
@@ -186,10 +187,20 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
   otimizados para o hardware**: `qwen3-ia` para geração e `nomic-embed-text` para embeddings).
   Desde a fila (2026-10-30), o `ia-local` (`/v1`) chega **sem raciocínio** por padrão; com
   `OPENAI_MODEL=qwen3-ia-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
-- **Fase 9 (fila + `/monitor`):** código em `src/gateway/` e `src/cmd/mcpollama-gateway/`.
-  **Implantado em 2026-10-30 12:12** (9.6): nginx :8443 → `mcpollama-gateway` 127.0.0.1:11500 →
-  Ollama **só em 127.0.0.1:11434**. Monitor em `https://ia.cslsolucoes.com.br:8443/monitor`, só na LAN,
-  com usuário `admin`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
+- **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
+  `store`, `monitor`, `gpu`, `cpu`, `models`) e `src/cmd/mcpollama-gateway/`. Versão em produção `0.10.1-e0d273c`.
+  Caminho: nginx :8443 → `mcpollama-gateway` 127.0.0.1:11500 → Ollama **só em 127.0.0.1:11434**.
+  Monitor em `https://ia.cslsolucoes.com.br:8443/monitor`, **só na LAN**. Pelo túnel do Cloudflare (`::1` +
+  `CF-Connecting-IP`), a resposta é 403. Leitura livre; as ações exigem o usuário `admin`. Mostra:
+  - fila e execução;
+  - GPUs (W / limite);
+  - CPU/RAM por thread e núcleo;
+  - modelos carregados e disponíveis;
+  - histórico, eventos e auditoria.
+
+  A atualização é a cada 1 s, e o SQLite grava a cada 5 s. Aceite 9.7: ordem por prioridade e ações do admin
+  (promover, despromover, remover, cancelar) provadas, com auditoria e SQLite.
+  **Fase 10 (futura):** faixa CPU/RAM com um segundo Ollama e repasse a um secundário (§11 do plano da Fase 9). Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
   e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e manual:
   `deploy/fase9-gateway/` (`Instalar-Gateway.ps1`, `MANUAL.md`). Plano:
   `.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`. Mudanças em
