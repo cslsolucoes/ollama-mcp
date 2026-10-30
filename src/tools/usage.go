@@ -23,6 +23,7 @@ type usage struct {
 	doneReason string
 	parts      int // file parts of a map-reduce request; 0 for the other tools
 	think      bool
+	backend    string // "fallback" when the fallback server answered; "" for the primary
 }
 
 // line is the fixed last line of every result that called the model.
@@ -41,6 +42,9 @@ func (u usage) line() string {
 	}
 	if u.think {
 		b.WriteString(" think=on")
+	}
+	if u.backend != "" {
+		b.WriteString(" backend=" + u.backend)
 	}
 	return b.String()
 }
@@ -64,6 +68,9 @@ func (u usage) meta() map[string]any {
 	}
 	if u.think {
 		m["think"] = true
+	}
+	if u.backend != "" {
+		m["backend"] = u.backend
 	}
 	return map[string]any{"mcpollama/usage": m}
 }

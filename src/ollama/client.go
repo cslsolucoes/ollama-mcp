@@ -46,10 +46,18 @@ const (
 
 // Options configures the client. Zero values take the defaults above.
 type Options struct {
-	BaseURL        string // required; http(s) URL, trailing slash ignored
-	APIKey         string // Bearer token; empty means no Authorization header
-	TLSCA          string // extra CA bundle (PEM) added to the system pool
-	Insecure       bool   // skip TLS verification (the server logs the WARNING at start)
+	BaseURL  string // required; http(s) URL, trailing slash ignored
+	APIKey   string // Bearer token; empty means no Authorization header
+	TLSCA    string // extra CA bundle (PEM) added to the system pool
+	Insecure bool   // skip TLS verification (the server logs the WARNING at start)
+
+	// Fallback (optional, off by default): a second server tried ONCE when the
+	// primary cannot be reached (connection error) or answers 503 "queue full".
+	// The token and the CA are its own; --insecure never applies to it.
+	FallbackURL    string
+	FallbackAPIKey string
+	FallbackTLSCA  string
+
 	Model          string // default generation model
 	EmbedModel     string // default embeddings model
 	Timeout        time.Duration
@@ -86,6 +94,8 @@ type Client struct {
 	http   *http.Client
 	redact func(string) string
 	logf   func(string, ...any)
+
+	fb *Client // fallback server, nil when not configured (its own fb is always nil)
 }
 
 // New validates the options and builds the client. It performs no network I/O.
@@ -100,7 +110,7 @@ func New(o Options) (*Client, error) {
 
 	// Credentials embedded in the URL are secrets too, and are never sent:
 	// the only credential on the wire is the Bearer header.
-	secrets := []string{o.APIKey}
+	secrets := []string{o.APIKey, o.FallbackAPIKey}
 	if u.User != nil {
 		secrets = append(secrets, u.User.Username())
 		if pw, ok := u.User.Password(); ok {
@@ -145,11 +155,27 @@ func New(o Options) (*Client, error) {
 		logf := o.Logf
 		c.logf = func(format string, a ...any) { logf("%s", c.scrub(fmt.Sprintf(format, a...))) }
 	}
+	if strings.TrimSpace(o.FallbackURL) != "" {
+		fo := o
+		fo.BaseURL, fo.APIKey, fo.TLSCA = o.FallbackURL, o.FallbackAPIKey, o.FallbackTLSCA
+		fo.Insecure = false
+		fo.FallbackURL, fo.FallbackAPIKey, fo.FallbackTLSCA = "", "", ""
+		fb, err := New(fo)
+		if err != nil {
+			return nil, fmt.Errorf("fallback: %w", err)
+		}
+		c.fb = fb
+	}
 	return c, nil
 }
 
 // Close releases idle keep-alive connections.
-func (c *Client) Close() { c.http.CloseIdleConnections() }
+func (c *Client) Close() {
+	c.http.CloseIdleConnections()
+	if c.fb != nil {
+		c.fb.Close()
+	}
+}
 
 func orDur(v, def time.Duration) time.Duration {
 	if v <= 0 {
@@ -198,6 +224,13 @@ func newTransport(insecure bool, caPath string) (*http.Transport, error) {
 	tr.TLSClientConfig = cfg
 	return tr, nil
 }
+
+// NewTLSTransport is the transport the client uses for an https endpoint: the
+// system pool plus the PEM bundle at caPath (empty: system pool only). The
+// gateway pool (Fase 10.4) reuses it for its secondary backends, so there is
+// one TLS policy in the repository. Redirects and the environment proxy are the
+// caller's business.
+func NewTLSTransport(caPath string) (*http.Transport, error) { return newTransport(false, caPath) }
 
 func (c *Client) debugf(format string, a ...any) {
 	if c.logf != nil {

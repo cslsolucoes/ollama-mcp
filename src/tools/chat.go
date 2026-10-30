@@ -149,5 +149,6 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 		queue:      waited + time.Duration(resp.QueueMS)*time.Millisecond,
 		doneReason: resp.DoneReason,
 		think:      think,
+		backend:    resp.Backend,
 	}), nil
 }
