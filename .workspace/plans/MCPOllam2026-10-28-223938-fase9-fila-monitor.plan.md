@@ -780,3 +780,19 @@ Executada com a produção em horário combinado, **uma coisa por vez**, monitor
     2. Trocar a senha por uma de 12 ou mais e apagar `/root/mcpgw_password.txt`.
     3. Identificar a máquina `2804:2904:706:da01::4`, que perdeu o acesso direto e deve passar a usar :8443 com token.
     4. As extensões §11 (faixa CPU e pool) continuam planejadas.
+- 2026-10-30 12:25 — **9.6, ajustes depois da implantação** (loop principal).
+  1. **`/monitor` sem estilo e parado em "conectando…"** (visto pelo owner no navegador): o CSP com hash bloqueava o script e o estilo.
+     - Causa: o binário foi gerado de uma cópia de trabalho com `index.html` em CRLF. O gateway fazia o hash dos bytes brutos, mas o navegador faz o hash do texto já convertido para LF.
+     - Correção `7a86350`: o HTML embutido é normalizado para LF antes do CSP e de servir. Regressão em `csp_newline_test.go` (hash calculado como o navegador). Provado com uma entrada CRLF: o código antigo não casa e o novo casa.
+     - Gateway `0.9.1-7a86350` instalado pelo instalador (`-Modo Atualizar`). No servidor, os 2 hashes conferem.
+     - Conferido no Chrome do owner: página renderizada, com dados ao vivo.
+  2. **Instalador:** no `-Modo Atualizar`, o PowerShell 5.1 removia as aspas duplas do comando remoto e o `curl -w` se desfazia. Corrigido em `1e5e70c`.
+  3. **Senha do admin trocada pelo owner** (15 caracteres, no arquivo `/root/mcpgw_password.txt`):
+     - hash gravado sem exibir a senha, com backup do hash anterior; gateway reiniciado;
+     - login certo → 200; senha errada → 401;
+     - **o owner decidiu manter o arquivo em texto puro** (root 0600).
+  4. **Erro meu de processo:** um `cat >>` sem entrada travou um comando por 2 min e criou um arquivo vazio em `.workspace/plans/`. Apagado e refeito; sem efeito no servidor.
+  - **Pendências:**
+    1. 9.7: aceite com carga, mais as ações do `/monitor` feitas pelo owner no navegador.
+    2. Identificar a máquina `2804:2904:706:da01::4`.
+    3. Opcional: importar a CA do Cloudflare nas estações e usar o nome `ia.cslsolucoes.com.br` em vez do IP, para tirar o aviso "Não seguro".
