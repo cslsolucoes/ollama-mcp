@@ -405,6 +405,25 @@ raciocinar a cada chamada deixa o `ia-local` muito mais lento). Não coloque o t
 nome do certificado). **Só da LAN `10.100.2.0/24`** (e do próprio servidor): de fora, pelo Cloudflare, o nginx dá **403**.
 Ver o monitor **não exige login**; as ações exigem.
 
+**Cloudflare e túnel (conferido em 2026-10-30):** a internet chega pelo túnel `cloudflared`, que roda no próprio servidor,
+para `ia.cslsolucoes.com.br` e para `…:8443`. Esses pedidos entram no nginx **como `::1`/`127.0.0.1`** e trazem o
+`CF-Connecting-IP`. Por isso, o `ollama.conf`:
+- recusa (403) no `/monitor` **todo pedido com `CF-Connecting-IP`**. Antes disso, o loopback liberado deixava o monitor aberto
+  à internet; corrigido no commit `2a16888`;
+- **não** trata o loopback como LAN: para quem vem pelo túnel, o IP real do cliente (`CF-Connecting-IP`) vai para a fila,
+  os limites e a justiça. Da LAN, esse cabeçalho é ignorado, para não permitir IP forjado.
+
+A regra de NAT do `MK-ESCRITORIO-02` que leva WAN:8443 ao servidor vale **só para a lista `PERMITIDOS`** desde 2026-10-30;
+o Cloudflare não depende dela.
+
+Conferência rápida, feita no servidor (sai pela internet e volta pelo Cloudflare):
+
+```bash
+H=ia.cslsolucoes.com.br; IP=$(dig +short @1.1.1.1 $H A | tail -1)
+curl -s -o /dev/null -w '%{http_code}\n' --resolve $H:443:$IP https://$H/monitor       # 403 (bloqueado de fora)
+curl -s -o /dev/null -w '%{http_code}\n' --resolve $H:443:$IP https://$H/api/version   # 401 (API exige token)
+```
+
 **Certificado (Cloudflare Origin CA).** O Windows não confia nessa CA, então o navegador avisa. Importe a CA uma vez em
 cada estação de administração (PowerShell **como administrador**; o arquivo é o que o `ia-local` já usa):
 
@@ -692,6 +711,7 @@ o gateway não subir): o nginx ainda aponta para o Ollama (nada mudou para os cl
 **Garantido** (revisão adversarial 9.5, Opus 5.5: 30 vetores executáveis, **0 achados Altos**, 5 Médios e 7 Baixos, todos corrigidos com teste de regressão; reexecutada na 9.6a sem regressões):
 
 - o IP do cliente só vale a partir do `X-Real-IP` do nginx local; forjado, duplicado ou de fora é ignorado;
+- o `/monitor` não é alcançável pela internet, nem pelo túnel do Cloudflare (403 para pedidos com `CF-Connecting-IP`; provado em 2026-10-30, ver a seção 6);
 - sem *request smuggling* (CL/TE duplicados) e sem acesso às 6 rotas administrativas, em 17 variantes de escrita; 0 de 17 chegou ao Ollama;
 - o `Authorization` do cliente **não** é repassado ao Ollama; token, prompt e resposta não entram no log, no banco nem em `error_class` (teste de sentinela);
 - os contadores vêm só do último pedaço da resposta; o texto do modelo não os engana;
