@@ -112,3 +112,17 @@
     - mcpollama `--ollama-url-fallback` (+ token e CA próprios), **desligado por padrão**.
   - **Aceite (10.7)** numa INSTÂNCIA DE TESTE do gateway, com um secundário temporário (por exemplo, uma `ollama-cpu` na 11435 só durante o teste), para provar o repasse e o disjuntor sem tocar na produção.
   - 10.4 disparada (agente sonnet).
+- 2026-10-30 16:55 — **Incidente + nova prioridade: log de jobs** (loop principal).
+  - **2 reboots:**
+    - **16:40:01:** durante uma `extract` do GestorERP (cliente `002-1985/42424`), com um prompt de ~36 mil tokens e as 4 GPUs entre 86 e 93 W;
+    - **16:41:12:** durante a carga do modelo pelo `ollama-warm` no boot, sem nenhum pedido.
+
+    É a fonte de 850 W outra vez, já a 100 W. Proteção imediata: fila pausada às 16:42:30, para cortar o laço.
+  - **Decisão do owner (16:49):** travar o clock das GPUs (`nvidia-smi -lgc 210,1400`), aplicado e **persistido no `nvidia-powercap.service`** (backup `nvidia-powercap.service.antes-lgc-164936`), já que o warm roda depois do powercap. Fila religada às 16:49. A prova sob carga fica pendente: em repouso, o clock fica em 210 MHz.
+  - **Falha achada:** o registro de um pedido só era gravado no fim, então a `extract` que derrubou o servidor **não aparece no histórico**.
+  - **Pedido do owner (16:50):** "log de cada job da fila, incluindo o contexto enviado e se houve ou não resposta" + "monitorar em tempo real".
+  - **Decisões (AskUserQuestion):** **prompt completo**, **resposta completa**, **retenção de 7 dias** para o conteúdo; os metadados seguem com 90 dias.
+    - Esta mudança substitui a regra de sigilo "nenhum texto no banco", por decisão do owner.
+    - Proteções do loop principal: banco separado em 0600, teto de tamanho total, texto visível só para o admin logado.
+  - **A 10.4 foi estacionada** no ramo `wip/fase10-4-pool` (`d38fb61`, parcial, não compila). O `master` está limpo e compila.
+  - Etapa nova **10.L (log de jobs)**, antes de retomar a 10.4.
