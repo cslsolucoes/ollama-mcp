@@ -33,7 +33,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -641,18 +640,20 @@ func (t *Ticket) FinalPriority() Priority {
 	return t.finalPrio
 }
 
-// outcomeOf classifies a finished request for the circuit breaker: only what
-// says something about the backend counts. A failure is a connection error or a
-// 5xx / dropped connection with no answer at all; a timeout, a stream error or a
-// 4xx depends on the request, so a client cannot force the breaker open with
-// them.
+// outcomeOf classifies a finished request for the circuit breaker. ONLY what no
+// client controls counts: ok, and a failure to reach the backend
+// (upstream_unreachable: dial, connection or TLS error; the proxy never sets it
+// when the client's own context ended). A 5xx, a dropped connection, a timeout
+// or a stream error depends on the request (a malformed or abusive one makes the
+// Ollama answer 500) or on the client leaving, so they are neutral: otherwise one
+// client could open the breaker for everybody and force the hand-over to a
+// secondary. The active health check (/api/version, /api/ps) is the other input
+// of the breaker.
 func outcomeOf(r Result) pool.Outcome {
 	switch {
 	case r.Status == "" || r.Status == StatusOK:
 		return pool.OutcomeOK
 	case r.ErrorClass == "upstream_unreachable":
-		return pool.OutcomeFail
-	case !r.Responded && (strings.HasPrefix(r.ErrorClass, "upstream_5") || r.ErrorClass == "upstream_dropped"):
 		return pool.OutcomeFail
 	}
 	return pool.OutcomeNeutral

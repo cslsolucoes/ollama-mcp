@@ -399,3 +399,42 @@ func TestFailureOnASecondaryIsReportedNotMigrated(t *testing.T) {
 }
 
 var _ = net.IPv4len
+
+// Revisao de seguranca (MEDIUM): a client must not be able to open the breaker.
+// 5xx answers and client give-ups are neutral; a refused connection and a failing
+// active check open it.
+func TestBreakerCannotBeForcedByAClient(t *testing.T) {
+	r := newRig(t, rigCfg{PrimarySlots: 1, OverloadQueue: 6, Secs: twoSecs[:1]})
+	for i := 0; i < 50; i++ { // one client, 50 requests that make the Ollama answer 500
+		tk := r.submit(queue.Request{ClientIP: "10.7.7.7"}).started(t)
+		tk.Release(queue.Result{Status: queue.StatusError, ErrorClass: "upstream_500", HTTPStatus: 500})
+	}
+	for i := 0; i < 50; i++ { // the same client dropping its connection mid-stream
+		tk := r.submit(queue.Request{ClientIP: "10.7.7.7"}).started(t)
+		tk.Release(queue.Result{Status: queue.StatusCanceled, ErrorClass: "client_gone", HTTPStatus: 499})
+		tk2 := r.submit(queue.Request{ClientIP: "10.7.7.7"}).started(t)
+		tk2.Release(queue.Result{Status: queue.StatusError, ErrorClass: "upstream_dropped", HTTPStatus: 502})
+	}
+	if st := r.q.PoolStatus(); st[0].Breaker != "fechado" || r.evs.has("breaker_open") {
+		t.Fatalf("a client forced the breaker: %+v", st[0])
+	}
+	// a backend that refuses the connection opens it
+	for i := 0; i < 3; i++ {
+		tk := r.submit(queue.Request{}).started(t)
+		tk.Release(queue.Result{Status: queue.StatusError, ErrorClass: "upstream_unreachable", HTTPStatus: 502})
+	}
+	if st := r.q.PoolStatus(); st[0].Breaker != "aberto" {
+		t.Fatalf("unreachable x3 must open: %+v", st[0])
+	}
+}
+
+func TestFailingActiveCheckOpensTheBreaker(t *testing.T) {
+	r := newRig(t, rigCfg{PrimarySlots: 1, OverloadQueue: 6, Secs: twoSecs[:1]})
+	r.prim.set(func(f *fake) { f.version = 500 })
+	for i := 0; i < 3; i++ {
+		r.pl.CheckOnce(context.Background(), r.pl.Primary())
+	}
+	if st := r.q.PoolStatus(); st[0].Breaker != "aberto" || !r.evs.has("breaker_open") {
+		t.Fatalf("3 failed active checks must open: %+v", st[0])
+	}
+}
