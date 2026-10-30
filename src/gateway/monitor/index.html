@@ -97,6 +97,13 @@ function fmtMs(ms) {
   var s = ms / 1000; if (s < 60) return s.toFixed(1).replace(".", ",") + " s";
   var m = Math.floor(s / 60); return m + " min " + String(Math.floor(s % 60)).padStart(2, "0") + " s";
 }
+// keep_alive -1 makes Ollama report an expiry centuries ahead: show it as permanent.
+function fmtExpires(v) {
+  if (!v) return "";
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return d.getFullYear() > 2100 ? "permanente" : d.toLocaleString("pt-BR");
+}
 function fmtTime(ms) { if (!ms) return ""; var d = new Date(ms); return d.toLocaleTimeString("pt-BR"); }
 function msg(t) { $("msg").textContent = t || ""; }
 
@@ -257,7 +264,7 @@ function renderModels(m) {
     $("mmeta").textContent = "Modelos: coletor desligado"; return;
   }
   var loaded = (m.loaded || []).map(function (x) {
-    return [x.name, gb(x.size_vram_mib) + " GB", x.processor, x.context_length, x.expires_at ? new Date(x.expires_at).toLocaleString("pt-BR") : "", yesNo(x.allowed)];
+    return [x.name, gb(x.size_vram_mib) + " GB", x.processor, x.context_length, fmtExpires(x.expires_at), yesNo(x.allowed)];
   });
   table("mloaded", ["Modelo", "VRAM", "GPU/CPU", "Contexto", "Expira", "Permitido"], loaded, "Nenhum modelo carregado.");
   var inst = (m.installed || []).map(function (x) {
