@@ -1,0 +1,25 @@
+# gate (com D6 e o teste de flush estabilizado) 2026-10-30 18:05:21 go version go1.27.0 windows/amd64
+BUILD_OK
+VET_OK
+## gofmt -l .
+GOFMT_FIM
+ok  	github.com/cslsoftwares/mcpollama/cmd/bakeoff	0.084s
+ok  	github.com/cslsoftwares/mcpollama/cmd/dumptools	0.052s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	8.966s
+ok  	github.com/cslsoftwares/mcpollama/doctext	18.162s
+ok  	github.com/cslsoftwares/mcpollama/files	1.210s
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	2.884s
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	1.516s
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	1.372s
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	2.682s
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	1.452s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	3.488s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	2.051s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	1.932s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	2.700s
+?   	github.com/cslsoftwares/mcpollama/mcp	[no test files]
+ok  	github.com/cslsoftwares/mcpollama/mcpollama-mcp	0.787s
+ok  	github.com/cslsoftwares/mcpollama/ocr	13.631s
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.874s
+ok  	github.com/cslsoftwares/mcpollama/redact	0.057s
+ok  	github.com/cslsoftwares/mcpollama/tools	4.151s

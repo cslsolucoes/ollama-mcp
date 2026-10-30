@@ -1,0 +1,14 @@
+# depois do D6 (2026-10-30 18:03:19): vetores do content
+    fase10l_adv_test.go:43: VEC|D2-teto-por-job|Media|gateway/content/content.go:160|OK: prompt 16777218 bytes -> guardado 16777216 truncado=true; resposta 17 MiB -> 16777216 truncada=true resp_bytes=17825792; exatamente 16 MiB -> 16777216
+--- PASS: TestAdvLPerJobCapBoundary (1.40s)
+    fase10l_adv_test.go:79: VEC|D3-teto-total-concorrente|Media|gateway/content/content.go:188|OK: 640 jobs x 16 KiB (10 MiB) num teto de 2 MiB: SUM real 1949696, contador 1949696, eventos 19, jobs mais novos (i=39) presentes 16/16
+--- PASS: TestAdvLTotalCapUnderConcurrency (2.19s)
+    fase10l_adv_test.go:122: VEC|D4-teto-no-caminho-do-pedido|Media|gateway/content/content.go:180|OK: a gravacao que passou do teto (4096000 bytes antes, teto 4194304) levou 4ms (restaram 3387 de 4001 jobs)
+--- PASS: TestAdvLCapEnforcementOnRequestPath (0.18s)
+    fase10l_adv_test.go:146: VEC|D5-flush-parcial|Baixa|gateway/content/content.go:322|MEDIDA: custo de 1 flush com a resposta ja em 1 MiB: 4.9ms, 4 MiB: 39.7ms, 16 MiB: 187.7ms
+--- PASS: TestAdvLPartialFlushCost (26.66s)
+    fase10l_adv_test.go:153: VEC|P1-permissoes|Media|gateway/content/content.go:89|N/A no Windows (sem bits POSIX); rodar o binario de teste Linux no servidor
+--- SKIP: TestAdvLPermissions (0.00s)
+    fase10l_adv_test.go:199: VEC|R1-corrompido-erro|Baixa|gateway/content/content.go:100|OK: Open recusa: content: schema: file is not a database (26)
+--- PASS: TestAdvLCorruptOpenErrors (0.00s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	30.462s

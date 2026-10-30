@@ -1,0 +1,5 @@
+    fase10l_regress_test.go:147: a goroutine do teto gira sem parar com o enforceCap falhando
+--- FAIL: TestRegress10LCapFailureDoesNotSpin (5.02s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/content	5.043s
+FAIL

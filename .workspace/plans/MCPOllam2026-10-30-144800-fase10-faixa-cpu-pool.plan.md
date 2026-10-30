@@ -166,3 +166,42 @@
     8. Interrupcao no meio de um commit pode perder a ultima transicao e deixar o job com o estado anterior (o `interrompido_*` o cobre); a perda maxima de texto e ~2 s (`FlushEvery`).
     9. Retomar a **10.4** (pool) depois do implante: o campo `backend` ja existe no log (`gpu-local`).
   - **Sem commit** (ordem do owner).
+- 2026-10-30 18:06 - **10.L revisão adversarial** (pendência 2 acima; subagente Opus 5.5, verificação crítica; `master`, sem servidor/SSH/`D:\MCP`/`.mcp.json`; ramo `wip/fase10-4-pool` intocado).
+  - **Estado: concluída e verde no gate local; NÃO implantada** (o loop principal implanta). Commits `cd71ed8` (fix), `998a70d` (fix D6) e o de docs. Report: `.workspace/reports/MCPOllam2026-10-30-173000-revisao-adversarial-10L.report.md`, com os testes e os logs em `…10L.testes/`.
+  - **Método:** um arquivo de ataque por pacote (`monitor` 11 vetores, `content` 6, `joblog` 4, `cmd` 1 com 2 casos; linhas `VEC|id|sev|arquivo:linha|resultado`). Rodada no `6cbaf22` (`antes.log`: 7 vetores em FALHA), correção, regressões `fase10l_regress_test.go` no pacote, rodada de novo (`depois.log`: 0 FALHA). Prova de "falha antes" com `git archive 6cbaf22` no scratchpad (`regressao-no-codigo-antigo.log`). Os ataques foram movidos para `…10L.testes/<pacote>/`.
+  - **Deu certo (sem defeito):**
+    - o texto só sai com sessão: 29 variações de caminho e de método pelo mesmo mux do `main.go` (`%2F`, `//`, `..`, maiúsculas, `HEAD`, `OPTIONS`, `POST`, `conteudo` duplicado ou estranho);
+    - sessão expirada, cookie de outro gateway, cookie após logout, CSRF como cookie e cookie duplicado: todos 401;
+    - o SSE, o `/state`, o `/jobs/{id}` e os erros não ecoam o texto, com ou sem sessão;
+    - 7 pedidos malformados não ecoam o prompt, e o log, o `gw.db` e o `-wal` não têm o texto;
+    - processo **filho morto de verdade** (`TerminateProcess`) no meio do stream: `interrompido_gateway` (mesma boot) e `interrompido_reboot` (boot trocada), com o prompt, a resposta parcial, `responded` e o evento;
+    - ids de 128 bits (`crypto/rand`), nenhum POST novo, SQLi nos filtros sem efeito, XSS estático limpo, export de 20 mil linhas com +3 MiB de heap, teto por job exato, teto total certo com 16 goroutines;
+    - **ataques da 9.5 reexecutados** (copiados para `src`, rodados e removidos): 41/41 `VEC` OK com `-short` e 43/43 sem `-short` (inclui o S2, 142 s).
+  - **Achados e solução:**
+    1. **H1 (Média, do coordenador):** `/monitor/api/jobs/{id}` sem login devolvia `prompt_sha256` e os tamanhos exatos (confirmação de documento). Solução: `content.Info` só com a sessão do admin e pedido do próprio site (`adminRead`); o hash não sai em nenhuma rota aberta.
+    2. **H2 (Média):** `bytes_in`/`resp_bytes` exatos nas rotas abertas (fila, recentes, `/history`, `/jobs`, `/jobs/{id}`, export sem conteúdo). Solução: sem sessão, arredondados para cima em KiB (`coarseBytes`).
+    3. **D4 (Média):** o teto total apagava 1 job por commit FULL dentro da gravação que passou do teto (614 jobs = 0,83 a 1,69 s, com o slot preso). Solução: em segundo plano, em transações de 500 (4 a 14 ms).
+    4. **R2 (Média):** `content.db` corrompido, ou caminho que não abre, fazia o gateway sair com 1. Solução: sobe sem texto, com o evento `conteudo_indisponivel`, e deixa o arquivo intocado.
+    5. **D6 (Média, do coordenador, sobre a MINHA correção do D4):** a goroutine do teto girava para sempre (100% de uma CPU) quando o `enforceCap` falhava. Solução: `enforceCap` devolve `(removidos, erro)`; com erro ou 0 removidos, sai, relê o total, espera 1 min e grava `teto_conteudo_falhou` (no máximo 1/min); com progresso, faz no máximo 5 rodadas, com backoff que o `Close` corta.
+    6. **Baixas:** A2, `/content` e export de outro site → 403; I1, `status` com 40 mil itens dava 500 → só status conhecidos; I2, CSV neutraliza LF; P1, `content.db` pré-existente volta a 0600; M1, `SavePrompt` e `extractPrompt` sem cópias inteiras (+161 → +113 MiB por pedido de 32 MiB).
+  - **Não deu certo / erros meus (corrigidos):**
+    1. falso positivo do H1 na página `/monitor` (o JS cita o nome do campo);
+    2. falso positivo do I1 (o `ok,` da lista casava de verdade);
+    3. D4 que não chegava ao teto (o prompt era cortado pelo teto por job do próprio vetor);
+    4. heredoc Python pelo Bash quebrou nas aspas; conferi que nada foi aplicado pela metade e refiz com a ferramenta de edição;
+    5. a 1ª correção do M1 usava `io.WriteString`, que copia a string inteira (49 MiB); a regressão pegou;
+    6. o D6 foi um defeito introduzido pela minha correção do D4;
+    7. `TestPartialAnswerIsFlushedWhileStreaming` (da 10.L) falhava de vez em quando (`FlushEvery` de 20 ms sob a suíte inteira); passou para 200 ms. Provavelmente era o `FAIL` sem nome de uma rodada anterior.
+  - **Medidas:**
+    - **5 commits FULL por pedido aceito**, não 2 a 3: +6 a 13 ms por pedido no NVMe local, e 2 deles com o slot preso. Mesmo assim, um `Finish` de 500 ms **não trava a fila** (o hook roda fora do lock, depois de a vaga ser liberada).
+    - O flush parcial reescreve a linha: ~35 ms com 4 MiB e 165 a 188 ms com 16 MiB, a cada 2 s.
+  - **Gate (`src/`):** build, vet e `gofmt -l .` vazios; `go test -count=1 ./...` com 19 `ok`; `-race` em `./gateway/... ./cmd/mcpollama-gateway` com 10 `ok`; build, vet e `go test -c` Linux ok. O `index.html` não mudou.
+  - **MANUAL:** `/jobs/{id}` (hash e tamanhos só para o admin), `/content` (403 de outro site), export (LF, KiB, `status`), `--content-db` (0600 forçado; não abrir não derruba), teto em segundo plano e `teto_conteudo_falhou`, tamanhos sem login, eventos.
+  - **Pendências (numeradas):**
+    1. P1 no Linux: rodar o `content.test` Linux no servidor, como `mcpgw`, numa pasta temporária (comando no report §6.1).
+    2. Medir no disco do servidor o custo dos 5 commits FULL por pedido e confirmar `synchronous=2` nos dois pools.
+    3. M1 restante (+113 MiB por pedido de 32 MiB, vindo do `json.Unmarshal` do `extractPrompt`); medir o pico de RSS com 4 a 8 pedidos de 32 MiB contra o `MemoryMax=1G`.
+    4. D5: guardar a resposta em pedaços (só `INSERT`) se as respostas grandes virarem comuns.
+    5. **Decisão do owner:** os contadores de tokens seguem exatos nas rotas abertas (o arredondamento a KiB é mitigação, não sigilo).
+    6. Export por `OFFSET` pode repetir ou pular linha com jobs chegando (Baixa).
+    7. Pendências 3 a 8 da 10.L (acima) seguem como estavam; a 8 foi confirmada pelo K1.

@@ -1,0 +1,54 @@
+# antes: commit 6cbaf22 + vetores 10.L (2026-10-30 17:41:11)
+    fase10l_adv_test.go:117: VEC|H1-hash-aberto|Media|gateway/monitor/jobs.go:184|FALHA: /monitor/api/jobs/00000000000000000000000000000029:sha256
+    fase10l_adv_test.go:144: VEC|H2-tamanho-exato-aberto|Media|gateway/monitor/jobs.go:184|FALHA: /monitor/api/state:"bytes_in":12345, /monitor/api/history:"bytes_in":12345, /monitor/api/jobs:"bytes_in":12345, /monitor/api/jobs/00000000000000000000000000000029:"prompt_bytes", /monitor/api/jobs/export?formato=jsonl:"bytes_in":12345, /monitor/api/jobs/export?formato=csv:celula 12345, /monitor/api/jobs/export?formato=csv:celula 4321
+--- FAIL: TestAdvLHashAndExactSizesOpen (0.10s)
+    fase10l_adv_test.go:201: VEC|V1-variantes-caminho|Alta|gateway/monitor/monitor.go:221|OK: 29 variantes (caminho, %2F, maiusculas, HEAD, OPTIONS, POST, conteudo duplicado/estranho) sem texto e sem 2xx
+--- PASS: TestAdvLContentPathVariants (0.07s)
+    fase10l_adv_test.go:249: VEC|V2-sse-state-detalhe|Alta|gateway/monitor/monitor.go:349|OK: SSE, /state, /jobs/{id} e erros (id, filtro, formato) sem o texto, com e sem sessao
+--- PASS: TestAdvLNoTextInStreamStateDetail (3.06s)
+    fase10l_adv_test.go:297: VEC|A1-sessao|Alta|gateway/monitor/jobs.go:193|OK: expirada, de outro gateway, apos logout, csrf como cookie e cookie duplicado: todos 401
+--- PASS: TestAdvLSessionEdges (0.18s)
+    fase10l_adv_test.go:312: VEC|A2-get-cross-site|Baixa|gateway/monitor/jobs.go:193|FALHA: cross-site com cookie -> 200 / export com Origin alheio -> 200
+--- FAIL: TestAdvLCrossSiteGETContent (0.09s)
+    fase10l_adv_test.go:350: VEC|A3-ids-csrf|Media|gateway/monitor/monitor.go:208|OK: 20.000 ids hex de 128 bits sem repeticao (crypto/rand); nenhum POST novo na 10.L; POST nas rotas de jobs = 405
+--- PASS: TestAdvLIDsAndNoNewPOST (0.11s)
+    fase10l_adv_test.go:390: VEC|I1-sql-filtros|Baixa|gateway/monitor/jobs.go:114|FALHA: status com 40 mil itens -> 500 em 14ms
+--- FAIL: TestAdvLSQLInjectionFilters (0.16s)
+    fase10l_adv_test.go:438: VEC|I2-csv-jsonl|Media|gateway/monitor/jobs.go:229|FALHA: celula "\n=1", celula "\n=1", celula "\n=1", celula "\n=1\nlinha2\n{\"x\":1}", celula "\n=1"
+--- FAIL: TestAdvLCSVAndJSONL (0.20s)
+    fase10l_adv_test.go:463: VEC|I3-xss-estatico|Alta|gateway/monitor/index.html|OK: sem sumidouros de HTML, sem handlers/estilo inline, LF
+--- PASS: TestAdvLXSSStatic (0.00s)
+    fase10l_adv_test.go:526: VEC|D1-export-memoria|Media|gateway/monitor/jobs.go:315|OK: 20.000 linhas, 764948 bytes em 68ms, pico de heap +3.2 MiB
+--- PASS: TestAdvLExportMemory (1.24s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/monitor	5.240s
+    fase10l_adv_test.go:43: VEC|D2-teto-por-job|Media|gateway/content/content.go:160|OK: prompt 16777218 bytes -> guardado 16777216 truncado=true; resposta 17 MiB -> 16777216 truncada=true resp_bytes=17825792; exatamente 16 MiB -> 16777216
+--- PASS: TestAdvLPerJobCapBoundary (1.19s)
+    fase10l_adv_test.go:79: VEC|D3-teto-total-concorrente|Media|gateway/content/content.go:188|OK: 640 jobs x 16 KiB (10 MiB) num teto de 2 MiB: SUM real 1933312, contador 1933312, eventos 27, jobs mais novos (i=39) presentes 16/16
+--- PASS: TestAdvLTotalCapUnderConcurrency (5.41s)
+    fase10l_adv_test.go:119: VEC|D4-teto-no-caminho-do-pedido|Media|gateway/content/content.go:180|FALHA: a gravacao que passou do teto (4096000 bytes antes, teto 4194304) levou 1.693s (restaram 3387 de 4001 jobs)
+--- FAIL: TestAdvLCapEnforcementOnRequestPath (1.86s)
+    fase10l_adv_test.go:146: VEC|D5-flush-parcial|Baixa|gateway/content/content.go:322|MEDIDA: custo de 1 flush com a resposta ja em 1 MiB: 6.2ms, 4 MiB: 33.8ms, 16 MiB: 168.7ms
+--- PASS: TestAdvLPartialFlushCost (24.75s)
+    fase10l_adv_test.go:153: VEC|P1-permissoes|Media|gateway/content/content.go:89|N/A no Windows (sem bits POSIX); rodar o binario de teste Linux no servidor
+--- SKIP: TestAdvLPermissions (0.00s)
+    fase10l_adv_test.go:199: VEC|R1-corrompido-erro|Baixa|gateway/content/content.go:100|OK: Open recusa: content: schema: file is not a database (26)
+--- PASS: TestAdvLCorruptOpenErrors (0.00s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/content	33.245s
+--- SKIP: TestAdvLKillChild (0.00s)
+    fase10l_adv_test.go:137: VEC|K1-sigkill-no-stream|Alta|gateway/store/jobs.go:94|OK (processo filho morto por TerminateProcess): boot-A->boot-A: interrompido_gateway responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true | boot-A->boot-B: interrompido_reboot responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true
+--- PASS: TestAdvLKilledMidStream (0.25s)
+    fase10l_adv_test.go:274: VEC|F1-fsync-rajada|Media|gateway/joblog/joblog.go:37|OK/MEDIDA: 600 pedidos/10 paralelos: sem journal 103ms (p50 1.6ms p95 2.6ms); com journal 6.14s (p50 89ms p95 159.5ms); +10.06 ms/pedido; 620 jobs gravados; Finish de 500 ms: 6 pedidos em 50ms, Snapshot em 0s
+--- PASS: TestAdvLFsyncBurst (7.44s)
+    fase10l_adv_test.go:324: VEC|E1-eco-log-sentinela|Alta|gateway/proxy/journal.go:50|OK: 7 pedidos (JSON quebrado, modelo proibido, rota bloqueada...) sem eco; log, gw.db e -wal sem o texto; o texto esta so no content.db
+--- PASS: TestAdvLNoEchoNoMetadataText (0.61s)
+    fase10l_adv_test.go:348: VEC|M1-memoria-prompt-grande|Baixa|gateway/proxy/proxy.go:364|MEDIDA: alocado por 1 pedido de 32 MiB: sem journal 138 MiB, com journal 299 MiB (+161 MiB)
+--- PASS: TestAdvLMemoryBigPrompt (0.91s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	9.250s
+    fase10l_adv_test.go:89: VEC|R2-content-db-corrompido|Media|cmd/mcpollama-gateway/main.go:97|FALHA: lixo: o gateway saiu com 1 na partida
+    fase10l_adv_test.go:89: VEC|R2-content-db-corrompido|Media|cmd/mcpollama-gateway/main.go:97|FALHA: diretorio: o gateway saiu com 1 na partida
+--- FAIL: TestAdvLCorruptContentDBKeepsGatewayUp (0.07s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.112s
+FAIL

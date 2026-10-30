@@ -1,0 +1,29 @@
+gateway\content\fase10l_regress_test.go:43:4: s.WaitCap undefined (type *Store has no field or method WaitCap)
+gateway\content\fase10l_regress_test.go:75:4: s.WaitCap undefined (type *Store has no field or method WaitCap)
+gateway\content\fase10l_regress_test.go:76:4: s.triggerCap undefined (type *Store has no field or method triggerCap)
+gateway\content\fase10l_regress_test.go:77:4: s.WaitCap undefined (type *Store has no field or method WaitCap)
+    fase10l_regress_test.go:46: /monitor/api/jobs/0000000000000000000000000000012d sem sessão traz o hash do prompt: {"content":{"job_id":"0000000000000000000000000000012d","prompt_bytes":23,"resp_bytes":0,"prompt_sha25
+--- FAIL: TestRegress10LNoPromptHashWithoutSession (0.08s)
+    fase10l_regress_test.go:68: /monitor/api/state tem tamanho exato: {"now":"2026-10-30T17:53:02.3263035-03:00","version":"test","boot_id":"boot-test","uptime_s":0,"queue":{"now":"2026-10-30T17:53:02.3263035-03:00","run
+--- FAIL: TestRegress10LSizesAreCoarseWithoutSession (0.05s)
+    fase10l_regress_test.go:104: /monitor/api/jobs/0000000000000000000000000000012f/content map[Cookie:mcpgw_session=U8UMnmJSY0JWxib8QTZWxaoSJw1dCv0Cms2fqPiDGrA Sec-Fetch-Site:cross-site]: 200
+--- FAIL: TestRegress10LCrossSiteContentRefused (0.06s)
+    fase10l_regress_test.go:119: lista grande: 500
+--- FAIL: TestRegress10LStatusListBounded (0.05s)
+    fase10l_regress_test.go:133: "\n=1" -> "\n=1"
+--- FAIL: TestRegress10LCSVLeadingNewline (0.00s)
+    jobs_test.go:263: <nil> {"content":{"job_id":"00000000000000000000000000000003","prompt_bytes":17,"resp_bytes":26,"prompt_sha256":"26685c8381053b81521c0c70cc59bd4e6f66e20465f86e86d50c8c8ace57922a","truncado":false,"r
+--- FAIL: TestJobDetailHasTheGPUExtractWithoutText (0.04s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/monitor	0.315s
+FAIL	github.com/cslsoftwares/mcpollama/gateway/content [build failed]
+    fase10l_regress_test.go:43: o gateway saiu com 1: 2026/10/30 17:53:02 sem --admin-file: o monitor é somente leitura
+--- FAIL: TestRegress10LCorruptContentDBDoesNotStopTheGateway (0.05s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.080s
+FAIL
+    fase10l_regress_test.go:22: SavePrompt alocou 65 MiB para guardar 16 MiB
+--- FAIL: TestRegress10LSavePromptDoesNotCopyTheWholePrompt (0.32s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/content	0.350s
+FAIL

@@ -1,0 +1,50 @@
+# depois: codigo corrigido + vetores 10.L (2026-10-30 17:53:51)
+    fase10l_adv_test.go:120: VEC|H1-hash-aberto|Media|gateway/monitor/jobs.go:184|OK: nenhum prompt_sha256 nas rotas GET abertas nem no export sem conteudo
+    fase10l_adv_test.go:147: VEC|H2-tamanho-exato-aberto|Media|gateway/monitor/jobs.go:184|OK: sem sessao os tamanhos saem arredondados a 1 KiB
+--- PASS: TestAdvLHashAndExactSizesOpen (0.30s)
+    fase10l_adv_test.go:201: VEC|V1-variantes-caminho|Alta|gateway/monitor/monitor.go:221|OK: 29 variantes (caminho, %2F, maiusculas, HEAD, OPTIONS, POST, conteudo duplicado/estranho) sem texto e sem 2xx
+--- PASS: TestAdvLContentPathVariants (0.10s)
+    fase10l_adv_test.go:249: VEC|V2-sse-state-detalhe|Alta|gateway/monitor/monitor.go:349|OK: SSE, /state, /jobs/{id} e erros (id, filtro, formato) sem o texto, com e sem sessao
+--- PASS: TestAdvLNoTextInStreamStateDetail (3.10s)
+    fase10l_adv_test.go:297: VEC|A1-sessao|Alta|gateway/monitor/jobs.go:193|OK: expirada, de outro gateway, apos logout, csrf como cookie e cookie duplicado: todos 401
+--- PASS: TestAdvLSessionEdges (0.24s)
+    fase10l_adv_test.go:315: VEC|A2-get-cross-site|Baixa|gateway/monitor/jobs.go:193|OK: 403 / 403
+--- PASS: TestAdvLCrossSiteGETContent (0.13s)
+    fase10l_adv_test.go:350: VEC|A3-ids-csrf|Media|gateway/monitor/monitor.go:208|OK: 20.000 ids hex de 128 bits sem repeticao (crypto/rand); nenhum POST novo na 10.L; POST nas rotas de jobs = 405
+--- PASS: TestAdvLIDsAndNoNewPOST (0.13s)
+    fase10l_adv_test.go:393: VEC|I1-sql-filtros|Baixa|gateway/monitor/jobs.go:114|OK: parametros sempre ligados; status desconhecido ignorado; tabela intacta
+--- PASS: TestAdvLSQLInjectionFilters (0.18s)
+    fase10l_adv_test.go:441: VEC|I2-csv-jsonl|Baixa|gateway/monitor/jobs.go:229|OK: nenhuma celula comeca com = + - @ TAB CR LF; JSONL com 1 objeto por linha
+--- PASS: TestAdvLCSVAndJSONL (0.24s)
+    fase10l_adv_test.go:463: VEC|I3-xss-estatico|Alta|gateway/monitor/index.html|OK: sem sumidouros de HTML, sem handlers/estilo inline, LF
+--- PASS: TestAdvLXSSStatic (0.00s)
+    fase10l_adv_test.go:526: VEC|D1-export-memoria|Media|gateway/monitor/jobs.go:315|OK: 20.000 linhas, 764948 bytes em 70ms, pico de heap +2.6 MiB
+--- PASS: TestAdvLExportMemory (1.26s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	5.702s
+    fase10l_adv_test.go:43: VEC|D2-teto-por-job|Media|gateway/content/content.go:160|OK: prompt 16777218 bytes -> guardado 16777216 truncado=true; resposta 17 MiB -> 16777216 truncada=true resp_bytes=17825792; exatamente 16 MiB -> 16777216
+--- PASS: TestAdvLPerJobCapBoundary (1.31s)
+    fase10l_adv_test.go:79: VEC|D3-teto-total-concorrente|Media|gateway/content/content.go:188|OK: 640 jobs x 16 KiB (10 MiB) num teto de 2 MiB: SUM real 2072576, contador 2072576, eventos 16, jobs mais novos (i=39) presentes 16/16
+--- PASS: TestAdvLTotalCapUnderConcurrency (5.51s)
+    fase10l_adv_test.go:122: VEC|D4-teto-no-caminho-do-pedido|Media|gateway/content/content.go:180|OK: a gravacao que passou do teto (4096000 bytes antes, teto 4194304) levou 14ms (restaram 3387 de 4001 jobs)
+--- PASS: TestAdvLCapEnforcementOnRequestPath (0.32s)
+    fase10l_adv_test.go:146: VEC|D5-flush-parcial|Baixa|gateway/content/content.go:322|MEDIDA: custo de 1 flush com a resposta ja em 1 MiB: 26.7ms, 4 MiB: 35.3ms, 16 MiB: 174.6ms
+--- PASS: TestAdvLPartialFlushCost (26.17s)
+    fase10l_adv_test.go:153: VEC|P1-permissoes|Media|gateway/content/content.go:89|N/A no Windows (sem bits POSIX); rodar o binario de teste Linux no servidor
+--- SKIP: TestAdvLPermissions (0.00s)
+    fase10l_adv_test.go:199: VEC|R1-corrompido-erro|Baixa|gateway/content/content.go:100|OK: Open recusa: content: schema: file is not a database (26)
+--- PASS: TestAdvLCorruptOpenErrors (0.00s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	33.357s
+--- SKIP: TestAdvLKillChild (0.00s)
+    fase10l_adv_test.go:137: VEC|K1-sigkill-no-stream|Alta|gateway/store/jobs.go:94|OK (processo filho morto por TerminateProcess): boot-A->boot-A: interrompido_gateway responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true | boot-A->boot-B: interrompido_reboot responded=true resp_bytes=40 prompt=true parcial="SENTINELA-RESPOSTA-10L-k9-parte1 parte2 " final=false evento=true
+--- PASS: TestAdvLKilledMidStream (0.50s)
+    fase10l_adv_test.go:276: VEC|F1-fsync-rajada|Media|gateway/joblog/joblog.go:37|OK/MEDIDA: 600 pedidos/10 paralelos: sem journal 105ms (p50 1.6ms p95 2.6ms); com journal 7.768s (p50 118.4ms p95 218.9ms); +12.77 ms/pedido; 620 jobs gravados; Finish de 500 ms: 6 pedidos em 42ms, Snapshot em 0s
+--- PASS: TestAdvLFsyncBurst (9.08s)
+    fase10l_adv_test.go:326: VEC|E1-eco-log-sentinela|Alta|gateway/proxy/journal.go:50|OK: 7 pedidos (JSON quebrado, modelo proibido, rota bloqueada...) sem eco; log, gw.db e -wal sem o texto; o texto esta so no content.db
+--- PASS: TestAdvLNoEchoNoMetadataText (0.47s)
+    fase10l_adv_test.go:350: VEC|M1-memoria-prompt-grande|Baixa|gateway/proxy/proxy.go:364|MEDIDA: alocado por 1 pedido de 32 MiB: sem journal 138 MiB, com journal 251 MiB (+113 MiB)
+--- PASS: TestAdvLMemoryBigPrompt (1.39s)
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	11.483s
+    fase10l_adv_test.go:92: VEC|R2-content-db-corrompido|Media|cmd/mcpollama-gateway/main.go:97|OK lixo: pedido 200, content_enabled=false, evento conteudo_indisponivel content.db não abriu; o gateway segue sem gravar o texto: content: schema: file is not a database (26)
+    fase10l_adv_test.go:92: VEC|R2-content-db-corrompido|Media|cmd/mcpollama-gateway/main.go:97|OK diretorio: pedido 200, content_enabled=false, evento conteudo_indisponivel content.db não abriu; o gateway segue sem gravar o texto: content: cannot create D:\Users\claiton.linhares\AppData\Local\Temp\TestAdvLCorruptContentDBKeepsGatewayUp1304846569\002\content.db: open D:\Users\claiton.linhares\AppData\Local\Temp\TestAdvLCorruptContentDBKeepsGatewayUp1304846569\002\content.db: is a directory
+--- PASS: TestAdvLCorruptContentDBKeepsGatewayUp (0.36s)
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	0.393s

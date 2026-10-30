@@ -1,0 +1,12 @@
+# race (com D6) 2026-10-30 18:04:30
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	7.078s
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	2.676s
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	14.439s
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	3.712s
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	2.557s
+ok  	github.com/cslsoftwares/mcpollama/gateway/monitor	8.715s
+ok  	github.com/cslsoftwares/mcpollama/gateway/proxy	3.085s
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	2.992s
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	7.974s
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	19.612s
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	9.761s
