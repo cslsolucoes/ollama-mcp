@@ -284,6 +284,10 @@ Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico
 
 ## 8. Instalação e atualização
 
+> **Guia completo do zero:** para montar o servidor de IA, o gateway, as estações e os clientes do começo, ou depois de um desastre, siga o
+> **[INSTALACAO.md](INSTALACAO.md)** (passo a passo com comandos, saída esperada e conferência). Os arquivos de referência do servidor estão em
+> [`deploy/servidor-ia/`](deploy/servidor-ia/README.md). O resumo abaixo cobre só a instalação e a atualização do dia a dia.
+
 **mcpollama (estação Windows).** Os fontes ficam em `src/`; o executável vai para `D:\MCP`. Binários não são versionados.
 
 ```powershell
@@ -412,6 +416,8 @@ cliente é livre, há um único administrador compartilhado e a LAN inteira pode
 | [TOOLS.md](TOOLS.md) | catálogo das 7 tools (esquemas), gerado do código |
 | [deploy/fase9-gateway/MANUAL.md](deploy/fase9-gateway/MANUAL.md) | operação do gateway: instalação, flags, fila, políticas, monitor, API, SQLite, diagnóstico, rollback, segurança |
 | [deploy/fase9-gateway/README.md](deploy/fase9-gateway/README.md) | instalador e arquivos de `deploy/` |
+| [INSTALACAO.md](INSTALACAO.md) | guia completo de instalação do zero: servidor, gateway, estação e clientes |
+| [deploy/servidor-ia/](deploy/servidor-ia/README.md) | cópias dos arquivos do servidor de IA (Ollama, powercap, nginx, cloudflared), coletadas em 2026-10-30 |
 | [Plano de implementação (Fases 0 a 6)](.workspace/plans/MCPOllam2026-10-23-150845-mcpollama-implementacao.plan.md) | decisões e changelog das fases iniciais |
 | [Plano da Fase 7 (extração de documentos)](.workspace/plans/MCPOllam2026-10-28-132000-extracao-docx-pdf-pptx.brief.md) | brief de `.docx`, `.pdf` e `.pptx` |
 | [Plano da Fase 8 (bake-off)](.workspace/plans/MCPOllam2026-10-28-193200-fase8-bakeoff-modelos.plan.md) | escolha do modelo |

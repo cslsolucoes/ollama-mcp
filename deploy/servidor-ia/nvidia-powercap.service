@@ -1,0 +1,18 @@
+[Unit]
+Description=NVIDIA GPU power cap for stable 4-GPU inference (240W MAX post-riser-fix)
+# 2026-10-28: sem multi-user.target aqui (fechava ciclo com ollama-warm e o warm era descartado no boot).
+After=nvidia-persistenced.service
+Wants=nvidia-persistenced.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Conservador (owner 2026-10-23): pos Xid 79 'GPU fell off the bus' na placa PCI 01:00 sob carga a 240W.
+# Clock travado 210-1400 MHz (owner 2026-10-30 16:49: corta os picos de ms que desarmam a fonte de 850 W; 2 reboots as 16:40/16:41, um deles na carga do modelo no boot).
+# Power limit 100W nas 4 GPUs (owner 2026-10-28 21:48: fonte Cougar 850 W insuficiente para 4 placas - causa dos reboots, nao os risers; 100W preserva os 32 GB de VRAM ate a troca da fonte; antes 130W/150W); SEM locked clocks.
+ExecStart=/bin/bash -c 'for i in $(nvidia-smi --query-gpu=index --format=csv,noheader); do nvidia-smi -i "$i" -pm 1; nvidia-smi -i "$i" -pl 100; nvidia-smi -i "$i" -lgc 210,1400; done'
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

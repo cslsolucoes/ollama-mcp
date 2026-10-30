@@ -1,0 +1,14 @@
+/etc/nginx/ollama/:
+total 20
+drwxr-xr-x. 2 root root 4096 out 22 17:22 .
+drwxr-xr-x. 6 root root 4096 out 22 16:53 ..
+-rw-------. 1 root root 65 out 22 17:22 api-key
+-rw-------. 1 root root 189 out 22 17:22 auth.conf
+-rw-r--r--. 1 root root 490 out 22 16:53 cloudflare-allow.conf
+
+/etc/nginx/ssl/:
+total 16
+drwxr-xr-x. 2 root root 4096 out 22 18:04 .
+drwxr-xr-x. 6 root root 4096 out 22 16:53 ..
+-rw-------. 1 root root 1704 out 22 18:04 ia.cslsolucoes.com.br.key
+-rw-r--r--. 1 root root 1688 out 22 18:04 ia.cslsolucoes.com.br.pem

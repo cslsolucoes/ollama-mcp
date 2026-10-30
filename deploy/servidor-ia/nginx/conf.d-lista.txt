@@ -1,0 +1,2 @@
+ollama.conf
+ollama.conf.bak-20261023-011207

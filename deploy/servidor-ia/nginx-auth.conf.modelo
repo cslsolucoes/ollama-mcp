@@ -1,0 +1,5 @@
+# Rotated by ollama-key-rotate
+map $http_authorization $ollama_authorized {
+    default 0;
+    "<TOKEN>" 1;
+}

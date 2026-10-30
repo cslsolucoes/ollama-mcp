@@ -1,0 +1,13 @@
+[Unit]
+Description=Warm qwen3-ia (64K context) into VRAM at boot
+After=ollama.service nvidia-powercap.service
+Requires=ollama.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/ollama-warm
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
