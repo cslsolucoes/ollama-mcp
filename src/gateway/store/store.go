@@ -13,6 +13,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -40,13 +41,19 @@ CREATE TABLE IF NOT EXISTS audit(
   antes TEXT, depois TEXT, motivo TEXT);
 CREATE TABLE IF NOT EXISTS gpu_samples(
   ts INTEGER, gpu INTEGER, bus_id TEXT, power_w REAL, mem_used_mib INTEGER,
-  util_pct INTEGER, temp_c INTEGER, aer_corr_1b4 INTEGER, boot_id TEXT);
+  util_pct INTEGER, temp_c INTEGER, aer_corr_1b4 INTEGER, boot_id TEXT, power_limit_w REAL);
+CREATE TABLE IF NOT EXISTS cpu_samples(
+  ts INTEGER, util_pct REAL, load1 REAL, load5 REAL, load15 REAL,
+  ram_total_mib INTEGER, ram_used_mib INTEGER, ram_avail_mib INTEGER,
+  swap_used_mib INTEGER, swap_total_mib INTEGER, temp_c REAL, freq_mhz REAL,
+  ollama_rss_mib INTEGER, power_w REAL, boot_id TEXT, threads_json TEXT);
 CREATE TABLE IF NOT EXISTS events(ts INTEGER, kind TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
 CREATE INDEX IF NOT EXISTS idx_requests_enq ON requests(enqueued_at);
 CREATE INDEX IF NOT EXISTS idx_requests_client ON requests(client_label, enqueued_at);
 CREATE INDEX IF NOT EXISTS idx_requests_fin ON requests(finished_at);
 CREATE INDEX IF NOT EXISTS idx_gpu_ts ON gpu_samples(ts);
+CREATE INDEX IF NOT EXISTS idx_cpu_ts ON cpu_samples(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
 `
@@ -97,6 +104,7 @@ type itemKind int
 const (
 	kRecord itemKind = iota
 	kGPU
+	kCPU
 	kEvent
 	kBarrier
 )
@@ -105,20 +113,42 @@ type item struct {
 	kind itemKind
 	rec  queue.Record
 	gpu  []GPURow
+	cpu  CPURow
 	ev   Event
 	done chan struct{}
 }
 
 // GPURow is one GPU sample as stored.
 type GPURow struct {
-	TS         time.Time
-	GPU        int
-	BusID      string
-	PowerW     float64
-	MemUsedMiB int
-	UtilPct    int
-	TempC      int
-	AER        int64 // correctable AER counter of the bridge; -1 when unknown
+	TS          time.Time
+	GPU         int
+	BusID       string
+	PowerW      float64
+	MemUsedMiB  int
+	UtilPct     int
+	TempC       int
+	AER         int64   // correctable AER counter of the bridge; -1 when unknown
+	PowerLimitW float64 // power cap in force; -1 when unknown
+}
+
+// CPURow is one CPU/RAM sample as stored. Unknown numbers are -1. Threads is
+// the compact per-thread detail (see EncodeThreads), "" when there is none.
+type CPURow struct {
+	TS           time.Time
+	UtilPct      float64
+	Load1        float64
+	Load5        float64
+	Load15       float64
+	RAMTotalMiB  int64
+	RAMUsedMiB   int64
+	RAMAvailMiB  int64
+	SwapUsedMiB  int64
+	SwapTotalMiB int64
+	TempC        float64
+	FreqMHz      float64
+	OllamaRSSMiB int64
+	PowerW       float64
+	Threads      string // threads_json
 }
 
 // Event is a row of the events table.
@@ -183,6 +213,8 @@ func Open(path string, o Options) (*Store, error) {
 // migrate brings a database created by an older version up to the current
 // schema. Each step checks before it changes, so running it twice is harmless.
 //   - think (Fase 9.6a): reasoning mode of the request.
+//   - gpu_samples.power_limit_w (power cap in the GPU cards).
+//   - cpu_samples (CPU/RAM board): new table, created by the schema; threads_json column.
 func migrate(db *sql.DB) error {
 	rows, err := db.Query(`PRAGMA table_info(requests)`)
 	if err != nil {
@@ -209,7 +241,49 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 	}
+	// gpu_samples.power_limit_w (power cap board): old rows keep NULL, read as -1.
+	gpuCols, err := tableColumns(db, "gpu_samples")
+	if err != nil {
+		return err
+	}
+	if len(gpuCols) > 0 && !gpuCols["power_limit_w"] {
+		if _, err := db.Exec(`ALTER TABLE gpu_samples ADD COLUMN power_limit_w REAL`); err != nil {
+			return err
+		}
+	}
+	// cpu_samples itself comes from the schema (CREATE TABLE IF NOT EXISTS);
+	// only a table made by a build without the per-thread detail lacks the
+	// column.
+	cpuCols, err := tableColumns(db, "cpu_samples")
+	if err != nil {
+		return err
+	}
+	if len(cpuCols) > 0 && !cpuCols["threads_json"] {
+		if _, err := db.Exec(`ALTER TABLE cpu_samples ADD COLUMN threads_json TEXT`); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// tableColumns returns the column names of a table (empty when it does not exist).
+func tableColumns(db *sql.DB, table string) (map[string]bool, error) {
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	have := map[string]bool{}
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return nil, err
+		}
+		have[name] = true
+	}
+	return have, rows.Err()
 }
 
 func (s *Store) logf(format string, a ...any) {
@@ -270,6 +344,9 @@ func (s *Store) GPU(rows []GPURow) {
 		s.push(item{kind: kGPU, gpu: rows})
 	}
 }
+
+// CPU queues one CPU/RAM sample. Never blocks.
+func (s *Store) CPU(r CPURow) { s.push(item{kind: kCPU, cpu: r}) }
 
 // Event queues an event row. Never blocks.
 func (s *Store) Event(kind, detail string) {
@@ -359,12 +436,17 @@ func (s *Store) writeBatch(batch []item) int {
 			err = s.insertRecord(tx, it.rec)
 		case kGPU:
 			for _, g := range it.gpu {
-				_, err = tx.Exec(`INSERT INTO gpu_samples(ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,boot_id) VALUES(?,?,?,?,?,?,?,?,?)`,
-					g.TS.UnixMilli(), g.GPU, g.BusID, g.PowerW, g.MemUsedMiB, g.UtilPct, g.TempC, g.AER, s.opts.BootID)
+				_, err = tx.Exec(`INSERT INTO gpu_samples(ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,boot_id,power_limit_w) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+					g.TS.UnixMilli(), g.GPU, g.BusID, g.PowerW, g.MemUsedMiB, g.UtilPct, g.TempC, g.AER, s.opts.BootID, g.PowerLimitW)
 				if err != nil {
 					break
 				}
 			}
+		case kCPU:
+			c := it.cpu
+			_, err = tx.Exec(`INSERT INTO cpu_samples(ts,util_pct,load1,load5,load15,ram_total_mib,ram_used_mib,ram_avail_mib,swap_used_mib,swap_total_mib,temp_c,freq_mhz,ollama_rss_mib,power_w,boot_id,threads_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				c.TS.UnixMilli(), c.UtilPct, c.Load1, c.Load5, c.Load15, c.RAMTotalMiB, c.RAMUsedMiB, c.RAMAvailMiB,
+				c.SwapUsedMiB, c.SwapTotalMiB, c.TempC, c.FreqMHz, c.OllamaRSSMiB, c.PowerW, s.opts.BootID, c.Threads)
 		case kEvent:
 			_, err = tx.Exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, it.ev.TS.UnixMilli(), it.ev.Kind, it.ev.Detail)
 		}
@@ -643,7 +725,7 @@ func (s *Store) GPUSince(ctx context.Context, since time.Time, limit int) ([]GPU
 	if limit <= 0 || limit > 100000 {
 		limit = 20000
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4 FROM gpu_samples WHERE ts >= ? ORDER BY ts LIMIT ?`, since.UnixMilli(), limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,COALESCE(power_limit_w,-1) FROM gpu_samples WHERE ts >= ? ORDER BY ts LIMIT ?`, since.UnixMilli(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -652,11 +734,35 @@ func (s *Store) GPUSince(ctx context.Context, since time.Time, limit int) ([]GPU
 	for rows.Next() {
 		var g GPURow
 		var ts int64
-		if err := rows.Scan(&ts, &g.GPU, &g.BusID, &g.PowerW, &g.MemUsedMiB, &g.UtilPct, &g.TempC, &g.AER); err != nil {
+		if err := rows.Scan(&ts, &g.GPU, &g.BusID, &g.PowerW, &g.MemUsedMiB, &g.UtilPct, &g.TempC, &g.AER, &g.PowerLimitW); err != nil {
 			return nil, err
 		}
 		g.TS = time.UnixMilli(ts)
 		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// CPUSince returns CPU/RAM samples newer than since, oldest first.
+func (s *Store) CPUSince(ctx context.Context, since time.Time, limit int) ([]CPURow, error) {
+	if limit <= 0 || limit > 100000 {
+		limit = 20000
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT ts,util_pct,load1,load5,load15,ram_total_mib,ram_used_mib,ram_avail_mib,swap_used_mib,swap_total_mib,temp_c,freq_mhz,ollama_rss_mib,power_w,COALESCE(threads_json,'') FROM cpu_samples WHERE ts >= ? ORDER BY ts LIMIT ?`, since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []CPURow{}
+	for rows.Next() {
+		var c CPURow
+		var ts int64
+		if err := rows.Scan(&ts, &c.UtilPct, &c.Load1, &c.Load5, &c.Load15, &c.RAMTotalMiB, &c.RAMUsedMiB, &c.RAMAvailMiB,
+			&c.SwapUsedMiB, &c.SwapTotalMiB, &c.TempC, &c.FreqMHz, &c.OllamaRSSMiB, &c.PowerW, &c.Threads); err != nil {
+			return nil, err
+		}
+		c.TS = time.UnixMilli(ts)
+		out = append(out, c)
 	}
 	return out, rows.Err()
 }
@@ -686,8 +792,9 @@ func (s *Store) Events(ctx context.Context, limit int) ([]Event, error) {
 
 // ---- maintenance -------------------------------------------------------------
 
-// Prune deletes requests and GPU samples older than the retention. audit and
-// events never expire.
+// Prune deletes requests, GPU samples and CPU samples (same retention as the
+// GPU) older than the retention; gpus counts the GPU rows. audit and events
+// never expire.
 func (s *Store) Prune(ctx context.Context, now time.Time) (reqs, gpus int64, err error) {
 	r, err := s.db.ExecContext(ctx, `DELETE FROM requests WHERE enqueued_at < ?`, now.Add(-s.opts.ReqKeep).UnixMilli())
 	if err != nil {
@@ -699,6 +806,9 @@ func (s *Store) Prune(ctx context.Context, now time.Time) (reqs, gpus int64, err
 		return reqs, 0, err
 	}
 	gpus, _ = g.RowsAffected()
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM cpu_samples WHERE ts < ?`, now.Add(-s.opts.GPUKeep).UnixMilli()); err != nil {
+		return reqs, gpus, err
+	}
 	return reqs, gpus, nil
 }
 
@@ -798,4 +908,36 @@ func BootID(path string) string {
 		return "unknown"
 	}
 	return s
+}
+
+// threadsDetail is the shape of CPURow.Threads: short keys because there is
+// one row every few seconds. t = [id, util_pct, core_id] per logical CPU and
+// c = [core_id, temp_c] per physical core; -1 is "unknown".
+type threadsDetail struct {
+	T [][3]float64 `json:"t"`
+	C [][2]float64 `json:"c"`
+}
+
+// EncodeThreads builds the threads_json text from the per-thread values.
+func EncodeThreads(threads [][3]float64, cores [][2]float64) string {
+	if len(threads) == 0 && len(cores) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(threadsDetail{T: threads, C: cores})
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// DecodeThreads is the inverse of EncodeThreads; ok is false on malformed text.
+func DecodeThreads(txt string) (threads [][3]float64, cores [][2]float64, ok bool) {
+	if txt == "" {
+		return nil, nil, true
+	}
+	var d threadsDetail
+	if err := json.Unmarshal([]byte(txt), &d); err != nil {
+		return nil, nil, false
+	}
+	return d.T, d.C, true
 }

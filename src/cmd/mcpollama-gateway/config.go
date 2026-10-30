@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 )
@@ -61,12 +62,16 @@ environment variable; the flag wins.
   --max-body-bytes N      request body ceiling               (MCPGW_MAX_BODY_BYTES, default 33554432)
   --admin-file FILE       "user:pbkdf2-sha256$..." line, mode 0600; without it the monitor is
                           read only                          (MCPGW_ADMIN_FILE)
-  --gpu-interval D        nvidia-smi sampling period         (MCPGW_GPU_INTERVAL, default 5s; 0 disables)
+  --gpu-interval D        nvidia-smi and CPU/RAM sampling period (MCPGW_GPU_INTERVAL, default 1s; 0 disables both)
   --nvidia-smi PATH       nvidia-smi binary                  (MCPGW_NVIDIA_SMI, default nvidia-smi)
   --aer-path FILE         correctable AER counter of the bridge 00:1b.4; "-" disables
                                                              (MCPGW_AER_PATH)
+  --proc-root DIR         procfs root read by the CPU/RAM sampler (tests)  (MCPGW_PROC_ROOT, default /proc)
+  --sys-root DIR          sysfs root read by the CPU/RAM sampler (tests)   (MCPGW_SYS_ROOT, default /sys)
+  --sample-store-interval D  how often a GPU/CPU sample goes to SQLite; the live page gets every sample
+                                                             (MCPGW_SAMPLE_STORE_INTERVAL, default 5s; >= --gpu-interval)
   --retention-requests D  requests kept for                  (MCPGW_RETENTION_REQUESTS, default 2160h = 90 days)
-  --retention-gpu D       GPU samples kept for               (MCPGW_RETENTION_GPU, default 168h = 7 days)
+  --retention-gpu D       GPU and CPU/RAM samples kept for               (MCPGW_RETENTION_GPU, default 168h = 7 days)
   --max-request-rows N    cap of the request history; the oldest rows go first
                                                              (MCPGW_MAX_REQUEST_ROWS, default 3000000)
   --non-loopback-listen   allow --listen outside the loopback (MCPGW_NON_LOOPBACK_LISTEN; not recommended)
@@ -102,6 +107,9 @@ type Config struct {
 	GPUInterval    time.Duration
 	NvidiaSMI      string
 	AERPath        string
+	SampleStore    time.Duration
+	ProcRoot       string
+	SysRoot        string
 	RetentionReq   time.Duration
 	RetentionGPU   time.Duration
 	NonLoopback    bool
@@ -140,6 +148,9 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fGPUInt  = fs.Duration("gpu-interval", 0, "")
 		fSMI     = fs.String("nvidia-smi", "", "")
 		fAER     = fs.String("aer-path", "", "")
+		fSStore  = fs.Duration("sample-store-interval", 0, "")
+		fProc    = fs.String("proc-root", "", "")
+		fSys     = fs.String("sys-root", "", "")
 		fRetReq  = fs.Duration("retention-requests", 0, "")
 		fRetGPU  = fs.Duration("retention-gpu", 0, "")
 		fNonLoop = fs.Bool("non-loopback-listen", false, "")
@@ -219,9 +230,12 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		AgeAfter:     dur("age-after", "MCPGW_AGE_AFTER", 5*time.Minute, fAge),
 		StartStagger: dur("start-stagger", "MCPGW_START_STAGGER", 300*time.Millisecond, fStagger),
 		AdminFile:    str("admin-file", "MCPGW_ADMIN_FILE", "", fAdmin),
-		GPUInterval:  dur("gpu-interval", "MCPGW_GPU_INTERVAL", 5*time.Second, fGPUInt),
+		GPUInterval:  dur("gpu-interval", "MCPGW_GPU_INTERVAL", time.Second, fGPUInt),
+		SampleStore:  dur("sample-store-interval", "MCPGW_SAMPLE_STORE_INTERVAL", 5*time.Second, fSStore),
 		NvidiaSMI:    str("nvidia-smi", "MCPGW_NVIDIA_SMI", "nvidia-smi", fSMI),
 		AERPath:      str("aer-path", "MCPGW_AER_PATH", gpu.DefaultAERPath, fAER),
+		ProcRoot:     str("proc-root", "MCPGW_PROC_ROOT", cpu.DefaultProcRoot, fProc),
+		SysRoot:      str("sys-root", "MCPGW_SYS_ROOT", cpu.DefaultSysRoot, fSys),
 		RetentionReq: dur("retention-requests", "MCPGW_RETENTION_REQUESTS", 90*24*time.Hour, fRetReq),
 		RetentionGPU: dur("retention-gpu", "MCPGW_RETENTION_GPU", 7*24*time.Hour, fRetGPU),
 		NonLoopback:  boolean("non-loopback-listen", "MCPGW_NON_LOOPBACK_LISTEN", fNonLoop),
@@ -357,6 +371,9 @@ func (c Config) validate() error {
 	}
 	if c.MaxWait <= 0 || c.RunTimeout <= 0 || c.AgeAfter <= 0 || c.StartStagger < 0 || c.GPUInterval < 0 {
 		return errors.New("durations must be positive (--start-stagger and --gpu-interval may be 0)")
+	}
+	if c.SampleStore <= 0 || (c.GPUInterval > 0 && c.SampleStore < c.GPUInterval) {
+		return errors.New("--sample-store-interval must be positive and not shorter than --gpu-interval")
 	}
 	if c.MaxBodyBytes <= 0 {
 		return errors.New("--max-body-bytes must be positive")

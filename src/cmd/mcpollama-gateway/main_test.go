@@ -24,7 +24,7 @@ func TestParseConfigDefaults(t *testing.T) {
 	if c.Listen != "127.0.0.1:11500" || c.Ollama.Host != "127.0.0.1:11434" || c.GenSlots != 2 || c.EmbedSlots != 2 ||
 		c.QueueMax != 64 || c.PerClient != 16 || c.PerIP != 16 || c.LabelsPerIP != 16 ||
 		c.MaxWait != 10*time.Minute || c.AgeAfter != 5*time.Minute || c.StartStagger != 300*time.Millisecond ||
-		c.MaxBodyBytes != 32<<20 || c.RetentionReq != 90*24*time.Hour || c.RetentionGPU != 7*24*time.Hour || c.GPUInterval != 5*time.Second {
+		c.MaxBodyBytes != 32<<20 || c.RetentionReq != 90*24*time.Hour || c.RetentionGPU != 7*24*time.Hour || c.GPUInterval != time.Second || c.SampleStore != 5*time.Second {
 		t.Fatalf("%+v", c)
 	}
 	if err := c.validate(); err != nil {

@@ -28,7 +28,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
@@ -87,6 +89,8 @@ type Config struct {
 	Queue   *queue.Manager
 	Store   *store.Store // may be nil (no history)
 	GPU     *gpu.Collector
+	CPU     *cpu.Collector    // may be nil (board shows "coletor desligado")
+	Models  *models.Collector // may be nil (no "models" in the state)
 	Hub     *Hub
 	Admin   *Credentials // nil disables the actions
 	Version string
@@ -95,6 +99,9 @@ type Config struct {
 	// MaxSSEPerIP bounds the streams of one client IP (Fase 9.5, M3), so one
 	// machine cannot take every stream; default 4.
 	MaxSSEPerIP int
+	// StreamEvery is the periodic push of the event stream (follows the
+	// sampling interval); default 1 s. Queue changes are still sent at once.
+	StreamEvery time.Duration
 	Logf        func(format string, args ...any)
 }
 
@@ -135,6 +142,9 @@ func New(cfg Config) (*Handler, error) {
 	}
 	if cfg.MaxSSE <= 0 {
 		cfg.MaxSSE = 32
+	}
+	if cfg.StreamEvery <= 0 {
+		cfg.StreamEvery = time.Second
 	}
 	if cfg.MaxSSEPerIP <= 0 {
 		cfg.MaxSSEPerIP = 4
@@ -258,17 +268,19 @@ type extras struct {
 
 // State is the photo the page shows.
 type State struct {
-	Now          time.Time      `json:"now"`
-	Version      string         `json:"version"`
-	BootID       string         `json:"boot_id"`
-	UptimeS      int64          `json:"uptime_s"`
-	Queue        queue.Snapshot `json:"queue"`
-	GPU          *gpu.Snapshot  `json:"gpu,omitempty"`
-	Cards        Cards          `json:"cards"`
-	Recent       []store.Row    `json:"recent"`
-	Events       []store.Event  `json:"events"`
-	Dropped      int64          `json:"dropped"`
-	AdminEnabled bool           `json:"admin_enabled"`
+	Now          time.Time        `json:"now"`
+	Version      string           `json:"version"`
+	BootID       string           `json:"boot_id"`
+	UptimeS      int64            `json:"uptime_s"`
+	Queue        queue.Snapshot   `json:"queue"`
+	GPU          *gpu.Snapshot    `json:"gpu,omitempty"`
+	CPU          *cpu.Sample      `json:"cpu,omitempty"`
+	Models       *models.Snapshot `json:"models,omitempty"`
+	Cards        Cards            `json:"cards"`
+	Recent       []store.Row      `json:"recent"`
+	Events       []store.Event    `json:"events"`
+	Dropped      int64            `json:"dropped"`
+	AdminEnabled bool             `json:"admin_enabled"`
 }
 
 const extrasTTL = 2 * time.Second
@@ -317,6 +329,14 @@ func (h *Handler) state(ctx context.Context) State {
 	if h.cfg.GPU != nil {
 		g := h.cfg.GPU.Latest()
 		st.GPU = &g
+	}
+	if h.cfg.CPU != nil {
+		c := h.cfg.CPU.Latest()
+		st.CPU = &c
+	}
+	if h.cfg.Models != nil {
+		m := h.cfg.Models.Latest() // cached: the Ollama is queried by the collector, never here
+		st.Models = &m
 	}
 	if h.cfg.Store != nil {
 		st.Dropped = h.cfg.Store.Dropped()
@@ -387,7 +407,7 @@ func (h *Handler) apiStream(w http.ResponseWriter, r *http.Request) {
 	if !send() {
 		return
 	}
-	tick := time.NewTicker(2 * time.Second)
+	tick := time.NewTicker(h.cfg.StreamEvery)
 	defer tick.Stop()
 	last := time.Now()
 	for {

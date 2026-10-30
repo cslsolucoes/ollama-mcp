@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -21,7 +22,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/monitor"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
@@ -101,21 +104,74 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		},
 	})
 
+	// The live state gets every sample; SQLite only one per SampleStore, so a
+	// 1 s sampling does not write 4 GPU rows and 1 CPU row a second. The two
+	// callbacks run on their collector goroutine, so each has its own clock.
+	var lastGPU, lastCPU time.Time
+	due := func(last *time.Time, ts time.Time) bool {
+		if !last.IsZero() && ts.Sub(*last) < cfg.SampleStore-cfg.GPUInterval/2 { // half a tick of tolerance for jitter
+			return false
+		}
+		*last = ts
+		return true
+	}
 	var col *gpu.Collector
 	if cfg.GPUInterval > 0 {
 		col = &gpu.Collector{
 			Cmd: cfg.NvidiaSMI, AERPath: cfg.AERPath, Interval: cfg.GPUInterval, BootID: bootID, Logf: logf,
 			OnSamples: func(ts time.Time, ss []gpu.Sample, aer int64) {
+				if !due(&lastGPU, ts) {
+					return
+				}
 				rows := make([]store.GPURow, 0, len(ss))
 				for _, s := range ss {
-					rows = append(rows, store.GPURow{TS: ts, GPU: s.Index, BusID: s.BusID, PowerW: s.PowerW, MemUsedMiB: s.MemUsedMiB, UtilPct: s.UtilPct, TempC: s.TempC, AER: aer})
+					rows = append(rows, store.GPURow{TS: ts, GPU: s.Index, BusID: s.BusID, PowerW: s.PowerW, MemUsedMiB: s.MemUsedMiB, UtilPct: s.UtilPct, TempC: s.TempC, AER: aer, PowerLimitW: s.PowerLimitW})
 				}
 				st.GPU(rows)
 			},
 		}
 	}
 
-	mon, err = monitor.New(monitor.Config{Queue: q, Store: st, GPU: col, Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
+	var ccol *cpu.Collector
+	if cfg.GPUInterval > 0 {
+		ccol = &cpu.Collector{
+			ProcRoot: cfg.ProcRoot, SysRoot: cfg.SysRoot, Interval: cfg.GPUInterval, BootID: bootID, Logf: logf,
+			OnSample: func(s cpu.Sample) {
+				if !due(&lastCPU, s.At) {
+					return
+				}
+				th := make([][3]float64, 0, len(s.Threads))
+				for _, t := range s.Threads {
+					th = append(th, [3]float64{float64(t.ID), round1(t.UtilPct), float64(t.CoreID)})
+				}
+				cs := make([][2]float64, 0, len(s.Cores))
+				for _, c := range s.Cores {
+					cs = append(cs, [2]float64{float64(c.CoreID), round1(c.TempC)})
+				}
+				st.CPU(store.CPURow{
+					TS: s.At, UtilPct: s.UtilPct, Load1: s.Load1, Load5: s.Load5, Load15: s.Load15,
+					RAMTotalMiB: s.RAMTotalMiB, RAMUsedMiB: s.RAMUsedMiB, RAMAvailMiB: s.RAMAvailMiB,
+					SwapUsedMiB: s.SwapUsedMiB, SwapTotalMiB: s.SwapTotalMiB, TempC: s.TempC, FreqMHz: s.FreqMHz,
+					OllamaRSSMiB: s.OllamaRSSMiB, PowerW: s.PowerW, Threads: store.EncodeThreads(th, cs),
+				})
+			},
+		}
+	}
+
+	// The Ollama is asked directly (loopback), outside the queue and the proxy.
+	mcol := &models.Collector{
+		Upstream: cfg.Ollama, Allowed: cfg.AllowedModels, ThinkSuffix: cfg.ThinkSuffix, Logf: logf,
+		OnChange: func(loaded, unloaded []string) {
+			for _, n := range loaded {
+				st.Event("modelo_carregado", n)
+			}
+			for _, n := range unloaded {
+				st.Event("modelo_descarregado", n)
+			}
+		},
+	}
+
+	mon, err = monitor.New(monitor.Config{Models: mcol, Queue: q, Store: st, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
 		return 1
@@ -160,6 +216,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	if col != nil {
 		start(func() { col.RunLoop(bg) })
 	}
+	if ccol != nil {
+		start(func() { ccol.RunLoop(bg) })
+	}
+	start(func() { mcol.RunLoop(bg) })
 
 	logf("mcpollama-gateway %s em %s -> Ollama %s (geracao=%d embed=%d fila=%d por-ip=%d) boot=%s",
 		Version, ln.Addr(), cfg.Ollama.Host, cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerIP, bootID)
@@ -246,4 +306,16 @@ func (s *syncWriter) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.w.Write(p)
+}
+
+// round1 keeps one decimal in the stored per-thread detail.
+func round1(v float64) float64 { return math.Round(v*10) / 10 }
+
+// streamEvery is the periodic push of the monitor stream: the sampling
+// interval, or 2 s when sampling is off.
+func streamEvery(cfg Config) time.Duration {
+	if cfg.GPUInterval > 0 {
+		return cfg.GPUInterval
+	}
+	return 2 * time.Second
 }

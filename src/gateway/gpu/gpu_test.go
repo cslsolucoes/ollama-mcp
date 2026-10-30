@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -131,4 +132,51 @@ func TestCollectorRealExecOfFakeBinary(t *testing.T) {
 	if snap.Err != "" || len(snap.Samples) != 4 {
 		t.Fatalf("%+v", snap)
 	}
+}
+
+// A slow nvidia-smi must never pile up runs: at most one in flight, and the
+// tick that came due meanwhile is dropped.
+func TestRunLoopNeverOverlapsSlowRuns(t *testing.T) {
+	var inflight, maxInflight, calls atomic.Int32
+	c := &Collector{
+		AERPath: "-", Interval: 40 * time.Millisecond, Timeout: time.Second,
+		Run: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+			n := inflight.Add(1)
+			if n > maxInflight.Load() {
+				maxInflight.Store(n)
+			}
+			calls.Add(1)
+			time.Sleep(150 * time.Millisecond)
+			inflight.Add(-1)
+			return []byte(smiOut), nil
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
+	defer cancel()
+	done := make(chan struct{})
+	go func() { c.RunLoop(ctx); close(done) }()
+	<-done
+	if maxInflight.Load() != 1 {
+		t.Fatalf("overlap: %d in flight", maxInflight.Load())
+	}
+	// 150 ms per run: back to back would be 4-5 calls in 700 ms; never more than 5.
+	if n := calls.Load(); n < 2 || n > 5 {
+		t.Fatalf("%d calls", n)
+	}
+}
+
+// The cost of one round with a fake binary executed for real (process start
+// included); the changelog quotes it.
+func TestCollectionCostFakeBinary(t *testing.T) {
+	t.Setenv("GPU_FAKE_SMI", "1")
+	c := &Collector{Cmd: os.Args[0], Args: []string{"-test.run=^TestHelperProcess$"}, AERPath: "-"}
+	c.Once(context.Background())
+	const n = 10
+	start := time.Now()
+	for i := 0; i < n; i++ {
+		if s := c.Once(context.Background()); s.Err != "" {
+			t.Fatal(s.Err)
+		}
+	}
+	t.Logf("gpu round with a real exec of a fake nvidia-smi: %v", time.Since(start)/n)
 }

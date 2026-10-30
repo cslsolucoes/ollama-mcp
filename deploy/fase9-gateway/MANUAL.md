@@ -264,18 +264,21 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--strip-options LIST` | `MCPGW_STRIP_OPTIONS` | `num_gpu,main_gpu,low_vram,use_mmap,use_mlock,numa` | Opções removidas de `options` (`,` ou `;`; `none` = nenhuma). O `num_ctx` sai pela flag acima, não por esta lista | padrão |
 | `--max-body-bytes N` | `MCPGW_MAX_BODY_BYTES` | `33554432` (32 MiB) | Teto do corpo da requisição (413 acima). O nginx tem 64 MiB | padrão |
 | `--admin-file FILE` | `MCPGW_ADMIN_FILE` | vazio | Linha `usuario:pbkdf2-sha256$...` (modo `0600`). Sem ele o monitor é **somente leitura**. Lido **só na partida** | `/etc/mcpollama-gateway/admin` |
-| `--gpu-interval D` | `MCPGW_GPU_INTERVAL` | `5s` | Período do `nvidia-smi`. `0` desliga o coletor | padrão (5s) |
+| `--gpu-interval D` | `MCPGW_GPU_INTERVAL` | `1s` | Período da coleta ao vivo: `nvidia-smi` **e** CPU/RAM (o mesmo intervalo vale para os dois coletores). `0` desliga os dois. É também o período do envio periódico do SSE. Nunca há duas coletas ao mesmo tempo: se uma demora mais que o intervalo, o tick atrasado é descartado | `1s` (padrão) |
+| `--sample-store-interval D` | `MCPGW_SAMPLE_STORE_INTERVAL` | `5s` | De quanto em quanto tempo uma amostra de GPU e uma de CPU/RAM é **gravada** em `gpu_samples`/`cpu_samples`. A página ao vivo recebe toda amostra (1 s); o banco só 1 a cada 5 s (4 linhas/s de GPU e 1/s de CPU seriam gravação inútil). Tem de ser **>= `--gpu-interval`** (senão a partida falha, código 2) | padrão (5s) |
+| `--proc-root DIR` | `MCPGW_PROC_ROOT` | `/proc` | Raiz do procfs lida pelo coletor de CPU/RAM (`stat`, `loadavg`, `meminfo`, `cpuinfo`, `<pid>/comm` e `<pid>/status`). Só se muda em teste, com uma árvore falsa | padrão |
+| `--sys-root DIR` | `MCPGW_SYS_ROOT` | `/sys` | Raiz do sysfs lida pelo coletor de CPU/RAM (`class/hwmon`, `class/thermal`, `class/powercap`, `devices/system/cpu`). Só se muda em teste | padrão |
 | `--nvidia-smi PATH` | `MCPGW_NVIDIA_SMI` | `nvidia-smi` | Binário do `nvidia-smi` | padrão |
 | `--aer-path FILE` | `MCPGW_AER_PATH` | `/sys/bus/pci/devices/0000:00:1b.4/aer_dev_correctable` | Contador AER corrigível da ponte `00:1b.4`; `-` desliga | padrão |
 | `--retention-requests D` | `MCPGW_RETENTION_REQUESTS` | `2160h` (90 dias) | Quanto tempo ficam os pedidos no banco | padrão |
-| `--retention-gpu D` | `MCPGW_RETENTION_GPU` | `168h` (7 dias) | Quanto tempo ficam as amostras de GPU | padrão |
+| `--retention-gpu D` | `MCPGW_RETENTION_GPU` | `168h` (7 dias) | Quanto tempo ficam as amostras de GPU **e de CPU/RAM** | padrão |
 | `--max-request-rows N` | `MCPGW_MAX_REQUEST_ROWS` | `3000000` | Teto de linhas de `requests` (mínimo 1000); as mais antigas saem primeiro, de hora em hora | padrão |
 | `--non-loopback-listen` | `MCPGW_NON_LOOPBACK_LISTEN` | `false` | Permite `--listen` fora do loopback (não recomendado) | não usado |
 | `--debug` | `MCPGW_DEBUG` | `false` | Uma linha de log por pedido (`req <id> <faixa> <rota> status=... class=... wait_ms=...`), nunca com texto | não usado |
 | `--version` | (sem env) | — | Imprime a versão e sai | — |
 
 **Validações da partida** (erro = sair com código 2): slots, `--queue-*` e `--labels-per-ip` ≥ 1; durações > 0
-(`--start-stagger` e `--gpu-interval` podem ser 0); `--max-body-bytes` > 0; retenções > 0 e `--max-request-rows` ≥ 1000;
+(`--start-stagger` e `--gpu-interval` podem ser 0); `--sample-store-interval` > 0 e >= `--gpu-interval`; `--max-body-bytes` > 0; retenções > 0 e `--max-request-rows` ≥ 1000;
 `--listen` no loopback; `--db` não vazio; `--admin-file` com permissão `0600` (ver Nota N1).
 
 **Subcomando:** `mcpollama-gateway hash-password [-user NOME] [-iterations N]` lê a senha do **stdin** (primeira linha,
@@ -434,7 +437,7 @@ certutil -addstore -f Root "$env:USERPROFILE\.openclaude\certs\cloudflare-origin
 Para só o seu usuário (sem administrador): `certutil -user -addstore Root "<arquivo>"`. Edge e Chrome usam a loja do
 Windows; o Firefox tem loja própria (importe lá ou ative `security.enterprise_roots.enabled`). Reinicie o navegador.
 
-**O que a página mostra** (atualiza ao vivo por SSE, com *polling* de 2 s se o SSE falhar):
+**O que a página mostra** (atualiza ao vivo por SSE, a cada `--gpu-interval` (1 s) e de imediato a cada mudança da fila, com *polling* de 1 s se o SSE falhar):
 
 | Quadro | Conteúdo |
 | --- | --- |
@@ -442,11 +445,13 @@ Windows; o Firefox tem loja própria (importe lá ou ative `security.enterprise_
 | Cartões | Em execução; Na fila; Concluídos hoje (status `ok` desde 00:00 do servidor); Erros hoje (status `erro`); Espera p50 e p95 (15 min); **Tokens/s** (tokens gerados nos últimos 15 min ÷ 900 s, é média e não instantâneo); Pedidos/min (15 min) |
 | Em execução | Faixa, id (8 caracteres), cliente (passe o mouse: IP + rótulo), tool, modelo, raciocínio, prioridade concedida, rodando há, esperou; botão **Cancelar** (logado) |
 | Fila de espera | Posição (a ordem em que vão começar, simulada), faixa, id, cliente, tool, modelo, raciocínio, prioridade atual (já com envelhecimento), esperando há; botões **▲ ▼ ✕** (logado) |
-| GPUs | Por GPU: potência (W), memória (MiB), uso (%), temperatura; linha `AER 00:1b.4 (corrigíveis): N`; "registros descartados: N" se o buffer do banco encheu |
+| GPUs | Por GPU: potência em uso **e o limite aplicado** ("71 W / 100 W"; é o `enforced.power.limit`, o power cap que o `nvidia-powercap.service` aplica), uma barra fina com a fração do limite usada (cor de aviso acima de **90%** do limite; o teto da placa, `power.max_limit`, aparece ao passar o mouse na barra), memória (MiB), uso (%), temperatura; linha `AER 00:1b.4 (corrigíveis): N`; "registros descartados: N" se o buffer do banco encheu. Se o driver não informa o limite, mostra só os W |
+| CPU / RAM | Logo abaixo das GPUs, no mesmo visual de cartões. **CPU**: uso total (%, pelo delta de `/proc/stat` entre duas amostras; a primeira amostra após a partida mostra `-`), frequência média (GHz) e temperatura do pacote (°C, hwmon `coretemp` "Package id 0", ou a zona térmica `x86_pkg_temp`). **Carga** 1/5/15 min. **RAM**: usada/total em GB, % e "Ollama: X GB" (soma do `VmRSS` dos processos de nome `ollama`). **Swap**: usado/total. Abaixo, **uma barra por thread** (T0..T11), agrupadas por núcleo físico ("Núcleo 0: T0 T6 · 45 °C"; o núcleo vem de `topology/core_id`, a temperatura de `coretemp` "Core N"). Rodapé: "potência da CPU: indisponível (só root)" quando o RAPL não é legível (no servidor, `/sys/class/powercap/intel-rapl*/energy_uj` é `root 0400`; o gateway roda como `mcpgw` e **não** abre essa permissão). Qualquer leitura que falhe vira `-` e um texto curto de erro no rodapé; o gateway nunca para por isso |
+| Modelos | Duas tabelas. **Carregados (VRAM)**, do `/api/ps` do Ollama: nome, VRAM em GB, GPU/CPU (`100% GPU`, ou o split `70%/30% CPU/GPU` calculado de `size_vram`/`size`), contexto, quando expira e se é permitido. **Disponíveis (instalados)**, do `/api/tags`: nome, tamanho, parâmetros, quantização, família e "permitido" sim/não (o mesmo critério do `--allowed-models`; sem a lista, tudo é permitido). A legenda lista os permitidos e explica que os nomes com o sufixo de `--think-suffix` são **virtuais**: `qwen3-ia-think` liga o raciocínio de `qwen3-ia`, e o gateway tira o sufixo. O gateway consulta o próprio Ollama (`--ollama`, loopback, direto, fora da fila) **a cada 5 s**, uma consulta de cada vez; a página só lê o cache, então abrir 30 painéis não gera nenhuma consulta a mais. Se o Ollama não responde, a lista fica vazia e o rodapé mostra um erro curto (`ps: ...` / `tags: ...`). Cada carga ou descarga de modelo vira um evento `modelo_carregado` / `modelo_descarregado` (a primeira leitura depois da partida não gera evento, e um erro de consulta não conta como descarga) |
 | Última hora | Três gráficos: pedidos na fila, vazão (pedidos/min), espera média (ms). **Ficam em memória**: reiniciar o gateway zera |
 | Concluídos recentes | Últimos 50 (qualquer status: `ok`, `erro`, `cancelado`, `rejeitado`, `expirado`...), com HTTP, espera, execução, tokens (prompt / gerados) e classe do erro |
 | Auditoria | Últimas 20 ações do administrador |
-| Eventos | Últimos 10: `gateway_inicio`, `gateway_config`, `gateway_parada`, `boot_novo`, `registros_descartados`, `teto_pedidos` |
+| Eventos | Últimos 10: `gateway_inicio`, `gateway_config`, `gateway_parada`, `boot_novo`, `registros_descartados`, `teto_pedidos`, `modelo_carregado`, `modelo_descarregado` |
 
 **Login do administrador:** usuário `admin` (um só) e a senha definida na instalação (seção 2.1, modo `Senha`).
 Sessão: cookie `HttpOnly; Secure; SameSite=Strict` de **8 horas**, no máximo 8 sessões ao mesmo tempo (a mais antiga cai).
@@ -485,7 +490,7 @@ diferentes) dá 403.
 | --- | --- | --- | --- |
 | GET | `/monitor` e `/monitor/` | — | A página HTML (CSP restritiva, `no-store`) |
 | GET | `/api/state` | — | Foto: `{now, version, boot_id, uptime_s, queue:{running[], waiting[], slots, in_use, totals}, gpu:{samples[], aer_corr_1b4, error?}, cards, recent[], events[], dropped, admin_enabled}` |
-| GET | `/api/stream` | — | SSE: a cada mudança (agrupadas em 150 ms) e a cada 2 s, uma linha `data: <o mesmo JSON de /state>`. 503 + `Retry-After: 5` acima de 4 por IP / 32 total |
+| GET | `/api/stream` | — | SSE: a cada mudança (agrupadas em 150 ms) e a cada `--gpu-interval` (1 s), uma linha `data: <o mesmo JSON de /state>`. 503 + `Retry-After: 5` acima de 4 por IP / 32 total |
 | GET | `/api/series` | — | `{every_s:5, points:[{t, waiting, running, finished, wait_avg_ms}]}`, até 720 pontos (1 h), só em memória |
 | GET | `/api/history` | `desde`, `ate` (RFC 3339 ou epoch em ms), `cliente` (rótulo exato), `modelo` (exato), `limite` (padrão 100, máx. 1000), `offset` | `{rows:[{id, client_ip, client_label, tool, endpoint, model, lane, priority_in, priority_final, bytes_in, enqueued_at, started_at, finished_at, wait_ms, run_ms, status, http_status, error_class, prompt_eval_count, eval_count, load_ms, boot_id, think}]}`, mais novo primeiro (tempos em epoch ms). 400 se a data é inválida |
 | GET | `/api/stats` | `janela=15m\|1h\|24h\|7d` (padrão `15m`) | `{window, total, ok, errors, by_status{}, by_class{}, wait_p50_ms, wait_p95_ms, run_p50_ms, run_p95_ms, per_minute, prompt_tokens, eval_tokens, tokens_per_sec, truncated}`. Cache de 5 s. 400 se a janela é outra |
@@ -527,7 +532,8 @@ assíncrona e em lote (nunca atrasa a fila); se o buffer de 4096 itens enche, o 
 | --- | --- |
 | `requests` | `id` (PK), `client_ip`, `client_label`, `tool`, `endpoint`, `model`, `lane`, `priority_in`, `priority_final`, `bytes_in`, `enqueued_at`, `started_at` (0 se nunca rodou), `finished_at`, `wait_ms`, `run_ms`, `status`, `http_status`, `error_class`, `prompt_eval_count`, `eval_count`, `load_ms`, `boot_id`, `think` |
 | `audit` | `id`, `ts`, `usuario`, `ip`, `acao`, `request_id`, `antes`, `depois`, `motivo` |
-| `gpu_samples` | `ts`, `gpu`, `bus_id`, `power_w`, `mem_used_mib`, `util_pct`, `temp_c`, `aer_corr_1b4`, `boot_id` |
+| `gpu_samples` | `ts`, `gpu`, `bus_id`, `power_w`, `mem_used_mib`, `util_pct`, `temp_c`, `aer_corr_1b4`, `boot_id`, `power_limit_w` (limite aplicado em W; `NULL` nas linhas antigas, gravadas antes do campo existir; -1 = o driver não informou) |
+| `cpu_samples` | `ts`, `util_pct`, `load1`, `load5`, `load15`, `ram_total_mib`, `ram_used_mib`, `ram_avail_mib`, `swap_used_mib`, `swap_total_mib`, `temp_c`, `freq_mhz`, `ollama_rss_mib`, `power_w`, `boot_id`, `threads_json` (índice em `ts`). -1 = não legível. `threads_json` é o detalhe por thread, curto: `{"t":[[id,uso_%,core_id],...],"c":[[core_id,temp_c],...]}` |
 | `events` | `ts`, `kind`, `detail` |
 | `meta` | `k`, `v` (`boot_id`, `last_prune`, `last_vacuum`) |
 
@@ -541,9 +547,11 @@ rejeitados `fila cheia` ou `limite de pedidos em espera deste cliente`. `think`:
 | Dado | Regra |
 | --- | --- |
 | `requests` | 90 dias (`--retention-requests`) **e** teto de 3.000.000 linhas (`--max-request-rows`), as mais antigas saem primeiro (evento `teto_pedidos`) |
-| `gpu_samples` | 7 dias (`--retention-gpu`) |
+| `gpu_samples` e `cpu_samples` | 7 dias (`--retention-gpu`); gravam 1 linha a cada `--sample-store-interval` (5 s), não a cada coleta |
 | `audit` e `events` | **nunca expiram** |
 | `VACUUM` | semanal |
+
+**Migração:** ao abrir um banco antigo, o gateway cria `cpu_samples` e acrescenta `gpu_samples.power_limit_w` (`ALTER TABLE ... ADD COLUMN`), cada passo só se faltar; abrir de novo não muda nada, e os dados existentes ficam intactos. Para voltar a um binário antigo basta ignorar a tabela e a coluna novas (o binário antigo não as lê).
 
 **Garantia de privacidade:** o banco guarda **só metadados**. Não existe coluna para prompt, documento, resposta ou token.
 O corpo é lido para aplicar as políticas, mas só contadores numéricos (do **último** pedaço da resposta) são mantidos; o
@@ -573,6 +581,10 @@ Q "select datetime(ts/1000,'unixepoch','localtime') quando, usuario, ip, acao, s
 Q "select datetime(ts/1000,'unixepoch','localtime') quando, kind, detail from events order by ts desc limit 20;"
 # GPU na última hora: pico de potência e temperatura por placa
 Q "select gpu, max(power_w) pico_w, max(temp_c) temp_max, max(aer_corr_1b4) aer from gpu_samples where ts > (strftime('%s','now')-3600)*1000 group by gpu;"
+# Potência x limite aplicado por placa na última hora (limite NULL/-1 = não informado)
+Q "select gpu, round(max(power_w),1) pico_w, max(power_limit_w) limite_w from gpu_samples where ts > (strftime('%s','now')-3600)*1000 group by gpu;"
+# CPU/RAM na última hora: pico de uso, temperatura, RAM e RAM do Ollama
+Q "select round(max(util_pct),1) cpu_pico, round(max(temp_c),1) temp_max, max(ram_used_mib) ram_pico_mib, max(ollama_rss_mib) ollama_mib from cpu_samples where ts > (strftime('%s','now')-3600)*1000;"
 # Tamanho e esquema (prova de que não há coluna de texto de conteúdo)
 ls -lh /var/lib/mcpollama-gateway/; sqlite3 -readonly "$DB" .schema
 ```
@@ -767,7 +779,7 @@ cotas/limites da fila.
 | Flags e padrões | `E:\MCPOllam\src\cmd\mcpollama-gateway\config.go`, `main.go` |
 | Fila, proxy, políticas | `E:\MCPOllam\src\gateway\queue\queue.go`, `proxy\proxy.go`, `proxy\policy.go` |
 | Monitor, página, login | `E:\MCPOllam\src\gateway\monitor\monitor.go`, `admin.go`, `index.html` |
-| Banco e GPU | `E:\MCPOllam\src\gateway\store\store.go`, `gpu\gpu.go` |
+| Banco e GPU | `E:\MCPOllam\src\gateway\store\store.go`, `gpu\gpu.go`, `cpu\cpu.go` |
 | Plano (decisões D9-*, changelog, §11) | `E:\MCPOllam\.workspace\plans\MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md` |
 | Revisão adversarial | `E:\MCPOllam\.workspace\reports\MCPOllam2026-10-28-235633-revisao-adversarial-fase9.report.md` |
 | Contexto do servidor | `E:\MCPOllam\CLAUDE.md`; `D:\Users\claiton.linhares\.ssh\.workspace\Backup\ia\CONEXAO-IA.md` |

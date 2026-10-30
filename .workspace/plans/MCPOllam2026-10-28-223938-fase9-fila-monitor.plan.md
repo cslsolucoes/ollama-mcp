@@ -808,3 +808,46 @@ Executada com a produção em horário combinado, **uma coisa por vez**, monitor
     1. Atualizar o `cloudflared` (2026.10.3 → 2026.10.6).
     2. O owner verificar o app de IA na TV LG.
     3. Endurecimento opcional do nginx: responder 403 antes do 401 para quem está fora da LAN e do Cloudflare.
+- 2026-10-30 14:22 — **Quadro CPU/RAM no /monitor** (+ acréscimos do owner das 14:00, 14:02, 14:10 e 14:14), loop de implementação. Sem commit; servidor, SSH, `D:\MCP`, `deploy/` (exceto `MANUAL.md`), `files`, `doctext` e `ocr` não foram tocados.
+  - **Estado:** código e testes concluídos; **não implantado** (decisão do owner/loop principal).
+  - **O que foi feito**
+    1. **Pacote novo `src/gateway/cpu/cpu.go`** (em vez de dentro de `gpu`: a fonte é outra, procfs/sysfs sem comando externo, e a amostra é uma linha por instante, não uma por placa; o formato do laço copia o do `gpu`). Lê:
+       - CPU % total e **por thread** (cada linha `cpuN` de `/proc/stat`, delta entre amostras; idle = idle + iowait; só os 8 primeiros campos, porque guest já está dentro de user);
+       - mapa thread→núcleo (`/sys/devices/system/cpu/cpuN/topology/core_id`) e temperatura por núcleo (`coretemp` "Core N");
+       - load 1/5/15; RAM (total, disponível, usada = total − MemAvailable); swap; temperatura do pacote (`coretemp` "Package id 0", senão `temp1`, senão `thermal_zone*` com type `x86_pkg_temp`); frequência média (`cpuinfo`, senão `scaling_cur_freq`); soma do `VmRSS` dos processos com comm `ollama`; potência pelo RAPL (`intel-rapl:N`, sem sub-domínios; trata a volta do contador).
+       - Tudo que não puder ser lido vale -1; erro curto (≤ 200 caracteres, uma linha) vai para o state; erro só é logado quando o texto muda (a 1 s, um erro permanente encheria o journal); RAPL ilegível é o caso normal e **não** gera erro. Leituras limitadas a 1 MiB, no máximo 20.000 entradas de `/proc` e 1.024 threads.
+    2. **Flags:** `--proc-root`/`MCPGW_PROC_ROOT` (`/proc`), `--sys-root`/`MCPGW_SYS_ROOT` (`/sys`), `--sample-store-interval`/`MCPGW_SAMPLE_STORE_INTERVAL` (5 s; validação: > 0 e >= `--gpu-interval`). **`--gpu-interval` passou de 5 s para 1 s** e vale para GPU e CPU (0 desliga os dois).
+    3. **Store:** tabela `cpu_samples` (as 15 colunas pedidas + `threads_json` TEXT com `{"t":[[id,uso,core],...],"c":[[core,temp],...]}`) e índice em `ts`; `gpu_samples.power_limit_w`. Migração idempotente: a tabela vem do `CREATE TABLE IF NOT EXISTS`; `migrate()` acrescenta `threads_json` (tabela feita sem ele) e `power_limit_w` só se faltarem; linhas antigas ficam `NULL` e `GPUSince` lê como -1. Retenção de `cpu_samples` = `--retention-gpu`, dentro do `Prune` existente (assinatura mantida). Mesmo gravador assíncrono (`Store.CPU`, `CPUSince`).
+    4. **Gravação desacoplada:** o state ao vivo recebe toda amostra (1 s); o SQLite só 1 a cada `--sample-store-interval`, com tolerância de meio tick contra jitter (função `due` em `main.go`, um relógio por coletor). Isso evita 4 linhas/s de GPU + 1 de CPU.
+    5. **SSE e polling:** `Config.StreamEvery` no monitor (padrão 1 s; o `main` usa o `--gpu-interval`, ou 2 s com a coleta desligada) no lugar do `2 * time.Second` fixo; envio imediato nas mudanças e debounce de 150 ms intactos. Polling de reserva da página: 2000 → 1000 ms.
+    6. **Coletores sem empilhar:** os dois `RunLoop` (gpu e cpu) já eram sequenciais por construção; agora, se uma rodada dura ≥ o intervalo, o tick acumulado no canal é descartado (a próxima começa um intervalo depois do fim, não colada).
+    7. **GPU, limite de potência:** consulta do `nvidia-smi` ganhou `enforced.power.limit,power.max_limit`; campos `power_limit_w` e `power_max_w` na amostra (-1 se a coluna não vier ou for N/A; `ParseCSV` aceita 6 ou 8 colunas, rejeita as demais). Se o driver recusar a consulta, cai para `power.limit` e depois para a consulta antiga, **e lembra o nível que funcionou** (um custo extra só na primeira rodada).
+    8. **Pacote novo `src/gateway/models`:** consulta o próprio Ollama (`GET /api/ps` e `/api/tags`, direto, fora da fila) a cada 5 s, uma rodada por vez, timeout de 3 s, resposta limitada a 4 MiB, só GET. O state recebe sempre o **cache** (`Latest()`), então N leituras do state = 0 consultas; o coletor faz 2 por janela. Calcula `processor` ("100% GPU", "100% CPU" ou "70%/30% CPU/GPU") de `size_vram`/`size`, marca "permitido" pela mesma regra do proxy (`:latest` ignorado; sem lista = tudo), e expõe `allowed`, `allow_all` e `think_suffix`. Erro de uma consulta deixa aquela lista vazia, com `ps: ...`/`tags: ...` curto. Evento `modelo_carregado`/`modelo_descarregado` quando o conjunto de carregados muda (a 1ª leitura é só a base; um erro em `/api/ps` não conta como descarga).
+    9. **Monitor:** `state.cpu` (última amostra, com `threads` e `cores`), `state.models`. Página: quadro **CPU / RAM** logo abaixo de GPUs (cartões `card gpu` de CPU, Carga, RAM+Ollama, Swap; uma barra por thread agrupada por núcleo físico, "Núcleo 0: T0 T6 · 45 °C", título da barra com o núcleo; rodapé "potência da CPU: indisponível (só root)"); cartão de GPU com "71 W / 100 W", barra fina e cor de aviso acima de 90% do limite (teto da placa no `title`); quadro **Modelos** (Carregados e Disponíveis, pela função `table()`, com a legenda do sufixo `-think`). Só `textContent` e `style.width` por atribuição em JS; CSS só dentro do `<style>` existente; `index.html` em LF (0 CR).
+  - **O que deu certo**
+    - O desenho "coletor + OnSample → Store.X" do `gpu` se repetiu sem atrito para CPU e modelos; o CSP (`csp_newline_test.go` e testes de hash) continuou verde sem mexer no cálculo.
+    - Os 29 VEC da 9.5 seguem OK com todo o código novo.
+  - **O que não deu certo e a solução**
+    1. Heredocs longos no Bash da ferramenta falharam duas vezes ("unexpected EOF"). Solução: scripts Python e arquivos gravados com a ferramenta Write, no scratchpad.
+    2. `columns` (helper novo no store) colidiu com o helper de mesmo nome em `think_test.go`. Renomeado para `tableColumns`.
+    3. Os testes de RAPL usam diretórios `intel-rapl:0`, e o `:` é inválido no Windows (`mkdir` falhou). **Esses 2 testes ficam `Skip` no Windows** e só rodam em Linux (ver pendência 1).
+    4. Dois erros de expectativa meus nos testes, ambos do teste e não do código: a reabertura do banco mantém as linhas (esperava 1, eram 2), e 6.600.000.000 B = 6.294 MiB (esperava 6.293).
+  - **Custo de uma coleta (fake, nesta máquina Windows; no servidor o loop principal mede depois)**
+    - CPU, árvore `/proc`+`/sys` falsa (12 threads): **2,3–2,5 ms** por rodada (200 rodadas).
+    - GPU, `exec` real de um nvidia-smi falso (o próprio binário de teste, que só imprime): **~12 ms** por rodada. É principalmente a criação do processo no Windows; o `nvidia-smi` real, falando com 4 placas, deve custar bem mais e é o número a medir no servidor.
+    - Teste do `nvidia-smi` lento (150 ms, intervalo 40 ms, 700 ms): no máximo **1 execução em andamento**, 2–5 chamadas (nunca coladas). O mesmo vale para o coletor de modelos (Ollama lento: 1 consulta em andamento).
+  - **Gate (dentro de `src/`, na ordem final, depois da última alteração)**
+    - `go build ./...` e `go vet ./...`: exit 0. `gofmt -l .`: vazio.
+    - `go test -count=1 ./...`: **17 pacotes `ok`**, 1 sem testes (`mcp`); gateway: cmd 0,7 s, cpu 1,4 s, gpu 1,1 s, models 1,4 s, monitor 1,7 s, proxy 1,9 s, queue 1,9 s, store 1,1 s.
+    - race (`gateway/...` + `cmd/mcpollama-gateway`): **7 pacotes `ok`**, cmd 7,1 s, gpu 14,3 s, store 4,0 s, monitor 4,4 s.
+    - build Linux (`GOOS=linux CGO_ENABLED=0`): exit 0. CR no `index.html`: **0**.
+  - **Ataques da 9.5** (`…fase9.testes`, método do report §3; arquivos copiados para os pacotes, rodados com `-v` e removidos): **29 VEC, 29 OK**, 0 FAIL, nenhum arquivo de ataque restou em `src` (conferido por `git status`). Rodados 3 vezes ao longo da tarefa, a última depois de todo o código.
+  - **Arquivos**
+    - Novos: `src/gateway/cpu/{cpu.go,cpu_test.go}`, `src/gateway/models/{models.go,models_test.go}`, `src/gateway/gpu/limit_test.go`, `src/gateway/store/{cpu_test.go,gpulimit_test.go}`, `src/gateway/monitor/{cpu_test.go,models_test.go}`, `src/cmd/mcpollama-gateway/cpu_config_test.go`.
+    - Alterados: `src/gateway/gpu/{gpu.go,gpu_test.go}`, `src/gateway/store/store.go`, `src/gateway/monitor/{monitor.go,index.html}`, `src/cmd/mcpollama-gateway/{config.go,main.go,main_test.go}`, `deploy/fase9-gateway/MANUAL.md` (seções 3, 6 e 8).
+  - **Pendências**
+    1. Rodar `go test ./gateway/cpu` **em Linux** (ou no servidor) para exercitar os 2 testes de RAPL, hoje `Skip` no Windows.
+    2. Implantar e conferir no servidor: o `--gpu-interval 1s` na unit; o custo real do `nvidia-smi` a cada 1 s com 4 placas (se passar de ~300 ms, subir o intervalo); se o `coretemp` e o `core_id` dão os 6 núcleos e os 12 threads esperados; o `enforced.power.limit` mostrando 100 W; `mcpgw` lendo `/proc/<pid>/status` do `ollama` (se houver `hidepid`, o RSS fica -1).
+    3. Conferir no navegador do owner a aparência dos quadros novos (a página só foi verificada por testes de conteúdo e CSP, não renderizada).
+    4. Com o SSE a 1 s, cada painel aberto serializa o state a cada segundo (até 32 painéis); observar a CPU do gateway.
+    5. `power_max_w` só aparece ao vivo (no `title` da barra); não é gravado.

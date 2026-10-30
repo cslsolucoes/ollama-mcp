@@ -30,6 +30,19 @@ button.danger{color:var(--bad)}
 input{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:3px 6px}
 .gpus{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .gpu b{font-size:16px}
+.threads{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:10px}
+.core{border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.core .l{margin-bottom:4px}
+.tbar{display:flex;align-items:center;gap:6px;font-size:12px}
+.tbar .name{width:26px;color:var(--mut)}
+.tbar .track{flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.tbar .fill{display:block;height:100%;background:var(--chart)}
+.tbar .pct{width:42px;text-align:right}
+.sub{margin:12px 0 4px}
+.pbar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:4px 0}
+.pbar span{display:block;height:100%;background:var(--chart)}
+.pbar.hot span{background:var(--warn)}
+.gpu b.hot{color:var(--warn)}
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
 svg{width:100%;height:90px;background:transparent}
 svg .grid{stroke:var(--line);stroke-width:1}
@@ -55,6 +68,12 @@ svg text{fill:var(--mut);font-size:9px}
   <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div></section>
   <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div></section>
   <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
+  <section><h2>CPU / RAM</h2><div class="gpus" id="cpucards"></div><div class="threads" id="cputhreads"></div><div id="cpumeta" class="empty"></div></section>
+  <section><h2>Modelos</h2>
+    <div class="l">Carregados (VRAM)</div><div class="wrap"><table id="mloaded"></table></div>
+    <div class="l sub">Disponíveis (instalados)</div><div class="wrap"><table id="minstalled"></table></div>
+    <div id="mmeta" class="empty"></div>
+  </section>
   <section><h2>Última hora</h2><div class="charts" id="charts"></div></section>
   <section>
     <div class="tabs" role="tablist" aria-label="Histórico">
@@ -171,13 +190,84 @@ function render(s) {
     gs.samples.forEach(function (x) {
       var d = el("div", null, "card gpu");
       d.appendChild(el("div", "GPU " + x.index + " · " + x.bus_id, "l"));
-      d.appendChild(el("b", Number(x.power_w).toFixed(0) + " W"));
+      var lim = Number(x.power_limit_w), use = Number(x.power_w), hot = lim > 0 && use > lim * 0.9;
+      d.appendChild(el("b", Number(x.power_w).toFixed(0) + " W" + (lim > 0 ? " / " + lim.toFixed(0) + " W" : ""), hot ? "hot" : ""));
+      if (lim > 0) {
+        var bar = el("div", null, hot ? "pbar hot" : "pbar"), fillP = el("span");
+        fillP.style.width = Math.min(100, use / lim * 100).toFixed(0) + "%"; // JS assignment: allowed by the CSP
+        bar.appendChild(fillP); d.appendChild(bar);
+        bar.title = "uso do limite de potência: " + (use / lim * 100).toFixed(0) + "%" + (x.power_max_w > 0 ? " (teto da placa: " + Number(x.power_max_w).toFixed(0) + " W)" : "");
+      }
       d.appendChild(el("div", x.mem_used_mib + " MiB · " + x.util_pct + "% · " + x.temp_c + " °C"));
       g.appendChild(d);
     });
   }
+  renderCPU(s.cpu);
+  renderModels(s.models);
   var aer = gs ? (gs.aer_corr_1b4 >= 0 ? "AER 00:1b.4 (corrigíveis): " + gs.aer_corr_1b4 : "AER 00:1b.4: indisponível") : "GPU: coletor desligado";
   meta.textContent = aer + (gs && gs.error ? " · " + gs.error : "") + (s.dropped ? " · registros descartados: " + s.dropped : "");
+}
+
+// Value helpers for the CPU / RAM board: -1 means "not readable".
+function pct1(v) { return v >= 0 ? Number(v).toFixed(1).replace(".", ",") + "%" : "-"; }
+function num1(v) { return Number(v).toFixed(1).replace(".", ","); }
+function gb(mib) { return mib >= 0 ? num1(mib / 1024) : "-"; }
+function renderCPU(c) {
+  var box = $("cpucards"), th = $("cputhreads"), meta = $("cpumeta");
+  box.textContent = ""; th.textContent = "";
+  if (!c) { meta.textContent = "CPU/RAM: coletor desligado"; return; }
+  function card(label, value, sub) {
+    var d = el("div", null, "card gpu");
+    d.appendChild(el("div", label, "l")); d.appendChild(el("b", value)); d.appendChild(el("div", sub));
+    box.appendChild(d);
+  }
+  card("CPU", pct1(c.util_pct), (c.freq_mhz >= 0 ? num1(c.freq_mhz / 1000) + " GHz" : "- GHz") + " · " + (c.temp_c >= 0 ? Math.round(c.temp_c) + " °C" : "- °C"));
+  card("Carga 1/5/15 min", c.load1 >= 0 ? num1(c.load1) + " · " + num1(c.load5) + " · " + num1(c.load15) : "-", "");
+  var ramPct = c.ram_total_mib > 0 && c.ram_used_mib >= 0 ? Math.round(c.ram_used_mib * 100 / c.ram_total_mib) + "%" : "-";
+  card("RAM", gb(c.ram_used_mib) + " / " + gb(c.ram_total_mib) + " GB", ramPct + " · Ollama: " + (c.ollama_rss_mib >= 0 ? gb(c.ollama_rss_mib) + " GB" : "-"));
+  card("Swap", c.swap_total_mib > 0 ? gb(c.swap_used_mib) + " / " + gb(c.swap_total_mib) + " GB" : (c.swap_total_mib === 0 ? "sem swap" : "-"), "");
+
+  // One bar per logical CPU, grouped by physical core.
+  var temps = {}; (c.cores || []).forEach(function (x) { temps[x.core_id] = x.temp_c; });
+  var groups = {}, order = [];
+  (c.threads || []).forEach(function (t) { var k = t.core_id; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(t); });
+  order.sort(function (a, b) { return a - b; });
+  order.forEach(function (k) {
+    var ts = groups[k], names = ts.map(function (t) { return "T" + t.id; }).join(" ");
+    var tc = temps[k] >= 0 ? " · " + Math.round(temps[k]) + " °C" : "";
+    var d = el("div", null, "core");
+    d.appendChild(el("div", (k >= 0 ? "Núcleo " + k : "Núcleo ?") + ": " + names + tc, "l"));
+    ts.forEach(function (t) {
+      var r = el("div", null, "tbar"); r.title = "T" + t.id + " · núcleo físico " + (k >= 0 ? k : "desconhecido");
+      r.appendChild(el("span", "T" + t.id, "name"));
+      var track = el("span", null, "track"), fill = el("span", null, "fill");
+      fill.style.width = (t.util_pct >= 0 ? Math.min(100, t.util_pct) : 0) + "%"; // JS assignment: allowed by the CSP
+      track.appendChild(fill); r.appendChild(track); r.appendChild(el("span", pct1(t.util_pct), "pct"));
+      d.appendChild(r);
+    });
+    th.appendChild(d);
+  });
+  meta.textContent = (c.power_w >= 0 ? "potência da CPU: " + num1(c.power_w) + " W" : "potência da CPU: indisponível (só root)") + (c.error ? " · " + c.error : "");
+}
+
+function yesNo(b) { return { text: b ? "sim" : "não", cls: b ? "ok" : "alta" }; }
+function renderModels(m) {
+  if (!m) {
+    table("mloaded", [], [], ""); table("minstalled", [], [], "");
+    $("mmeta").textContent = "Modelos: coletor desligado"; return;
+  }
+  var loaded = (m.loaded || []).map(function (x) {
+    return [x.name, gb(x.size_vram_mib) + " GB", x.processor, x.context_length, x.expires_at ? new Date(x.expires_at).toLocaleString("pt-BR") : "", yesNo(x.allowed)];
+  });
+  table("mloaded", ["Modelo", "VRAM", "GPU/CPU", "Contexto", "Expira", "Permitido"], loaded, "Nenhum modelo carregado.");
+  var inst = (m.installed || []).map(function (x) {
+    return [x.name, gb(x.size_mib) + " GB", x.parameter_size, x.quantization, x.family, yesNo(x.allowed)];
+  });
+  table("minstalled", ["Modelo", "Tamanho", "Parâmetros", "Quantização", "Família", "Permitido"], inst, "Nenhum modelo instalado (ou a consulta ao Ollama falhou).");
+  var base = (m.allowed && m.allowed[0]) || "modelo", sfx = m.think_suffix || "";
+  var legend = m.allow_all ? "Todos os modelos instalados são permitidos." : "Permitidos: " + (m.allowed || []).join(", ") + ".";
+  if (sfx) legend += " Nomes terminados em “" + sfx + "” são virtuais: " + base + sfx + " liga o raciocínio de " + base + " (o gateway tira o sufixo).";
+  $("mmeta").textContent = legend + (m.error ? " · " + m.error : "");
 }
 
 function chart(title, pts, key, fmt) {
@@ -238,7 +328,7 @@ function connect() {
   es.onmessage = function (e) { try { render(JSON.parse(e.data)); } catch (x) {} stopPolling(); };
   es.onerror = function () { startPolling(); };
 }
-function startPolling() { if (!pollTimer) { poll(); pollTimer = setInterval(poll, 2000); } }
+function startPolling() { if (!pollTimer) { poll(); pollTimer = setInterval(poll, 1000); } }
 function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
 // Tabs for "Concluídos recentes" / "Eventos"; the chosen tab is remembered per browser.
