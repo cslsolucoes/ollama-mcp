@@ -47,8 +47,8 @@ func (j *Journal) Enqueued(rec queue.Record, prompt string) {
 
 // Started marks the job as running, durably.
 func (j *Journal) Started(id string, at time.Time, backend string) {
-	if j.Backend != "" {
-		backend = j.Backend
+	if backend == "" {
+		backend = j.Backend // the ticket names the backend; this is the default
 	}
 	if err := j.Store.JobStarted(id, at, backend); err != nil {
 		j.logf("joblog: início de %s: %v", id, err)

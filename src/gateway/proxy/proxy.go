@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 )
 
@@ -81,8 +82,14 @@ type Config struct {
 	// Journal, when set, receives the full prompt and the answer of every queued
 	// job (Fase 10.L); nil disables the job log in the proxy.
 	Journal Journal
-	// Backend names where the jobs run, for the log ("gpu-local" by default).
+	// Backend names where the jobs run, for the log when the ticket names none
+	// ("gpu-local" by default).
 	Backend string
+	// Pool, when set, resolves the backend a ticket was given to (Fase 10.4):
+	// requests given to a secondary go to its URL, over its own TLS policy and
+	// with its own bearer token. The client's Authorization header is never
+	// forwarded to any backend. nil means the single Upstream.
+	Pool *pool.Pool
 
 	Logf func(format string, args ...any)
 }
@@ -130,6 +137,7 @@ type exchange struct {
 	status  int
 	body    *countingBody
 	proxyEr error
+	backend *pool.Backend // nil: the primary (Upstream)
 	runCtx  context.Context
 	tee     *respTee // nil without a journal
 }
@@ -157,13 +165,23 @@ func New(cfg Config) (*Handler, error) {
 	tr.MaxIdleConnsPerHost = 16
 	h.proxy = &httputil.ReverseProxy{
 		FlushInterval: -1,
-		Transport:     tr,
+		Transport:     backendTransport{def: tr},
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(cfg.Upstream)
-			pr.Out.Host = cfg.Upstream.Host
+			target := cfg.Upstream
+			var sec *pool.Backend
+			if ex, _ := pr.In.Context().Value(ctxKey{}).(*exchange); ex != nil && ex.backend != nil {
+				sec = ex.backend
+				target = sec.URL
+			}
+			pr.SetURL(target)
+			pr.Out.Host = target.Host
 			for _, k := range []string{"X-Real-Ip", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
 				"Authorization", "Cookie", HeaderClient, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID} {
 				pr.Out.Header.Del(k)
+			}
+			// The only credential that reaches a backend is its own.
+			if sec != nil && sec.Token() != "" {
+				pr.Out.Header.Set("Authorization", "Bearer "+sec.Token())
 			}
 		},
 		ModifyResponse: func(resp *http.Response) error {
@@ -198,6 +216,28 @@ func New(cfg Config) (*Handler, error) {
 		ErrorLog: log.New(io.Discard, "", 0),
 	}
 	return h, nil
+}
+
+// backendTransport sends a request through the transport of the backend it was
+// given to (its TLS policy) and everything else through the default one.
+type backendTransport struct{ def http.RoundTripper }
+
+func (t backendTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if ex, _ := r.Context().Value(ctxKey{}).(*exchange); ex != nil && ex.backend != nil && ex.backend.Transport != nil {
+		return ex.backend.Transport.RoundTrip(r)
+	}
+	return t.def.RoundTrip(r)
+}
+
+// backendOf resolves the backend of a started ticket: nil for the primary.
+func (h *Handler) backendOf(tk *queue.Ticket) *pool.Backend {
+	if h.cfg.Pool == nil {
+		return nil
+	}
+	if b := h.cfg.Pool.Backend(tk.Backend()); b != nil && !b.Primary {
+		return b
+	}
+	return nil
 }
 
 func (h *Handler) logf(format string, a ...any) {
@@ -370,10 +410,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runCtx, cancelRun := context.WithTimeoutCause(tk.Ctx, h.cfg.RunTimeout, ErrRunTimeout)
-	ex := &exchange{runCtx: runCtx}
+	ex := &exchange{runCtx: runCtx, backend: h.backendOf(tk)}
 	if jr != nil {
 		// Write-ahead: the "em_execucao" row is on disk before the Ollama hears of the job.
-		jr.Started(tk.ID, tk.StartedAt(), h.cfg.Backend)
+		bname := tk.Backend()
+		if bname == "" {
+			bname = h.cfg.Backend
+		}
+		jr.Started(tk.ID, tk.StartedAt(), bname)
 		if sink := jr.Response(tk.ID); sink != nil {
 			ex.tee = newRespTee(routeKinds[path], sink)
 		}

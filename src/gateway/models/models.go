@@ -31,6 +31,7 @@ type Loaded struct {
 	ContextLength int    `json:"context_length"`
 	ExpiresAt     string `json:"expires_at"`
 	Allowed       bool   `json:"allowed"`
+	Digest        string `json:"digest"`
 }
 
 // Installed is a model on the Ollama disk (/api/tags).
@@ -42,6 +43,7 @@ type Installed struct {
 	Family        string `json:"family"`
 	ModifiedAt    string `json:"modified_at"`
 	Allowed       bool   `json:"allowed"`
+	Digest        string `json:"digest"` // what the pool compares across backends (Fase 10.4, F4)
 }
 
 // Snapshot is the latest reading. A list whose query failed is empty and the
@@ -131,6 +133,7 @@ type psAnswer struct {
 		SizeVRAM      int64   `json:"size_vram"`
 		ContextLength int     `json:"context_length"`
 		ExpiresAt     string  `json:"expires_at"`
+		Digest        string  `json:"digest"`
 		Details       details `json:"details"`
 	} `json:"models"`
 }
@@ -141,6 +144,7 @@ type tagsAnswer struct {
 		Model      string  `json:"model"`
 		Size       int64   `json:"size"`
 		ModifiedAt string  `json:"modified_at"`
+		Digest     string  `json:"digest"`
 		Details    details `json:"details"`
 	} `json:"models"`
 }
@@ -165,6 +169,13 @@ func mib(b int64) int64 {
 		return 0
 	}
 	return b >> 20
+}
+
+// Get does one GET of the Ollama (any path, JSON answer into `into`) with the
+// collector's client. The pool uses it for /api/version.
+func (c *Collector) Get(ctx context.Context, path string, into any) error {
+	c.defaults()
+	return c.get(ctx, path, into)
 }
 
 func (c *Collector) get(ctx context.Context, path string, into any) error {
@@ -226,7 +237,7 @@ func (c *Collector) Once(ctx context.Context) Snapshot {
 			snap.Loaded = append(snap.Loaded, Loaded{
 				Name: name, SizeVRAMMiB: mib(m.SizeVRAM), SizeMiB: mib(m.Size),
 				Processor: Processor(m.Size, m.SizeVRAM), ContextLength: m.ContextLength,
-				ExpiresAt: m.ExpiresAt, Allowed: IsAllowed(c.Allowed, name),
+				ExpiresAt: m.ExpiresAt, Allowed: IsAllowed(c.Allowed, name), Digest: m.Digest,
 			})
 		}
 	}
@@ -242,7 +253,7 @@ func (c *Collector) Once(ctx context.Context) Snapshot {
 			snap.Installed = append(snap.Installed, Installed{
 				Name: name, SizeMiB: mib(m.Size), ParameterSize: m.Details.ParameterSize,
 				Quantization: m.Details.Quantization, Family: m.Details.Family,
-				ModifiedAt: m.ModifiedAt, Allowed: IsAllowed(c.Allowed, name),
+				ModifiedAt: m.ModifiedAt, Allowed: IsAllowed(c.Allowed, name), Digest: m.Digest,
 			})
 		}
 	}

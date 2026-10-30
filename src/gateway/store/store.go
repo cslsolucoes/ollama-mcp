@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS requests(
   wait_ms INTEGER, run_ms INTEGER,
   status TEXT, http_status INTEGER, error_class TEXT,
   prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT, think TEXT,
-  responded INTEGER, resp_bytes INTEGER, backend TEXT);
+  responded INTEGER, resp_bytes INTEGER, backend TEXT, failover_rule TEXT);
 CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, ts INTEGER, usuario TEXT, ip TEXT, acao TEXT, request_id TEXT,
   antes TEXT, depois TEXT, motivo TEXT);
@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS cpu_samples(
   ram_total_mib INTEGER, ram_used_mib INTEGER, ram_avail_mib INTEGER,
   swap_used_mib INTEGER, swap_total_mib INTEGER, temp_c REAL, freq_mhz REAL,
   ollama_rss_mib INTEGER, power_w REAL, boot_id TEXT, threads_json TEXT);
+CREATE TABLE IF NOT EXISTS backend_samples(
+  ts INTEGER, backend_id TEXT, estado TEXT, slots_usados INTEGER, fila INTEGER, p50_ms INTEGER);
 CREATE TABLE IF NOT EXISTS events(ts INTEGER, kind TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
 CREATE INDEX IF NOT EXISTS idx_requests_enq ON requests(enqueued_at);
@@ -68,6 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_jgs_job ON job_gpu_samples(job_id, ts);
 CREATE INDEX IF NOT EXISTS idx_jgs_ts ON job_gpu_samples(ts);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
 CREATE INDEX IF NOT EXISTS idx_cpu_ts ON cpu_samples(ts);
+CREATE INDEX IF NOT EXISTS idx_backend_ts ON backend_samples(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
 `
@@ -125,17 +128,19 @@ const (
 	kRecord itemKind = iota
 	kGPU
 	kCPU
+	kBackend
 	kEvent
 	kBarrier
 )
 
 type item struct {
-	kind itemKind
-	rec  queue.Record
-	gpu  []GPURow
-	cpu  CPURow
-	ev   Event
-	done chan struct{}
+	kind     itemKind
+	rec      queue.Record
+	gpu      []GPURow
+	cpu      CPURow
+	backends []BackendRow
+	ev       Event
+	done     chan struct{}
 }
 
 // GPURow is one GPU sample as stored.
@@ -288,6 +293,9 @@ func migrate(db *sql.DB) error {
 		{"responded", `ALTER TABLE requests ADD COLUMN responded INTEGER`},
 		{"resp_bytes", `ALTER TABLE requests ADD COLUMN resp_bytes INTEGER`},
 		{"backend", `ALTER TABLE requests ADD COLUMN backend TEXT`},
+		// Fase 10.4: the rule that sent a job away from the primary. Idempotent: the
+		// column is added only when missing, so a second start changes nothing.
+		{"failover_rule", `ALTER TABLE requests ADD COLUMN failover_rule TEXT`},
 	} {
 		if !have[c.name] {
 			if _, err := db.Exec(c.ddl); err != nil {
@@ -497,6 +505,14 @@ func (s *Store) writeBatch(batch []item) int {
 			_, err = tx.Exec(`INSERT INTO cpu_samples(ts,util_pct,load1,load5,load15,ram_total_mib,ram_used_mib,ram_avail_mib,swap_used_mib,swap_total_mib,temp_c,freq_mhz,ollama_rss_mib,power_w,boot_id,threads_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 				c.TS.UnixMilli(), c.UtilPct, c.Load1, c.Load5, c.Load15, c.RAMTotalMiB, c.RAMUsedMiB, c.RAMAvailMiB,
 				c.SwapUsedMiB, c.SwapTotalMiB, c.TempC, c.FreqMHz, c.OllamaRSSMiB, c.PowerW, s.opts.BootID, c.Threads)
+		case kBackend:
+			for _, b := range it.backends {
+				_, err = tx.Exec(`INSERT INTO backend_samples(ts,backend_id,estado,slots_usados,fila,p50_ms) VALUES(?,?,?,?,?,?)`,
+					b.TS.UnixMilli(), b.BackendID, b.State, b.SlotsUsed, b.Queue, b.P50MS)
+				if err != nil {
+					break
+				}
+			}
 		case kEvent:
 			_, err = tx.Exec(`INSERT INTO events(ts,kind,detail) VALUES(?,?,?)`, it.ev.TS.UnixMilli(), it.ev.Kind, it.ev.Detail)
 		}
@@ -537,8 +553,8 @@ func ms(t time.Time) int64 {
 // keeps the rowid (the row cap relies on it) and the backend written at the
 // start. INSERT OR REPLACE would drop both.
 const upsertRecordSQL = `INSERT INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''))
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''))
 		ON CONFLICT(id) DO UPDATE SET client_ip=excluded.client_ip, client_label=excluded.client_label, tool=excluded.tool,
 		endpoint=excluded.endpoint, model=excluded.model, lane=excluded.lane, priority_in=excluded.priority_in,
 		priority_final=excluded.priority_final, bytes_in=excluded.bytes_in, enqueued_at=excluded.enqueued_at,
@@ -546,12 +562,13 @@ const upsertRecordSQL = `INSERT INTO requests(id,client_ip,client_label,tool,end
 		status=excluded.status, http_status=excluded.http_status, error_class=excluded.error_class,
 		prompt_eval_count=excluded.prompt_eval_count, eval_count=excluded.eval_count, load_ms=excluded.load_ms,
 		boot_id=excluded.boot_id, think=excluded.think, responded=excluded.responded, resp_bytes=excluded.resp_bytes,
-		backend=COALESCE(excluded.backend, requests.backend)`
+		backend=COALESCE(excluded.backend, requests.backend),
+		failover_rule=COALESCE(excluded.failover_rule, requests.failover_rule)`
 
 func (s *Store) recordArgs(r queue.Record) []any {
 	return []any{r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
 		ms(r.EnqueuedAt), ms(r.StartedAt), ms(r.FinishedAt), r.WaitMS, r.RunMS, r.Status, r.HTTPStatus, r.ErrorClass,
-		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think, boolInt(r.Responded), r.RespBytes, ""}
+		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think, boolInt(r.Responded), r.RespBytes, r.Backend, r.FailoverRule}
 }
 
 func boolInt(b bool) int {
@@ -647,6 +664,8 @@ type Row struct {
 	Responded bool   `json:"responded"`
 	RespBytes int64  `json:"resp_bytes"`
 	Backend   string `json:"backend"`
+	// Fase 10.4: the rule that gave the job to a secondary ("" when it ran on the primary).
+	FailoverRule string `json:"failover_rule"`
 }
 
 // HistoryQuery filters the history. Zero fields do not filter.
@@ -658,7 +677,7 @@ type HistoryQuery struct {
 	Offset       int
 }
 
-const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,COALESCE(responded,0),COALESCE(resp_bytes,0),COALESCE(backend,'')`
+const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,COALESCE(responded,0),COALESCE(resp_bytes,0),COALESCE(backend,''),COALESCE(failover_rule,'')`
 
 // inFlightSQL leaves out the jobs that have not ended (Fase 10.L): History is
 // the list of what finished; Jobs (jobs.go) lists everything.
@@ -669,7 +688,7 @@ func scanRow(sc interface{ Scan(...any) error }) (Row, error) {
 	var bootID, ec, think sql.NullString
 	var responded int
 	err := sc.Scan(&r.ID, &r.ClientIP, &r.ClientLabel, &r.Tool, &r.Endpoint, &r.Model, &r.Lane, &r.PriorityIn, &r.PriorityFinal, &r.BytesIn,
-		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think, &responded, &r.RespBytes, &r.Backend)
+		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think, &responded, &r.RespBytes, &r.Backend, &r.FailoverRule)
 	r.ErrorClass, r.BootID, r.Think, r.Responded = ec.String, bootID.String, think.String, responded != 0
 	return r, err
 }
@@ -892,6 +911,9 @@ func (s *Store) Prune(ctx context.Context, now time.Time) (reqs, gpus int64, err
 	}
 	gpus, _ = g.RowsAffected()
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM cpu_samples WHERE ts < ?`, now.Add(-s.opts.GPUKeep).UnixMilli()); err != nil {
+		return reqs, gpus, err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM backend_samples WHERE ts < ?`, now.Add(-s.opts.GPUKeep).UnixMilli()); err != nil {
 		return reqs, gpus, err
 	}
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM job_gpu_samples WHERE ts < ?`, now.Add(-s.opts.JobGPUKeep).UnixMilli()); err != nil {
