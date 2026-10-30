@@ -200,7 +200,13 @@ src/ocr/                    OCR de PDF digitalizado e imagens (7.9, concluído n
 
   A atualização é a cada 1 s, e o SQLite grava a cada 5 s. Aceite 9.7: ordem por prioridade e ações do admin
   (promover, despromover, remover, cancelar) provadas, com auditoria e SQLite.
-  **Fase 10 (futura):** faixa CPU/RAM com um segundo Ollama e repasse a um secundário (§11 do plano da Fase 9). Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
+  **Fase 10 (2026-10-30, em execução):**
+  - faixa CPU **descartada** (medida: saldo ~0);
+  - **log de jobs em produção (10.L, gateway `0.11.1-f7975fb`)**: grava **prompt e resposta completos** em
+    `content.db` (0600, 7 dias; texto só para o admin) e um extrato das GPUs a 1 s por job;
+  - o pool para um secundário (10.4) está no ramo `wip/fase10-4-pool`; o secundário planejado é um PC com 4× RTX 2060.
+  - Clock das GPUs travado em 210–1400 MHz desde 2026-10-30, por causa da fonte.
+  - Plano: `.workspace/plans/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
   e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e manual:
   `deploy/fase9-gateway/` (`Instalar-Gateway.ps1`, `MANUAL.md`). Plano:
   `.workspace/plans/MCPOllam2026-10-28-223938-fase9-fila-monitor.plan.md`. Mudanças em
