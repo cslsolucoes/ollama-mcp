@@ -248,3 +248,18 @@
     4. 10.7 (aceite do pool numa **instância de teste**, com um secundário **temporário** que substitui o PC 2060: repasse por sobrecarga, disjuntor, histerese, drenar e fallback do mcpollama), sem tocar na produção;
     5. 10.8 (documentação + report).
   - Em seguida, **🧊 CONGELAR** este plano (convenção do ProvidersORM: estado no cabeçalho e o arquivo movido para `.workspace/plans/congelados/`). As pendências sem data ficam listadas para o descongelamento: 10.S secundário, segunda fonte, backup do `content.db` e divisão da RAM.
+- 2026-10-30 19:42 — **Organização do projeto (owner: "tudo ajustadinho e organizado, padrão profissional").**
+  - **Feito agora:**
+    - worktree e ramo da Fase 9 (`agent-a5589…`, já no master) removidos;
+    - `.claude/worktrees/` e o pack (`.cursor`/`.claude`/`.vscode`) no `.gitignore` (decisão: ignorar);
+    - os arquivos soltos na raiz (`MCPOllam.rar`, `mcpollama-mcp.rar`, `mcpollama-mcp.exe` antigo) enviados para a **Lixeira do Windows** (o owner pediu "apagar"; ficou recuperável);
+    - relatório de integração de 26/10 + 2 evidências v10 versionados depois da varredura de segredos (`878315f`).
+    - `git status` limpo e push feito.
+    - Antes, no GitHub: ficou só o `master`; tags `mcpollama-v0.8.1`/`gateway-v0.11.1`; README completo (`b2e1d7f`); `INSTALACAO.md` + `deploy/servidor-ia/` (`7ebf6d4`).
+  - **Para o fechamento (10.8), decisão "reorganizar completo":**
+    - `deploy/fase9-gateway` → `deploy/gateway`;
+    - MANUAL do gateway e `INSTALACAO.md` em `docs/`;
+    - criar `CHANGELOG.md` (versões e tags) e `NOTICE` (uso proprietário interno);
+    - corrigir as divergências: `limit_conn` 12 → 30 no MANUAL, MANUAL §13 (faixa CPU descartada e pool), versão/onde está a 10.4 no `CLAUDE.md`, flag de fallback no README depois do merge;
+    - atualizar todos os links;
+    - apagar o ramo local `wip/fase10-4-pool` e o worktree da 10.4 depois do merge.
