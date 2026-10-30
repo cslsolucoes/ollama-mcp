@@ -78,8 +78,17 @@ type Config struct {
 	AllowClientNumCtx    bool     // let the client's options.num_ctx through
 	StripOptions         []string // options removed from "options" (no defaulting here; see DefaultStripOptions)
 
+	// Journal, when set, receives the full prompt and the answer of every queued
+	// job (Fase 10.L); nil disables the job log in the proxy.
+	Journal Journal
+	// Backend names where the jobs run, for the log ("gpu-local" by default).
+	Backend string
+
 	Logf func(format string, args ...any)
 }
+
+// DefaultBackend is the backend name of the single local Ollama.
+const DefaultBackend = "gpu-local"
 
 // ErrRunTimeout is the cause of a request cut by RunTimeout.
 var ErrRunTimeout = errors.New("tempo máximo de execução no servidor esgotado")
@@ -122,6 +131,7 @@ type exchange struct {
 	body    *countingBody
 	proxyEr error
 	runCtx  context.Context
+	tee     *respTee // nil without a journal
 }
 
 // New builds the Handler.
@@ -137,6 +147,9 @@ func New(cfg Config) (*Handler, error) {
 	}
 	if cfg.RunTimeout <= 0 {
 		cfg.RunTimeout = cfg.Queue.Config().MaxWait
+	}
+	if cfg.Backend == "" {
+		cfg.Backend = DefaultBackend
 	}
 	h := &Handler{cfg: cfg, pol: newPolicyCfg(cfg)}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
@@ -160,6 +173,9 @@ func New(cfg Config) (*Handler, error) {
 			}
 			ex.status = resp.StatusCode
 			ex.body = &countingBody{rc: resp.Body, ctx: resp.Request.Context()}
+			if ex.tee != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				ex.body.tee = ex.tee.Write
+			}
 			resp.Body = ex.body
 			return nil
 		},
@@ -343,6 +359,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		qreq.ClientLabel = "anonimo"
 	}
 
+	jr := h.cfg.Journal
+	if jr != nil {
+		prompt := extractPrompt(routeKinds[path], body)
+		qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, prompt) }
+	}
 	tk, err := h.cfg.Queue.Acquire(r.Context(), qreq)
 	if err != nil {
 		h.rejectAcquire(w, r, err)
@@ -350,6 +371,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	runCtx, cancelRun := context.WithTimeoutCause(tk.Ctx, h.cfg.RunTimeout, ErrRunTimeout)
 	ex := &exchange{runCtx: runCtx}
+	if jr != nil {
+		// Write-ahead: the "em_execucao" row is on disk before the Ollama hears of the job.
+		jr.Started(tk.ID, tk.StartedAt(), h.cfg.Backend)
+		if sink := jr.Response(tk.ID); sink != nil {
+			ex.tee = newRespTee(routeKinds[path], sink)
+		}
+	}
 	defer func() {
 		// Also runs when ReverseProxy aborts the handler (client gone mid-stream).
 		tk.Release(h.result(r.Context(), tk, ex))
@@ -388,6 +416,9 @@ func (h *Handler) rejectAcquire(w http.ResponseWriter, r *http.Request, err erro
 // result classifies how the exchange ended.
 func (h *Handler) result(reqCtx context.Context, tk *queue.Ticket, ex *exchange) queue.Result {
 	res := queue.Result{HTTPStatus: ex.status}
+	if ex.tee != nil {
+		res.Responded, res.RespBytes = ex.tee.End()
+	}
 	var c counters
 	if ex.body != nil {
 		c = parseCounters(ex.body.tail())
@@ -488,6 +519,7 @@ type countingBody struct {
 	readErr error
 	synth   []byte
 	done    bool
+	tee     func([]byte) // optional: every chunk read from the upstream (job log)
 }
 
 func (b *countingBody) Read(p []byte) (int, error) {
@@ -505,6 +537,9 @@ func (b *countingBody) Read(p []byte) (int, error) {
 	}
 	n, err := b.rc.Read(p)
 	if n > 0 {
+		if b.tee != nil {
+			b.tee(p[:n])
+		}
 		b.buf = append(b.buf, p[:n]...)
 		if len(b.buf) > 2*tailBytes {
 			b.buf = append(b.buf[:0], b.buf[len(b.buf)-tailBytes:]...)

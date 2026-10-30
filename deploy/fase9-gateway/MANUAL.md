@@ -273,13 +273,20 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--retention-requests D` | `MCPGW_RETENTION_REQUESTS` | `2160h` (90 dias) | Quanto tempo ficam os pedidos no banco | padrão |
 | `--retention-gpu D` | `MCPGW_RETENTION_GPU` | `168h` (7 dias) | Quanto tempo ficam as amostras de GPU **e de CPU/RAM** | padrão |
 | `--max-request-rows N` | `MCPGW_MAX_REQUEST_ROWS` | `3000000` | Teto de linhas de `requests` (mínimo 1000); as mais antigas saem primeiro, de hora em hora | padrão |
+| `--log-content BOOL` | `MCPGW_LOG_CONTENT` | `true` | **Log de jobs com o prompt e a resposta COMPLETOS** num banco à parte (`--content-db`). Decisão do owner de 2026-10-30. `false`: o log de jobs, o extrato de GPU e a recuperação continuam; só o texto deixa de ser gravado (e o `content.db` não é criado) | padrão (`true`) |
+| `--content-db FILE` | `MCPGW_CONTENT_DB` | `content.db` na pasta de `--db` (`/var/lib/mcpollama-gateway/content.db`) | Arquivo do texto dos jobs, criado `0600` pelo `mcpgw`. Tem de ser outro arquivo que `--db`: o texto **nunca** vai para o banco de metadados | padrão |
+| `--content-max-bytes N` | `MCPGW_CONTENT_MAX_BYTES` | `2147483648` (2 GiB) | Teto TOTAL do texto guardado (soma de prompts e respostas). Passou: apaga os jobs mais antigos até 90% do teto e grava o evento `teto_conteudo`. Mínimo 1 MiB | padrão |
+| `--content-max-job-bytes N` | `MCPGW_CONTENT_MAX_JOB_BYTES` | `16777216` (16 MiB) | Teto do prompt e da resposta de UM job, **cada um**. Passou: corta (em fronteira de caractere) e marca `truncado=sim`. Mínimo 1024, e não acima do teto total | padrão |
+| `--retention-content D` | `MCPGW_RETENTION_CONTENT` | `168h` (7 dias) | Quanto tempo fica o texto dos jobs (os metadados seguem com `--retention-requests`, 90 dias) | padrão |
+| `--retention-job-gpu D` | `MCPGW_RETENTION_JOB_GPU` | `168h` (7 dias) | Quanto tempo fica o extrato de GPU segundo a segundo de cada job (`job_gpu_samples`) | padrão |
+| `--monitor-keep-done D` | `MCPGW_MONITOR_KEEP_DONE` | `5m` | Quanto tempo um pedido concluído continua **visível** no `/monitor` ("Concluídos nos últimos 5 min"). Só exibição: não ocupa vaga nem entra nos limites. `0` esconde a lista | padrão |
 | `--non-loopback-listen` | `MCPGW_NON_LOOPBACK_LISTEN` | `false` | Permite `--listen` fora do loopback (não recomendado) | não usado |
 | `--debug` | `MCPGW_DEBUG` | `false` | Uma linha de log por pedido (`req <id> <faixa> <rota> status=... class=... wait_ms=...`), nunca com texto | não usado |
 | `--version` | (sem env) | — | Imprime a versão e sai | — |
 
 **Validações da partida** (erro = sair com código 2): slots, `--queue-*` e `--labels-per-ip` ≥ 1; durações > 0
 (`--start-stagger` e `--gpu-interval` podem ser 0); `--sample-store-interval` > 0 e >= `--gpu-interval`; `--max-body-bytes` > 0; retenções > 0 e `--max-request-rows` ≥ 1000;
-`--listen` no loopback; `--db` não vazio; `--admin-file` com permissão `0600` (ver Nota N1).
+`--listen` no loopback; `--db` não vazio; com `--log-content`: `--content-db` diferente de `--db`, `--content-max-bytes` ≥ 1 MiB, `--content-max-job-bytes` ≥ 1024 e ≤ o teto total; `--retention-content` e `--retention-job-gpu` > 0; `--monitor-keep-done` ≥ 0; `--admin-file` com permissão `0600` (ver Nota N1).
 
 **Subcomando:** `mcpollama-gateway hash-password [-user NOME] [-iterations N]` lê a senha do **stdin** (primeira linha,
 mínimo 8 caracteres no código; o script de senha exige 12) e imprime `usuario:pbkdf2-sha256$600000$<sal>$<hash>`.
@@ -475,7 +482,28 @@ usuário, IP, ação, id do pedido, estado antes e depois e o motivo (até 200 c
 - **5 falhas por IP em 15 min** → bloqueio de 15 min (**429** + `Retry-After`); cada novo bloqueio dobra (30 min, 1 h... até 24 h); um dia sem atividade zera. Acertar a senha limpa o IP. Não há bloqueio global: falhas de outros IPs não trancam o administrador.
 - No máximo **2 verificações de senha** ao mesmo tempo (PBKDF2 pesa); se ocupado por 10 s: 503.
 - **SSE: 4 painéis por IP e 32 no total**; acima disso: 503 `muitos painéis abertos`. Fechar abas antigas resolve.
-- Os GET do monitor são abertos a quem alcança a LAN; eles mostram IPs, rótulos, modelos e contadores, **nunca** prompts ou respostas.
+- Os GET do monitor são abertos a quem alcança a LAN; eles mostram IPs, rótulos, modelos, contadores e o extrato de GPU de cada job, **nunca** prompts ou respostas: o texto só sai para o **administrador logado** (ver a subseção abaixo).
+
+**Concluídos nos últimos 5 min (Fase 10.L).** Sob "Em execução", uma sub-tabela mantém cada pedido que terminou por
+`--monitor-keep-done` (5 min), para os que entram e saem rápido demais para serem vistos. As linhas aparecem
+**esmaecidas**, com o status final em cor (verde "concluído"; vermelho erro, cancelado, removido, expirado ou interrompido), a hora do
+fim, quanto rodou, o pico de W e de clock, um contador "some em mm:ss" e o botão **Detalhes**. É só exibição: o pedido
+concluído não ocupa vaga, não entra nos limites nem nos cartões "Em execução" e "Na fila". A lista vem do log de jobs
+(`recent_done` no `/state` e no SSE).
+
+**Aba "Log em tempo real" (Fase 10.L).** Terceira aba, ao lado de "Concluídos recentes" e "Eventos". Atualiza **pelo SSE**, sem
+recarregar: o job aparece ao entrar na fila (`na fila`), vira `em execução` e termina no estado final; os mais novos ficam
+no topo, no máximo 200. Colunas: hora de entrada, status (com cor), cliente, tool, modelo, raciocínio, esperou, rodou, tokens
+(prompt / gerados), "Resposta" (sim, não ou parcial), pico de W e de clock do job e o botão **Detalhes**.
+- **Detalhes** abre o painel do job: metadados completos, o **extrato das GPUs segundo a segundo** (tabela e gráficos SVG de
+  W e de clock por GPU, mais uma linha de CPU) e, **só para o administrador logado**, o prompt e a resposta completos. Sem
+  sessão, o painel diz "entre como admin para ver o conteúdo". O painel de um job em execução se atualiza enquanto ele roda
+  (a resposta parcial é gravada a cada ~2 s). "Fechar" fecha.
+- **Exportar log** (topo da aba): baixa o log em JSONL ou CSV, de tudo (até 7 dias) ou da última hora / 24 h. A caixa
+  "incluir prompt e resposta" só vale logado (sem sessão o servidor responde 401).
+- Estados do job: `na_fila`, `em_execucao`, `ok`, `erro`, `cancelado`, `cancelado_admin`, `removido`, `rejeitado`, `expirado`,
+  `interrompido_reboot` (estava em andamento quando o **servidor reiniciou**) e `interrompido_gateway` (o processo do gateway
+  morreu, sem reboot).
 
 ---
 
@@ -489,7 +517,11 @@ diferentes) dá 403.
 | Método | Rota | Parâmetros | Resposta (resumo) |
 | --- | --- | --- | --- |
 | GET | `/monitor` e `/monitor/` | — | A página HTML (CSP restritiva, `no-store`) |
-| GET | `/api/state` | — | Foto: `{now, version, boot_id, uptime_s, queue:{running[], waiting[], slots, in_use, totals}, gpu:{samples[], aer_corr_1b4, error?}, cards, recent[], events[], dropped, admin_enabled}` |
+| GET | `/api/state` | — | Foto: `{now, version, boot_id, uptime_s, queue:{running[], waiting[], slots, in_use, totals}, gpu:{samples[], aer_corr_1b4, error?}, cards, recent[], events[], jobs[] (log de jobs, até 200), recent_done[] (terminaram nos últimos `keep_done_ms`), keep_done_ms, content_enabled, dropped, admin_enabled}` |
+| GET | `/api/jobs` | `desde`, `ate` (RFC 3339 ou epoch ms), `status` (lista separada por vírgula), `cliente` (exato), `limite` (padrão 200, máx. 1000), `offset` | **Log de jobs** (Fase 10.L): `{rows:[{...campos de /history..., responded, resp_bytes, backend, peak_power_w, peak_clock_mhz, samples}]}`, mais novo primeiro, **inclui `na_fila` e `em_execucao`**. Só metadados. Cache de 1 s |
+| GET | `/api/jobs/{id}` | — | `{job, samples:[{ts, job_id, gpu, power_w, power_limit_w, clock_mhz, util_pct, mem_used_mib, temp_c}], content_enabled, content:{prompt_bytes, resp_bytes, prompt_sha256, truncado, resp_final, stored_bytes}}`. O extrato tem 1 linha por GPU por segundo (`gpu` = -1 é a linha da CPU). **Sem o texto** |
+| GET | `/api/jobs/{id}/content` | — | **Só administrador logado** (cookie de sessão; sem sessão = **401**): `{prompt, response, prompt_bytes, resp_bytes, prompt_sha256, prompt_truncated, resp_truncated, truncado, resp_final, created_at, updated_at}`. `resp_final=false` = resposta parcial (em andamento ou job interrompido). 404 se o texto não existe (apagado) ou `--log-content=false` |
+| GET | `/api/jobs/export` | `formato=jsonl\|csv` (padrão `jsonl`), `desde`, `ate`, `status`, `cliente`, `conteudo=1` | Baixa o log (arquivo `log-jobs-AAAAMMDD-HHMMSS.jsonl\|csv`), até 100.000 linhas. **Só metadados**; com `conteudo=1` inclui prompt e resposta e **exige a sessão do administrador** (401 antes do primeiro byte). No CSV, células que começam com `= + - @` ganham um `'` na frente (injeção de fórmula) |
 | GET | `/api/stream` | — | SSE: a cada mudança (agrupadas em 150 ms) e a cada `--gpu-interval` (1 s), uma linha `data: <o mesmo JSON de /state>`. 503 + `Retry-After: 5` acima de 4 por IP / 32 total |
 | GET | `/api/series` | — | `{every_s:5, points:[{t, waiting, running, finished, wait_avg_ms}]}`, até 720 pontos (1 h), só em memória |
 | GET | `/api/history` | `desde`, `ate` (RFC 3339 ou epoch em ms), `cliente` (rótulo exato), `modelo` (exato), `limite` (padrão 100, máx. 1000), `offset` | `{rows:[{id, client_ip, client_label, tool, endpoint, model, lane, priority_in, priority_final, bytes_in, enqueued_at, started_at, finished_at, wait_ms, run_ms, status, http_status, error_class, prompt_eval_count, eval_count, load_ms, boot_id, think}]}`, mais novo primeiro (tempos em epoch ms). 400 se a data é inválida |
@@ -524,21 +556,42 @@ rm -f /tmp/mcpgw.jar
 
 ## 8. Banco SQLite
 
-**Arquivo:** `/var/lib/mcpollama-gateway/gateway.db` (+ `-wal` e `-shm`), dono `mcpgw`, modo `0600`, modo WAL. A gravação é
+**Dois bancos (Fase 10.L).** Ambos em `/var/lib/mcpollama-gateway/`, dono `mcpgw`, modo `0600` (com `-wal` e `-shm`), modo WAL:
+
+| Arquivo | O que guarda | Retenção |
+| --- | --- | --- |
+| `gateway.db` | **só metadados**: pedidos, auditoria, amostras de GPU/CPU, o extrato de GPU por job, eventos | 90 dias (pedidos); 7 dias (amostras e extrato) |
+| `content.db` | **o texto**: prompt e resposta completos de cada job (tabela `job_content`) | **7 dias**; teto de 2 GiB; 16 MiB por parte |
+
+**Escrita durável do log de jobs.** Cada job é gravado em 3 tempos, todos **síncronos** (`synchronous=FULL`, num segundo
+pool de conexões, fora do gravador em lote): ao **entrar na fila** (`na_fila`, com o prompt no `content.db`), ao **começar**
+(`em_execucao`, com `started_at` e o `backend`) e ao **terminar** (estado final, tokens, "houve resposta"). Em transmissão
+(stream), a resposta recebida é acrescentada ao `content.db` **a cada ~2 s** (e no fim), então uma queda de energia perde
+no máximo os últimos ~2 s de texto. Enquanto há job rodando, o extrato de GPU (1 linha por GPU por segundo, no mesmo
+ritmo do coletor de `--gpu-interval`) também é gravado de forma durável.
+
+**Na partida**, todo job que ficou em `na_fila`/`em_execucao` é de um processo que morreu: vira `interrompido_reboot` (o
+`boot_id` mudou: o servidor reiniciou) ou `interrompido_gateway` (mesmo boot: só o gateway morreu), o `finished_at` passa a ser
+o **último segundo do extrato de GPU** daquele job (a melhor evidência de quando caiu) e o evento `jobs_interrompidos`
+(`reboot=N reinicio_gateway=M total=T ids=...`) registra quantos foram. A resposta parcial já recebida fica no `content.db`.
+
+**Gravação em lote do resto.** A gravação dos demais dados é
 assíncrona e em lote (nunca atrasa a fila); se o buffer de 4096 itens enche, o item é descartado e contado (evento
 `registros_descartados`, no máximo 1 por minuto). Os tempos são **epoch em milissegundos**.
 
 | Tabela | Colunas |
 | --- | --- |
-| `requests` | `id` (PK), `client_ip`, `client_label`, `tool`, `endpoint`, `model`, `lane`, `priority_in`, `priority_final`, `bytes_in`, `enqueued_at`, `started_at` (0 se nunca rodou), `finished_at`, `wait_ms`, `run_ms`, `status`, `http_status`, `error_class`, `prompt_eval_count`, `eval_count`, `load_ms`, `boot_id`, `think` |
+| `requests` | `id` (PK), `client_ip`, `client_label`, `tool`, `endpoint`, `model`, `lane`, `priority_in`, `priority_final`, `bytes_in`, `enqueued_at`, `started_at` (0 se nunca rodou), `finished_at`, `wait_ms`, `run_ms`, `status`, `http_status`, `error_class`, `prompt_eval_count`, `eval_count`, `load_ms`, `boot_id`, `think`, **`responded`** (houve resposta, 0/1), **`resp_bytes`** (bytes de texto gerado recebidos), **`backend`** (onde rodou; `gpu-local`; vazio se nunca começou). Linhas anteriores à 10.L têm esses 3 campos NULL |
+| `job_gpu_samples` | **Extrato por job (10.L)**: `ts`, `job_id`, `gpu` (**-1 = linha da CPU**), `power_w`, `power_limit_w`, `clock_mhz` (`clocks.gr`; -1 = não informado), `util_pct`, `mem_used_mib`, `temp_c`. Índices `(job_id, ts)` e `ts`. Só há linhas enquanto há job em execução; 7 dias (`--retention-job-gpu`) |
+| `job_content` (**no `content.db`**) | `job_id` (PK), `created_at`, `updated_at`, `prompt` (BLOB), `prompt_bytes` (tamanho enviado), `prompt_sha256` (do prompt inteiro), `prompt_truncated`, `response` (BLOB), `resp_bytes` (recebido), `resp_truncated`, `resp_final` (0 = parcial/em andamento/interrompido). Para embeddings a resposta é só a contagem e a dimensão ("embeddings: 2 vetor(es) de 768 dimensões"): **o vetor nunca é gravado** |
 | `audit` | `id`, `ts`, `usuario`, `ip`, `acao`, `request_id`, `antes`, `depois`, `motivo` |
-| `gpu_samples` | `ts`, `gpu`, `bus_id`, `power_w`, `mem_used_mib`, `util_pct`, `temp_c`, `aer_corr_1b4`, `boot_id`, `power_limit_w` (limite aplicado em W; `NULL` nas linhas antigas, gravadas antes do campo existir; -1 = o driver não informou) |
+| `gpu_samples` | `ts`, `gpu`, `bus_id`, `power_w`, `mem_used_mib`, `util_pct`, `temp_c`, `aer_corr_1b4`, `boot_id`, `clock_mhz` (clock gráfico; NULL nas linhas anteriores à 10.L), `power_limit_w` (limite aplicado em W; `NULL` nas linhas antigas, gravadas antes do campo existir; -1 = o driver não informou) |
 | `cpu_samples` | `ts`, `util_pct`, `load1`, `load5`, `load15`, `ram_total_mib`, `ram_used_mib`, `ram_avail_mib`, `swap_used_mib`, `swap_total_mib`, `temp_c`, `freq_mhz`, `ollama_rss_mib`, `power_w`, `boot_id`, `threads_json` (índice em `ts`). -1 = não legível. `threads_json` é o detalhe por thread, curto: `{"t":[[id,uso_%,core_id],...],"c":[[core_id,temp_c],...]}` |
 | `events` | `ts`, `kind`, `detail` |
 | `meta` | `k`, `v` (`boot_id`, `last_prune`, `last_vacuum`) |
 
-Valores de `status`: `ok`, `erro`, `cancelado` (cliente desistiu), `cancelado_admin`, `removido`, `rejeitado` (fila cheia),
-`expirado` (`--max-wait`). Valores de `error_class` (texto **fixo** do gateway): `upstream_<código>`, `stream_error`,
+Valores de `status`: `na_fila` e `em_execucao` (em andamento, 10.L), `ok`, `erro`, `cancelado` (cliente desistiu), `cancelado_admin`, `removido`, `rejeitado` (fila cheia),
+`expirado` (`--max-wait`), `interrompido_reboot` e `interrompido_gateway` (10.L, ver acima). Valores de `error_class` (texto **fixo** do gateway): `upstream_<código>`, `stream_error`,
 `run_timeout`, `client_gone`, `upstream_unreachable`, `upstream_dropped`, `admin_cancel`, `removido`, `expirado`, e para
 rejeitados `fila cheia` ou `limite de pedidos em espera deste cliente`. `think`: `on`, `off`, `modelo` ou vazio.
 
@@ -547,16 +600,40 @@ rejeitados `fila cheia` ou `limite de pedidos em espera deste cliente`. `think`:
 | Dado | Regra |
 | --- | --- |
 | `requests` | 90 dias (`--retention-requests`) **e** teto de 3.000.000 linhas (`--max-request-rows`), as mais antigas saem primeiro (evento `teto_pedidos`) |
+| `job_gpu_samples` | 7 dias (`--retention-job-gpu`) |
+| `job_content` (`content.db`) | 7 dias (`--retention-content`) **e** teto total de 2 GiB (`--content-max-bytes`): passou, apaga os jobs mais antigos até 90% e grava o evento `teto_conteudo`; 16 MiB por parte (`--content-max-job-bytes`), cortado com `truncado=sim`. Hora em hora; o arquivo devolve as páginas livres ao disco (`auto_vacuum` incremental), mas pode ficar um pouco maior que o total lógico |
 | `gpu_samples` e `cpu_samples` | 7 dias (`--retention-gpu`); gravam 1 linha a cada `--sample-store-interval` (5 s), não a cada coleta |
 | `audit` e `events` | **nunca expiram** |
 | `VACUUM` | semanal |
 
-**Migração:** ao abrir um banco antigo, o gateway cria `cpu_samples` e acrescenta `gpu_samples.power_limit_w` (`ALTER TABLE ... ADD COLUMN`), cada passo só se faltar; abrir de novo não muda nada, e os dados existentes ficam intactos. Para voltar a um binário antigo basta ignorar a tabela e a coluna novas (o binário antigo não as lê).
+**Migração (10.L):** a abertura também acrescenta `requests.responded`, `requests.resp_bytes`, `requests.backend`, `gpu_samples.clock_mhz` e cria `job_gpu_samples`, cada passo só se faltar (rodar duas vezes não muda nada). A ordem de gravação mudou: o registro do pedido passa a existir **desde a entrada na fila** e o fim vira um `UPSERT` (a linha e o `rowid` são os mesmos). Voltar a um binário antigo: ele ignora as colunas novas, mas **não** conhece os estados `na_fila`/`em_execucao`/`interrompido_*`.
 
-**Garantia de privacidade:** o banco guarda **só metadados**. Não existe coluna para prompt, documento, resposta ou token.
-O corpo é lido para aplicar as políticas, mas só contadores numéricos (do **último** pedaço da resposta) são mantidos; o
-`error_class` nunca carrega texto do Ollama. Um teste com texto-sentinela confirma que ele não aparece no `.db`, no
-`-wal`, no `-shm` nem no log, nem nos caminhos de erro (revisão 9.5 e teste da 9.6a).
+**Migração (anterior):** ao abrir um banco antigo, o gateway cria `cpu_samples` e acrescenta `gpu_samples.power_limit_w` (`ALTER TABLE ... ADD COLUMN`), cada passo só se faltar; abrir de novo não muda nada, e os dados existentes ficam intactos. Para voltar a um binário antigo basta ignorar a tabela e a coluna novas (o binário antigo não as lê).
+
+**Garantia de privacidade (alterada na 10.L, decisão do owner de 2026-10-30).** O `gateway.db` continua **só com
+metadados**: não existe coluna para prompt, documento, resposta ou token, e o `error_class` nunca carrega texto do Ollama.
+O **texto** passou a existir, mas **somente no `content.db`**: prompt e resposta completos, por 7 dias, visíveis só ao
+administrador logado (ver a seção 12). O **token do cliente** (`Authorization`) não é gravado em nenhum dos dois bancos nem no
+log. Os testes-sentinela provam as duas metades: o texto-sentinela está no `content.db` e **não** está no `.db`, no `-wal`, no
+`-shm` nem no log; o token-sentinela não está em arquivo nenhum.
+
+**Como consultar um job interrompido** (no servidor; `-readonly`):
+
+```bash
+DB=/var/lib/mcpollama-gateway/gateway.db; CDB=/var/lib/mcpollama-gateway/content.db
+# O que aconteceu nos últimos reinícios
+sqlite3 -readonly -header -column "$DB" "select datetime(ts/1000,'unixepoch','localtime') quando, kind, detail from events where kind in ('boot_novo','gateway_inicio','jobs_interrompidos') order by ts desc limit 10;"
+# Os jobs interrompidos, com o último segundo vivo, o backend e se já havia resposta
+sqlite3 -readonly -header -column "$DB" "select substr(id,1,8) id, datetime(enqueued_at/1000,'unixepoch','localtime') entrou, status, client_label, tool, bytes_in, responded, resp_bytes, backend, datetime(finished_at/1000,'unixepoch','localtime') ultimo_segundo from requests where status like 'interrompido%' order by enqueued_at desc limit 20;"
+# O extrato de GPU dos últimos 10 segundos antes da queda (use o id completo; W por placa)
+sqlite3 -readonly -header -column "$DB" "select datetime(ts/1000,'unixepoch','localtime') hora, gpu, power_w, power_limit_w, clock_mhz, util_pct, temp_c from job_gpu_samples where job_id='<ID de 32 hex>' order by ts desc, gpu limit 40;"
+# O que foi enviado e a resposta parcial (texto sensível: só o root, no servidor)
+sqlite3 -readonly "$CDB" "select prompt_bytes, resp_bytes, resp_final, prompt_truncated, resp_truncated, cast(prompt as text) from job_content where job_id='<ID de 32 hex>';"
+sqlite3 -readonly "$CDB" "select cast(response as text) from job_content where job_id='<ID de 32 hex>';"
+```
+
+Pelo monitor: aba "Log em tempo real" → filtre/ordene → **Detalhes** (o texto exige login). Para guardar o log: **Exportar log**
+(JSONL ou CSV; com "incluir prompt e resposta" só logado) ou `GET /monitor/api/jobs/export` (seção 7).
 
 **Consultas úteis** (no servidor; use `-readonly` para não interferir no gateway; se o `sqlite3` não estiver instalado,
 use `/monitor/api/history` e `/stats`):
@@ -725,7 +802,7 @@ o gateway não subir): o nginx ainda aponta para o Ollama (nada mudou para os cl
 - o IP do cliente só vale a partir do `X-Real-IP` do nginx local; forjado, duplicado ou de fora é ignorado;
 - o `/monitor` não é alcançável pela internet, nem pelo túnel do Cloudflare (403 para pedidos com `CF-Connecting-IP`; provado em 2026-10-30, ver a seção 6);
 - sem *request smuggling* (CL/TE duplicados) e sem acesso às 6 rotas administrativas, em 17 variantes de escrita; 0 de 17 chegou ao Ollama;
-- o `Authorization` do cliente **não** é repassado ao Ollama; token, prompt e resposta não entram no log, no banco nem em `error_class` (teste de sentinela);
+- o `Authorization` do cliente **não** é repassado ao Ollama; o token não entra no log, em banco algum nem em `error_class`; prompt e resposta não entram no log nem no `gateway.db` (**mudança da 10.L:** o texto é gravado, mas só no `content.db`, ver abaixo) (teste de sentinela);
 - os contadores vêm só do último pedaço da resposta; o texto do modelo não os engana;
 - nenhum slot "vaza": Ollama que cai, cliente que desiste, ações simultâneas do administrador (`-race`, 1.800 pedidos = 1.800 registros);
 - `--run-timeout` impede um stream sem fim de prender o slot; teto de linhas e retenção limitam o banco; o cálculo de estatísticas é limitado e com cache;
@@ -734,13 +811,28 @@ o gateway não subir): o nginx ainda aponta para o Ollama (nada mudou para os cl
 - SQL parametrizado (0 injeção nos filtros do `/history`);
 - as etapas de instalação conferem hashes (pasta `0700` só do root, `SHA256SUMS`, binário conferido de novo), e o token nunca vai em linha de comando.
 
+**Sigilo do conteúdo dos jobs (Fase 10.L, decisão do owner de 2026-10-30).** O gateway **passou a gravar o prompt e a resposta
+completos** de cada job (inclusive `extract`, `summarize_file` e `translate` com o conteúdo de documentos e dados de clientes).
+Isto substitui a regra antiga "nenhum texto no banco". O que protege:
+- **onde:** só no `content.db` (`/var/lib/mcpollama-gateway/content.db`, `0600`, dono `mcpgw`), nunca no `gateway.db`; o `ProtectSystem=strict`
+  do serviço só deixa o `mcpgw` escrever em `/var/lib/mcpollama-gateway`. Quem lê o disco como root lê o texto: trate o
+  servidor e **os backups dessa pasta** como dado sigiloso (o `content.db` não deve ir para backup compartilhado);
+- **quem vê no monitor:** só o administrador logado (cookie de sessão `HttpOnly; Secure; SameSite=Strict`); sem sessão,
+  `GET /api/jobs/{id}/content` e a exportação com `conteudo=1` dão **401**. O resto do log (metadados, extrato de GPU) segue visível na LAN;
+- **por quanto tempo:** 7 dias (`--retention-content`), teto total de 2 GiB (apaga os mais antigos) e 16 MiB por parte;
+- **como sai na tela:** sempre por `textContent` (um prompt com `</script><img onerror=...>` aparece como texto; os JSON escapam `<`, `>` e `&`);
+- **como desligar:** `--log-content=false` (o log de jobs, o extrato e a recuperação continuam; o texto não é gravado nem o `content.db` criado). Para
+  apagar o que já existe: pare o gateway e remova `content.db*`;
+- **embeddings:** só a contagem e a dimensão, nunca o vetor.
+O token do cliente nunca é gravado.
+
 **Riscos residuais e pendências:**
 
 1. ~~**Nota N1:** arquivo da senha `0640` x código que exige `0600`~~ — **resolvida** (scripts gravam `mcpgw:mcpgw 0600`; provado no servidor);
 2. o **rótulo do cliente é livre** (só o IP é confiável); a justiça ancora no IP;
 3. `--priority-ips 10.100.2.0/24` dá `alta` a **qualquer máquina da LAN com o token**; isso é decisão do owner (D9-8), e vale só como pedido (o mcpollama não usa);
 4. **um único administrador** compartilhado; a auditoria registra o usuário, não a pessoa;
-5. os GET do `/monitor` são abertos na LAN (IPs, rótulos, modelos, contadores; nunca conteúdo);
+5. os GET do `/monitor` são abertos na LAN (IPs, rótulos, modelos, contadores, extrato de GPU; **nunca o texto dos jobs**, que exige o administrador logado);
 6. o login e o SSE contam por IP completo (não `/64`); hoje o `/monitor` só atende a LAN IPv4. Se for exposto a IPv6, usar `fairIP`;
 7. o gateway **não tem prazo de leitura do corpo**; depende do `proxy_request_buffering on` do nginx (padrão; o `ollama.conf` não o desliga). Não desligue;
 8. um pedido sem `X-Real-IP` vindo do loopback conta como `127.0.0.1`: **não** ponha `127.0.0.1` em `--priority-ips` e mantenha `proxy_set_header X-Real-IP` em todo `location` que aponta ao gateway;

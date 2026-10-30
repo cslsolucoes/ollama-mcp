@@ -286,3 +286,51 @@ func TestRunAppliesPolicies(t *testing.T) {
 		t.Fatal("did not shut down")
 	}
 }
+
+// Fase 10.L flags: defaults, env, validation, --help text.
+func TestParseConfigJobLogFlags(t *testing.T) {
+	var buf bytes.Buffer
+	c, err := parseConfig(nil, noEnv, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.LogContent || c.ContentMax != 2<<30 || c.ContentMaxJob != 16<<20 || c.RetentionCont != 7*24*time.Hour ||
+		c.RetentionJobGP != 7*24*time.Hour || c.KeepDone != 5*time.Minute || filepath.ToSlash(c.ContentDB) != "/var/lib/mcpollama-gateway/content.db" {
+		t.Fatalf("defaults: %+v", c)
+	}
+	if err := c.validate(); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{"MCPGW_LOG_CONTENT": "false", "MCPGW_CONTENT_MAX_BYTES": "1048576", "MCPGW_MONITOR_KEEP_DONE": "90s", "MCPGW_RETENTION_JOB_GPU": "24h"}
+	c, err = parseConfig([]string{"--content-max-job-bytes", "4096"}, func(k string) string { return env[k] }, &buf)
+	if err != nil || c.LogContent || c.ContentMax != 1<<20 || c.ContentMaxJob != 4096 || c.KeepDone != 90*time.Second || c.RetentionJobGP != 24*time.Hour {
+		t.Fatalf("env: %v %+v", err, c)
+	}
+	// the flag beats the env, and --log-content=true turns it back on
+	c, _ = parseConfig([]string{"--log-content=true", "--db", "/x/gw.db"}, func(k string) string { return env[k] }, &buf)
+	if !c.LogContent || filepath.ToSlash(c.ContentDB) != "/x/content.db" {
+		t.Fatalf("%+v", c)
+	}
+	bad := [][]string{{"--content-db", "/var/lib/mcpollama-gateway/gateway.db", "--db", "/var/lib/mcpollama-gateway/gateway.db"}, {"--content-max-job-bytes", "999999999999"}, {"--content-max-bytes", "10"}, {"--monitor-keep-done", "-1s"}}
+	for _, a := range bad {
+		c, err := parseConfig(a, noEnv, &buf)
+		if err == nil {
+			err = c.validate()
+		}
+		if err == nil {
+			t.Errorf("%v accepted", a)
+		}
+	}
+	// --log-content=false does not need the content flags to be sane
+	c, _ = parseConfig([]string{"--log-content=false", "--content-max-bytes", "10"}, noEnv, &buf)
+	if err := c.validate(); err != nil {
+		t.Errorf("content off must ignore the content caps: %v", err)
+	}
+	var help bytes.Buffer
+	parseConfig([]string{"-h"}, noEnv, &help)
+	for _, w := range []string{"--log-content", "--content-db", "--content-max-bytes", "--content-max-job-bytes", "--retention-content", "--retention-job-gpu", "--monitor-keep-done", "MCPGW_LOG_CONTENT"} {
+		if !strings.Contains(help.String(), w) {
+			t.Errorf("--help lacks %s", w)
+		}
+	}
+}

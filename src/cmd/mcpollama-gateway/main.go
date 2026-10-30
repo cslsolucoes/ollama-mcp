@@ -22,8 +22,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/content"
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/joblog"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/monitor"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
@@ -81,13 +83,34 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 
 	bootID := store.BootID("")
 	st, err := store.Open(cfg.DB, store.Options{
-		BootID: bootID, Logf: logf, ReqKeep: cfg.RetentionReq, GPUKeep: cfg.RetentionGPU, MaxRequests: int64(cfg.MaxReqRows),
+		BootID: bootID, Logf: logf, ReqKeep: cfg.RetentionReq, GPUKeep: cfg.RetentionGPU, JobGPUKeep: cfg.RetentionJobGP, MaxRequests: int64(cfg.MaxReqRows),
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
 		return 1
 	}
 	defer st.Close()
+
+	// Job log (Fase 10.L): the text goes to a database of its own, never to --db.
+	var cs *content.Store
+	if cfg.LogContent {
+		cs, err = content.Open(cfg.ContentDB, content.Options{
+			MaxBytes: cfg.ContentMax, MaxJobBytes: cfg.ContentMaxJob, Keep: cfg.RetentionCont, Logf: logf,
+			OnEvent: st.Event,
+		})
+		if err != nil {
+			fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
+			return 1
+		}
+		defer cs.Close()
+	} else {
+		logf("--log-content=false: o texto dos jobs não é gravado")
+	}
+	jr := &joblog.Journal{Store: st, Content: cs, Backend: proxy.DefaultBackend, Logf: logf}
+	jr.RecoverResponses(context.Background())
+	if rec := st.Recovered(); len(rec) > 0 {
+		logf("%d job(s) do processo anterior ficaram em andamento e foram marcados como interrompidos", len(rec))
+	}
 
 	hub := monitor.NewHub()
 	var mon *monitor.Handler
@@ -97,7 +120,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		MaxWait: cfg.MaxWait, AgeAfter: cfg.AgeAfter, StartStagger: cfg.StartStagger,
 		OnChange: hub.Notify,
 		OnRecord: func(r queue.Record) {
-			st.Record(r)
+			jr.Finish(r) // synchronous and durable (the async writer stays as the fallback)
 			if mon != nil {
 				mon.Observe(r)
 			}
@@ -115,24 +138,32 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		*last = ts
 		return true
 	}
+	jr.Running = q.RunningIDs
+	var ccol *cpu.Collector
 	var col *gpu.Collector
 	if cfg.GPUInterval > 0 {
 		col = &gpu.Collector{
 			Cmd: cfg.NvidiaSMI, AERPath: cfg.AERPath, Interval: cfg.GPUInterval, BootID: bootID, Logf: logf,
 			OnSamples: func(ts time.Time, ss []gpu.Sample, aer int64) {
+				// Every second, while a job runs, one durable row per GPU and job.
+				var cpuNow *cpu.Sample
+				if ccol != nil {
+					l := ccol.Latest()
+					cpuNow = &l
+				}
+				jr.Sample(ts, ss, cpuNow)
 				if !due(&lastGPU, ts) {
 					return
 				}
 				rows := make([]store.GPURow, 0, len(ss))
 				for _, s := range ss {
-					rows = append(rows, store.GPURow{TS: ts, GPU: s.Index, BusID: s.BusID, PowerW: s.PowerW, MemUsedMiB: s.MemUsedMiB, UtilPct: s.UtilPct, TempC: s.TempC, AER: aer, PowerLimitW: s.PowerLimitW})
+					rows = append(rows, store.GPURow{TS: ts, GPU: s.Index, BusID: s.BusID, PowerW: s.PowerW, MemUsedMiB: s.MemUsedMiB, UtilPct: s.UtilPct, TempC: s.TempC, AER: aer, PowerLimitW: s.PowerLimitW, ClockMHz: s.ClockMHz})
 				}
 				st.GPU(rows)
 			},
 		}
 	}
 
-	var ccol *cpu.Collector
 	if cfg.GPUInterval > 0 {
 		ccol = &cpu.Collector{
 			ProcRoot: cfg.ProcRoot, SysRoot: cfg.SysRoot, Interval: cfg.GPUInterval, BootID: bootID, Logf: logf,
@@ -171,12 +202,13 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		},
 	}
 
-	mon, err = monitor.New(monitor.Config{Models: mcol, Queue: q, Store: st, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
+	mon, err = monitor.New(monitor.Config{Models: mcol, Queue: q, Store: st, Content: cs, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
 		return 1
 	}
 	px, err := proxy.New(proxy.Config{
+		Journal: jr, Backend: proxy.DefaultBackend,
 		Upstream: cfg.Ollama, Queue: q, PriorityNets: cfg.PriorityNets, AllowedModels: cfg.AllowedModels,
 		MaxBodyBytes: cfg.MaxBodyBytes, RunTimeout: cfg.RunTimeout, Logf: dbg,
 		DefaultThink: cfg.DefaultThink, ThinkSuffix: cfg.ThinkSuffix,
@@ -212,6 +244,9 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	start := func(f func()) { wg.Add(1); go func() { defer wg.Done(); f() }() }
 	start(func() { mon.Start(bg) })
 	start(func() { st.RunMaintenance(bg, time.Hour) })
+	if cs != nil {
+		start(func() { cs.RunMaintenance(bg, time.Hour) })
+	}
 	start(func() { sweepLoop(bg, q) })
 	if col != nil {
 		start(func() { col.RunLoop(bg) })
@@ -223,8 +258,9 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 
 	logf("mcpollama-gateway %s em %s -> Ollama %s (geracao=%d embed=%d fila=%d por-ip=%d) boot=%s",
 		Version, ln.Addr(), cfg.Ollama.Host, cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerIP, bootID)
-	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s run_timeout=%s max_rows=%d default_think=%v think_suffix=%q allow_keepalive=%v allow_num_ctx=%v strip=%s",
+	st.Event("gateway_config", fmt.Sprintf("gen=%d embed=%d queue=%d per_client=%d per_ip=%d labels=%d stagger=%s max_wait=%s run_timeout=%s max_rows=%d log_content=%v content_max=%d content_max_job=%d ret_content=%s ret_job_gpu=%s default_think=%v think_suffix=%q allow_keepalive=%v allow_num_ctx=%v strip=%s",
 		cfg.GenSlots, cfg.EmbedSlots, cfg.QueueMax, cfg.PerClient, cfg.PerIP, cfg.LabelsPerIP, cfg.StartStagger, cfg.MaxWait, cfg.RunTimeout, cfg.MaxReqRows,
+		cfg.LogContent, cfg.ContentMax, cfg.ContentMaxJob, cfg.RetentionCont, cfg.RetentionJobGP,
 		cfg.DefaultThink, cfg.ThinkSuffix, cfg.AllowKeepAlive, cfg.AllowNumCtx, strings.Join(cfg.StripOptions, ",")))
 	if ready != nil {
 		ready(ln.Addr().String())

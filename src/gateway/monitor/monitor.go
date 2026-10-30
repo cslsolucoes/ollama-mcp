@@ -28,6 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/content"
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
@@ -92,7 +93,8 @@ type Config struct {
 	CPU     *cpu.Collector    // may be nil (board shows "coletor desligado")
 	Models  *models.Collector // may be nil (no "models" in the state)
 	Hub     *Hub
-	Admin   *Credentials // nil disables the actions
+	Content *content.Store // may be nil: the text of the jobs is not recorded (Fase 10.L)
+	Admin   *Credentials   // nil disables the actions
 	Version string
 	BootID  string
 	MaxSSE  int // concurrent event streams, default 32
@@ -102,7 +104,12 @@ type Config struct {
 	// StreamEvery is the periodic push of the event stream (follows the
 	// sampling interval); default 1 s. Queue changes are still sent at once.
 	StreamEvery time.Duration
-	Logf        func(format string, args ...any)
+	// KeepDone is how long a finished request stays in State.RecentDone (display
+	// only; the queue itself is not touched). Zero disables the list.
+	KeepDone time.Duration
+	// Now is the clock of the done list and its cache; default time.Now (tests inject one).
+	Now  func() time.Time
+	Logf func(format string, args ...any)
 }
 
 // Handler serves everything under /monitor.
@@ -119,6 +126,8 @@ type Handler struct {
 	sseMu    sync.Mutex
 	sseTotal int
 	sseByIP  map[string]int
+
+	jobs jobsCache // Fase 10.L
 
 	statsMu    sync.Mutex
 	statsCache map[string]statsEntry
@@ -151,6 +160,9 @@ func New(cfg Config) (*Handler, error) {
 	}
 	if cfg.Hub == nil {
 		cfg.Hub = NewHub()
+	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
 	}
 	csp, err := buildCSP(indexHTML)
 	if err != nil {
@@ -203,6 +215,10 @@ func (h *Handler) routes() {
 	m.HandleFunc("GET /monitor/api/history", h.apiHistory)
 	m.HandleFunc("GET /monitor/api/stats", h.apiStats)
 	m.HandleFunc("GET /monitor/api/audit", h.apiAudit)
+	m.HandleFunc("GET /monitor/api/jobs", h.apiJobs)
+	m.HandleFunc("GET /monitor/api/jobs/export", h.apiJobsExport)
+	m.HandleFunc("GET /monitor/api/jobs/{id}", h.apiJob)
+	m.HandleFunc("GET /monitor/api/jobs/{id}/content", h.apiJobContent)
 	m.HandleFunc("GET /monitor/api/session", h.apiSession)
 	m.HandleFunc("POST /monitor/api/login", h.apiLogin)
 	m.HandleFunc("POST /monitor/api/logout", h.apiLogout)
@@ -268,19 +284,27 @@ type extras struct {
 
 // State is the photo the page shows.
 type State struct {
-	Now          time.Time        `json:"now"`
-	Version      string           `json:"version"`
-	BootID       string           `json:"boot_id"`
-	UptimeS      int64            `json:"uptime_s"`
-	Queue        queue.Snapshot   `json:"queue"`
-	GPU          *gpu.Snapshot    `json:"gpu,omitempty"`
-	CPU          *cpu.Sample      `json:"cpu,omitempty"`
-	Models       *models.Snapshot `json:"models,omitempty"`
-	Cards        Cards            `json:"cards"`
-	Recent       []store.Row      `json:"recent"`
-	Events       []store.Event    `json:"events"`
-	Dropped      int64            `json:"dropped"`
-	AdminEnabled bool             `json:"admin_enabled"`
+	Now       time.Time        `json:"now"`
+	Version   string           `json:"version"`
+	BootID    string           `json:"boot_id"`
+	UptimeS   int64            `json:"uptime_s"`
+	Queue     queue.Snapshot   `json:"queue"`
+	GPU       *gpu.Snapshot    `json:"gpu,omitempty"`
+	CPU       *cpu.Sample      `json:"cpu,omitempty"`
+	Models    *models.Snapshot `json:"models,omitempty"`
+	Cards     Cards            `json:"cards"`
+	Recent    []store.Row      `json:"recent"`
+	Events    []store.Event    `json:"events"`
+	Jobs      []store.JobRow   `json:"jobs"` // Fase 10.L: the live job log, newest first
+	JobsLimit int              `json:"jobs_limit"`
+	// RecentDone: requests that ended in the last KeepDone, newest first. Shown
+	// next to the running ones so a request that came and went in a blink can
+	// still be seen; it takes no slot and counts in no limit.
+	RecentDone   []store.JobRow `json:"recent_done"`
+	KeepDoneMS   int64          `json:"keep_done_ms"`
+	ContentOn    bool           `json:"content_enabled"`
+	Dropped      int64          `json:"dropped"`
+	AdminEnabled bool           `json:"admin_enabled"`
 }
 
 const extrasTTL = 2 * time.Second
@@ -323,7 +347,7 @@ func (h *Handler) state(ctx context.Context) State {
 		Now: snap.Now, Version: h.cfg.Version, BootID: h.cfg.BootID,
 		UptimeS: int64(time.Since(h.started).Seconds()),
 		Queue:   snap, Cards: ex.cards, Recent: ex.recent, Events: ex.events,
-		AdminEnabled: h.cfg.Admin != nil,
+		AdminEnabled: h.cfg.Admin != nil, Jobs: h.liveJobs(ctx), JobsLimit: liveJobsLimit, RecentDone: h.recentDone(ctx), KeepDoneMS: h.cfg.KeepDone.Milliseconds(), ContentOn: h.cfg.Content != nil,
 	}
 	st.Cards.Running, st.Cards.Waiting = len(snap.Running), len(snap.Waiting)
 	if h.cfg.GPU != nil {

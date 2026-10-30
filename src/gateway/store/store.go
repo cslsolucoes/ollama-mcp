@@ -1,5 +1,12 @@
 // Package store keeps the gateway history in SQLite (Fase 9.3): metadata only,
-// never a prompt, a document, an answer or a token (plan section 5).
+// never a prompt, a document, an answer or a token (plan section 5). Since
+// Fase 10.L the text of the jobs lives in a SEPARATE database (package content,
+// owner decision of 2026-10-30); this file stays free of any text.
+//
+// Fase 10.L also makes the job log durable (jobs.go): the entry, the start and
+// the end of a job are written synchronously (synchronous=FULL) on a second
+// connection pool, outside the batch writer below, so a power cut cannot take
+// the last transitions with it.
 //
 // The database is never on the hot path: the queue lives in memory and the
 // producers (Record, GPU, Event) only push into a buffered channel. One
@@ -35,13 +42,17 @@ CREATE TABLE IF NOT EXISTS requests(
   enqueued_at INTEGER, started_at INTEGER, finished_at INTEGER,
   wait_ms INTEGER, run_ms INTEGER,
   status TEXT, http_status INTEGER, error_class TEXT,
-  prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT, think TEXT);
+  prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT, think TEXT,
+  responded INTEGER, resp_bytes INTEGER, backend TEXT);
 CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, ts INTEGER, usuario TEXT, ip TEXT, acao TEXT, request_id TEXT,
   antes TEXT, depois TEXT, motivo TEXT);
 CREATE TABLE IF NOT EXISTS gpu_samples(
   ts INTEGER, gpu INTEGER, bus_id TEXT, power_w REAL, mem_used_mib INTEGER,
-  util_pct INTEGER, temp_c INTEGER, aer_corr_1b4 INTEGER, boot_id TEXT, power_limit_w REAL);
+  util_pct INTEGER, temp_c INTEGER, aer_corr_1b4 INTEGER, boot_id TEXT, power_limit_w REAL, clock_mhz REAL);
+CREATE TABLE IF NOT EXISTS job_gpu_samples(
+  ts INTEGER, job_id TEXT, gpu INTEGER, power_w REAL, power_limit_w REAL, clock_mhz REAL,
+  util_pct INTEGER, mem_used_mib INTEGER, temp_c INTEGER);
 CREATE TABLE IF NOT EXISTS cpu_samples(
   ts INTEGER, util_pct REAL, load1 REAL, load5 REAL, load15 REAL,
   ram_total_mib INTEGER, ram_used_mib INTEGER, ram_avail_mib INTEGER,
@@ -53,6 +64,9 @@ CREATE INDEX IF NOT EXISTS idx_requests_enq ON requests(enqueued_at);
 CREATE INDEX IF NOT EXISTS idx_requests_client ON requests(client_label, enqueued_at);
 CREATE INDEX IF NOT EXISTS idx_requests_fin ON requests(finished_at);
 CREATE INDEX IF NOT EXISTS idx_gpu_ts ON gpu_samples(ts);
+CREATE INDEX IF NOT EXISTS idx_jgs_job ON job_gpu_samples(job_id, ts);
+CREATE INDEX IF NOT EXISTS idx_jgs_ts ON job_gpu_samples(ts);
+CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
 CREATE INDEX IF NOT EXISTS idx_cpu_ts ON cpu_samples(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit(ts);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
@@ -67,6 +81,7 @@ type Options struct {
 	Logf        func(format string, args ...any) // optional
 	ReqKeep     time.Duration                    // requests retention, default 90 days
 	GPUKeep     time.Duration                    // GPU samples retention, default 7 days
+	JobGPUKeep  time.Duration                    // per-job GPU extract retention, default 7 days (Fase 10.L)
 	VacuumEvery time.Duration                    // default 7 days
 	// MaxRequests caps the requests table (Fase 9.5, S2): the retention is by
 	// age only, and a client in a loop at the rate the nginx allows writes
@@ -88,6 +103,11 @@ const dropEventEvery = time.Minute
 type Store struct {
 	db   *sql.DB
 	opts Options
+
+	// jdb is a second pool on the same file with synchronous=FULL: the job log
+	// (jobs.go) and the per-job GPU extract never go through the batch writer.
+	jdb       *sql.DB
+	recovered []RecoveredJob
 
 	ch      chan item
 	dropped atomic.Int64
@@ -129,6 +149,7 @@ type GPURow struct {
 	TempC       int
 	AER         int64   // correctable AER counter of the bridge; -1 when unknown
 	PowerLimitW float64 // power cap in force; -1 when unknown
+	ClockMHz    float64 // current graphics clock (clocks.gr); -1 when unknown
 }
 
 // CPURow is one CPU/RAM sample as stored. Unknown numbers are -1. Threads is
@@ -177,6 +198,9 @@ func Open(path string, o Options) (*Store, error) {
 	if o.GPUKeep <= 0 {
 		o.GPUKeep = 7 * 24 * time.Hour
 	}
+	if o.JobGPUKeep <= 0 {
+		o.JobGPUKeep = 7 * 24 * time.Hour
+	}
 	if o.VacuumEvery <= 0 {
 		o.VacuumEvery = 7 * 24 * time.Hour
 	}
@@ -203,8 +227,15 @@ func Open(path string, o Options) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("store: migrate: %w", err)
 	}
-	s := &Store{db: db, opts: o, ch: make(chan item, o.BufferSize)}
+	jdb, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)")
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	jdb.SetMaxOpenConns(2)
+	s := &Store{db: db, jdb: jdb, opts: o, ch: make(chan item, o.BufferSize)}
 	s.noteBoot()
+	s.recoverInterrupted(time.Now())
 	s.wg.Add(1)
 	go s.writer()
 	return s, nil
@@ -248,6 +279,24 @@ func migrate(db *sql.DB) error {
 	}
 	if len(gpuCols) > 0 && !gpuCols["power_limit_w"] {
 		if _, err := db.Exec(`ALTER TABLE gpu_samples ADD COLUMN power_limit_w REAL`); err != nil {
+			return err
+		}
+	}
+	// Fase 10.L: the job-log columns of requests, and the clock of gpu_samples.
+	// Old rows keep NULL (read as 0 / "").
+	for _, c := range []struct{ name, ddl string }{
+		{"responded", `ALTER TABLE requests ADD COLUMN responded INTEGER`},
+		{"resp_bytes", `ALTER TABLE requests ADD COLUMN resp_bytes INTEGER`},
+		{"backend", `ALTER TABLE requests ADD COLUMN backend TEXT`},
+	} {
+		if !have[c.name] {
+			if _, err := db.Exec(c.ddl); err != nil {
+				return err
+			}
+		}
+	}
+	if len(gpuCols) > 0 && !gpuCols["clock_mhz"] {
+		if _, err := db.Exec(`ALTER TABLE gpu_samples ADD COLUMN clock_mhz REAL`); err != nil {
 			return err
 		}
 	}
@@ -377,6 +426,7 @@ func (s *Store) Close() error {
 	close(s.ch)
 	s.closeMu.Unlock()
 	s.wg.Wait()
+	_ = s.jdb.Close()
 	return s.db.Close()
 }
 
@@ -436,8 +486,8 @@ func (s *Store) writeBatch(batch []item) int {
 			err = s.insertRecord(tx, it.rec)
 		case kGPU:
 			for _, g := range it.gpu {
-				_, err = tx.Exec(`INSERT INTO gpu_samples(ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,boot_id,power_limit_w) VALUES(?,?,?,?,?,?,?,?,?,?)`,
-					g.TS.UnixMilli(), g.GPU, g.BusID, g.PowerW, g.MemUsedMiB, g.UtilPct, g.TempC, g.AER, s.opts.BootID, g.PowerLimitW)
+				_, err = tx.Exec(`INSERT INTO gpu_samples(ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,boot_id,power_limit_w,clock_mhz) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+					g.TS.UnixMilli(), g.GPU, g.BusID, g.PowerW, g.MemUsedMiB, g.UtilPct, g.TempC, g.AER, s.opts.BootID, g.PowerLimitW, g.ClockMHz)
 				if err != nil {
 					break
 				}
@@ -482,13 +532,37 @@ func ms(t time.Time) int64 {
 	return t.UnixMilli()
 }
 
-func (s *Store) insertRecord(tx *sql.Tx, r queue.Record) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
+// upsertRecordSQL writes the end of a request. The row may already exist: the
+// job log (jobs.go) wrote it as na_fila / em_execucao, so this is an UPSERT that
+// keeps the rowid (the row cap relies on it) and the backend written at the
+// start. INSERT OR REPLACE would drop both.
+const upsertRecordSQL = `INSERT INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''))
+		ON CONFLICT(id) DO UPDATE SET client_ip=excluded.client_ip, client_label=excluded.client_label, tool=excluded.tool,
+		endpoint=excluded.endpoint, model=excluded.model, lane=excluded.lane, priority_in=excluded.priority_in,
+		priority_final=excluded.priority_final, bytes_in=excluded.bytes_in, enqueued_at=excluded.enqueued_at,
+		started_at=excluded.started_at, finished_at=excluded.finished_at, wait_ms=excluded.wait_ms, run_ms=excluded.run_ms,
+		status=excluded.status, http_status=excluded.http_status, error_class=excluded.error_class,
+		prompt_eval_count=excluded.prompt_eval_count, eval_count=excluded.eval_count, load_ms=excluded.load_ms,
+		boot_id=excluded.boot_id, think=excluded.think, responded=excluded.responded, resp_bytes=excluded.resp_bytes,
+		backend=COALESCE(excluded.backend, requests.backend)`
+
+func (s *Store) recordArgs(r queue.Record) []any {
+	return []any{r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
 		ms(r.EnqueuedAt), ms(r.StartedAt), ms(r.FinishedAt), r.WaitMS, r.RunMS, r.Status, r.HTTPStatus, r.ErrorClass,
-		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think)
+		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think, boolInt(r.Responded), r.RespBytes, ""}
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func (s *Store) insertRecord(tx *sql.Tx, r queue.Record) error {
+	_, err := tx.Exec(upsertRecordSQL, s.recordArgs(r)...)
 	return err
 }
 
@@ -567,6 +641,12 @@ type Row struct {
 	LoadMS        int64  `json:"load_ms"`
 	BootID        string `json:"boot_id"`
 	Think         string `json:"think"` // on, off, modelo or "" (rows before 9.6a)
+	// Fase 10.L (job log). Responded: the model returned an answer; RespBytes:
+	// bytes of generated text received; Backend: where it ran ("" if it never
+	// started).
+	Responded bool   `json:"responded"`
+	RespBytes int64  `json:"resp_bytes"`
+	Backend   string `json:"backend"`
 }
 
 // HistoryQuery filters the history. Zero fields do not filter.
@@ -578,14 +658,19 @@ type HistoryQuery struct {
 	Offset       int
 }
 
-const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think`
+const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,COALESCE(responded,0),COALESCE(resp_bytes,0),COALESCE(backend,'')`
+
+// inFlightSQL leaves out the jobs that have not ended (Fase 10.L): History is
+// the list of what finished; Jobs (jobs.go) lists everything.
+const inFlightSQL = `status NOT IN ('na_fila','em_execucao')`
 
 func scanRow(sc interface{ Scan(...any) error }) (Row, error) {
 	var r Row
 	var bootID, ec, think sql.NullString
+	var responded int
 	err := sc.Scan(&r.ID, &r.ClientIP, &r.ClientLabel, &r.Tool, &r.Endpoint, &r.Model, &r.Lane, &r.PriorityIn, &r.PriorityFinal, &r.BytesIn,
-		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think)
-	r.ErrorClass, r.BootID, r.Think = ec.String, bootID.String, think.String
+		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think, &responded, &r.RespBytes, &r.Backend)
+	r.ErrorClass, r.BootID, r.Think, r.Responded = ec.String, bootID.String, think.String, responded != 0
 	return r, err
 }
 
@@ -597,7 +682,7 @@ func (s *Store) History(ctx context.Context, q HistoryQuery) ([]Row, error) {
 	if q.Limit > 1000 {
 		q.Limit = 1000
 	}
-	where, args := "1=1", []any{}
+	where, args := inFlightSQL, []any{}
 	if !q.Since.IsZero() {
 		where += " AND enqueued_at >= ?"
 		args = append(args, q.Since.UnixMilli())
@@ -725,7 +810,7 @@ func (s *Store) GPUSince(ctx context.Context, since time.Time, limit int) ([]GPU
 	if limit <= 0 || limit > 100000 {
 		limit = 20000
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,COALESCE(power_limit_w,-1) FROM gpu_samples WHERE ts >= ? ORDER BY ts LIMIT ?`, since.UnixMilli(), limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT ts,gpu,bus_id,power_w,mem_used_mib,util_pct,temp_c,aer_corr_1b4,COALESCE(power_limit_w,-1),COALESCE(clock_mhz,-1) FROM gpu_samples WHERE ts >= ? ORDER BY ts LIMIT ?`, since.UnixMilli(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -734,7 +819,7 @@ func (s *Store) GPUSince(ctx context.Context, since time.Time, limit int) ([]GPU
 	for rows.Next() {
 		var g GPURow
 		var ts int64
-		if err := rows.Scan(&ts, &g.GPU, &g.BusID, &g.PowerW, &g.MemUsedMiB, &g.UtilPct, &g.TempC, &g.AER, &g.PowerLimitW); err != nil {
+		if err := rows.Scan(&ts, &g.GPU, &g.BusID, &g.PowerW, &g.MemUsedMiB, &g.UtilPct, &g.TempC, &g.AER, &g.PowerLimitW, &g.ClockMHz); err != nil {
 			return nil, err
 		}
 		g.TS = time.UnixMilli(ts)
@@ -807,6 +892,9 @@ func (s *Store) Prune(ctx context.Context, now time.Time) (reqs, gpus int64, err
 	}
 	gpus, _ = g.RowsAffected()
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM cpu_samples WHERE ts < ?`, now.Add(-s.opts.GPUKeep).UnixMilli()); err != nil {
+		return reqs, gpus, err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM job_gpu_samples WHERE ts < ?`, now.Add(-s.opts.JobGPUKeep).UnixMilli()); err != nil {
 		return reqs, gpus, err
 	}
 	return reqs, gpus, nil

@@ -93,7 +93,60 @@ func TestQueryAllTiersFail(t *testing.T) {
 		return nil, errors.New("not found")
 	}}
 	s := c.Once(context.Background())
-	if !strings.Contains(s.Err, "nvidia-smi") || calls != 3 {
+	if !strings.Contains(s.Err, "nvidia-smi") || calls != 5 { // Fase 10.L: 5 tiers (clocks.gr added)
 		t.Fatalf("calls %d %+v", calls, s)
+	}
+}
+
+// Fase 10.L: clocks.gr is the 9th column; it proves the clock lock.
+const smiOutClock = `0, 00000000:03:00.0, 95.20, 12000, 80, 55, 100.00, 250.00, 1395
+1, 00000000:04:00.0, 90.00, 12000, 75, 54, 100.00, 250.00, 1400
+2, 00000000:05:00.0, 3.10, 5, 0, 40, 100.00, 250.00, 210
+3, 00000000:06:00.0, 3.10, 5, 0, 40, 100.00, 250.00, [N/A]
+`
+
+func TestParseCSVWithClock(t *testing.T) {
+	s, err := ParseCSV(smiOutClock, time.Now())
+	if err != nil || len(s) != 4 {
+		t.Fatal(err, s)
+	}
+	if s[0].ClockMHz != 1395 || s[1].ClockMHz != 1400 || s[2].ClockMHz != 210 || s[3].ClockMHz != -1 {
+		t.Fatalf("clocks %v %v %v %v", s[0].ClockMHz, s[1].ClockMHz, s[2].ClockMHz, s[3].ClockMHz)
+	}
+	if s[0].PowerLimitW != 100 || s[0].PowerMaxW != 250 {
+		t.Fatalf("limits lost: %+v", s[0])
+	}
+	old, _ := ParseCSV(smiOutLimit, time.Now())
+	if old[0].ClockMHz != -1 {
+		t.Fatalf("8 columns must give clock -1, got %v", old[0].ClockMHz)
+	}
+}
+
+func TestDefaultQueryAsksForClocksGr(t *testing.T) {
+	if !strings.Contains(queryOf(DefaultArgs), "clocks.gr") {
+		t.Fatal("clocks.gr missing from the default query")
+	}
+	var asked string
+	c := &Collector{AERPath: "-", Run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		asked = queryOf(args)
+		return []byte(smiOutClock), nil
+	}}
+	snap := c.Once(context.Background())
+	if snap.Err != "" || snap.Samples[0].ClockMHz != 1395 || !strings.Contains(asked, "clocks.gr") {
+		t.Fatalf("%q %+v", asked, snap)
+	}
+}
+
+// A driver without clocks.gr keeps working (falls back, clock -1).
+func TestQueryFallsBackWithoutClock(t *testing.T) {
+	c := &Collector{AERPath: "-", Run: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		if strings.Contains(queryOf(args), "clocks.gr") {
+			return nil, errors.New("not a valid field")
+		}
+		return []byte(smiOutLimit), nil
+	}}
+	s := c.Once(context.Background())
+	if s.Err != "" || s.Samples[0].ClockMHz != -1 || s.Samples[0].PowerLimitW != 100 {
+		t.Fatalf("%+v", s)
 	}
 }

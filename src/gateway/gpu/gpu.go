@@ -22,16 +22,20 @@ const DefaultAERPath = "/sys/bus/pci/devices/0000:00:1b.4/aer_dev_correctable"
 const baseFields = "index,pci.bus_id,power.draw,memory.used,utilization.gpu,temperature.gpu"
 
 // DefaultArgs is the fixed nvidia-smi query: the base fields plus the power
-// cap in force (enforced.power.limit) and the card ceiling (power.max_limit).
+// cap in force (enforced.power.limit), the card ceiling (power.max_limit) and
+// the current graphics clock (clocks.gr, Fase 10.L: it proves the clock lock).
 var DefaultArgs = []string{
-	"--query-gpu=" + baseFields + ",enforced.power.limit,power.max_limit",
+	"--query-gpu=" + baseFields + ",enforced.power.limit,power.max_limit,clocks.gr",
 	"--format=csv,noheader,nounits",
 }
 
 // fallbackArgs are tried, in order, when a driver rejects the query above
 // (an unknown field makes nvidia-smi fail as a whole): power.limit instead of
-// enforced.power.limit, then no limit columns at all.
+// enforced.power.limit; then the same two without the clock; then no limit
+// columns at all.
 var fallbackArgs = [][]string{
+	{"--query-gpu=" + baseFields + ",power.limit,power.max_limit,clocks.gr", "--format=csv,noheader,nounits"},
+	{"--query-gpu=" + baseFields + ",enforced.power.limit,power.max_limit", "--format=csv,noheader,nounits"},
 	{"--query-gpu=" + baseFields + ",power.limit,power.max_limit", "--format=csv,noheader,nounits"},
 	{"--query-gpu=" + baseFields, "--format=csv,noheader,nounits"},
 }
@@ -43,12 +47,14 @@ type Sample struct {
 	PowerW float64 `json:"power_w"`
 	// PowerLimitW is the power cap in force and PowerMaxW the card ceiling;
 	// -1 when the driver does not report them.
-	PowerLimitW float64   `json:"power_limit_w"`
-	PowerMaxW   float64   `json:"power_max_w"`
-	MemUsedMiB  int       `json:"mem_used_mib"`
-	UtilPct     int       `json:"util_pct"`
-	TempC       int       `json:"temp_c"`
-	At          time.Time `json:"at"`
+	PowerLimitW float64 `json:"power_limit_w"`
+	PowerMaxW   float64 `json:"power_max_w"`
+	// ClockMHz is the current graphics clock (clocks.gr); -1 when unreported.
+	ClockMHz   float64   `json:"clock_mhz"`
+	MemUsedMiB int       `json:"mem_used_mib"`
+	UtilPct    int       `json:"util_pct"`
+	TempC      int       `json:"temp_c"`
+	At         time.Time `json:"at"`
 }
 
 // Snapshot is the latest reading.
@@ -226,7 +232,8 @@ func oneLine(s string) string {
 }
 
 // ParseCSV parses the nvidia-smi query output (csv, noheader, nounits): 6
-// columns, or 8 with the power limit and ceiling. A base field the driver
+// columns, 8 with the power limit and ceiling, or 9 with the graphics clock
+// too. A base field the driver
 // cannot report ("[N/A]", "N/A") becomes 0; a missing or N/A limit is -1.
 func ParseCSV(out string, at time.Time) ([]Sample, error) {
 	r := csv.NewReader(strings.NewReader(strings.TrimSpace(out)))
@@ -241,7 +248,7 @@ func ParseCSV(out string, at time.Time) ([]Sample, error) {
 	}
 	var res []Sample
 	for _, f := range recs {
-		if len(f) != 6 && len(f) != 8 {
+		if len(f) != 6 && len(f) != 8 && len(f) != 9 {
 			return nil, fmt.Errorf("saída inesperada: %d colunas", len(f))
 		}
 		idx, err := strconv.Atoi(strings.TrimSpace(f[0]))
@@ -254,11 +261,14 @@ func ParseCSV(out string, at time.Time) ([]Sample, error) {
 			MemUsedMiB:  int(num(f[3])),
 			UtilPct:     int(num(f[4])),
 			TempC:       int(num(f[5])),
-			PowerLimitW: -1, PowerMaxW: -1,
+			PowerLimitW: -1, PowerMaxW: -1, ClockMHz: -1,
 		})
-		if len(f) == 8 {
+		if len(f) >= 8 {
 			last := &res[len(res)-1]
 			last.PowerLimitW, last.PowerMaxW = numOr(f[6], -1), numOr(f[7], -1)
+			if len(f) == 9 {
+				last.ClockMHz = numOr(f[8], -1)
+			}
 		}
 	}
 	return res, nil

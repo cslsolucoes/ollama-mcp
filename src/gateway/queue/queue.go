@@ -101,6 +101,14 @@ const (
 	StatusRemoved       = "removido"        // waiting request removed by the administrator
 	StatusRejected      = "rejeitado"       // queue full
 	StatusExpired       = "expirado"        // MaxWait elapsed
+
+	// Job-log states (Fase 10.L). The queue never emits a Record with these: the
+	// journal writes them (na_fila at the entry, em_execucao at the start) and the
+	// store assigns the last two when it finds a job of a dead process.
+	StatusQueued             = "na_fila"
+	StatusRunning            = "em_execucao"
+	StatusInterruptedReboot  = "interrompido_reboot"  // the job was in flight when the host rebooted (boot_id changed)
+	StatusInterruptedRestart = "interrompido_gateway" // in flight when the gateway process died (same boot_id)
 )
 
 // Config tunes a Manager. Zero values take the defaults below.
@@ -164,6 +172,13 @@ type Request struct {
 	PriorityFinal Priority // what the gateway granted
 	BytesIn       int64
 	Think         string // reasoning mode: on, off, modelo or "" (Fase 9.6a)
+
+	// OnAccepted, when set, is called once with the "na_fila" Record after the
+	// line accepted the request (never for a rejection). It runs in the caller's
+	// goroutine, outside the lock, BEFORE Acquire waits for the slot, so the job
+	// log can write the entry durably before the request can start (Fase 10.L).
+	// It may block (it is a synchronous write); it must not call the Manager.
+	OnAccepted func(Record)
 }
 
 // Result is what the proxy reports when the request ends.
@@ -174,6 +189,8 @@ type Result struct {
 	PromptEval int64
 	Eval       int64
 	LoadMS     int64
+	Responded  bool  // the model returned some answer (text, or embeddings)
+	RespBytes  int64 // bytes of generated text received (0 for embeddings)
 }
 
 // Record is the metadata row of a request (no text, plan section 5).
@@ -200,6 +217,8 @@ type Record struct {
 	Eval          int64
 	LoadMS        int64
 	Think         string // reasoning mode (Fase 9.6a)
+	Responded     bool   // Fase 10.L: some answer came back
+	RespBytes     int64  // Fase 10.L: bytes of generated text received
 }
 
 type state int
@@ -358,6 +377,8 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 	if req.ID == "" {
 		req.ID = NewID()
 	}
+	onAccepted := req.OnAccepted
+	req.OnAccepted = nil // the Ticket must not keep the closure (it may hold the whole prompt)
 	t := &Ticket{
 		ID: req.ID, m: m, req: req, ready: make(chan struct{}),
 		level: req.PriorityFinal, enqueued: now,
@@ -397,8 +418,13 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 	if t.st == stRunning {
 		t.Position = 0 // started at once
 	}
+	accepted := m.endRecord(t, now, Result{})
+	accepted.Status, accepted.StartedAt, accepted.FinishedAt, accepted.RunMS, accepted.WaitMS = StatusQueued, time.Time{}, time.Time{}, 0, 0
 	m.changed()
 	m.unlockOp()
+	if onAccepted != nil {
+		onAccepted(accepted)
+	}
 
 	timer := time.NewTimer(m.cfg.MaxWait)
 	defer timer.Stop()
@@ -473,6 +499,7 @@ func (m *Manager) endRecord(t *Ticket, now time.Time, r Result) Record {
 		BytesIn: t.req.BytesIn, Think: t.req.Think, EnqueuedAt: t.enqueued, FinishedAt: now,
 		Status: r.Status, HTTPStatus: r.HTTPStatus, ErrorClass: r.ErrorClass,
 		PromptEval: r.PromptEval, Eval: r.Eval, LoadMS: r.LoadMS,
+		Responded: r.Responded, RespBytes: r.RespBytes,
 	}
 	if rec.PriorityFinal == 0 {
 		rec.PriorityFinal = t.level
@@ -512,6 +539,28 @@ func (t *Ticket) Release(r Result) {
 
 // Req returns the request data of the ticket.
 func (t *Ticket) Req() Request { return t.req }
+
+// StartedAt is the instant the slot was granted (valid once Acquire returned).
+func (t *Ticket) StartedAt() time.Time {
+	t.m.mu.Lock()
+	defer t.m.mu.Unlock()
+	return t.started
+}
+
+// RunningIDs returns the ids of the requests holding a slot right now (both
+// lanes), for the per-job GPU extract.
+func (m *Manager) RunningIDs() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var ids []string
+	for _, lane := range []Lane{LaneGen, LaneEmbed} {
+		for id := range m.running[lane] {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
 
 // FinalPriority is the priority the request had when it started.
 func (t *Ticket) FinalPriority() Priority {

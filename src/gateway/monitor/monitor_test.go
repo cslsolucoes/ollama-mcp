@@ -566,8 +566,8 @@ func TestAdminFilePermissions(t *testing.T) {
 func TestThinkColumnInPageAndState(t *testing.T) {
 	f := newFixture(t, false, queue.Config{GenSlots: 1})
 	page := do(f.h, "GET", "/monitor", "", nil).Body.String()
-	if n := strings.Count(page, `"Raciocínio"`); n != 3 {
-		t.Fatalf("the Raciocínio column must be in the 3 tables, found %d", n)
+	if n := strings.Count(page, `"Raciocínio"`); n != 4 { // running, waiting, recent + the Fase 10.L job log table
+		t.Fatalf("the Raciocínio column must be in the 4 tables, found %d", n)
 	}
 	tk, err := f.q.Acquire(context.Background(), queue.Request{Lane: queue.LaneGen, ClientIP: "10.0.0.7", ClientLabel: "h/1", Model: "qwen3-ia", Think: "off"})
 	if err != nil {

@@ -23,6 +23,7 @@ th{color:var(--mut);font-weight:600;font-size:12px}
 .wrap{overflow-x:auto}
 .empty{color:var(--mut);padding:6px 0}
 .pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:12px;border:1px solid var(--line)}
+.na_fila{color:var(--mut)}.em_execucao{color:var(--acc);font-weight:600}.interrompido_reboot,.interrompido_gateway{color:var(--bad);font-weight:600}
 .alta{color:var(--bad)}.baixa{color:var(--mut)}.ok{color:var(--ok)}.erro,.cancelado_admin,.removido,.rejeitado,.expirado{color:var(--bad)}.cancelado{color:var(--warn)}
 button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:2px 8px;cursor:pointer}
 button:hover{border-color:var(--acc)}
@@ -39,6 +40,8 @@ input{font:inherit;border:1px solid var(--line);background:var(--card);color:var
 .tbar .fill{display:block;height:100%;background:var(--chart)}
 .tbar .pct{width:42px;text-align:right}
 .sub{margin:12px 0 4px}
+.mb8{margin-bottom:8px}
+.dim{opacity:.6}
 .pbar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:4px 0}
 .pbar span{display:block;height:100%;background:var(--chart)}
 .pbar.hot span{background:var(--warn)}
@@ -55,6 +58,15 @@ svg text{fill:var(--mut);font-size:9px}
 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc);font-weight:600}
 .tabs button:hover{color:var(--fg)}
+select{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:3px 6px}
+.det{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0 0 12px;display:grid;gap:10px}
+.det[hidden]{display:none}
+.det .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:2px 16px}
+.det .kv div span{color:var(--mut)}
+.det pre{white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto;margin:4px 0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font:12px/1.4 ui-monospace,Consolas,monospace}
+.det .sc{max-height:260px;overflow:auto}
+svg .line.s0{stroke:#2f6fed}svg .line.s1{stroke:#e0783a}svg .line.s2{stroke:#22a06b}svg .line.s3{stroke:#b64fd0}svg .line.s4{stroke:#c9a000}svg .line.s5{stroke:#17a2b8}
+.lg{margin-right:10px;font-size:12px}.lg.s0{color:#2f6fed}.lg.s1{color:#e0783a}.lg.s2{color:#22a06b}.lg.s3{color:#b64fd0}.lg.s4{color:#c9a000}.lg.s5{color:#17a2b8}
 </style>
 </head>
 <body>
@@ -65,7 +77,8 @@ svg text{fill:var(--mut);font-size:9px}
 <main>
   <div id="msg" role="status"></div>
   <div class="cards" id="cards"></div>
-  <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div></section>
+  <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div>
+    <div class="l sub" id="donehead"></div><div class="wrap"><table id="donelist"></table></div></section>
   <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div></section>
   <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
   <section><h2>CPU / RAM</h2><div class="gpus" id="cpucards"></div><div class="threads" id="cputhreads"></div><div id="cpumeta" class="empty"></div></section>
@@ -79,9 +92,21 @@ svg text{fill:var(--mut);font-size:9px}
     <div class="tabs" role="tablist" aria-label="Histórico">
       <button type="button" role="tab" id="tabbtn-recent" data-tab="recent" aria-controls="tab-recent" aria-selected="true">Concluídos recentes</button>
       <button type="button" role="tab" id="tabbtn-events" data-tab="events" aria-controls="tab-events" aria-selected="false">Eventos</button>
+      <button type="button" role="tab" id="tabbtn-joblog" data-tab="joblog" aria-controls="tab-joblog" aria-selected="false">Log em tempo real</button>
     </div>
     <div role="tabpanel" id="tab-recent" aria-labelledby="tabbtn-recent"><div class="wrap"><table id="recent"></table></div></div>
     <div role="tabpanel" id="tab-events" aria-labelledby="tabbtn-events" hidden><div class="wrap"><table id="events"></table></div></div>
+    <div role="tabpanel" id="tab-joblog" aria-labelledby="tabbtn-joblog" hidden>
+      <div class="row mb8" id="jlbar">
+        <button type="button" id="jlexport" title="Baixa o log de jobs">Exportar log</button>
+        <select id="jlfmt" aria-label="Formato"><option value="jsonl">JSONL</option><option value="csv">CSV</option></select>
+        <select id="jlsince" aria-label="Período"><option value="">tudo (7 dias)</option><option value="3600000">última hora</option><option value="86400000">últimas 24 h</option></select>
+        <label><input type="checkbox" id="jlcontent" disabled> incluir prompt e resposta (admin)</label>
+        <span id="jlmeta" class="empty"></span>
+      </div>
+      <div class="det" id="jobdetail" hidden></div>
+      <div class="wrap"><table id="joblog"></table></div>
+    </div>
   </section>
   <section><h2>Auditoria (ações do administrador)</h2><div class="wrap"><table id="audit"></table></div></section>
 </main>
@@ -205,12 +230,14 @@ function render(s) {
         bar.appendChild(fillP); d.appendChild(bar);
         bar.title = "uso do limite de potência: " + (use / lim * 100).toFixed(0) + "%" + (x.power_max_w > 0 ? " (teto da placa: " + Number(x.power_max_w).toFixed(0) + " W)" : "");
       }
-      d.appendChild(el("div", x.mem_used_mib + " MiB · " + x.util_pct + "% · " + x.temp_c + " °C"));
+      d.appendChild(el("div", x.mem_used_mib + " MiB · " + x.util_pct + "% · " + x.temp_c + " °C" + (x.clock_mhz > 0 ? " · " + Math.round(x.clock_mhz) + " MHz" : "")));
       g.appendChild(d);
     });
   }
   renderCPU(s.cpu);
   renderModels(s.models);
+  renderJobs(s);
+  renderDone(s);
   var aer = gs ? (gs.aer_corr_1b4 >= 0 ? "AER 00:1b.4 (corrigíveis): " + gs.aer_corr_1b4 : "AER 00:1b.4: indisponível") : "GPU: coletor desligado";
   meta.textContent = aer + (gs && gs.error ? " · " + gs.error : "") + (s.dropped ? " · registros descartados: " + s.dropped : "");
 }
@@ -312,7 +339,7 @@ function renderAuth() {
   if (loggedIn) {
     a.appendChild(el("span", "administrador", "pill"));
     var out = el("button", "Sair"); out.type = "button";
-    out.addEventListener("click", function () { post("/monitor/api/logout").then(function () { loggedIn = false; csrf = ""; renderAuth(); if (lastState) render(lastState); }); });
+    out.addEventListener("click", function () { post("/monitor/api/logout").then(function () { loggedIn = false; csrf = ""; renderAuth(); if (lastState) render(lastState); if (selJob) { selFinal = false; loadDetail(true); } }); });
     a.appendChild(out);
   } else {
     var u = el("input"); u.placeholder = "usuário"; u.autocomplete = "username"; u.size = 10;
@@ -321,7 +348,7 @@ function renderAuth() {
     function go() {
       fetch("/monitor/api/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: u.value, password: p.value }) })
         .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
-        .then(function (x) { if (x.s === 200) { csrf = x.j.csrf; loggedIn = true; msg(""); renderAuth(); if (lastState) render(lastState); loadAudit(); } else msg(x.j.error || "Falha no login"); });
+        .then(function (x) { if (x.s === 200) { csrf = x.j.csrf; loggedIn = true; msg(""); renderAuth(); if (lastState) render(lastState); loadAudit(); if (selJob) { selFinal = false; loadDetail(true); } } else msg(x.j.error || "Falha no login"); });
     }
     b.addEventListener("click", go); p.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
     a.appendChild(u); a.appendChild(p); a.appendChild(b);
@@ -338,9 +365,176 @@ function connect() {
 function startPolling() { if (!pollTimer) { poll(); pollTimer = setInterval(poll, 1000); } }
 function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
-// Tabs for "Concluídos recentes" / "Eventos"; the chosen tab is remembered per browser.
+
+// ---- Log em tempo real (Fase 10.L). The list comes in the SSE state; the detail of
+// one job is fetched while it is open and the job has not ended. The prompt and the
+// answer come from a separate endpoint that answers only to the administrator. Every
+// value (the text above all) goes in with textContent.
+var selJob = null, selFinal = false, lastDetail = 0;
+function isFinal(st) { return st !== "na_fila" && st !== "em_execucao"; }
+function respLabel(j) {
+  if (!isFinal(j.status)) return { text: "-" };
+  if (j.responded) return j.status === "ok" ? { text: "sim", cls: "ok" } : { text: "parcial", cls: "cancelado" };
+  return { text: "não", cls: "alta" };
+}
+function statusText(st) {
+  var m = { ok: "concluído", na_fila: "na fila", em_execucao: "em execução", interrompido_reboot: "interrompido (reboot)", interrompido_gateway: "interrompido (gateway)" };
+  return m[st] || st;
+}
+function renderJobs(s) {
+  var jobs = s.jobs || [], now = new Date(s.now).getTime();
+  $("jlmeta").textContent = "mostrando os " + jobs.length + " mais recentes (limite " + (s.jobs_limit || 200) + ")" + (s.content_enabled ? "" : " · conteúdo não é gravado (--log-content=false)");
+  $("jlcontent").disabled = !loggedIn || !s.content_enabled;
+  var rows = jobs.map(function (j) {
+    var fin = isFinal(j.status);
+    var wait = j.started_at ? j.wait_ms : now - j.enqueued_at;
+    var run = fin ? j.run_ms : (j.started_at ? now - j.started_at : 0);
+    var b = el("button", "Detalhes"); b.type = "button";
+    b.addEventListener("click", function () { openJob(j.id); });
+    return [fmtTime(j.enqueued_at), { text: statusText(j.status), cls: j.status }, who(j), j.tool, j.model, thinkLabel(j.think), fmtMs(wait), j.started_at ? fmtMs(run) : "-",
+      fin ? j.prompt_eval_count + " / " + j.eval_count : "-", respLabel(j), j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-", j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-", b];
+  });
+  table("joblog", ["Entrada", "Status", "Cliente", "Tool", "Modelo", "Raciocínio", "Esperou", "Rodou", "Tokens (prompt / gerados)", "Resposta", "Pico W", "Pico clock", ""], rows, "Nenhum job registrado ainda.");
+  if (selJob && !selFinal) loadDetail(false);
+}
+// "Concluídos nos últimos N min": finished requests stay in view for --monitor-keep-done,
+// dimmed, with the final status in colour and a countdown. Display only: they hold no slot.
+function mmss(ms) { var t = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
+function renderDone(s) {
+  var keep = Number(s.keep_done_ms) || 0, now = new Date(s.now).getTime();
+  var head = $("donehead");
+  if (keep <= 0) { head.textContent = ""; table("donelist", [], [], ""); $("donelist").parentNode.hidden = true; return; }
+  $("donelist").parentNode.hidden = false;
+  head.textContent = "Concluídos nos últimos " + Math.round(keep / 60000) + " min";
+  function dim(v) { return { text: v, cls: "dim" }; }
+  var rows = (s.recent_done || []).map(function (j) {
+    var left = j.finished_at + keep - now;
+    if (left <= 0) return null;
+    var b = el("button", "Detalhes"); b.type = "button";
+    b.addEventListener("click", function () { openJob(j.id); });
+    return [dim(fmtTime(j.finished_at)), { text: statusText(j.status), cls: j.status === "ok" ? "ok" : "erro" }, dim(j.client_label), dim(j.tool), dim(j.model),
+      dim(fmtMs(j.run_ms)), dim(j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-"), dim(j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-"),
+      dim("some em " + mmss(left)), b];
+  }).filter(function (r) { return r; });
+  table("donelist", ["Fim", "Status", "Cliente", "Tool", "Modelo", "Rodou", "Pico W", "Pico clock", "Some em", ""], rows, "Nenhum pedido concluído nos últimos minutos.");
+}
+function mkTable(heads, rows) {
+  var t = el("table"), hd = el("thead"), tr = el("tr");
+  heads.forEach(function (h) { tr.appendChild(el("th", h)); }); hd.appendChild(tr); t.appendChild(hd);
+  var tb = el("tbody");
+  rows.forEach(function (cells) { var r = el("tr"); cells.forEach(function (c) { r.appendChild(el("td", c)); }); tb.appendChild(r); });
+  t.appendChild(tb); return t;
+}
+function seriesChart(title, byGpu, key, unit) {
+  var box = el("div"); box.appendChild(el("div", title, "l"));
+  var ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 300 90"); svg.setAttribute("preserveAspectRatio", "none");
+  var ids = Object.keys(byGpu).map(Number).sort(function (a, b) { return a - b; }), max = 1, t0 = Infinity, t1 = -Infinity;
+  ids.forEach(function (g) { byGpu[g].forEach(function (p) { if (p[key] > max) max = p[key]; if (p.ts < t0) t0 = p.ts; if (p.ts > t1) t1 = p.ts; }); });
+  [20, 50, 80].forEach(function (y) { var l = document.createElementNS(ns, "line"); l.setAttribute("x1", 0); l.setAttribute("x2", 300); l.setAttribute("y1", y); l.setAttribute("y2", y); l.setAttribute("class", "grid"); svg.appendChild(l); });
+  var span = Math.max(1, t1 - t0), legend = el("div");
+  ids.forEach(function (g) {
+    var pts = byGpu[g];
+    if (pts.length > 1) {
+      var d = pts.map(function (p) { return ((p.ts - t0) / span * 300).toFixed(1) + "," + (85 - Math.max(0, p[key]) / max * 70).toFixed(1); }).join(" ");
+      var pl = document.createElementNS(ns, "polyline"); pl.setAttribute("points", d); pl.setAttribute("class", "line s" + (g % 6)); svg.appendChild(pl);
+    }
+    legend.appendChild(el("span", "GPU " + g, "lg s" + (g % 6)));
+  });
+  var t = document.createElementNS(ns, "text"); t.setAttribute("x", 3); t.setAttribute("y", 10); t.textContent = "máx " + Math.round(max) + " " + unit; svg.appendChild(t);
+  box.appendChild(svg); box.appendChild(legend); return box;
+}
+function renderDetail(d, c, cstate) {
+  var j = d.job, box = $("jobdetail"); box.textContent = "";
+  var head = el("div", null, "row");
+  head.appendChild(el("b", "Job " + j.id));
+  head.appendChild(el("span", statusText(j.status), "pill " + j.status));
+  var cl = el("button", "Fechar"); cl.type = "button"; cl.addEventListener("click", closeJob); head.appendChild(cl);
+  box.appendChild(head);
+  var kv = el("div", null, "kv");
+  [["Entrada", j.enqueued_at ? new Date(j.enqueued_at).toLocaleString("pt-BR") : ""], ["Início", j.started_at ? new Date(j.started_at).toLocaleString("pt-BR") : "-"],
+   ["Fim", j.finished_at ? new Date(j.finished_at).toLocaleString("pt-BR") : "-"], ["Cliente", (j.client_label || "") + " (" + (j.client_ip || "") + ")"],
+   ["Tool", j.tool], ["Endpoint", j.endpoint], ["Modelo", j.model], ["Modo de raciocínio", thinkLabel(j.think)], ["Faixa", j.lane], ["Prioridade", j.priority_in + " → " + j.priority_final],
+   ["Backend", j.backend || "-"], ["Bytes enviados", j.bytes_in], ["Esperou", fmtMs(j.wait_ms)], ["Rodou", fmtMs(j.run_ms)], ["HTTP", j.http_status], ["Classe do erro", j.error_class || "-"],
+   ["Tokens prompt / gerados", j.prompt_eval_count + " / " + j.eval_count], ["Carga do modelo", fmtMs(j.load_ms)], ["Houve resposta", respLabel(j).text], ["Bytes de resposta", j.resp_bytes],
+   ["Pico de potência", j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-"], ["Pico de clock", j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-"],
+   ["Segundos de extrato", j.samples], ["Boot", (j.boot_id || "").slice(0, 8)]].forEach(function (p) {
+    var row = el("div"); row.appendChild(el("span", p[0] + ": ")); row.appendChild(document.createTextNode(String(p[1] === null || p[1] === undefined ? "" : p[1]))); kv.appendChild(row);
+  });
+  box.appendChild(kv);
+
+  var samples = d.samples || [], byGpu = {}, byTs = {}, tsList = [], gpus = {}, hasCPU = false;
+  samples.forEach(function (x) {
+    if (!byTs[x.ts]) { byTs[x.ts] = {}; tsList.push(x.ts); }
+    byTs[x.ts][x.gpu] = x;
+    if (x.gpu < 0) { hasCPU = true; return; }
+    gpus[x.gpu] = true;
+    (byGpu[x.gpu] = byGpu[x.gpu] || []).push({ ts: new Date(x.ts).getTime(), w: x.power_w, mhz: x.clock_mhz });
+  });
+  var gl = Object.keys(gpus).map(Number).sort(function (a, b) { return a - b; });
+  if (!samples.length) {
+    box.appendChild(el("div", isFinal(j.status) ? "Sem extrato de GPU para este job (não rodou, ou passou da retenção)." : "Aguardando o primeiro segundo do extrato...", "empty"));
+  } else {
+    var charts = el("div", null, "charts");
+    charts.appendChild(seriesChart("Potência por GPU (W)", byGpu, "w", "W"));
+    charts.appendChild(seriesChart("Clock por GPU (MHz)", byGpu, "mhz", "MHz"));
+    box.appendChild(charts);
+    var heads = ["Hora"].concat(gl.map(function (g) { return "GPU " + g; }));
+    if (hasCPU) heads.push("CPU");
+    var shown = tsList.slice(-600);
+    var rows = shown.map(function (ts) {
+      var r = [new Date(ts).toLocaleTimeString("pt-BR")];
+      gl.forEach(function (g) {
+        var x = byTs[ts][g];
+        r.push(x ? Math.round(x.power_w) + " W · " + (x.clock_mhz > 0 ? Math.round(x.clock_mhz) + " MHz" : "- MHz") + " · " + x.util_pct + "% · " + x.temp_c + " °C" : "");
+      });
+      if (hasCPU) { var cx = byTs[ts][-1]; r.push(cx ? (cx.util_pct >= 0 ? cx.util_pct + "%" : "-") + " · " + cx.temp_c + " °C" : ""); }
+      return r;
+    });
+    box.appendChild(el("div", "Extrato segundo a segundo" + (tsList.length > shown.length ? " (últimos " + shown.length + " de " + tsList.length + " s)" : " (" + tsList.length + " s)"), "l"));
+    var sc = el("div", null, "sc"); sc.appendChild(mkTable(heads, rows)); box.appendChild(sc);
+  }
+
+  var cbox = el("div"); cbox.appendChild(el("div", "Prompt e resposta", "l"));
+  if (!d.content_enabled) cbox.appendChild(el("div", "O conteúdo não é gravado (--log-content=false).", "empty"));
+  else if (!loggedIn) cbox.appendChild(el("div", "entre como admin para ver o conteúdo", "empty"));
+  else if (cstate === "none") cbox.appendChild(el("div", "Sem conteúdo para este job (apagado pela retenção ou pelo teto).", "empty"));
+  else if (c) {
+    cbox.appendChild(el("div", "Prompt (" + c.prompt_bytes + " bytes" + (c.prompt_truncated ? ", TRUNCADO" : "") + ") · sha256 " + (c.prompt_sha256 || "").slice(0, 16), "l"));
+    cbox.appendChild(el("pre", c.prompt));
+    cbox.appendChild(el("div", "Resposta (" + c.resp_bytes + " bytes" + (c.resp_truncated ? ", TRUNCADA" : "") + (c.resp_final ? "" : ", PARCIAL/em andamento") + ")", "l"));
+    cbox.appendChild(el("pre", c.response));
+  } else cbox.appendChild(el("div", "carregando...", "empty"));
+  box.appendChild(cbox);
+}
+function openJob(id) { selJob = id; selFinal = false; $("jobdetail").hidden = false; lastDetail = 0; loadDetail(true); $("jobdetail").scrollIntoView({ block: "nearest" }); }
+function closeJob() { selJob = null; $("jobdetail").hidden = true; $("jobdetail").textContent = ""; }
+function loadDetail(force) {
+  if (!selJob) return;
+  var id = selJob, now = Date.now();
+  if (!force && now - lastDetail < 1000) return;
+  lastDetail = now;
+  fetch("/monitor/api/jobs/" + id, { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+    if (id !== selJob || !d.job) return;
+    if (isFinal(d.job.status)) selFinal = true;
+    if (!loggedIn || !d.content_enabled) { renderDetail(d, null, ""); return; }
+    return fetch("/monitor/api/jobs/" + id + "/content", { credentials: "same-origin" }).then(function (r) {
+      if (r.status === 404) return { none: true };
+      if (r.status === 401) { loggedIn = false; renderAuth(); return null; }
+      return r.json();
+    }).then(function (c) { if (id !== selJob) return; renderDetail(d, c && !c.none ? c : null, c && c.none ? "none" : ""); });
+  }).catch(function () {});
+}
+$("jlexport").addEventListener("click", function () {
+  var q = ["formato=" + $("jlfmt").value], since = $("jlsince").value;
+  if (since) q.push("desde=" + (Date.now() - Number(since)));
+  if ($("jlcontent").checked && loggedIn) q.push("conteudo=1");
+  window.location.href = "/monitor/api/jobs/export?" + q.join("&");
+});
+
+// Tabs for "Concluídos recentes" / "Eventos" / "Log em tempo real"; the chosen tab is remembered per browser.
 function showTab(name) {
-  ["recent", "events"].forEach(function (n) {
+  ["recent", "events", "joblog"].forEach(function (n) {
     var on = n === name;
     $("tabbtn-" + n).setAttribute("aria-selected", on ? "true" : "false");
     $("tab-" + n).hidden = !on;
@@ -350,7 +544,7 @@ function showTab(name) {
 Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
   b.addEventListener("click", function () { showTab(b.getAttribute("data-tab")); });
 });
-(function () { var t = "recent"; try { t = localStorage.getItem("monitor.tab") || "recent"; } catch (x) {} showTab(t === "events" ? "events" : "recent"); })();
+(function () { var t = "recent"; try { t = localStorage.getItem("monitor.tab") || "recent"; } catch (x) {} showTab(t === "events" || t === "joblog" ? t : "recent"); })();
 
 fetch("/monitor/api/session", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
   adminEnabled = !!j.admin_enabled; loggedIn = !!j.logged_in; csrf = j.csrf || ""; renderAuth();

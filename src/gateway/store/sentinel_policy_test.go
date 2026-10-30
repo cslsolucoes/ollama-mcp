@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/content"
+	"github.com/cslsoftwares/mcpollama/gateway/joblog"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
@@ -35,6 +37,13 @@ func TestSentinelSurvivesThePolicies(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
+	contentPath := filepath.Join(filepath.Dir(dbPath), "content.db")
+	cs, err := content.Open(contentPath, content.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	jr := &joblog.Journal{Store: st, Content: cs}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.Copy(io.Discard, r.Body)
 		io.WriteString(w, `{"response":"","done":true,"prompt_eval_count":1,"eval_count":2}`+"\n")
@@ -43,8 +52,9 @@ func TestSentinelSurvivesThePolicies(t *testing.T) {
 	uu, _ := url.Parse(up.URL)
 	var mu sync.Mutex
 	var logs []string
-	q := queue.New(queue.Config{OnRecord: st.Record})
+	q := queue.New(queue.Config{OnRecord: jr.Finish})
 	h, err := proxy.New(proxy.Config{
+		Journal:  jr,
 		Upstream: uu, Queue: q, AllowedModels: []string{"qwen3-ia"},
 		ThinkSuffix: "-think", StripOptions: proxy.DefaultStripOptions,
 		Logf: func(f string, a ...any) { mu.Lock(); logs = append(logs, f); mu.Unlock() },
@@ -107,21 +117,38 @@ func TestSentinelSurvivesThePolicies(t *testing.T) {
 			t.Fatalf("a 400 echoed the body: %s", a)
 		}
 	}
+	// Fase 10.L: the prompts of the two accepted jobs live in content.db only;
+	// the rejected bodies (400/403) were never queued, so they are in no file.
 	scan := func(label string) {
 		for _, suffix := range []string{"", "-wal", "-shm"} {
-			b, err := os.ReadFile(dbPath + suffix)
-			if err != nil {
-				if os.IsNotExist(err) {
-					continue
+			for _, f := range []string{dbPath, contentPath} {
+				b, err := os.ReadFile(f + suffix)
+				if err != nil {
+					if os.IsNotExist(err) {
+						continue
+					}
+					t.Fatal(err)
 				}
-				t.Fatal(err)
-			}
-			for _, s := range []string{ok1, ok2, bad} {
-				if bytes.Contains(b, []byte(s)) {
-					t.Fatalf("%s: sentinel %q in %s%s", label, s, filepath.Base(dbPath), suffix)
+				banned := []string{bad}
+				if f == dbPath {
+					banned = append(banned, ok1, ok2)
+				}
+				for _, s := range banned {
+					if bytes.Contains(b, []byte(s)) {
+						t.Fatalf("%s: sentinel %q in %s%s", label, s, filepath.Base(f), suffix)
+					}
 				}
 			}
 		}
+	}
+	foundP := 0
+	for _, r := range rows {
+		if c, ok, _ := cs.Get(context.Background(), r.ID); ok && (strings.Contains(c.Prompt, ok1) || strings.Contains(c.Prompt, ok2)) {
+			foundP++
+		}
+	}
+	if foundP != 2 {
+		t.Fatalf("the two accepted prompts must be in content.db, found %d", foundP)
 	}
 	scan("open")
 	found := false
