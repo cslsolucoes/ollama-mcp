@@ -102,7 +102,8 @@ if ($Modo -eq 'Preparar') { Write-Host "`nPronto (so preparo)." -ForegroundColor
 
 if ($Modo -eq 'Atualizar') {
     Passo 'Reiniciando o gateway com o binario novo'
-    Invoke-Remoto 'systemctl restart mcpollama-gateway && sleep 2 && systemctl is-active mcpollama-gateway && /usr/local/bin/mcpollama-gateway --version && curl -s -m 5 -o /dev/null -w "gateway /api/version: %{http_code}\n" http://127.0.0.1:11500/api/version && curl -s -m 5 -o /dev/null -w "gateway /monitor: %{http_code}\n" http://127.0.0.1:11500/monitor'
+    # sem aspas duplas no comando remoto: o PowerShell 5.1 as remove ao chamar o ssh.exe
+    Invoke-Remoto 'systemctl restart mcpollama-gateway && sleep 2 && systemctl is-active mcpollama-gateway && /usr/local/bin/mcpollama-gateway --version && echo gateway_api_version=$(curl -s -m 5 -o /dev/null -w %{http_code} http://127.0.0.1:11500/api/version) && echo gateway_monitor=$(curl -s -m 5 -o /dev/null -w %{http_code} http://127.0.0.1:11500/monitor)'
     Write-Host "`nBinario atualizado." -ForegroundColor Green
     return
 }
