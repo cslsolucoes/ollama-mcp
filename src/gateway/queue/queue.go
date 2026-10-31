@@ -187,6 +187,13 @@ type Request struct {
 	BytesIn       int64
 	Think         string // reasoning mode: on, off, modelo or "" (Fase 9.6a)
 
+	// Station* is what the workstation declared in X-Mcpollama-Station, already
+	// validated by the proxy ("" when absent or invalid). Not authenticated.
+	StationComputer string
+	StationUser     string
+	StationDomain   string
+	StationMAC      string
+
 	// OnAccepted, when set, is called once with the "na_fila" Record after the
 	// line accepted the request (never for a rejection). It runs in the caller's
 	// goroutine, outside the lock, BEFORE Acquire waits for the slot, so the job
@@ -239,6 +246,12 @@ type Record struct {
 	RespBytes     int64  // Fase 10.L: bytes of generated text received
 	Backend       string // Fase 10.4: where it ran ("" when it never started)
 	FailoverRule  string // Fase 10.4: why it did not run on the primary ("F2:S1", "" when it did)
+
+	// Declared by the workstation (X-Mcpollama-Station); not authenticated.
+	StationComputer string
+	StationUser     string
+	StationDomain   string
+	StationMAC      string
 }
 
 type state int
@@ -559,6 +572,8 @@ func (m *Manager) endRecord(t *Ticket, now time.Time, r Result) Record {
 		PromptEval: r.PromptEval, Eval: r.Eval, LoadMS: r.LoadMS,
 		Responded: r.Responded, RespBytes: r.RespBytes,
 		Backend: t.backend, FailoverRule: t.rule,
+		StationComputer: t.req.StationComputer, StationUser: t.req.StationUser,
+		StationDomain: t.req.StationDomain, StationMAC: t.req.StationMAC,
 	}
 	if rec.PriorityFinal == 0 {
 		rec.PriorityFinal = t.level

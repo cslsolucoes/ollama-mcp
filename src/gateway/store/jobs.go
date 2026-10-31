@@ -35,8 +35,8 @@ import (
 func (s *Store) JobEnqueued(r queue.Record) error {
 	args := s.recordArgs(r)
 	_, err := s.jdb.Exec(`INSERT INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''))
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule,station_computer,station_user,station_domain,station_mac)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))
 		ON CONFLICT(id) DO NOTHING`, args...)
 	return err
 }

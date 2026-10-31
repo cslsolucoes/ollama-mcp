@@ -330,7 +330,8 @@ func isoMs(ms int64) string {
 
 var exportHeader = []string{"id", "entrada", "inicio", "fim", "status", "http", "classe_erro", "cliente", "ip", "tool", "endpoint", "modelo",
 	"raciocinio", "faixa", "prioridade", "backend", "bytes_enviados", "espera_ms", "execucao_ms", "tokens_prompt", "tokens_gerados",
-	"houve_resposta", "bytes_resposta", "pico_w", "pico_clock_mhz", "segundos_de_extrato", "boot_id"}
+	"houve_resposta", "bytes_resposta", "pico_w", "pico_clock_mhz", "segundos_de_extrato", "boot_id",
+	"maquina", "usuario", "dominio", "mac"}
 
 func exportCells(j store.JobRow) []string {
 	i := func(n int64) string { return strconv.FormatInt(n, 10) }
@@ -341,7 +342,8 @@ func exportCells(j store.JobRow) []string {
 	}
 	return []string{j.ID, isoMs(j.EnqueuedAt), isoMs(j.StartedAt), isoMs(j.FinishedAt), csvSafe(j.Status), strconv.Itoa(j.HTTPStatus), csvSafe(j.ErrorClass),
 		csvSafe(j.ClientLabel), j.ClientIP, csvSafe(j.Tool), j.Endpoint, csvSafe(j.Model), j.Think, j.Lane, j.PriorityFinal, csvSafe(j.Backend),
-		i(j.BytesIn), i(j.WaitMS), i(j.RunMS), i(j.PromptEval), i(j.Eval), yes, i(j.RespBytes), f(j.PeakPowerW), f(j.PeakClockMHz), strconv.Itoa(j.Samples), j.BootID}
+		i(j.BytesIn), i(j.WaitMS), i(j.RunMS), i(j.PromptEval), i(j.Eval), yes, i(j.RespBytes), f(j.PeakPowerW), f(j.PeakClockMHz), strconv.Itoa(j.Samples), j.BootID,
+		csvSafe(j.StationComputer), csvSafe(j.StationUser), csvSafe(j.StationDomain), csvSafe(j.StationMAC)}
 }
 
 // apiJobsExport streams the job log as JSONL or CSV. Metadata only, unless

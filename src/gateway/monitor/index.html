@@ -581,7 +581,8 @@ function renderDetail(d, c, cstate) {
    ["Backend", j.backend || "-"], ["Bytes enviados", j.bytes_in], ["Esperou", fmtMs(j.wait_ms)], ["Rodou", fmtMs(j.run_ms)], ["HTTP", j.http_status], ["Classe do erro", j.error_class || "-"],
    ["Tokens prompt / gerados", j.prompt_eval_count + " / " + j.eval_count], ["Carga do modelo", fmtMs(j.load_ms)], ["Houve resposta", respLabel(j).text], ["Bytes de resposta", j.resp_bytes],
    ["Pico de potência", j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-"], ["Pico de clock", j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-"],
-   ["Segundos de extrato", j.samples], ["Boot", (j.boot_id || "").slice(0, 8)]].forEach(function (p) {
+   ["Segundos de extrato", j.samples], ["Boot", (j.boot_id || "").slice(0, 8)],
+   ["Máquina", j.station_computer || "-"], ["Usuário", j.station_user || "-"], ["Domínio", j.station_domain || "-"], ["MAC", j.station_mac || "-"]].forEach(function (p) {
     var row = el("div"); row.appendChild(el("span", p[0] + ": ")); row.appendChild(document.createTextNode(String(p[1] === null || p[1] === undefined ? "" : p[1]))); kv.appendChild(row);
   });
   box.appendChild(kv);

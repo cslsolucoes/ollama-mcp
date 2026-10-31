@@ -36,6 +36,7 @@ import (
 // Request headers set by mcpollama (all optional).
 const (
 	HeaderClient   = "X-Mcpollama-Client"
+	HeaderStation  = "X-Mcpollama-Station" // computer=..;user=..;domain=..;mac=.. (declared, not authenticated)
 	HeaderTool     = "X-Mcpollama-Tool"
 	HeaderPriority = "X-Mcpollama-Priority"
 )
@@ -187,7 +188,7 @@ func New(cfg Config) (*Handler, error) {
 			pr.SetURL(target)
 			pr.Out.Host = target.Host
 			for _, k := range []string{"X-Real-Ip", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
-				"Authorization", "Cookie", HeaderClient, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID} {
+				"Authorization", "Cookie", HeaderClient, HeaderStation, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID} {
 				pr.Out.Header.Del(k)
 			}
 			// The only credential that reaches a backend is its own.
@@ -306,6 +307,62 @@ func cleanLabel(v string) string {
 	return v
 }
 
+// Station is what a workstation declares about itself in X-Mcpollama-Station.
+// Not authenticated: any client can send anything, so it is metadata only.
+type Station struct {
+	Computer, User, Domain, MAC string
+}
+
+const maxStationHeader = 512
+
+var (
+	stationValueRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+	stationMACRe   = regexp.MustCompile(`^[0-9A-F]{12}$`)
+)
+
+// parseStation reads the header strictly: computer=<v>;user=<v>;domain=<v>;mac=<v>.
+// Only those four keys, each at most once; values match [A-Za-z0-9._-]{1,64} and
+// the MAC is exactly 12 upper-case hex digits; the whole header is at most 512
+// bytes. Anything else (several header lines, an unknown or repeated key, a bad
+// value, an oversized header) yields an EMPTY Station for the whole header: the
+// request is never refused because of it.
+func parseStation(vals []string) Station {
+	if len(vals) != 1 || len(vals[0]) == 0 || len(vals[0]) > maxStationHeader {
+		return Station{}
+	}
+	var st Station
+	seen := map[string]bool{}
+	for _, part := range strings.Split(vals[0], ";") {
+		k, v, ok := strings.Cut(part, "=")
+		if !ok || seen[k] {
+			return Station{}
+		}
+		seen[k] = true
+		switch k {
+		case "computer", "user", "domain":
+			if !stationValueRe.MatchString(v) {
+				return Station{}
+			}
+			switch k {
+			case "computer":
+				st.Computer = v
+			case "user":
+				st.User = v
+			default:
+				st.Domain = v
+			}
+		case "mac":
+			if !stationMACRe.MatchString(v) {
+				return Station{}
+			}
+			st.MAC = v
+		default:
+			return Station{}
+		}
+	}
+	return st
+}
+
 func cleanTool(v string) string {
 	if v == "" {
 		return ""
@@ -418,6 +475,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if qreq.ClientLabel == "" {
 		qreq.ClientLabel = "anonimo"
 	}
+	st := parseStation(r.Header.Values(HeaderStation))
+	qreq.StationComputer, qreq.StationUser, qreq.StationDomain, qreq.StationMAC = st.Computer, st.User, st.Domain, st.MAC
 
 	jr := h.cfg.Journal
 	if jr != nil {

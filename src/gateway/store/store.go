@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS requests(
   wait_ms INTEGER, run_ms INTEGER,
   status TEXT, http_status INTEGER, error_class TEXT,
   prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT, think TEXT,
-  responded INTEGER, resp_bytes INTEGER, backend TEXT, failover_rule TEXT);
+  responded INTEGER, resp_bytes INTEGER, backend TEXT, failover_rule TEXT,
+  station_computer TEXT, station_user TEXT, station_domain TEXT, station_mac TEXT);
 CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, ts INTEGER, usuario TEXT, ip TEXT, acao TEXT, request_id TEXT,
   antes TEXT, depois TEXT, motivo TEXT);
@@ -296,6 +297,11 @@ func migrate(db *sql.DB) error {
 		// Fase 10.4: the rule that sent a job away from the primary. Idempotent: the
 		// column is added only when missing, so a second start changes nothing.
 		{"failover_rule", `ALTER TABLE requests ADD COLUMN failover_rule TEXT`},
+		// Station declared by the workstation (X-Mcpollama-Station), same idempotent rule.
+		{"station_computer", `ALTER TABLE requests ADD COLUMN station_computer TEXT`},
+		{"station_user", `ALTER TABLE requests ADD COLUMN station_user TEXT`},
+		{"station_domain", `ALTER TABLE requests ADD COLUMN station_domain TEXT`},
+		{"station_mac", `ALTER TABLE requests ADD COLUMN station_mac TEXT`},
 	} {
 		if !have[c.name] {
 			if _, err := db.Exec(c.ddl); err != nil {
@@ -553,9 +559,12 @@ func ms(t time.Time) int64 {
 // keeps the rowid (the row cap relies on it) and the backend written at the
 // start. INSERT OR REPLACE would drop both.
 const upsertRecordSQL = `INSERT INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''))
-		ON CONFLICT(id) DO UPDATE SET client_ip=excluded.client_ip, client_label=excluded.client_label, tool=excluded.tool,
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule,station_computer,station_user,station_domain,station_mac)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))
+		ON CONFLICT(id) DO UPDATE SET station_computer=COALESCE(excluded.station_computer, requests.station_computer),
+		station_user=COALESCE(excluded.station_user, requests.station_user),
+		station_domain=COALESCE(excluded.station_domain, requests.station_domain),
+		station_mac=COALESCE(excluded.station_mac, requests.station_mac), client_ip=excluded.client_ip, client_label=excluded.client_label, tool=excluded.tool,
 		endpoint=excluded.endpoint, model=excluded.model, lane=excluded.lane, priority_in=excluded.priority_in,
 		priority_final=excluded.priority_final, bytes_in=excluded.bytes_in, enqueued_at=excluded.enqueued_at,
 		started_at=excluded.started_at, finished_at=excluded.finished_at, wait_ms=excluded.wait_ms, run_ms=excluded.run_ms,
@@ -568,7 +577,8 @@ const upsertRecordSQL = `INSERT INTO requests(id,client_ip,client_label,tool,end
 func (s *Store) recordArgs(r queue.Record) []any {
 	return []any{r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
 		ms(r.EnqueuedAt), ms(r.StartedAt), ms(r.FinishedAt), r.WaitMS, r.RunMS, r.Status, r.HTTPStatus, r.ErrorClass,
-		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think, boolInt(r.Responded), r.RespBytes, r.Backend, r.FailoverRule}
+		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think, boolInt(r.Responded), r.RespBytes, r.Backend, r.FailoverRule,
+		r.StationComputer, r.StationUser, r.StationDomain, r.StationMAC}
 }
 
 func boolInt(b bool) int {
@@ -666,6 +676,11 @@ type Row struct {
 	Backend   string `json:"backend"`
 	// Fase 10.4: the rule that gave the job to a secondary ("" when it ran on the primary).
 	FailoverRule string `json:"failover_rule"`
+	// Declared by the workstation (X-Mcpollama-Station); not authenticated.
+	StationComputer string `json:"station_computer"`
+	StationUser     string `json:"station_user"`
+	StationDomain   string `json:"station_domain"`
+	StationMAC      string `json:"station_mac"`
 }
 
 // HistoryQuery filters the history. Zero fields do not filter.
@@ -677,7 +692,7 @@ type HistoryQuery struct {
 	Offset       int
 }
 
-const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,COALESCE(responded,0),COALESCE(resp_bytes,0),COALESCE(backend,''),COALESCE(failover_rule,'')`
+const rowCols = `id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,COALESCE(responded,0),COALESCE(resp_bytes,0),COALESCE(backend,''),COALESCE(failover_rule,''),COALESCE(station_computer,''),COALESCE(station_user,''),COALESCE(station_domain,''),COALESCE(station_mac,'')`
 
 // inFlightSQL leaves out the jobs that have not ended (Fase 10.L): History is
 // the list of what finished; Jobs (jobs.go) lists everything.
@@ -688,7 +703,8 @@ func scanRow(sc interface{ Scan(...any) error }) (Row, error) {
 	var bootID, ec, think sql.NullString
 	var responded int
 	err := sc.Scan(&r.ID, &r.ClientIP, &r.ClientLabel, &r.Tool, &r.Endpoint, &r.Model, &r.Lane, &r.PriorityIn, &r.PriorityFinal, &r.BytesIn,
-		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think, &responded, &r.RespBytes, &r.Backend, &r.FailoverRule)
+		&r.EnqueuedAt, &r.StartedAt, &r.FinishedAt, &r.WaitMS, &r.RunMS, &r.Status, &r.HTTPStatus, &ec, &r.PromptEval, &r.Eval, &r.LoadMS, &bootID, &think, &responded, &r.RespBytes, &r.Backend, &r.FailoverRule,
+		&r.StationComputer, &r.StationUser, &r.StationDomain, &r.StationMAC)
 	r.ErrorClass, r.BootID, r.Think, r.Responded = ec.String, bootID.String, think.String, responded != 0
 	return r, err
 }
