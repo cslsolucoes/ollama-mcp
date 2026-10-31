@@ -12,9 +12,10 @@ body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,Segoe
 header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
 h1{font-size:18px;margin:0}
 h2{font-size:14px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
-main{padding:16px;display:grid;gap:16px;max-width:1400px;margin:0 auto}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.card,section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px}
+main{padding:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:1400px;margin:0 auto}
+main>*{min-width:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:12px}
+.card,section{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0;overflow-wrap:anywhere}
 .card .v{font-size:26px;font-weight:600}
 .card .l{color:var(--mut);font-size:12px}
 table{width:100%;border-collapse:collapse}
@@ -29,9 +30,9 @@ button{font:inherit;border:1px solid var(--line);background:var(--card);color:va
 button:hover{border-color:var(--acc)}
 button.danger{color:var(--bad)}
 input{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:3px 6px}
-.gpus{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.gpus{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:10px}
 .gpu b{font-size:16px}
-.threads{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:10px}
+.threads{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:8px;margin-top:10px}
 .core{border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 .core .l{margin-bottom:4px}
 .tbar{display:flex;align-items:center;gap:6px;font-size:12px}
@@ -46,7 +47,7 @@ input{font:inherit;border:1px solid var(--line);background:var(--card);color:var
 .pbar span{display:block;height:100%;background:var(--chart)}
 .pbar.hot span{background:var(--warn)}
 .gpu b.hot{color:var(--warn)}
-.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:12px}
 svg{width:100%;height:90px;background:transparent}
 svg .grid{stroke:var(--line);stroke-width:1}
 svg .line{fill:none;stroke:var(--chart);stroke-width:1.6}
@@ -54,19 +55,29 @@ svg text{fill:var(--mut);font-size:9px}
 #status{font-size:12px;color:var(--mut)}
 #msg{min-height:1.2em;color:var(--warn)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 10px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 10px}
 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc);font-weight:600}
 .tabs button:hover{color:var(--fg)}
 select{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:3px 6px}
-.det{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0 0 12px;display:grid;gap:10px}
+.det{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0 0 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-width:0}
 .det[hidden]{display:none}
-.det .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:2px 16px}
+.det .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:2px 16px}
 .det .kv div span{color:var(--mut)}
 .det pre{white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto;margin:4px 0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font:12px/1.4 ui-monospace,Consolas,monospace}
 .det .sc{max-height:260px;overflow:auto}
 svg .line.s0{stroke:#2f6fed}svg .line.s1{stroke:#e0783a}svg .line.s2{stroke:#22a06b}svg .line.s3{stroke:#b64fd0}svg .line.s4{stroke:#c9a000}svg .line.s5{stroke:#17a2b8}
 .lg{margin-right:10px;font-size:12px}.lg.s0{color:#2f6fed}.lg.s1{color:#e0783a}.lg.s2{color:#22a06b}.lg.s3{color:#b64fd0}.lg.s4{color:#c9a000}.lg.s5{color:#17a2b8}
+/* Narrow windows: tighter paddings, stacked header; only the .wrap boxes scroll sideways. */
+@media (max-width:640px){
+header{flex-direction:column;align-items:flex-start;padding:8px}
+h1{font-size:16px}
+main{padding:8px;gap:8px}
+.card,section{padding:8px}
+.card .v{font-size:20px}
+#auth{width:100%}
+#auth input{flex:1 1 90px;min-width:0;width:auto}
+}
 </style>
 </head>
 <body>
@@ -133,24 +144,69 @@ function fmtExpires(v) {
 function fmtTime(ms) { if (!ms) return ""; var d = new Date(ms); return d.toLocaleTimeString("pt-BR"); }
 function msg(t) { $("msg").textContent = t || ""; }
 
+// Tables are redrawn on every SSE message (about 2 per second). To keep the scroll position of the .wrap
+// parent and the buttons (a click is lost when its button is swapped between mousedown and mouseup), a
+// table whose shape did not change is updated in place: only the text, class and title of the cells that
+// changed are touched, and a node cell (a button) with the same data-k key is kept as it is.
+function cellInfo(c) {
+  if (c && c.nodeType) return { node: c, k: c.dataset && c.dataset.k ? c.dataset.k : "" };
+  if (c && c.text !== undefined) return { text: String(c.text), cls: c.cls || "", title: c.title || "" };
+  return { text: c === null || c === undefined ? "" : String(c), cls: "", title: "" };
+}
+function cellFits(td, info) {
+  if (info.node) return !!info.k && !!td.firstElementChild && td.firstElementChild.dataset.k === info.k;
+  return !td.firstElementChild;
+}
+function tableFits(t, sig, infos) {
+  var tb = t.tBodies[0];
+  if (t._sig !== sig || !tb || tb.rows.length !== infos.length) return false;
+  return infos.every(function (cells, i) {
+    var tds = tb.rows[i].cells;
+    return tds.length === cells.length && cells.every(function (info, j) { return cellFits(tds[j], info); });
+  });
+}
 function table(id, heads, rows, emptyText) {
-  var t = $(id); t.textContent = "";
-  if (!rows.length) { var p = t.parentNode; t.style.display = "none"; var old = p.querySelector(".empty"); if (old) old.remove(); p.appendChild(el("div", emptyText, "empty")); return; }
-  t.style.display = ""; var oldE = t.parentNode.querySelector(".empty"); if (oldE) oldE.remove();
+  var t = $(id), p = t.parentNode, old = p.querySelector(".empty");
+  if (!rows.length) {
+    t._sig = null; t.textContent = ""; t.style.display = "none";
+    if (old && old.textContent === String(emptyText)) return;
+    if (old) old.remove();
+    p.appendChild(el("div", emptyText, "empty")); return;
+  }
+  if (old) old.remove();
+  t.style.display = "";
+  var infos = rows.map(function (cells) { return cells.map(cellInfo); });
+  var sig = heads.join("\u0001");
+  if (tableFits(t, sig, infos)) {
+    var trs = t.tBodies[0].rows;
+    infos.forEach(function (cells, i) {
+      cells.forEach(function (info, j) {
+        if (info.node) return; // same key: keep the node (and its listener)
+        var td = trs[i].cells[j];
+        if (td.textContent !== info.text) td.textContent = info.text;
+        if (td.className !== info.cls) td.className = info.cls;
+        if (info.title) { if (td.title !== info.title) td.title = info.title; } else if (td.hasAttribute("title")) td.removeAttribute("title");
+      });
+    });
+    return;
+  }
+  var sl = p.scrollLeft; // a rebuild must not send the scroll back to the start
+  t.textContent = ""; t._sig = sig;
   var thead = el("thead"), tr = el("tr");
   heads.forEach(function (h) { tr.appendChild(el("th", h)); });
   thead.appendChild(tr); t.appendChild(thead);
   var tb = el("tbody");
-  rows.forEach(function (cells) {
+  infos.forEach(function (cells) {
     var r = el("tr");
-    cells.forEach(function (c) {
+    cells.forEach(function (info) {
       var td = el("td");
-      if (c && c.nodeType) td.appendChild(c); else if (c && c.text !== undefined) { td.textContent = c.text; if (c.cls) td.className = c.cls; if (c.title) td.title = c.title; } else td.textContent = c === null || c === undefined ? "" : String(c);
+      if (info.node) td.appendChild(info.node); else { td.textContent = info.text; if (info.cls) td.className = info.cls; if (info.title) td.title = info.title; }
       r.appendChild(td);
     });
     tb.appendChild(r);
   });
   t.appendChild(tb);
+  p.scrollLeft = sl;
 }
 function thinkLabel(v) { return v === "on" ? "ligado" : v === "off" ? "desligado" : v === "modelo" ? "padrão do modelo" : "-"; }
 function who(it) { return { text: it.client_label || "", title: (it.client_ip || "") + " " + (it.client_label || "") }; }
@@ -177,11 +233,12 @@ function act(kind, id) {
   post(path, { reason: reason }).then(function (r) {
     if (r.status === 200) msg(""); else msg((r.body && r.body.error) || ("Erro " + r.status));
     if (r.status === 401) { loggedIn = false; renderAuth(); }
-    loadAudit(); if (lastState) render(lastState);
+    loadAudit(); if (lastState) safeRender(lastState);
   });
 }
 function btn(label, title, kind, id, cls) {
   var b = el("button", label, cls); b.title = title; b.type = "button";
+  b.dataset.k = kind + ":" + id; // stable key: table() keeps this node while the key is the same
   b.addEventListener("click", function () { act(kind, id); });
   return b;
 }
@@ -209,14 +266,37 @@ function renderBackends(list) {
   $("bkmeta").textContent = list && list.length > 1 ? (ov ? "Primário sobrecarregado: " + ov.rules + "." : "Primário sem sobrecarga.") + " A fila é uma só; slots e fila por backend contam só a geração." : "Um só backend (sem --backends): comportamento de sempre.";
 }
 
+// sameSig reports whether box was last drawn from the same data; otherwise it records the new data.
+// The caller redraws the box when it returns false.
+function sameSig(box, data) {
+  var sig = JSON.stringify(data === undefined ? null : data);
+  if (box._sig === sig) return true;
+  box._sig = sig; return false;
+}
+// safeRender draws the state; a drawing error is shown in #msg (and the console) instead of being swallowed,
+// and it never reaches the EventSource handlers.
+var renderFailed = false;
+function safeRender(s) {
+  try {
+    render(s);
+    if (renderFailed) { renderFailed = false; msg(""); }
+  } catch (x) {
+    console.error(x);
+    renderFailed = true;
+    msg("Erro ao desenhar o painel: " + (x && x.message ? x.message : x));
+  }
+}
 function render(s) {
   lastState = s;
   $("status").textContent = "versão " + s.version + " · boot " + (s.boot_id || "?").slice(0, 8) + " · ativo há " + fmtMs(s.uptime_s * 1000) + " · atualizado " + new Date(s.now).toLocaleTimeString("pt-BR");
-  var c = s.cards, cards = $("cards"); cards.textContent = "";
+  var c = s.cards, cards = $("cards");
+  if (sameSig(cards, c)) { /* unchanged: keep the nodes (and their tooltips) */ } else {
+  cards.textContent = "";
   [["Em execução", c.running], ["Na fila", c.waiting], ["Concluídos hoje", c.done_today], ["Erros hoje", c.errors_today],
    ["Espera p50 (15 min)", fmtMs(c.wait_p50_ms)], ["Espera p95 (15 min)", fmtMs(c.wait_p95_ms)],
    ["Tokens/s (15 min)", Number(c.tokens_per_sec || 0).toFixed(1).replace(".", ",")], ["Pedidos/min (15 min)", Number(c.per_minute || 0).toFixed(1).replace(".", ",")]]
     .forEach(function (x) { var d = el("div", null, "card"); d.appendChild(el("div", x[1], "v")); d.appendChild(el("div", x[0], "l")); cards.appendChild(d); });
+  }
 
   var q = s.queue, slots = q.slots || {}, inuse = q.in_use || {};
   var runRows = q.running.map(function (it) {
@@ -228,7 +308,7 @@ function render(s) {
     "Nada em execução (slots: geração " + (inuse.geracao || 0) + "/" + (slots.geracao || 0) + ", embed " + (inuse.embed || 0) + "/" + (slots.embed || 0) + ").");
 
   var waitRows = q.waiting.map(function (it) {
-    var box = el("div", null, "row");
+    var box = el("div", null, "row"); box.dataset.k = "wbox:" + it.id + ":" + (loggedIn ? 1 : 0);
     if (loggedIn) {
       box.appendChild(btn("▲", "Promover", "promote", it.id)); box.appendChild(btn("▼", "Despromover", "demote", it.id)); box.appendChild(btn("✕", "Remover da fila", "remove", it.id, "danger"));
     }
@@ -244,9 +324,9 @@ function render(s) {
   var ev = (s.events || []).map(function (e) { return [new Date(e.TS || e.ts).toLocaleString("pt-BR"), e.Kind || e.kind, e.Detail || e.detail]; });
   table("events", ["Quando", "Tipo", "Detalhe"], ev, "Sem eventos.");
 
-  var g = $("gpus"); g.textContent = "";
-  var gs = s.gpu, meta = $("gpumeta");
-  if (gs && gs.samples && gs.samples.length) {
+  var g = $("gpus"), gs = s.gpu, meta = $("gpumeta");
+  if (!sameSig(g, gs && gs.samples)) g.textContent = "";
+  if (gs && gs.samples && gs.samples.length && !g.firstChild) {
     gs.samples.forEach(function (x) {
       var d = el("div", null, "card gpu");
       d.appendChild(el("div", "GPU " + x.index + " · " + x.bus_id, "l"));
@@ -277,6 +357,7 @@ function num1(v) { return Number(v).toFixed(1).replace(".", ","); }
 function gb(mib) { return mib >= 0 ? num1(mib / 1024) : "-"; }
 function renderCPU(c) {
   var box = $("cpucards"), th = $("cputhreads"), meta = $("cpumeta");
+  if (sameSig(box, c)) return; // nothing changed: keep the nodes
   box.textContent = ""; th.textContent = "";
   if (!c) { meta.textContent = "CPU/RAM: coletor desligado"; return; }
   function card(label, value, sub) {
@@ -368,7 +449,7 @@ function renderAuth() {
   if (loggedIn) {
     a.appendChild(el("span", "administrador", "pill"));
     var out = el("button", "Sair"); out.type = "button";
-    out.addEventListener("click", function () { post("/monitor/api/logout").then(function () { loggedIn = false; csrf = ""; renderAuth(); if (lastState) render(lastState); if (selJob) { selFinal = false; loadDetail(true); } }); });
+    out.addEventListener("click", function () { post("/monitor/api/logout").then(function () { loggedIn = false; csrf = ""; renderAuth(); if (lastState) safeRender(lastState); if (selJob) { selFinal = false; loadDetail(true); } }); });
     a.appendChild(out);
   } else {
     var u = el("input"); u.placeholder = "usuário"; u.autocomplete = "username"; u.size = 10;
@@ -377,18 +458,23 @@ function renderAuth() {
     function go() {
       fetch("/monitor/api/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: u.value, password: p.value }) })
         .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
-        .then(function (x) { if (x.s === 200) { csrf = x.j.csrf; loggedIn = true; msg(""); renderAuth(); if (lastState) render(lastState); loadAudit(); if (selJob) { selFinal = false; loadDetail(true); } } else msg(x.j.error || "Falha no login"); });
+        .then(function (x) { if (x.s === 200) { csrf = x.j.csrf; loggedIn = true; msg(""); renderAuth(); if (lastState) safeRender(lastState); loadAudit(); if (selJob) { selFinal = false; loadDetail(true); } } else msg(x.j.error || "Falha no login"); });
     }
     b.addEventListener("click", go); p.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
     a.appendChild(u); a.appendChild(p); a.appendChild(b);
   }
 }
 
-function poll() { fetch("/monitor/api/state", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(render).catch(function () { $("status").textContent = "sem conexão com o servidor"; }); }
+function poll() { fetch("/monitor/api/state", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(safeRender).catch(function () { $("status").textContent = "sem conexão com o servidor"; }); }
 function connect() {
   if (!window.EventSource) { startPolling(); return; }
   es = new EventSource("/monitor/api/stream");
-  es.onmessage = function (e) { try { render(JSON.parse(e.data)); } catch (x) {} stopPolling(); };
+  es.onmessage = function (e) {
+    var s = null;
+    try { s = JSON.parse(e.data); } catch (x) { console.error(x); msg("Erro ao desenhar o painel: resposta inválida do servidor"); renderFailed = true; }
+    if (s) safeRender(s);
+    stopPolling();
+  };
   es.onerror = function () { startPolling(); };
 }
 function startPolling() { if (!pollTimer) { poll(); pollTimer = setInterval(poll, 1000); } }
@@ -414,11 +500,18 @@ function renderJobs(s) {
   var jobs = s.jobs || [], now = new Date(s.now).getTime();
   $("jlmeta").textContent = "mostrando os " + jobs.length + " mais recentes (limite " + (s.jobs_limit || 200) + ")" + (s.content_enabled ? "" : " · conteúdo não é gravado (--log-content=false)");
   $("jlcontent").disabled = !loggedIn || !s.content_enabled;
+  // s.jobs comes from the SQLite (written every few seconds): a job that just ended can still read "em execução".
+  // The same id in s.recent_done already has the final status, so it wins.
+  var ended = {};
+  (s.recent_done || []).forEach(function (d) { if (d && d.id && isFinal(d.status)) ended[d.id] = d; });
   var rows = jobs.map(function (j) {
+    var e = !isFinal(j.status) ? ended[j.id] : null;
+    if (e) j = Object.assign({}, j, { status: e.status, finished_at: e.finished_at, run_ms: e.run_ms, wait_ms: j.wait_ms || e.wait_ms, started_at: j.started_at || e.started_at,
+      prompt_eval_count: e.prompt_eval_count || 0, eval_count: e.eval_count || 0, responded: j.responded || e.responded });
     var fin = isFinal(j.status);
     var wait = j.started_at ? j.wait_ms : now - j.enqueued_at;
     var run = fin ? j.run_ms : (j.started_at ? now - j.started_at : 0);
-    var b = el("button", "Detalhes"); b.type = "button";
+    var b = el("button", "Detalhes"); b.type = "button"; b.dataset.k = "det:" + j.id;
     b.addEventListener("click", function () { openJob(j.id); });
     return [fmtTime(j.enqueued_at), { text: statusText(j.status), cls: j.status }, who(j), j.tool, j.model, backendCell(j), thinkLabel(j.think), fmtMs(wait), j.started_at ? fmtMs(run) : "-",
       fin ? j.prompt_eval_count + " / " + j.eval_count : "-", respLabel(j), j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-", j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-", b];
@@ -439,7 +532,7 @@ function renderDone(s) {
   var rows = (s.recent_done || []).map(function (j) {
     var left = j.finished_at + keep - now;
     if (left <= 0) return null;
-    var b = el("button", "Detalhes"); b.type = "button";
+    var b = el("button", "Detalhes"); b.type = "button"; b.dataset.k = "det:" + j.id;
     b.addEventListener("click", function () { openJob(j.id); });
     return [dim(fmtTime(j.finished_at)), { text: statusText(j.status), cls: j.status === "ok" ? "ok" : "erro" }, dim(j.client_label), dim(j.tool), dim(j.model),
       dim(fmtMs(j.run_ms)), dim(j.peak_power_w > 0 ? Math.round(j.peak_power_w) + " W" : "-"), dim(j.peak_clock_mhz > 0 ? Math.round(j.peak_clock_mhz) + " MHz" : "-"),

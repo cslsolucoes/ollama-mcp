@@ -8,6 +8,29 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 (`<versão>-<hash curto do commit>`, definido na compilação por `-X main.Version`). O que não deu para confirmar está marcado
 **(data/versão a conferir)**.
 
+## Não lançado
+
+Mudanças já no ramo `master`, sem binário nem implantação ainda (2026-10-30).
+
+### mcpollama 0.9.1
+- Rótulo padrão do cliente (commit `54ad2d6`): `<máquina>/<usuário>` em vez de `<hostname>/<pid>` (o domínio do Windows,
+  `DOMINIO\usuario`, é removido; sem usuário, volta para `<máquina>/<pid>`). Todas as sessões do mesmo usuário passam a dividir
+  **um só cliente** na justiça da fila (limite de 16 por cliente). `--client-label` continua sobrescrevendo.
+
+### mcpollama-gateway 0.12.2 (painel `/monitor`)
+- **Responsivo:** a coluna do `<main>` passou a poder encolher (`minmax(0,1fr)`) e as grades de cards, GPUs, CPU, gráficos e do
+  detalhe do job quebram em telas estreitas (`minmax(min(<valor>,100%),1fr)`); abaixo de 640 px os espaçamentos diminuem e o
+  cabeçalho empilha. Antes, a ~570 e ~720 px as seções ficavam mais largas que a janela e cards, GPUs, Backends e threads eram
+  cortados à direita. Só as tabelas, dentro do `.wrap`, rolam na horizontal.
+- **Tabelas estáveis:** a cada mensagem (~2/s) o painel reconstruía todas as tabelas, o que zerava a rolagem horizontal e
+  trocava os botões (Detalhes, Cancelar, ▲▼✕, Drenar) entre o mousedown e o mouseup (cliques perdidos). Agora uma tabela de
+  mesmo formato é atualizada no lugar (só texto, classe e título das células que mudaram), os botões têm chave estável
+  (`data-k`) e são mantidos, e uma reconstrução preserva o `scrollLeft`. Cards de GPU/CPU só são redesenhados se o dado mudar.
+- **Erros de desenho visíveis:** o `catch` vazio do `onmessage` foi trocado por `console.error` e pela linha "Erro ao desenhar o
+  painel: ..." em `#msg` (some quando um desenho seguinte dá certo); o erro não derruba o EventSource.
+- Aba "Log em tempo real": um job que acabou de terminar, ainda "em execução" na lista vinda do SQLite, passa a mostrar o status
+  final vindo de `recent_done`.
+
 ## mcpollama
 
 ### [0.9.0] - 2026-10-30 (tag `mcpollama-v0.9.0`)

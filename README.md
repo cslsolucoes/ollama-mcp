@@ -207,7 +207,7 @@ diagnóstico, está no [CLAUDE.md](CLAUDE.md).
 | `--max-chunks` | `MCPOLLAMA_MAX_CHUNKS` | `40` (teto de chamadas do map-reduce por arquivo) |
 | `--pdf-cache-dir` | `MCPOLLAMA_PDF_CACHE_DIR` | sem padrão (absoluto; sem ele nada é gravado e o 1º PDF leva ~8 s a mais) |
 | `--ocr-lib` e `--ocr-lib-sha256` | `MCPOLLAMA_OCR_LIB`, `MCPOLLAMA_OCR_LIB_SHA256` | sem padrão (juntas, ligam o OCR) |
-| `--client-label` | `MCPOLLAMA_CLIENT_LABEL` | `<hostname>/<pid>` (rótulo que aparece no `/monitor`) |
+| `--client-label` | `MCPOLLAMA_CLIENT_LABEL` | `<máquina>/<usuário>` (rótulo que aparece no `/monitor`; sem usuário, `<máquina>/<pid>`) |
 | `--tools-verbosity` | `MCPOLLAMA_TOOLS_VERBOSITY` | `full` (`compact` encurta o `tools/list`) |
 | `--ollama-url-fallback` | `OLLAMA_HOST_FALLBACK` | sem padrão: **desligado**. Segundo servidor, tentado **uma vez** quando o primário dá erro de conexão ou 503 de fila cheia; a linha `[uso]` ganha `backend=fallback` |
 | `--fallback-api-key` | `OLLAMA_FALLBACK_API_KEY` | sem padrão (Bearer **do fallback**; o token do primário nunca vai para ele; só com `https://` ou loopback) |

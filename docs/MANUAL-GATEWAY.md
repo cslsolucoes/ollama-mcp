@@ -56,7 +56,7 @@ O que muda:
 
 | Cliente | Mudança |
 | --- | --- |
-| **mcpollama** (MCP) | Manda `X-Mcpollama-Client` (rótulo, `--client-label`, padrão `<hostname>/<pid>`) e `X-Mcpollama-Tool`. Lê `X-Queue-Ms` e mostra `queue_ms` na linha `[uso]`. Em **503 com `Retry-After`** repete **uma vez** (só se sobrar tempo no `--timeout`). Em **409** (administrador removeu/cancelou) não repete. Não manda prioridade nem `think` (usa o padrão do gateway). |
+| **mcpollama** (MCP) | Manda `X-Mcpollama-Client` (rótulo, `--client-label`, padrão `<máquina>/<usuário>`, ou `<máquina>/<pid>` se não houver usuário) e `X-Mcpollama-Tool`. Lê `X-Queue-Ms` e mostra `queue_ms` na linha `[uso]`. Em **503 com `Retry-After`** repete **uma vez** (só se sobrar tempo no `--timeout`). Em **409** (administrador removeu/cancelou) não repete. Não manda prioridade nem `think` (usa o padrão do gateway). |
 | **ia-local** (OpenClaude, `/v1`) | Sem rótulo: aparece como `anonimo` (a justiça por IP continua valendo). Por padrão o gateway **desliga o raciocínio** no `/v1`; para ligar, use o modelo `qwen3-ia-think` (seção 5). |
 | **Qualquer um** | Respostas ganham `X-Request-Id`, `X-Queue-Ms` (quanto esperou) e `X-Queue-Position` (posição na entrada). O gateway remove `keep_alive`, `num_ctx` e opções de GPU do corpo e decide o raciocínio (seção 5). Pedido fora da lista de modelos dá 403. |
 
