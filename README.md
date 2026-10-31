@@ -69,11 +69,11 @@ Em produção (2026-10-30):
 
 | Componente | Versão (tag) | Onde |
 | --- | --- | --- |
-| `mcpollama-mcp` | **0.9.0** (`mcpollama-v0.9.0`, `0.9.0-c4031f7`, gerado em 2026-10-30; vale após reiniciar o Claude Code) | `D:\MCP\mcpollama-mcp.exe` (estações) |
-| `mcpollama-gateway` | **0.12.1** (`gateway-v0.12.1`, `0.12.1-c4031f7`, desde 2026-10-30 20:46), com o pool de backends | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
+| `mcpollama-mcp` | **0.9.1** (`mcpollama-v0.9.1`, `0.9.1-755f168`; sessões reiniciadas em 2026-10-30 23:31). Rótulo padrão `<máquina>/<usuário>` | `D:\MCP\mcpollama-mcp.exe` (estações) |
+| `mcpollama-gateway` | **0.12.3** (`gateway-v0.12.3`, `0.12.3-55fd624`, desde 2026-10-30 22:35), com o pool de backends; fila 64 por cliente/IP e 128 no total | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
 
-Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `gateway-v0.11.1`, `gateway-v0.12.0` e `gateway-v0.12.1`. O histórico de versões está no
-[CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5) vai no binário `0.9.0`, **desligado por padrão**.
+Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `gateway-v0.11.1`, `gateway-v0.12.0`, `gateway-v0.12.1`, `gateway-v0.12.2` e `gateway-v0.12.3`. O histórico de versões está no
+[CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5, desde o `0.9.0`) segue no binário atual, **desligado por padrão**.
 
 | Fase | Assunto | Estado |
 | --- | --- | --- |
@@ -87,6 +87,7 @@ Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `gateway-v0.11.1`,
 | 8 | Bake-off de modelos: `qwen3-ia` = `qwen3.5:9b`; argumento `think` por chamada | concluída |
 | 9 | Gateway: fila, políticas, `/monitor`, SQLite, instalador | concluída (2026-10-30) |
 | 10 | Log de jobs, pool de backends e fallback (faixa CPU descartada) | **10.1 a 10.8 concluídas; plano congelado em 2026-10-30**; 10.S (secundário) pendente, sem data |
+| 11 | Túnel WebSocket e jobs assíncronos ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md)) | **congelada em 2026-10-30 23:50** (decisão do owner); só o spike 11.1 foi feito ([relatório](.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md)); nenhum código |
 
 **Fase 10** ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md), congelado):
 
@@ -99,7 +100,7 @@ Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `gateway-v0.11.1`,
 | 10.5: revisão adversarial do pool | **concluída** (correções `b1d8418`) |
 | 10.6: implantação do pool | **concluída**: gateway `0.12.0` em produção desde 2026-10-30 19:43, com um único backend (`gpu-local`) |
 | 10.7: aceite em instância de teste | **concluída** (todos os cenários PASS); correções pós-aceite em `4a54c8e` e `c4031f7` |
-| 10.8: implantação 0.12.1/0.9.0, documentação final e congelamento | **concluída** (gateway `0.12.1-c4031f7` em produção às 20:46; [relatório final](.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md)) |
+| 10.8: implantação 0.12.1/0.9.0, documentação final e congelamento | **concluída** (gateway `0.12.1-c4031f7` em produção às 20:46; depois atualizado até o `0.12.3` às 22:35; [relatório final](.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md)) |
 | 10.S: secundário 4× RTX 2060 | planejado, **sem data** |
 
 Pendências sem data: segunda fonte para o servidor, backup do `content.db` (excluir ou cifrar) e
@@ -231,7 +232,7 @@ mesmo Bearer, mesmas rotas. O Ollama escuta só em `127.0.0.1`, então ninguém 
 | Faixas | `geracao` (`/api/generate`, `/api/chat`, `/v1/chat/completions`, `/v1/completions`; 1 slot) e `embed` (2 slots) |
 | Prioridade | `alta`, `normal` (padrão) e `baixa`, pelo header `X-Mcpollama-Priority`. `alta` só vale para IPs de `--priority-ips` (hoje a LAN `10.100.2.0/24`); de outro IP vira `normal` sem erro. `baixa` que espera 5 min passa a `normal` |
 | Justiça | dentro da faixa: prioridade, fixados do admin, rodízio por **IP** (o IP vem do nginx e não se forja), depois por rótulo (`X-Mcpollama-Client`) |
-| Limites | fila total 64 e 16 por IP/rótulo (acima: **503** com `Retry-After`); espera máxima 10 min (**504**); execução máxima 10 min; no nginx, 600 pedidos/min e 30 simultâneos por IP (**429**) |
+| Limites | fila total 128 e 64 por IP/rótulo (acima: **503** com `Retry-After`); espera máxima 10 min (**504**); execução máxima 10 min; no nginx, 600 pedidos/min (burst 100) e 80 simultâneos por IP (**429**) |
 | Raciocínio | desligado por padrão. Liga com `think:true`, header `X-Mcpollama-Think: on` ou o nome `qwen3-ia-think` (nome virtual, só do gateway). No `/v1`, injeta `reasoning_effort:"none"` |
 | Opções | `keep_alive`, `num_ctx` e `num_gpu`/`main_gpu`/`low_vram`/`use_mmap`/`use_mlock`/`numa` do cliente são removidos em silêncio, para não recarregar o modelo (~20 s) |
 | Modelos | só os de `--allowed-models`; outro dá **403** |
@@ -243,12 +244,17 @@ Ver não exige login; as ações exigem o usuário `admin`. Atualiza ao vivo por
 | Quadro | Conteúdo |
 | --- | --- |
 | Cartões | em execução, na fila, concluídos e erros do dia, espera p50/p95, tokens/s, pedidos/min |
-| Em execução e Fila | quem, tool, modelo, raciocínio, prioridade, tempos; ordem simulada de início |
-| Concluídos nos últimos 5 min | cada pedido que terminou, com status, pico de W e de clock, e botão **Detalhes** |
+| Em execução | quem, tool, modelo, raciocínio, tempos |
+| Fila de espera | logo abaixo de Em execução: prioridade, ordem simulada de início e botões ▲ ▼ ✕ numa linha |
+| Concluídos nos últimos 5 min | seção própria: cada pedido que terminou, com status, pico de W e de clock, e botão **Detalhes** |
 | GPUs | potência em uso e limite aplicado, memória, uso, temperatura, contador AER |
 | CPU / RAM | uso por thread e por núcleo, frequência, temperatura, carga, RAM e swap |
 | Modelos | carregados na VRAM e instalados, com o que é permitido |
 | Abas | Concluídos recentes, Eventos e **Log em tempo real** |
+
+Ordem do painel (0.12.3): Em execução, Fila de espera, Concluídos nos últimos 5 min, Backends, GPUs, CPU/RAM, Modelos, Última
+hora e abas. O painel é responsivo (só as tabelas rolam, dentro do `.wrap`), as tabelas se atualizam no lugar (rolagem e cliques
+preservados) e erros de desenho aparecem em `#msg`.
 
 - **Ações do admin** (com login, CSRF e auditoria que nunca expira): promover, despromover, remover (o cliente recebe
   409) e cancelar um pedido em execução.
@@ -259,7 +265,7 @@ Ver não exige login; as ações exigem o usuário `admin`. Atualiza ao vivo por
   `content.db` (texto dos jobs, 7 dias). O que sobrevive a reinício ou reboot fica marcado como
   `interrompido_reboot` ou `interrompido_gateway`.
 
-**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`; `0.12.1` desde 2026-10-30 20:46).** O gateway tem um **registro de backends**
+**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`; `0.12.3` desde 2026-10-30 22:35).** O gateway tem um **registro de backends**
 (`backends.json`, modo 0600, lido só na partida), saúde ativa e passiva, disjuntor, histerese e "drenar" no monitor, e repassa a
 geração que **ainda não começou** a um Ollama secundário da LAN quando o primário está sobrecarregado ou doente. **Hoje o pool
 tem um único backend, o `gpu-local`** (o Ollama do próprio servidor, sem `--backends`): o comportamento é o mesmo de antes do

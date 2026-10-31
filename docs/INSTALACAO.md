@@ -379,7 +379,7 @@ Destino: `/etc/nginx/conf.d/ollama.conf`. Fonte: [`deploy/gateway/ollama.conf`](
 | `geo $ollama_from_lan` | marca `10.100.2.0/24` como LAN (`1`); o resto é `0` |
 | `map ... $ollama_client_ip` | decide o **IP real do cliente**: se veio da LAN, usa `$remote_addr` (não confia no `CF-Connecting-IP`, que a LAN poderia forjar); se não é LAN e há `CF-Connecting-IP`, usa esse cabeçalho (vem do túnel/borda do Cloudflare); senão `$remote_addr`. O loopback **não** conta como LAN, porque o `cloudflared` entrega o tráfego da internet por 127.0.0.1/::1 com o `CF-Connecting-IP` |
 | `include /etc/nginx/ollama/auth.conf;` | define `$ollama_authorized` (0 ou 1) pelo Bearer |
-| `limit_req_zone` / `limit_conn_zone` | zonas por IP real: **600 pedidos/min** (`rate=600r/m`, `burst=60 nodelay`) e **30 conexões simultâneas** por IP (`limit_conn 30`); passar disso dá **429**. Valem também para tentativas com token errado |
+| `limit_req_zone` / `limit_conn_zone` | zonas por IP real: **600 pedidos/min** (`rate=600r/m`, `burst=100 nodelay`) e **80 conexões simultâneas** por IP (`limit_conn 80`); passar disso dá **429**. Valem também para tentativas com token errado |
 | `server { listen 8443 ssl; listen [::1]:8443 ssl; http2 on; }` | porta pública; `[::1]` é por onde o túnel entra |
 | `ssl_*` | TLS 1.2/1.3, cifras ECDHE, sessão em cache, tickets desligados; certificado e chave de `/etc/nginx/ssl/` |
 | `add_header` / `server_tokens off` | HSTS, `nosniff`, `X-Frame-Options DENY`, `no-referrer`; esconde a versão do nginx |
@@ -602,7 +602,7 @@ Como conferir (no servidor): `systemctl is-active mcpollama-gateway` (`active`),
 `ss -tlnH | grep -E '11434|11500'` (ambos em 127.0.0.1). Na LAN: `https://ia.cslsolucoes.com.br:8443/monitor` abre o painel.
 Tabela de diagnóstico completa: seção 10 do [MANUAL](MANUAL-GATEWAY.md#10-diagnóstico).
 
-Nota: o limite de conexões simultâneas por IP é **30** (`limit_conn ollama_conn 30` no `ollama.conf`, desde 2026-10-30); o MANUAL do gateway está alinhado com esse valor.
+Nota: o limite de conexões simultâneas por IP é **80** (`limit_conn ollama_conn 80` no `ollama.conf`, desde 2026-10-30 22:35; antes 30, com `burst=60`, e a fila do gateway por IP subiu de 16 para 64); o MANUAL do gateway está alinhado com esse valor.
 
 ---
 
@@ -936,7 +936,7 @@ Teste sempre depois de mexer no `ollama.conf`: da internet `/monitor` deve dar 4
 | --- | --- | --- |
 | nginx sobe e tudo dá 502 | gateway parado (nginx aponta para ele) ou Ollama parado; SELinux sem `httpd_can_network_connect` | `systemctl status mcpollama-gateway ollama`; `getsebool httpd_can_network_connect`; rollback se preciso |
 | `401` com token certo | `auth.conf` com valor diferente (`Bearer ` ausente) ou nginx não recarregado | conferir B.7.3; `nginx -t && systemctl reload nginx` e esperar ~5 s |
-| `429` | mais de 30 conexões ou 600/min do mesmo IP | reduzir a concorrência do cliente |
+| `429` | mais de 80 conexões ou 600/min do mesmo IP | reduzir a concorrência do cliente |
 | `x509: certificate signed by unknown authority` no cliente | CA ausente/errada na estação | D.3 |
 | Cliente da LAN dá timeout em `ia.cslsolucoes.com.br` sem porta | split-horizon: dentro da LAN use `:8443` | usar a porta explícita |
 | Modelo recarrega a cada pedido | `ollama-warm` parado, Ollama reiniciado, contexto diferente | `ollama ps`; `systemctl status ollama-warm` |

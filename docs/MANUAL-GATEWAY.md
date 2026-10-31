@@ -40,7 +40,7 @@ visível, justa e auditável** posta na frente do Ollama, com uma página (`/mon
 cliente (mcpollama, ia-local/OpenClaude, curl)
    │  HTTPS :8443, Authorization: Bearer <TOKEN>   (LAN 10.100.2.0/24 ou Cloudflare Tunnel)
    ▼
-nginx :8443   TLS, Bearer, 600 pedidos/min por IP (rajada 60), 30 simultâneos por IP,
+nginx :8443   TLS, Bearer, 600 pedidos/min por IP (rajada 100), 80 simultâneos por IP,
    │          403 em /api/pull|push|create|delete|copy|blobs, /monitor só da LAN
    ▼
 mcpollama-gateway 127.0.0.1:11500   fila em memória + proxy + SQLite + /monitor
@@ -248,9 +248,9 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--db FILE` | `MCPGW_DB` | `/var/lib/mcpollama-gateway/gateway.db` | Arquivo SQLite, criado `0600` | `/var/lib/mcpollama-gateway/gateway.db` |
 | `--gen-slots N` | `MCPGW_GEN_SLOTS` | `2` | Gerações simultâneas (`/api/generate`, `/api/chat`, `/v1/chat/completions`, `/v1/completions`) | **`1`** (o Ollama roda `qwen3.5:9b` com 1 slot) |
 | `--embed-slots N` | `MCPGW_EMBED_SLOTS` | `2` | Embeddings simultâneos | `2` |
-| `--queue-max N` | `MCPGW_QUEUE_MAX` | `64` | Pedidos esperando, todos os clientes e as duas faixas juntas. Cheio: 503 | padrão (64) |
-| `--queue-per-client N` | `MCPGW_QUEUE_PER_CLIENT` | `16` | Esperando por IP + rótulo | padrão (16) |
-| `--queue-per-ip N` | `MCPGW_QUEUE_PER_IP` | = `--queue-per-client` | Esperando por IP, todos os rótulos juntos | padrão (16) |
+| `--queue-max N` | `MCPGW_QUEUE_MAX` | `64` | Pedidos esperando, todos os clientes e as duas faixas juntas. Cheio: 503 | **`128`** (desde 2026-10-30; antes, o padrão 64) |
+| `--queue-per-client N` | `MCPGW_QUEUE_PER_CLIENT` | `16` | Esperando por IP + rótulo | **`64`** (antes 16) |
+| `--queue-per-ip N` | `MCPGW_QUEUE_PER_IP` | = `--queue-per-client` | Esperando por IP, todos os rótulos juntos | **`64`** (antes 16) |
 | `--labels-per-ip N` | `MCPGW_LABELS_PER_IP` | `16` | Rótulos distintos por IP; acima disso viram `<ip>/outros` (variar o rótulo não multiplica a cota) | padrão (16) |
 | `--max-wait D` | `MCPGW_MAX_WAIT` | `10m` | Maior espera na fila; depois, **504** | padrão (10m) |
 | `--run-timeout D` | `MCPGW_RUN_TIMEOUT` | = `--max-wait` | Maior tempo de execução de um pedido já iniciado; depois o slot é liberado e o cliente recebe 504 (ou uma linha final de erro no stream) | padrão (10m) |
@@ -336,8 +336,8 @@ Rótulo válido: `^[A-Za-z0-9._:/@+-]{1,64}$`; fora disso vira `invalido`; vazio
 
 | Situação | Resposta | Observação |
 | --- | --- | --- |
-| Fila total cheia (`--queue-max`, 64) | **503** `fila do servidor cheia (fila cheia); tente em 5 s` + `Retry-After: 5` | pedido nunca rodou; registrado `rejeitado` |
-| IP com 16 esperando (`--queue-per-ip`) ou IP+rótulo com 16 (`--queue-per-client`) | **503** `... (limite de pedidos em espera deste cliente) ...` + `Retry-After: 5` | idem |
+| Fila total cheia (`--queue-max`; padrão 64, **128 em produção**) | **503** `fila do servidor cheia (fila cheia); tente em 5 s` + `Retry-After: 5` | pedido nunca rodou; registrado `rejeitado` |
+| IP com 64 esperando (`--queue-per-ip`) ou IP+rótulo com 64 (`--queue-per-client`); padrão do código 16, **64 em produção** | **503** `... (limite de pedidos em espera deste cliente) ...` + `Retry-After: 5` | idem |
 | Esperou mais que `--max-wait` (10 min) | **504** `tempo máximo de espera na fila esgotado` | registrado `expirado` |
 | Rodando há mais que `--run-timeout` (10 min) | antes dos headers: **504** `tempo máximo de execução no servidor esgotado`; no meio do stream: linha final `{"error":"tempo máximo de execução no servidor esgotado"}` | registrado `erro` / `run_timeout`; o slot volta |
 | Administrador **removeu** da fila | **409** `removido da fila pelo administrador` | registrado `removido` |
@@ -350,9 +350,10 @@ Rótulo válido: `^[A-Za-z0-9._:/@+-]{1,64}$`; fora disso vira `invalido`; vazio
 slot de geração o efeito é pequeno; vale para quando houver mais slots (os prefills não começam no mesmo milissegundo, o
 que atenua os picos de energia que derrubam a fonte de 850 W).
 
-**Camadas de limite** (do cliente para dentro): nginx 600 pedidos/min por IP (rajada 60) e **30 simultâneos** por IP
+**Camadas de limite** (do cliente para dentro): nginx 600 pedidos/min por IP (rajada 100) e **80 simultâneos** por IP
 (excedeu → **429 do nginx**, página HTML, não do gateway) → gateway (limites acima, **503 JSON**) → Ollama. Na prática o
-teto de 30 do nginx só é atingido depois do teto de 16 esperando por IP do gateway.
+teto de 80 do nginx fica acima do de 64 esperando por IP do gateway, que é atingido primeiro (prova de 2026-10-30: 30 pedidos
+simultâneos de uma estação deram 30× HTTP 200; antes, com 16/30, deram 17× 200 e 13× 503).
 
 ---
 
@@ -495,7 +496,8 @@ usuário, IP, ação, id do pedido, estado antes e depois e o motivo (até 200 c
 - **SSE: 4 painéis por IP e 32 no total**; acima disso: 503 `muitos painéis abertos`. Fechar abas antigas resolve.
 - Os GET do monitor são abertos a quem alcança a LAN; eles mostram IPs, rótulos, modelos, contadores e o extrato de GPU de cada job, **nunca** prompts ou respostas: o texto só sai para o **administrador logado** (ver a subseção abaixo).
 
-**Concluídos nos últimos 5 min (Fase 10.L).** Sob "Em execução", uma sub-tabela mantém cada pedido que terminou por
+**Concluídos nos últimos 5 min (Fase 10.L).** Desde a `0.12.3` é uma **seção própria**, depois de "Fila de espera" (ordem do painel: Em execução, Fila de espera, Concluídos,
+Backends, GPUs, CPU/RAM, Modelos, Última hora, abas); a tabela mantém cada pedido que terminou por
 `--monitor-keep-done` (5 min), para os que entram e saem rápido demais para serem vistos. As linhas aparecem
 **esmaecidas**, com o status final em cor (verde "concluído"; vermelho erro, cancelado, removido, expirado ou interrompido), a hora do
 fim, quanto rodou, o pico de W e de clock, um contador "some em mm:ss" e o botão **Detalhes**. É só exibição: o pedido
@@ -750,8 +752,8 @@ Se a partida falhar por flag inválida, o serviço entra em laço (`Restart=alwa
 | **403** no `/monitor` | IP fora de `10.100.2.0/24` (inclusive via Cloudflare) | Acessar da LAN; ver `/monitor` por túnel só se o owner decidir |
 | **403** `origem não permitida` / `token CSRF ausente ou inválido` | Ação do monitor feita por outro site/ferramenta, ou sem o header | Usar a página, ou o `curl` da seção 7 |
 | **409** `removido da fila pelo administrador` / `cancelado pelo administrador` | O administrador agiu no `/monitor` | Ver a auditoria (motivo); o cliente pode repetir |
-| **429** (página HTML do nginx) | Mais de 30 pedidos simultâneos do mesmo IP, ou mais de 600/min (rajada 60) | Reduzir a concorrência do cliente; é o nginx, não a fila |
-| **503** JSON `fila do servidor cheia...` + `Retry-After` | Fila do gateway cheia (64) ou cota por IP/rótulo (16) | Esperar o `Retry-After` (o mcpollama repete 1 vez); ver quem ocupa a fila no `/monitor`; diminuir a rajada ou remover pedidos presos |
+| **429** (página HTML do nginx) | Mais de 80 pedidos simultâneos do mesmo IP, ou mais de 600/min (rajada 100) | Reduzir a concorrência do cliente; é o nginx, não a fila |
+| **503** JSON `fila do servidor cheia...` + `Retry-After` | Fila do gateway cheia (128 em produção) ou cota por IP/rótulo (64 em produção) | Esperar o `Retry-After` (o mcpollama repete 1 vez); ver quem ocupa a fila no `/monitor`; diminuir a rajada ou remover pedidos presos |
 | **503** `muitos painéis abertos` | Mais de 4 abas SSE do mesmo IP | Fechar painéis antigos |
 | **502** JSON `Ollama indisponível` | Ollama reiniciando ou parado | `systemctl status ollama`, `ollama ps`; aguardar a recarga (~20 s) |
 | **502** com página HTML do nginx (e **tudo** dá 502) | **Gateway parado** (o nginx aponta para ele) | `systemctl status mcpollama-gateway`, `journalctl -u mcpollama-gateway -n 50`; `systemctl restart`; se não voltar, rollback (seção 11) |
@@ -866,7 +868,7 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje (`0.12.1`, em produção desde 2026-10-30 20:46)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
+**O gateway de hoje (`0.12.3`, em produção desde 2026-10-30 22:35)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
 **pool de backends** (seção 16). Em produção o pool tem **um único backend, o `gpu-local`** (o Ollama do próprio servidor,
 `127.0.0.1:11434`): sem `--backends` tudo se comporta como antes da 10.4. Com `--backends`, o gateway repassa o trabalho que
 **ainda não começou** a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (`--overload-wait` e

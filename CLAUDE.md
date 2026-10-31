@@ -197,7 +197,8 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   `OPENAI_MODEL=qwen3-ia-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
 - **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
   `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção:
-  gateway `0.12.1-c4031f7`** (com o pool de backends; desde 2026-10-30 20:46). Caminho: nginx :8443 → `mcpollama-gateway`
+  gateway `0.12.3-55fd624`** (com o pool de backends; desde 2026-10-30 22:35; fila 64 por cliente/IP e 128 no total,
+  nginx 80 conexões por IP e burst 100). Caminho: nginx :8443 → `mcpollama-gateway`
   127.0.0.1:11500 → Ollama **só em 127.0.0.1:11434**.
   Monitor em `https://ia.cslsolucoes.com.br:8443/monitor`, **só na LAN**. Pelo túnel do Cloudflare (`::1` +
   `CF-Connecting-IP`), a resposta é 403. Leitura livre; as ações exigem o usuário `admin`. Mostra:
@@ -214,12 +215,15 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   - **log de jobs em produção (10.L)**: grava **prompt e resposta completos** em
     `content.db` (0600, 7 dias; texto só para o admin) e um extrato das GPUs a 1 s por job;
   - **pool de backends (10.4), revisão adversarial (10.5), implantação (10.6), aceite em instância de teste
-    (10.7, todos PASS) e correções pós-aceite concluídos**: o gateway `0.12.1-c4031f7` (tag `gateway-v0.12.1`) está
-    em produção com o pool, que tem um único backend, o `gpu-local` (sem `--backends`). O ramo `wip/fase10-4-pool`
+    (10.7, todos PASS) e correções pós-aceite concluídos**: o gateway `0.12.1-c4031f7` (tag `gateway-v0.12.1`) entrou
+    em produção com o pool (hoje `0.12.3`), que tem um único backend, o `gpu-local` (sem `--backends`). O ramo `wip/fase10-4-pool`
     foi removido (merge `736c205`; o commit `d38fb61` está só na tag local `archive/wip-fase10-4-pool`). O
     secundário planejado é um PC com 4× RTX 2060, sem data (10.S);
   - **fallback do mcpollama** (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`): vai no binário
-    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`; vale após reiniciar o Claude Code), **desligado por padrão**;
+    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`), **desligado por padrão**; binário atual em `D:\MCP`:
+    **`0.9.1-755f168`** (tag `mcpollama-v0.9.1`, sessões reiniciadas 2026-10-30 23:31; rótulo padrão `<máquina>/<usuário>`);
+  - **Fase 11 (túnel WebSocket + jobs assíncronos): congelada em 2026-10-30 23:50** por decisão do owner; só o spike 11.1
+    foi feito, nenhum código (`.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`);
   - clock das GPUs travado em 210–1400 MHz desde 2026-10-30, por causa da fonte.
   - Plano (congelado, com as pendências ao descongelar): `.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`; relatório final: `.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
   e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e configs do nginx/unit:
