@@ -2,7 +2,7 @@
 
 Histórico de versões do **mcpollama** (servidor MCP, na estação) e do **mcpollama-gateway** (fila + `/monitor`, no servidor
 de IA). O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); as versões não têm release formal no
-GitHub, só **tags anotadas** nas três marcadas abaixo (`mcpollama-v<versão>` e `gateway-v<versão>`).
+GitHub, só **tags anotadas** nas versões marcadas abaixo (`mcpollama-v<versão>` e `gateway-v<versão>`).
 
 Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm do `--version` do binário
 (`<versão>-<hash curto do commit>`, definido na compilação por `-X main.Version`). O que não deu para confirmar está marcado
@@ -10,37 +10,20 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 ## Não lançado
 
-Mudanças já no ramo `master` (2026-10-30). Implantados sem tag ainda: gateway `0.12.2-755f168` (22:20) e `0.12.3`
-(ordem do painel); binário mcpollama `0.9.1-755f168` em `D:\MCP`.
+Nada por enquanto. Em planejamento: Fase 11 (túnel WebSocket e jobs assíncronos), plano
+`.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
-### mcpollama-gateway 0.12.3 (painel `/monitor`) e limites da fila
-- Ordem do painel (pedido do owner): **Em execução → Fila de espera → Concluídos recentes** (os concluídos saíram da seção
-  "Em execução" para uma seção própria); depois Backends, GPUs etc.
-- Botões ▲▼✕ da fila numa linha só dentro da tabela (a 720 px quebravam em coluna e alongavam a linha).
-- Limites (unit `deploy/gateway/mcpollama-gateway.service`, decisão do owner 22:28): `--queue-per-client 64`,
-  `--queue-per-ip 64`, `--queue-max 128` (antes 16/16/64); nginx `limit_conn 80` e `burst=100` (antes 30/60). Prova: 30 pedidos
-  simultâneos de uma estação → 30× HTTP 200 (antes 17× 200 + 13× 503 "limite de pedidos em espera deste cliente").
+## mcpollama
 
-### mcpollama 0.9.1
+### [0.9.1] - 2026-10-30 (tag `mcpollama-v0.9.1`)
+
+Binário `0.9.1-755f168` em `D:\MCP\mcpollama-mcp.exe` (22:20); vale após reiniciar as sessões do Claude Code (feito 23:31).
+
+#### Alterado
 - Rótulo padrão do cliente (commit `54ad2d6`): `<máquina>/<usuário>` em vez de `<hostname>/<pid>` (o domínio do Windows,
   `DOMINIO\usuario`, é removido; sem usuário, volta para `<máquina>/<pid>`). Todas as sessões do mesmo usuário passam a dividir
   **um só cliente** na justiça da fila (limite de 64 por cliente desde o gateway 0.12.3). `--client-label` continua sobrescrevendo.
-
-### mcpollama-gateway 0.12.2 (painel `/monitor`)
-- **Responsivo:** a coluna do `<main>` passou a poder encolher (`minmax(0,1fr)`) e as grades de cards, GPUs, CPU, gráficos e do
-  detalhe do job quebram em telas estreitas (`minmax(min(<valor>,100%),1fr)`); abaixo de 640 px os espaçamentos diminuem e o
-  cabeçalho empilha. Antes, a ~570 e ~720 px as seções ficavam mais largas que a janela e cards, GPUs, Backends e threads eram
-  cortados à direita. Só as tabelas, dentro do `.wrap`, rolam na horizontal.
-- **Tabelas estáveis:** a cada mensagem (~2/s) o painel reconstruía todas as tabelas, o que zerava a rolagem horizontal e
-  trocava os botões (Detalhes, Cancelar, ▲▼✕, Drenar) entre o mousedown e o mouseup (cliques perdidos). Agora uma tabela de
-  mesmo formato é atualizada no lugar (só texto, classe e título das células que mudaram), os botões têm chave estável
-  (`data-k`) e são mantidos, e uma reconstrução preserva o `scrollLeft`. Cards de GPU/CPU só são redesenhados se o dado mudar.
-- **Erros de desenho visíveis:** o `catch` vazio do `onmessage` foi trocado por `console.error` e pela linha "Erro ao desenhar o
-  painel: ..." em `#msg` (some quando um desenho seguinte dá certo); o erro não derruba o EventSource.
-- Aba "Log em tempo real": um job que acabou de terminar, ainda "em execução" na lista vinda do SQLite, passa a mostrar o status
-  final vindo de `recent_done`.
-
-## mcpollama
+  Provado ao vivo: pedido do 0.9.1 aparece no `/monitor` como `002-1985/claiton.linhares`.
 
 ### [0.9.0] - 2026-10-30 (tag `mcpollama-v0.9.0`)
 
@@ -116,6 +99,34 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
+
+### [0.12.3] - 2026-10-30 (tag `gateway-v0.12.3`)
+
+Binário `0.12.3-55fd624` implantado às 22:35 pelo `Instalar-Gateway.ps1 -Modo Atualizar`.
+
+- Ordem do painel (pedido do owner): **Em execução → Fila de espera → Concluídos recentes** (os concluídos saíram da seção
+  "Em execução" para uma seção própria); depois Backends, GPUs etc.
+- Botões ▲▼✕ da fila numa linha só dentro da tabela (a 720 px quebravam em coluna e alongavam a linha).
+- Limites (unit `deploy/gateway/mcpollama-gateway.service`, decisão do owner 22:28): `--queue-per-client 64`,
+  `--queue-per-ip 64`, `--queue-max 128` (antes 16/16/64); nginx `limit_conn 80` e `burst=100` (antes 30/60). Prova: 30 pedidos
+  simultâneos de uma estação → 30× HTTP 200 (antes 17× 200 + 13× 503 "limite de pedidos em espera deste cliente").
+
+### [0.12.2] - 2026-10-30 (tag `gateway-v0.12.2`)
+
+Binário `0.12.2-755f168` implantado às 22:20.
+
+- **Responsivo:** a coluna do `<main>` passou a poder encolher (`minmax(0,1fr)`) e as grades de cards, GPUs, CPU, gráficos e do
+  detalhe do job quebram em telas estreitas (`minmax(min(<valor>,100%),1fr)`); abaixo de 640 px os espaçamentos diminuem e o
+  cabeçalho empilha. Antes, a ~570 e ~720 px as seções ficavam mais largas que a janela e cards, GPUs, Backends e threads eram
+  cortados à direita. Só as tabelas, dentro do `.wrap`, rolam na horizontal.
+- **Tabelas estáveis:** a cada mensagem (~2/s) o painel reconstruía todas as tabelas, o que zerava a rolagem horizontal e
+  trocava os botões (Detalhes, Cancelar, ▲▼✕, Drenar) entre o mousedown e o mouseup (cliques perdidos). Agora uma tabela de
+  mesmo formato é atualizada no lugar (só texto, classe e título das células que mudaram), os botões têm chave estável
+  (`data-k`) e são mantidos, e uma reconstrução preserva o `scrollLeft`. Cards de GPU/CPU só são redesenhados se o dado mudar.
+- **Erros de desenho visíveis:** o `catch` vazio do `onmessage` foi trocado por `console.error` e pela linha "Erro ao desenhar o
+  painel: ..." em `#msg` (some quando um desenho seguinte dá certo); o erro não derruba o EventSource.
+- Aba "Log em tempo real": um job que acabou de terminar, ainda "em execução" na lista vinda do SQLite, passa a mostrar o status
+  final vindo de `recent_done`.
 
 ### [0.12.1] - 2026-10-30 (tag `gateway-v0.12.1`)
 
@@ -214,6 +225,8 @@ Primeira versão em produção, às 12:12:40 (`0.9.0-2cb599d`; etapa 2 do instal
 
 - 2026-10-30 14:45: `limit_conn` do nginx de 12 para **30** por IP (`339517e`).
 
+[0.12.3]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.3
+[0.12.2]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.2
 [0.12.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.1
 [0.12.0]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.0
 [0.11.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.11.1
