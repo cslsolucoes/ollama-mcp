@@ -10,12 +10,21 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 ## Não lançado
 
-Mudanças já no ramo `master`, sem binário nem implantação ainda (2026-10-30).
+Mudanças já no ramo `master` (2026-10-30). Implantados sem tag ainda: gateway `0.12.2-755f168` (22:20) e `0.12.3`
+(ordem do painel); binário mcpollama `0.9.1-755f168` em `D:\MCP`.
+
+### mcpollama-gateway 0.12.3 (painel `/monitor`) e limites da fila
+- Ordem do painel (pedido do owner): **Em execução → Fila de espera → Concluídos recentes** (os concluídos saíram da seção
+  "Em execução" para uma seção própria); depois Backends, GPUs etc.
+- Botões ▲▼✕ da fila numa linha só dentro da tabela (a 720 px quebravam em coluna e alongavam a linha).
+- Limites (unit `deploy/gateway/mcpollama-gateway.service`, decisão do owner 22:28): `--queue-per-client 64`,
+  `--queue-per-ip 64`, `--queue-max 128` (antes 16/16/64); nginx `limit_conn 80` e `burst=100` (antes 30/60). Prova: 30 pedidos
+  simultâneos de uma estação → 30× HTTP 200 (antes 17× 200 + 13× 503 "limite de pedidos em espera deste cliente").
 
 ### mcpollama 0.9.1
 - Rótulo padrão do cliente (commit `54ad2d6`): `<máquina>/<usuário>` em vez de `<hostname>/<pid>` (o domínio do Windows,
   `DOMINIO\usuario`, é removido; sem usuário, volta para `<máquina>/<pid>`). Todas as sessões do mesmo usuário passam a dividir
-  **um só cliente** na justiça da fila (limite de 16 por cliente). `--client-label` continua sobrescrevendo.
+  **um só cliente** na justiça da fila (limite de 64 por cliente desde o gateway 0.12.3). `--client-label` continua sobrescrevendo.
 
 ### mcpollama-gateway 0.12.2 (painel `/monitor`)
 - **Responsivo:** a coluna do `<main>` passou a poder encolher (`minmax(0,1fr)`) e as grades de cards, GPUs, CPU, gráficos e do

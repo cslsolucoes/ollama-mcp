@@ -89,9 +89,9 @@ main{padding:8px;gap:8px}
 <main>
   <div id="msg" role="status"></div>
   <div class="cards" id="cards"></div>
-  <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div>
-    <div class="l sub" id="donehead"></div><div class="wrap"><table id="donelist"></table></div></section>
+  <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div></section>
   <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div></section>
+  <section id="donesec"><h2 id="donehead">Concluídos recentes</h2><div class="wrap"><table id="donelist"></table></div></section>
   <section><h2>Backends</h2><div class="wrap"><table id="backends"></table></div><div id="bkmeta" class="empty"></div></section>
   <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
   <section><h2>CPU / RAM</h2><div class="gpus" id="cpucards"></div><div class="threads" id="cputhreads"></div><div id="cpumeta" class="empty"></div></section>
@@ -526,8 +526,8 @@ function mmss(ms) { var t = Math.max(0, Math.ceil(ms / 1000)); return String(Mat
 function renderDone(s) {
   var keep = Number(s.keep_done_ms) || 0, now = new Date(s.now).getTime();
   var head = $("donehead");
-  if (keep <= 0) { head.textContent = ""; table("donelist", [], [], ""); $("donelist").parentNode.hidden = true; return; }
-  $("donelist").parentNode.hidden = false;
+  if (keep <= 0) { table("donelist", [], [], ""); $("donesec").hidden = true; return; }
+  $("donesec").hidden = false;
   head.textContent = "Concluídos nos últimos " + Math.round(keep / 60000) + " min";
   function dim(v) { return { text: v, cls: "dim" }; }
   var rows = (s.recent_done || []).map(function (j) {
