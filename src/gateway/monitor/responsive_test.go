@@ -19,6 +19,7 @@ func TestIndexIsResponsiveAndStable(t *testing.T) {
 		`function safeRender`,
 		`dataset.k`, // stable keys: buttons survive a redraw
 		`Erro ao desenhar o painel`,
+		`function openJob(id) { showTab("joblog");`, // "Detalhes" outside the log tab must open that tab (the box lives there)
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("index.html lacks %s", want)

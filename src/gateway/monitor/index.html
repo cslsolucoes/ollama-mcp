@@ -630,7 +630,9 @@ function renderDetail(d, c, cstate) {
   } else cbox.appendChild(el("div", "carregando...", "empty"));
   box.appendChild(cbox);
 }
-function openJob(id) { selJob = id; selFinal = false; $("jobdetail").hidden = false; lastDetail = 0; loadDetail(true); $("jobdetail").scrollIntoView({ block: "nearest" }); }
+// The detail box lives in the "Log em tempo real" tab: open that tab first, or a click from
+// "Concluídos" (or any other tab) fills a hidden box and seems to do nothing.
+function openJob(id) { showTab("joblog"); selJob = id; selFinal = false; $("jobdetail").hidden = false; lastDetail = 0; loadDetail(true); $("jobdetail").scrollIntoView({ block: "start" }); }
 function closeJob() { selJob = null; $("jobdetail").hidden = true; $("jobdetail").textContent = ""; }
 function loadDetail(force) {
   if (!selJob) return;
