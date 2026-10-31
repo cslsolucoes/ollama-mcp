@@ -80,7 +80,7 @@ mcpollama, e com a fila de 64 a espera pode passar disso — o modelo assíncron
 | # | Etapa | Modelo | Estado |
 | --- | --- | --- | --- |
 | 11.0 | Aprovação deste plano e das D11-8…D11-29 | owner | **concluído** (2026-10-30 23:25) |
-| 11.1 | **Spike primeiro (gate da fase):** um servidor MCP mínimo com uma tool que bloqueia 3 min, chamado de uma sessão real do Claude Code — provar (a) se a chamada vai para segundo plano aos 2 min, (b) se o modelo é avisado/acordado quando ela termina, (c) o comportamento com timeout de 5 min (D11-19). Resultado decide o timeout da `aguardar_jobs`. Depois: protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`, com entrega "pelo menos uma vez", `resume` e reenvio automático — D11-23) + testes de contrato | sonnet | pendente |
+| 11.1 | **Spike primeiro (gate da fase):** um servidor MCP mínimo com uma tool que bloqueia 3 min, chamado de uma sessão real do Claude Code — provar (a) se a chamada vai para segundo plano aos 2 min, (b) se o modelo é avisado/acordado quando ela termina, (c) o comportamento com timeout de 5 min (D11-19). Resultado decide o timeout da `aguardar_jobs`. Depois: protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`, com entrega "pelo menos uma vez", `resume` e reenvio automático — D11-23) + testes de contrato | sonnet | **spike concluído em `-p` (2026-10-30 23:46)**, resultado parcial: relatório `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`. 300 s sem background devolve o resultado; com background (>120 s) o modelo recebe só "movida para segundo plano" e a notificação final **não foi provada** (precisa de teste interativo). Recomendação: `aguardar_jobs` com `timeout_s` padrão 100 s e máx. 110 s por chamada. **Pendentes:** teste interativo pelo owner e protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`) + testes de contrato |
 | 11.2 | Gateway: endpoint `/api/ws`, ligação com a fila, jobs independentes da conexão, área de entrega 30 min, dono por `claim_hash`, `resume`, `cancel`, métricas | sonnet | pendente |
 | 11.3 | nginx: `location /api/ws` (Upgrade/Connection, `proxy_read_timeout` longo, mesmos limites e Bearer); conferir o túnel Cloudflare | sonnet | pendente |
 | 11.4 | mcpollama: cliente WebSocket persistente (reconexão, keepalive), recebimento imediato com `ack_result` (D11-16), registro local de jobs com segredo no perfil do usuário, fallback HTTP em segundo plano (D11-14), jobs compostos (D11-15), aviso na próxima resposta (D11-17) e notificação do Windows (D11-18) | sonnet | pendente |
@@ -124,3 +124,19 @@ mcpollama, e com a fila de 64 a espera pode passar disso — o modelo assíncron
   em parte (não precisa de polling; o risco real é conexões e o corte de 120 s) → D11-25; 11 já é tratado no HTTP (conferido em
   `src/gateway/queue/queue.go` `clientKey` e `src/gateway/proxy/proxy.go` `clientIP` + `ollama.conf` `$ollama_client_ip`) →
   estender ao WebSocket (D11-29). Protocolo da §3 ganha `cancel_result`.
+- 2026-10-30 23:46 — **11.1, parte "spike" (em `claude -p`, Claude Code 2.1.296, haiku)**; relatório
+  `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`. Servidor MCP stdio mínimo em Go (fora do repo,
+  tool `esperar(s)`), 5 cenários.
+  - **Deu certo:** A (40 s) normal; B0 (170 s) e C0 (300 s) sem a variável: **sem background e sem corte**, o resultado voltou
+    íntegro ao modelo (170,8 s e 300,0 s); com `CLAUDE_AUTO_BACKGROUND_TASKS=1` (B1, C1b) a chamada foi movida para segundo plano aos
+    ~120 s (`task_type: mcp_task`) e o modelo recebeu na hora um `tool_result` "movida para segundo plano, receberá notificação".
+  - **Não deu certo / não provado:** nas execuções com background o `-p` de um tiro terminou antes da tarefa; a tarefa virou
+    `stopped`, o servidor só viu o stdin fechar (sem `notifications/cancelled`) e o resultado nunca chegou ao modelo. Portanto
+    **(b), se o modelo é avisado/acordado ao fim, não foi provado** (a doc diz que sim, via task notification). Erro de processo meu:
+    o laço em background continuou depois da interrupção e disparou um C1 extra em paralelo, que intercalou os arquivos `C1.*`; repeti
+    o cenário sozinho como C1b e uso só ele.
+  - **Solução/decisão proposta:** `aguardar_jobs` com `timeout_s` **padrão 100 s, máx. 110 s** por chamada (volta antes do auto-background
+    de 120 s, o resultado entra como `tool_result` normal), com o ciclo "chame de novo" do D11-19; manter 300 s só se o teste interativo
+    provar que a notificação acorda o modelo, ou se o owner usar `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=0` nas estações. **Pendente:**
+    decisão do owner sobre o D11-19 (100 s em vez de 5 min) e teste interativo (CLI e extensão VS Code) com o `spike.exe` num `.mcp.json`
+    temporário, roteiro no §7 do relatório; protocolo escrito e testes de contrato da 11.1 seguem pendentes.
