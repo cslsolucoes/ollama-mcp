@@ -10,8 +10,8 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 ## Não lançado
 
-Nada por enquanto. Em planejamento: Fase 11 (túnel WebSocket e jobs assíncronos), plano
-`.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
+Nada por enquanto. A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
+feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
 ## mcpollama
 

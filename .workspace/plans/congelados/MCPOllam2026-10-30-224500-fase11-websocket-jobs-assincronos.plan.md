@@ -1,6 +1,10 @@
 # Plano — Fase 11: túnel WebSocket entre o MCP da estação e o servidor da IA, com jobs assíncronos
 
-> **Estado:** ✅ APROVADO pelo owner em 2026-10-30 23:25 ("podemos iniciar o plano?"). 11.1 (spike) em andamento.
+> **Estado:** 🧊 **CONGELADO** em 2026-10-30 23:50 por decisão explícita do owner ("vamos suspender a execução, volta ao estado
+> antes do início do plano de websocket, vamos congelar ele agora"). Aprovado às 23:25; só a parte "spike" da 11.1 foi executada.
+> Nada foi implementado: **nenhuma mudança em `src/`, `deploy/` nem no servidor de IA** (conferido por `git diff 55fd624 HEAD --
+> src deploy`, vazio). Produção segue: gateway `0.12.3-55fd624`, mcpollama `0.9.1-755f168`.
+> **Ao descongelar:** retomar na decisão pendente da §8.
 > **Versões alvo:** gateway `0.13.0` · mcpollama `0.10.0` (mudança incompatível nas tools: passam a devolver ID).
 > **Origem:** pedido do owner (2026-10-30 22:40): "um websocket para ter comunicação bidirecional, sendo o servidor da IA o
 > servidor e a estação o MCP; o MCP não fica esperando o response; quando a IA finalizar o job, envia para a estação solicitante".
@@ -106,6 +110,21 @@ mcpollama, e com a fila de 64 a espera pode passar disso — o modelo assíncron
    existe. A área de entrega segue a mesma regra de backup pendente (excluir ou cifrar).
 5. Cloudflare: WebSocket pelo túnel precisa estar liberado na zona (padrão: liberado); conferir na 11.3.
 
+## 8. Ponto de retomada (congelado em 2026-10-30 23:50)
+
+1. **Decisão pendente do owner (D11-19, tempo de espera da `aguardar_jobs`):** o spike 11.1
+   (`.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`, commit `f8c723e`) provou em `claude -p`
+   (Claude Code 2.1.296): sem auto-background, esperas de 170 s e 300 s voltam normais com o resultado; com
+   `CLAUDE_AUTO_BACKGROUND_TASKS=1`, aos ~120 s a chamada vai para segundo plano e o modelo recebe "você receberá uma notificação
+   com o resultado quando terminar" — se essa notificação acorda o modelo no uso interativo **não foi provado**. Opções
+   apresentadas ao owner: (a) teste interativo curto (`claude --mcp-config <spike>` num terminal, ~10 min); (b) ciclo de ~100 s
+   por chamada (provado); (c) `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=0` nas estações + 5 min (não testado).
+2. Restante da 11.1: protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`) + testes de contrato.
+3. Etapas 11.2–11.11: não iniciadas.
+4. Considerar atualizar o Claude Code (≥ 2.1.304 habilita as *tasks* MCP), o que pode reabrir a D11-1.
+5. O servidor de spike fica no scratchpad da sessão (`scratchpad\spike111\`, fora do repo, temporário); o código está descrito
+   no relatório.
+
 ## 7. Changelog do plano
 
 - 2026-10-30 22:45 — criado após o fechamento do entendimento com o owner (D11-1…D11-7). Decisões técnicas D11-8…D11-15 propostas,
@@ -124,6 +143,8 @@ mcpollama, e com a fila de 64 a espera pode passar disso — o modelo assíncron
   em parte (não precisa de polling; o risco real é conexões e o corte de 120 s) → D11-25; 11 já é tratado no HTTP (conferido em
   `src/gateway/queue/queue.go` `clientKey` e `src/gateway/proxy/proxy.go` `clientIP` + `ollama.conf` `$ollama_client_ip`) →
   estender ao WebSocket (D11-29). Protocolo da §3 ganha `cancel_result`.
+- 2026-10-30 23:50 — **CONGELADO** por decisão do owner, logo após o spike 11.1 (resultado na §8). Nada de código/implantação foi
+  feito; plano movido para `.workspace/plans/congelados/`.
 - 2026-10-30 23:46 — **11.1, parte "spike" (em `claude -p`, Claude Code 2.1.296, haiku)**; relatório
   `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`. Servidor MCP stdio mínimo em Go (fora do repo,
   tool `esperar(s)`), 5 cenários.
