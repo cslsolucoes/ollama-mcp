@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -60,7 +61,7 @@ type Config struct {
 	ToolsVerbosity string
 	TraceFile      string
 	AuditLogPath   string
-	ClientLabel    string // --client-label: name of this agent for the server queue; empty means <hostname>/<pid>
+	ClientLabel    string // --client-label: name of this agent for the server queue; empty means <hostname>/<user>
 	ShowVersion    bool
 	OCR            OCRFlags // --ocr-*: off unless OCR.Lib is set
 
@@ -155,7 +156,7 @@ Every flag falls back to its environment variable; the flag wins.
   --ocr-max-megapixels N  pixels per page, default 40 (dpi lowered to fit) (MCPOLLAMA_OCR_MAX_MEGAPIXELS)
   --ocr-dpi N             page render resolution, default 300      (MCPOLLAMA_OCR_DPI)
   --client-label NAME     name of this agent for the server queue and its monitor
-                          (metadata only); default <hostname>/<pid> (MCPOLLAMA_CLIENT_LABEL)
+                          (metadata only); default <hostname>/<user> (MCPOLLAMA_CLIENT_LABEL)
   --tools-verbosity MODE  full|compact tools/list size             (MCPOLLAMA_TOOLS_VERBOSITY)
   --trace-file FILE       opt-in trace file (later phase)          (MCPOLLAMA_TRACE)
   --audit-log-path FILE   opt-in audit log (later phase)           (MCPOLLAMA_AUDIT_LOG)
@@ -474,15 +475,41 @@ func (c Config) ollamaOptions() ollama.Options {
 	}
 }
 
-// clientLabel is --client-label, or <hostname>/<pid> by default so that each
-// agent shows up as its own client in the server queue.
+// clientLabel is --client-label, or <hostname>/<user> by default, so the server
+// monitor shows which machine and user sent each request (owner's decision,
+// 2026-10-30). All sessions of the same user share one client in the queue.
 func (c Config) clientLabel() string {
 	if c.ClientLabel != "" {
 		return c.ClientLabel
 	}
-	host, err := os.Hostname()
-	if err != nil || host == "" {
+	host, _ := os.Hostname()
+	return defaultLabel(host, currentUser(), os.Getpid())
+}
+
+// defaultLabel builds <host>/<user>, dropping a Windows "DOMAIN\" prefix; with
+// no user it falls back to <host>/<pid>.
+func defaultLabel(host, usr string, pid int) string {
+	if host == "" {
 		host = "mcpollama"
 	}
-	return fmt.Sprintf("%s/%d", host, os.Getpid())
+	if i := strings.LastIndexAny(usr, `\/`); i >= 0 {
+		usr = usr[i+1:]
+	}
+	if usr = strings.TrimSpace(usr); usr == "" {
+		return fmt.Sprintf("%s/%d", host, pid)
+	}
+	return host + "/" + usr
+}
+
+// currentUser is the login name of this process, or "" if it is unknown.
+func currentUser() string {
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		return u.Username
+	}
+	for _, k := range []string{"USERNAME", "USER"} {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }
