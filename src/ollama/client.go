@@ -69,6 +69,11 @@ type Options struct {
 	// metadata only, never content. Empty omits the header.
 	ClientLabel string
 
+	// StationInfo is the ready X-Mcpollama-Station value (computer=..;user=..;
+	// domain=..;mac=..), declared by the workstation and not authenticated.
+	// Empty omits the header.
+	StationInfo string
+
 	// DisableStream switches generate/chat to a single "stream":false
 	// response. The default is the internal stream (see Generate).
 	DisableStream bool
@@ -90,6 +95,7 @@ type Client struct {
 	maxLine    int
 	noStream   bool
 	label      string
+	station    string
 
 	http   *http.Client
 	redact func(string) string
@@ -144,6 +150,7 @@ func New(o Options) (*Client, error) {
 		maxLine:    orInt(o.MaxLineBytes, defaultMaxLineBytes),
 		noStream:   o.DisableStream,
 		label:      cleanHeader(o.ClientLabel, 64, labelOK),
+		station:    cleanHeader(o.StationInfo, 512, stationOK),
 		redact:     redact.New(secrets...),
 		http: &http.Client{
 			Transport: tr,
@@ -253,6 +260,10 @@ func toolFrom(ctx context.Context) string {
 
 func labelOK(r rune) bool {
 	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._:/@+-", r)
+}
+
+func stationOK(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._-=;", r)
 }
 
 func toolOK(r rune) bool {

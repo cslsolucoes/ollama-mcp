@@ -45,6 +45,11 @@ func TestEnvFallback(t *testing.T) {
 	want := Config{OllamaURL: "https://h.invalid:8443", APIKey: "k", TLSCA: "ca.pem", Insecure: true, Model: "m",
 		EmbedModel: "e", Timeout: 90 * time.Second, MaxPromptChars: 1000, MaxLineBytes: 2048, MaxFileBytes: 4096, MaxDocBytes: defaultMaxDocBytes, MaxChunks: 40,
 		Debug: true, ToolsVerbosity: "compact", TraceFile: "t.log", AuditLogPath: "a.log", OCR: defaultOCRFlags()}
+	// The station header is on by default and collected from the real machine.
+	if !c.StationInfo {
+		t.Fatalf("StationInfo must default to true")
+	}
+	want.StationInfo, want.stationHeader = true, c.stationHeader
 	if c != want {
 		t.Fatalf("got  %+v\nwant %+v", c, want)
 	}

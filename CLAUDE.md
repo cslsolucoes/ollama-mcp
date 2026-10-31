@@ -151,6 +151,8 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   `--ocr-max-mem`/`MCPOLLAMA_OCR_MAX_MEM` (default 1073741824),
   `--ocr-max-megapixels`/`MCPOLLAMA_OCR_MAX_MEGAPIXELS` (default 40),
   `--ocr-dpi`/`MCPOLLAMA_OCR_DPI` (default 300),
+  `--station-info`/`MCPOLLAMA_STATION_INFO` (booleana, padrão `true`; envia o cabeçalho `X-Mcpollama-Station` com máquina,
+  usuário, domínio e MAC da estação, declarados e não autenticados; MAC por WMI → `PLACA` → interface),
   `--tools-verbosity`/`MCPOLLAMA_TOOLS_VERBOSITY` (`full|compact`; o tamanho do `tools/list`
   também custa tokens), `--debug`/`MCPOLLAMA_DEBUG`, `--version`. A fonte da verdade é
   `src/mcpollama-mcp/config.go`.

@@ -62,6 +62,8 @@ type Config struct {
 	TraceFile      string
 	AuditLogPath   string
 	ClientLabel    string // --client-label: name of this agent for the server queue; empty means <hostname>/<user>
+	StationInfo    bool   // --station-info: send X-Mcpollama-Station (default true)
+	stationHeader  string // header text collected once at start; empty when off or unknown
 	ShowVersion    bool
 	OCR            OCRFlags // --ocr-*: off unless OCR.Lib is set
 
@@ -157,6 +159,9 @@ Every flag falls back to its environment variable; the flag wins.
   --ocr-dpi N             page render resolution, default 300      (MCPOLLAMA_OCR_DPI)
   --client-label NAME     name of this agent for the server queue and its monitor
                           (metadata only); default <hostname>/<user> (MCPOLLAMA_CLIENT_LABEL)
+  --station-info          send X-Mcpollama-Station (computer, user, domain, MAC of this
+                          workstation; declared, not authenticated) for the server job
+                          log; on by default, --station-info=false turns it off (MCPOLLAMA_STATION_INFO)
   --tools-verbosity MODE  full|compact tools/list size             (MCPOLLAMA_TOOLS_VERBOSITY)
   --trace-file FILE       opt-in trace file (later phase)          (MCPOLLAMA_TRACE)
   --audit-log-path FILE   opt-in audit log (later phase)           (MCPOLLAMA_AUDIT_LOG)
@@ -195,6 +200,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fTrace    = fs.String("trace-file", "", "")
 		fAudit    = fs.String("audit-log-path", "", "")
 		fLabel    = fs.String("client-label", "", "")
+		fStation  = fs.Bool("station-info", true, "")
 		fDebug    = fs.Bool("debug", false, "")
 		fVersion  = fs.Bool("version", false, "")
 
@@ -270,6 +276,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		AuditLogPath:   str("audit-log-path", "MCPOLLAMA_AUDIT_LOG", "", fAudit),
 		ClientLabel:    str("client-label", "MCPOLLAMA_CLIENT_LABEL", "", fLabel),
 		Debug:          boolean("debug", "MCPOLLAMA_DEBUG", fDebug),
+		StationInfo:    true,
 		ShowVersion:    *fVersion,
 		Timeout:        defaultTimeout,
 	}
@@ -282,6 +289,16 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 			cfgErr = errors.New("OLLAMA_TIMEOUT: invalid duration")
 		}
 		cfg.Timeout = d
+	}
+
+	switch {
+	case set["station-info"]:
+		cfg.StationInfo = *fStation
+	case strings.TrimSpace(getenv("MCPOLLAMA_STATION_INFO")) != "":
+		cfg.StationInfo = parseBool(getenv("MCPOLLAMA_STATION_INFO"))
+	}
+	if cfg.StationInfo && !cfg.ShowVersion {
+		cfg.stationHeader = collectStationHeader(getenv)
 	}
 
 	od := defaultOCRFlags()
@@ -472,6 +489,7 @@ func (c Config) ollamaOptions() ollama.Options {
 		MaxPromptChars: c.MaxPromptChars,
 		MaxLineBytes:   c.MaxLineBytes,
 		ClientLabel:    c.clientLabel(),
+		StationInfo:    c.stationHeader,
 	}
 }
 

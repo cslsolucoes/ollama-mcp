@@ -10,8 +10,46 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 ## Não lançado
 
-Nada por enquanto. A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
+A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
 feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
+
+### mcpollama 0.9.2 (identificação da estação)
+
+Pedido do owner em 2026-10-31: a estação se identifica **pelo executável**, lendo o ambiente do Windows.
+- **Cabeçalho novo `X-Mcpollama-Station`**, enviado em todo pedido junto com o `X-Mcpollama-Client` (que continua igual,
+  `máquina/usuário`). Formato `computer=<v>;user=<v>;domain=<v>;mac=<v>`, campos vazios omitidos; cada valor só com
+  `[A-Za-z0-9._-]` (o resto vira `_`), até 64 caracteres.
+- **Origem dos valores:** `computer` = `COMPUTERNAME` (ou `os.Hostname()`); `user` = usuário do processo, sem o prefixo
+  `DOMÍNIO\`; `domain` = `USERDOMAIN` (ou o prefixo `DOMÍNIO\` do usuário); `mac` por esta precedência:
+  1. **WMI**, em Go puro (`syscall` sobre as vtables do COM, sem cgo e **sem dependências novas**; só `golang.org/x/sys`, que
+     já estava no `go.mod`): `SELECT MACAddress FROM Win32_NetworkAdapter WHERE PhysicalAdapter=TRUE`, o primeiro com
+     `MACAddress` não nulo, na ordem do WMI, com limite de 3 s e uma vez só na partida. É a mesma regra do script de logon do AD;
+  2. a variável **`PLACA`** (12 hex, aceita `:` e `-`; inválida é ignorada);
+  3. o MAC da primeira interface ativa, não loopback, com 6 bytes e IPv4 privado.
+- **O script de logon** (`LoginScriptV4.00.vbs`, v4.10) é quem grava as variáveis nas máquinas do domínio: `PLACA` é o MAC do
+  **primeiro** adaptador de `Win32_NetworkAdapter where PhysicalAdapter=True` com `MACAddress` não nulo, sem os `:`, no ambiente
+  do USUÁRIO (`HKCU\Environment`); `USERDOMAIN`, `USERNAME` e `COMPUTERNAME` têm os mesmos valores de
+  `WScript.Network.UserDomain/UserName/ComputerName`. **Diferença do fallback:** sem WMI e sem `PLACA` (máquina fora do domínio ou
+  sem o script), o exe usa o MAC da **interface ativa com IPv4 privado**, que não é necessariamente o "primeiro físico do WMI".
+- **Flag `--station-info` / `MCPOLLAMA_STATION_INFO`** (booleana, padrão `true`); `--station-info=false` não envia o cabeçalho.
+  Tudo é coletado uma vez, na partida.
+- **É informação declarada pela estação, não autenticada:** qualquer cliente pode mandar qualquer valor. O `onda.py`, que chama o
+  servidor direto sem o exe, continua anônimo.
+
+### mcpollama-gateway 0.12.5 (estação no log de jobs)
+
+- **`proxy`:** lê `X-Mcpollama-Station` com validação estrita (só as quatro chaves, cada uma uma vez; valores
+  `^[A-Za-z0-9._-]{1,64}$`; `mac` com exatamente 12 hex maiúsculos; cabeçalho de até 512 bytes). Ausente ou inválido: campos vazios,
+  **sem recusar o pedido**. O cabeçalho é **apagado antes de repassar ao backend**.
+- **Banco:** quatro colunas novas em `requests` (`station_computer`, `station_user`, `station_domain`, `station_mac`), com
+  **migração idempotente** (`ALTER TABLE ADD COLUMN` só se faltar; bancos antigos abrem e leem normalmente). Vão do pedido até o
+  registro (fila, `joblog`, `store`); o fim do job sem estação não apaga a que foi gravada na entrada.
+- **API e exportações:** os quatro campos entram no JSON de `/monitor/api/jobs/<id>` e da lista, no JSONL e no CSV (colunas
+  `maquina`, `usuario`, `dominio`, `mac`, com `csvSafe`).
+- **Tela:** a coluna Cliente continua sendo o `client_label`; o **Detalhes** do job ganha as linhas Máquina, Usuário, Domínio e MAC
+  (sempre `textContent`).
+- **Privacidade:** o **MAC e o usuário ficam no log** (7 dias, como o resto do log de jobs). Como o resto da leitura do `/monitor`,
+  os campos aparecem a quem acessa o painel na LAN.
 
 ## mcpollama
 

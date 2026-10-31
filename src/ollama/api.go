@@ -312,6 +312,9 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 	if c.label != "" {
 		req.Header.Set("X-Mcpollama-Client", c.label)
 	}
+	if c.station != "" {
+		req.Header.Set("X-Mcpollama-Station", c.station)
+	}
 	if tool := toolFrom(ctx); tool != "" {
 		req.Header.Set("X-Mcpollama-Tool", tool)
 	}
