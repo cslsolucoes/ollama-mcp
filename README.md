@@ -280,7 +280,7 @@ Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico
 
 | Item | Valor |
 | --- | --- |
-| Host | `ia.cslsolucoes.com.br` (`lx-ai01`, CentOS Stream 10), Ollama v0.40.8 |
+| Host | `ia.cslsolucoes.com.br` (`lx-ai01`, CentOS Stream 10), Ollama v0.40.13 (desde 2026-10-31; antes 0.40.8) |
 | Hardware | 4× RTX 3070 (8 GB cada, 32 GB de VRAM), **100 W por GPU**, clock travado em 210–1400 MHz desde 2026-10-30 |
 | Limite conhecido | a **fonte de 850 W** não aguenta as 4 placas (causa dos reboots); os 100 W e o clock travado valem até a troca. A segunda fonte está planejada |
 | Modelo | `qwen3-ia` = alias do **`qwen3.5:9b`** (Q4_K_M, 100% GPU, `num_ctx` 65536, 13 GB), desde 2026-10-29. Raciocina por padrão; o mcpollama manda `think:false` e o gateway também |

@@ -40,7 +40,7 @@
 
 | Peça | Onde roda | Papel |
 | --- | --- | --- |
-| **Ollama** `0.40.8` | servidor Linux, `127.0.0.1:11434` | serve o modelo `qwen3-ia` e os embeddings |
+| **Ollama** `0.40.13` | servidor Linux, `127.0.0.1:11434` | serve o modelo `qwen3-ia` e os embeddings |
 | **nginx** `1.26.3` | servidor, `:8443` (TLS) | única porta pública: TLS (Cloudflare Origin CA), Bearer, limites, bloqueio de rotas administrativas |
 | **mcpollama-gateway** | servidor, `127.0.0.1:11500` | fila na retaguarda e o painel `/monitor` |
 | **cloudflared** | servidor | túnel para a internet (sem abrir porta no roteador para o público) |
@@ -177,7 +177,7 @@ Este guia **não** cobre a instalação do Ollama; ele deve estar instalado e fu
 
 | Item | Esperado |
 | --- | --- |
-| Versão | `ollama version is 0.40.8` (`ollama --version`) |
+| Versão | `ollama version is 0.40.13` (`ollama --version`) |
 | Binário e usuário | `/usr/local/bin/ollama`, serviço `ollama.service` como usuário `ollama` |
 | Modelos | `qwen3-ia` (**alias** do `qwen3.5:9b`) e `nomic-embed-text` |
 | Escuta | só `127.0.0.1:11434` (nada em `0.0.0.0`) |
@@ -890,8 +890,27 @@ Confira as conexões do túnel no `journalctl -u cloudflared` e, da internet, `/
 
 ### G.6 Atualizar o Ollama
 
-O Ollama é pré-requisito (B.4) e a versão de referência é **0.40.8**. Antes de atualizar: anote `ollama list`, faça backup do `10-performance.conf`, avise os usuários (o restart derruba o que está em execução) e reveja a fila no `/monitor`.
+O Ollama é pré-requisito (B.4) e a versão de referência é **0.40.13** (atualizada de 0.40.8 em 2026-10-31). Antes de atualizar: anote `ollama list`, faça backup do `10-performance.conf`, avise os usuários (o restart derruba o que está em execução) e reveja a fila no `/monitor`.
 Depois: `systemctl restart ollama && systemctl restart ollama-warm`, `ollama ps` (100% GPU) e um teste de carga curto. Uma versão nova pode mudar o comportamento de slots/raciocínio: valide antes de aceitar.
+
+Roteiro usado na atualização 0.40.8 → 0.40.13 (2026-10-31; a instalação é por tarball em `/usr/local`, não por RPM):
+
+```bash
+D=/root/ollama-upd-<versão>; mkdir -p $D; cd $D
+curl -fsSL -o sha256sum.txt https://github.com/ollama/ollama/releases/download/v<versão>/sha256sum.txt
+curl -fsSL -o ollama-linux-amd64.tar.zst https://github.com/ollama/ollama/releases/download/v<versão>/ollama-linux-amd64.tar.zst
+grep 'ollama-linux-amd64.tar.zst$' sha256sum.txt | sha256sum -c -        # tem de dar SUCESSO/OK
+B=/root/srv-backup-<data>-ollama-<versão antiga>; mkdir -p $B
+cp -a /usr/local/bin/ollama $B/ollama
+systemctl stop ollama                                                     # com a fila vazia no /monitor
+mv /usr/local/lib/ollama $B/lib-ollama
+tar --zstd -xf ollama-linux-amd64.tar.zst -C /usr/local                   # traz bin/ollama e lib/ollama/
+restorecon -RF /usr/local/bin/ollama /usr/local/lib/ollama
+systemctl start ollama && systemctl restart ollama-warm
+curl -s http://127.0.0.1:11434/api/version; ollama ps                     # versão nova; qwen3-ia 100% GPU, 64k
+# rollback: systemctl stop ollama; rm -rf /usr/local/lib/ollama; mv $B/lib-ollama /usr/local/lib/ollama;
+#           cp -a $B/ollama /usr/local/bin/; systemctl start ollama && systemctl restart ollama-warm
+```
 
 ### G.7 Backup
 

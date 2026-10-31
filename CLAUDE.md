@@ -165,7 +165,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
 
 ## Servidor Ollama (alvo)
 
-- `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.8 · modelo **`qwen3-ia`** = **alias do
+- `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.13 (desde 2026-10-31 09:50; antes 0.40.8) · modelo **`qwen3-ia`** = **alias do
   `qwen3.5:9b`** desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M,
   100% GPU, 13 GB a 64k). Antes, era o MoE `qwen3-coder:30b-a3b`, removido do servidor.
   - **Raciocina por padrão** (`thinking default true`; não dá para desligar no Modelfile). O

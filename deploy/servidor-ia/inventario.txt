@@ -1,7 +1,7 @@
 # Inventario do servidor de IA (coletado 2026-10-30 19:29)
 PRETTY_NAME="CentOS Stream 10 (Coughlan)"
 kernel: 6.12.0-278.el10.x86_64
-ollama: ollama version is 0.40.8
+ollama: ollama version is 0.40.13 (atualizado em 2026-10-31 09:50; na coleta era 0.40.8)
 nvidia: 610.57.04, NVIDIA GeForce RTX 3070 
 nginx: nginx version: nginx/1.26.3
 cloudflared: cloudflared version 2026.10.6 (built 2026-10-29-12:12 UTC)
