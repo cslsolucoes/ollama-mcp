@@ -10,6 +10,8 @@ User=mcpgw
 Group=mcpgw
 # Fase 9.6 (owner 2026-10-29): qwen3-ia = qwen3.5:9b roda com 1 slot no Ollama -> 1 slot de geracao aqui,
 # a espera fica visivel na fila do gateway. Prioridade alta aceita de toda a LAN (owner).
+# 2026-10-30 (owner): ate 64 em espera por cliente e por IP, fila total 128 (o rotulo virou
+# <maquina>/<usuario>, entao as sessoes do mesmo usuario dividem um cliente).
 ExecStart=/usr/local/bin/mcpollama-gateway \
   --listen 127.0.0.1:11500 \
   --ollama 127.0.0.1:11434 \
@@ -17,6 +19,9 @@ ExecStart=/usr/local/bin/mcpollama-gateway \
   --gen-slots 1 \
   --embed-slots 2 \
   --priority-ips 10.100.2.0/24 \
+  --queue-max 128 \
+  --queue-per-client 64 \
+  --queue-per-ip 64 \
   --allowed-models "qwen3-ia;nomic-embed-text" \
   --admin-file /etc/mcpollama-gateway/admin \
   --start-stagger 300ms
