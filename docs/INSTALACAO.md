@@ -1,7 +1,7 @@
 # Guia de instalação do zero: mcpollama, servidor de IA e gateway
 
 > Para o administrador da CSL que precisa montar tudo de novo (servidor novo ou depois de um desastre) e configurar as
-> estações. Repositório privado: <https://github.com/cslsolucoes/mcpollama>. Visão geral do projeto: [README.md](../README.md).
+> estações. Repositório privado: <https://github.com/cslsolucoes/ollama-mcp>. Visão geral do projeto: [README.md](../README.md).
 >
 > **Sem segredos neste guia.** Onde aparece `<TOKEN>`, `<SENHA>` ou `<IP>`, use o valor real do seu ambiente e **nunca**
 > o grave no git, em chat ou em log. Os segredos de produção ficam só no servidor e nos cofres do owner. O acesso SSH
@@ -619,7 +619,7 @@ Nota: o limite de conexões simultâneas por IP é **80** (`limit_conn ollama_co
 
 ```powershell
 go version                       # go version go1.27.0 windows/amd64 (ou superior a 1.26.0)
-git clone https://github.com/cslsolucoes/mcpollama.git E:\MCPOllam
+git clone https://github.com/cslsolucoes/ollama-mcp.git E:\MCPOllam
 ```
 
 ### D.2 Build

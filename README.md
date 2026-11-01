@@ -5,7 +5,7 @@
 > (fila + `/monitor`) que protege e observa esse Ollama. O Claude é o **orquestrador**; o trabalho
 > mecânico em volume vai para o modelo local, que custa **zero** da cota Anthropic.
 >
-> Repositório privado: <https://github.com/cslsolucoes/mcpollama> · Uso interno da CSL.
+> Repositório privado: <https://github.com/cslsolucoes/ollama-mcp> · Uso interno da CSL.
 
 ## Índice
 

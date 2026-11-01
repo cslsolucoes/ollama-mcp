@@ -276,11 +276,11 @@ Primeira versão em produção, às 12:12:40 (`0.9.0-2cb599d`; etapa 2 do instal
 
 - 2026-10-30 14:45: `limit_conn` do nginx de 12 para **30** por IP (`339517e`).
 
-[0.12.5]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.5
-[0.12.4]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.4
-[0.12.3]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.3
-[0.12.2]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.2
-[0.12.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.1
-[0.12.0]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.0
-[0.11.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.11.1
-[0.8.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/mcpollama-v0.8.1
+[0.12.5]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.5
+[0.12.4]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.4
+[0.12.3]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.3
+[0.12.2]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.2
+[0.12.1]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.1
+[0.12.0]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.0
+[0.11.1]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.11.1
+[0.8.1]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/mcpollama-v0.8.1
