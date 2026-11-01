@@ -13,7 +13,12 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
 feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
-### mcpollama 0.9.2 (identificação da estação)
+## mcpollama
+
+### [0.9.2] - 2026-10-31 (tag `mcpollama-v0.9.2`)
+
+Binário `0.9.2-f367b35` em `D:\MCP\mcpollama-mcp.exe` (22:21); vale após reiniciar as sessões do Claude Code.
+Provado ponta a ponta em 2026-10-31 22:22: o job gravou `002-1985` / `claiton.linhares` / `CSLSOLUCOES` / `5CCD5BF40B2D` (WMI igual à `PLACA`).
 
 Pedido do owner em 2026-10-31: a estação se identifica **pelo executável**, lendo o ambiente do Windows.
 - **Cabeçalho novo `X-Mcpollama-Station`**, enviado em todo pedido junto com o `X-Mcpollama-Client` (que continua igual,
@@ -35,23 +40,6 @@ Pedido do owner em 2026-10-31: a estação se identifica **pelo executável**, l
   Tudo é coletado uma vez, na partida.
 - **É informação declarada pela estação, não autenticada:** qualquer cliente pode mandar qualquer valor. O `onda.py`, que chama o
   servidor direto sem o exe, continua anônimo.
-
-### mcpollama-gateway 0.12.5 (estação no log de jobs)
-
-- **`proxy`:** lê `X-Mcpollama-Station` com validação estrita (só as quatro chaves, cada uma uma vez; valores
-  `^[A-Za-z0-9._-]{1,64}$`; `mac` com exatamente 12 hex maiúsculos; cabeçalho de até 512 bytes). Ausente ou inválido: campos vazios,
-  **sem recusar o pedido**. O cabeçalho é **apagado antes de repassar ao backend**.
-- **Banco:** quatro colunas novas em `requests` (`station_computer`, `station_user`, `station_domain`, `station_mac`), com
-  **migração idempotente** (`ALTER TABLE ADD COLUMN` só se faltar; bancos antigos abrem e leem normalmente). Vão do pedido até o
-  registro (fila, `joblog`, `store`); o fim do job sem estação não apaga a que foi gravada na entrada.
-- **API e exportações:** os quatro campos entram no JSON de `/monitor/api/jobs/<id>` e da lista, no JSONL e no CSV (colunas
-  `maquina`, `usuario`, `dominio`, `mac`, com `csvSafe`).
-- **Tela:** a coluna Cliente continua sendo o `client_label`; o **Detalhes** do job ganha as linhas Máquina, Usuário, Domínio e MAC
-  (sempre `textContent`).
-- **Privacidade:** o **MAC e o usuário ficam no log** (7 dias, como o resto do log de jobs). Como o resto da leitura do `/monitor`,
-  os campos aparecem a quem acessa o painel na LAN.
-
-## mcpollama
 
 ### [0.9.1] - 2026-10-30 (tag `mcpollama-v0.9.1`)
 
@@ -137,6 +125,31 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
+
+### [0.12.5] - 2026-10-31 (tag `gateway-v0.12.5`)
+
+Binário `0.12.5-4cd3290` implantado às 22:22, com a fila vazia. Decisão do owner (17:05): os quatro campos ficam **visíveis na LAN**, como o resto do `/monitor`.
+
+- **`proxy`:** lê `X-Mcpollama-Station` com validação estrita (só as quatro chaves, cada uma uma vez; valores
+  `^[A-Za-z0-9._-]{1,64}$`; `mac` com exatamente 12 hex maiúsculos; cabeçalho de até 512 bytes). Ausente ou inválido: campos vazios,
+  **sem recusar o pedido**. O cabeçalho é **apagado antes de repassar ao backend**.
+- **Banco:** quatro colunas novas em `requests` (`station_computer`, `station_user`, `station_domain`, `station_mac`), com
+  **migração idempotente** (`ALTER TABLE ADD COLUMN` só se faltar; bancos antigos abrem e leem normalmente). Vão do pedido até o
+  registro (fila, `joblog`, `store`); o fim do job sem estação não apaga a que foi gravada na entrada.
+- **API e exportações:** os quatro campos entram no JSON de `/monitor/api/jobs/<id>` e da lista, no JSONL e no CSV (colunas
+  `maquina`, `usuario`, `dominio`, `mac`, com `csvSafe`).
+- **Tela:** a coluna Cliente continua sendo o `client_label`; o **Detalhes** do job ganha as linhas Máquina, Usuário, Domínio e MAC
+  (sempre `textContent`).
+- **Privacidade:** o **MAC e o usuário ficam no log** (7 dias, como o resto do log de jobs). Como o resto da leitura do `/monitor`,
+  os campos aparecem a quem acessa o painel na LAN.
+
+### [0.12.4] - 2026-10-31 (tag `gateway-v0.12.4`)
+
+Binário `0.12.4-bfbc884` implantado às 16:02, com a fila vazia.
+
+- **Botão Detalhes** (em "Concluídos nos últimos 5 min") não fazia nada: o painel do job fica dentro da aba "Log em tempo real" e
+  abria escondido. Agora `openJob` abre essa aba antes. Provado no Firefox headless: na 0.12.3 a aba continuava oculta depois do
+  clique; na 0.12.4 a aba abre e o detalhe aparece. Teste de regressão em `responsive_test.go`; testes de ataque 9.5/10.L/10.5 ok.
 
 ### [0.12.3] - 2026-10-30 (tag `gateway-v0.12.3`)
 
@@ -263,6 +276,8 @@ Primeira versão em produção, às 12:12:40 (`0.9.0-2cb599d`; etapa 2 do instal
 
 - 2026-10-30 14:45: `limit_conn` do nginx de 12 para **30** por IP (`339517e`).
 
+[0.12.5]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.5
+[0.12.4]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.4
 [0.12.3]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.3
 [0.12.2]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.2
 [0.12.1]: https://github.com/cslsolucoes/mcpollama/releases/tag/gateway-v0.12.1
