@@ -124,7 +124,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 		if err != nil {
 			return nil, err
 		}
-		out.QueueMS, out.Backend = q, fu.backend()
+		out.QueueMS, out.Backend, out.JobID = q, fu.backend(), fu.job()
 		if out.Error != "" {
 			return nil, c.fail(ErrStream, 0, "o servidor reportou erro na geração: %s", c.detail([]byte(out.Error)))
 		}
@@ -149,7 +149,7 @@ func (c *Client) Generate(ctx context.Context, req GenerateRequest) (*GenerateRe
 		return false, nil
 	})
 	out.Response = text.String()
-	out.QueueMS, out.Backend = qms, fu.backend()
+	out.QueueMS, out.Backend, out.JobID = qms, fu.backend(), fu.job()
 	if err != nil {
 		if text.Len() == 0 {
 			return nil, err
@@ -187,7 +187,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		if err != nil {
 			return nil, err
 		}
-		out.QueueMS, out.Backend = q, fu.backend()
+		out.QueueMS, out.Backend, out.JobID = q, fu.backend(), fu.job()
 		if out.Error != "" {
 			return nil, c.fail(ErrStream, 0, "o servidor reportou erro na geração: %s", c.detail([]byte(out.Error)))
 		}
@@ -212,7 +212,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return false, nil
 	})
 	out.Message = ChatMessage{Role: "assistant", Content: text.String()}
-	out.QueueMS, out.Backend = qms, fu.backend()
+	out.QueueMS, out.Backend, out.JobID = qms, fu.backend(), fu.job()
 	if err != nil {
 		if text.Len() == 0 {
 			return nil, err
@@ -248,7 +248,7 @@ func (c *Client) Embed(ctx context.Context, req EmbedRequest) (*EmbedResponse, e
 	if err != nil {
 		return nil, err
 	}
-	out.QueueMS, out.Backend = q, fu.backend()
+	out.QueueMS, out.Backend, out.JobID = q, fu.backend(), fu.job()
 	if out.Error != "" {
 		return nil, c.fail(ErrServer, 0, "o servidor reportou erro no embed: %s", c.detail([]byte(out.Error)))
 	}
@@ -318,6 +318,9 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 	if tool := toolFrom(ctx); tool != "" {
 		req.Header.Set("X-Mcpollama-Tool", tool)
 	}
+	if doc := docFrom(ctx); doc != "" {
+		req.Header.Set("X-Mcpollama-Doc", doc)
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		c.debugf("%s %s failed after %dms", method, path, time.Since(start).Milliseconds())
@@ -375,7 +378,10 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 type fbKey struct{}
 
 // fallbackProbe tells the entry point of a call whether the fallback served it.
-type fallbackProbe struct{ used atomic.Bool }
+type fallbackProbe struct {
+	used  atomic.Bool
+	jobID atomic.Value // string: gateway job id of the response used
+}
 
 func withFallbackProbe(ctx context.Context) (context.Context, *fallbackProbe) {
 	p := &fallbackProbe{}
@@ -388,6 +394,42 @@ func (p *fallbackProbe) backend() string {
 		return "fallback"
 	}
 	return ""
+}
+
+// job is the gateway job id of the response that served the call, "" if none.
+func (p *fallbackProbe) job() string {
+	if p == nil {
+		return ""
+	}
+	s, _ := p.jobID.Load().(string)
+	return s
+}
+
+// recordJob keeps the job id of resp (header X-Request-Id) in the probe of ctx.
+// Only 32 lowercase hex characters are accepted; anything else is ignored.
+func recordJob(ctx context.Context, resp *http.Response) {
+	p, _ := ctx.Value(fbKey{}).(*fallbackProbe)
+	if p == nil {
+		return
+	}
+	id := strings.TrimSpace(resp.Header.Get("X-Request-Id"))
+	if validJobID(id) {
+		p.jobID.Store(id)
+	} else {
+		p.jobID.Store("")
+	}
+}
+
+func validJobID(s string) bool {
+	if len(s) != 32 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // tryFallback sends the same request to the fallback server, once, when cause
@@ -466,6 +508,7 @@ func (c *Client) callJSONQ(ctx context.Context, method, path string, in, out any
 	}
 	defer resp.Body.Close()
 	qms := queueMS(resp)
+	recordJob(ctx, resp)
 	b, err := io.ReadAll(io.LimitReader(resp.Body, int64(c.maxBody)+1))
 	if err != nil {
 		return 0, c.transportErr(ctx, err, start, true, len(b))
@@ -492,6 +535,7 @@ func (c *Client) streamNDJSON(ctx context.Context, path string, in any, handle f
 	}
 	defer resp.Body.Close()
 	qms := queueMS(resp)
+	recordJob(ctx, resp)
 
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 0, min(64*1024, c.maxLine)), c.maxLine) // cap above max would raise the limit

@@ -258,6 +258,28 @@ func toolFrom(ctx context.Context) string {
 	return cleanHeader(n, 32, toolOK)
 }
 
+type docKey struct{}
+
+// WithDoc tags the calls made with ctx with the sha256 (lowercase hex) of the
+// extracted text of the whole document (header X-Mcpollama-Doc, contract
+// C-4.1). A value that is not 64 lowercase hex characters is dropped.
+func WithDoc(ctx context.Context, sha256hex string) context.Context {
+	return context.WithValue(ctx, docKey{}, sha256hex)
+}
+
+func docFrom(ctx context.Context) string {
+	d, _ := ctx.Value(docKey{}).(string)
+	if len(d) != 64 {
+		return ""
+	}
+	for _, r := range d {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+			return ""
+		}
+	}
+	return d
+}
+
 func labelOK(r rune) bool {
 	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._:/@+-", r)
 }

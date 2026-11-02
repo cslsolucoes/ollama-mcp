@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -372,7 +373,7 @@ func (j *fileJob) room(overhead string) int {
 
 // call is one model call through the GPU queue. The slot is released after
 // each call, so other requests interleave between the parts.
-func (j *fileJob) call(ctx context.Context, prompt string) (string, error) {
+func (j *fileJob) call(ctx context.Context, prompt, role string) (string, error) {
 	if j.calls >= j.maxCalls {
 		return "", fmt.Errorf("o processamento passaria de %d chamadas ao modelo (--max-chunks); reduza o arquivo ou aumente o teto", j.maxCalls)
 	}
@@ -409,6 +410,7 @@ func (j *fileJob) call(ctx context.Context, prompt string) (string, error) {
 	if resp.Backend != "" {
 		j.u.backend = resp.Backend // any part served by the fallback marks the result
 	}
+	j.u.jobs = append(j.u.jobs, newJobRef(resp.JobID, role, resp.Backend))
 	return resp.Response, nil
 }
 
@@ -431,6 +433,9 @@ func (d Deps) runFile(ctx context.Context, path, model string, think bool, task 
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}
+	// C-4.1: one hash of the whole extracted text, sent in every call of the request.
+	sum := sha256.Sum256([]byte(f.Text))
+	ctx = ollama.WithDoc(ctx, hex.EncodeToString(sum[:]))
 	j := &fileJob{d: d, be: be, model: model, think: think, nonce: nonce, maxCalls: d.maxCalls(), maxChars: d.maxPrompt()}
 
 	// Budget: the worst-case task text (largest counters) decides the part size.
@@ -457,7 +462,7 @@ func (d Deps) runFile(ctx context.Context, path, model string, think bool, task 
 	omitted := 0
 	switch {
 	case n == 1:
-		answer, err = j.call(ctx, j.mapPrompt(task, 1, 1, parts[0]))
+		answer, err = j.call(ctx, j.mapPrompt(task, 1, 1, parts[0]), roleUnico)
 		if err != nil {
 			return mcp.ToolCallResult{}, err
 		}
@@ -469,7 +474,7 @@ func (d Deps) runFile(ctx context.Context, path, model string, think bool, task 
 	default:
 		partials := make([]string, 0, n)
 		for i, p := range parts {
-			out, err := j.call(ctx, j.mapPrompt(task, i+1, n, p))
+			out, err := j.call(ctx, j.mapPrompt(task, i+1, n, p), fmt.Sprintf("map%d", i+1))
 			if err != nil {
 				return mcp.ToolCallResult{}, fmt.Errorf("falha na parte %d de %d: %w", i+1, n, err)
 			}
@@ -568,7 +573,7 @@ func (j *fileJob) runConcat(ctx context.Context, task fileTask, parts []string) 
 	var sb strings.Builder
 	n := len(parts)
 	for i, p := range parts {
-		out, err := j.call(ctx, j.mapPrompt(task, i+1, n, p))
+		out, err := j.call(ctx, j.mapPrompt(task, i+1, n, p), fmt.Sprintf("map%d", i+1))
 		if err != nil {
 			return "", 0, fmt.Errorf("falha na parte %d de %d: %w", i+1, n, err)
 		}
@@ -593,6 +598,7 @@ func (j *fileJob) reduce(ctx context.Context, task fileTask, partials []string) 
 	if size < minPartRunes {
 		return "", fmt.Errorf("o teto --max-prompt-chars (%d) é baixo demais para combinar os parciais", j.maxChars)
 	}
+	rounds := 0 // intermediate reduce calls so far: reduce1..reduceN, the last call is "final"
 	for {
 		joined := strings.Join(partials, partialSeparator)
 		nonce, err := newNonce(joined)
@@ -601,11 +607,12 @@ func (j *fileJob) reduce(ctx context.Context, task fileTask, partials []string) 
 		}
 		groups := splitChunks(joined, size)
 		if len(groups) == 1 {
-			return j.call(ctx, j.reducePrompt(task, nonce, groups[0]))
+			return j.call(ctx, j.reducePrompt(task, nonce, groups[0]), "final")
 		}
 		next := make([]string, 0, len(groups))
 		for _, g := range groups {
-			out, err := j.call(ctx, j.reducePrompt(task, nonce, g))
+			rounds++
+			out, err := j.call(ctx, j.reducePrompt(task, nonce, g), fmt.Sprintf("reduce%d", rounds))
 			if err != nil {
 				return "", err
 			}

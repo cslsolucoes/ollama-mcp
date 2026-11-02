@@ -89,7 +89,7 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 	resp, err := be.Generate(ctx, ollama.GenerateRequest{Model: model, Prompt: prompt, System: system, Options: opts, Think: think})
 	if err != nil {
 		if resp != nil && resp.Response != "" {
-			return partialFailure(resp.Response, err), nil
+			return partialFailure(resp.Response, err, newJobRef(resp.JobID, roleUnico, resp.Backend)), nil
 		}
 		return mcp.ToolCallResult{}, err
 	}
@@ -107,6 +107,7 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 		doneReason: resp.DoneReason,
 		think:      think,
 		backend:    resp.Backend,
+		jobs:       []jobRef{newJobRef(resp.JobID, roleUnico, resp.Backend)},
 	}), nil
 }
 
@@ -124,9 +125,12 @@ func (d Deps) acquire(ctx context.Context) (func(), time.Duration, error) {
 
 // partialFailure keeps the text that arrived before a mid-stream failure: it
 // is an error result (the answer is incomplete) that still carries the text.
-func partialFailure(partial string, err error) mcp.ToolCallResult {
+func partialFailure(partial string, err error, job jobRef) mcp.ToolCallResult {
 	body := fmt.Sprintf("%s\n\n[texto parcial: %d caracteres recebidos antes da falha]\n%s",
 		err.Error(), len([]rune(partial)), capText(partial))
+	if job.ID != "" {
+		body += "\n\njob=" + job.ref() // the job exists in the gateway even though the answer is incomplete
+	}
 	return mcp.TextResult(body, true)
 }
 

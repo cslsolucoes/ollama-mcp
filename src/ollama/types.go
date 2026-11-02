@@ -25,6 +25,9 @@ type Usage struct {
 	// Backend is "fallback" when the call was served by the fallback server
 	// (--ollama-url-fallback) and "" for the primary. Not part of the Ollama JSON.
 	Backend string `json:"-"`
+	// JobID is the gateway job id of the response used (header X-Request-Id,
+	// 32 lowercase hex); "" when there is no gateway or the header is not valid.
+	JobID string `json:"-"`
 }
 
 // GenerateRequest is the input of Generate. Model empty means the client default.
@@ -95,6 +98,7 @@ type EmbedResponse struct {
 	Error           string      `json:"error"`
 	QueueMS         int64       `json:"-"` // see Usage.QueueMS
 	Backend         string      `json:"-"` // see Usage.Backend
+	JobID           string      `json:"-"` // see Usage.JobID
 }
 
 // ModelDetails is the "details" object shared by tags, ps and show.

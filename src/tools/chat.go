@@ -132,7 +132,7 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 	resp, err := be.Chat(ctx, ollama.ChatRequest{Model: model, Messages: msgs, Options: opts, Think: think})
 	if err != nil {
 		if resp != nil && resp.Message.Content != "" {
-			return partialFailure(resp.Message.Content, err), nil
+			return partialFailure(resp.Message.Content, err, newJobRef(resp.JobID, roleUnico, resp.Backend)), nil
 		}
 		return mcp.ToolCallResult{}, err
 	}
@@ -150,5 +150,6 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 		doneReason: resp.DoneReason,
 		think:      think,
 		backend:    resp.Backend,
+		jobs:       []jobRef{newJobRef(resp.JobID, roleUnico, resp.Backend)},
 	}), nil
 }

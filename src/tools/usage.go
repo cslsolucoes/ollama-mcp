@@ -24,6 +24,56 @@ type usage struct {
 	parts      int // file parts of a map-reduce request; 0 for the other tools
 	think      bool
 	backend    string // "fallback" when the fallback server answered; "" for the primary
+	jobs       []jobRef
+}
+
+// Job roles (contract C-1.2): unico, map1..mapN, reduce1..reduceN, final.
+const roleUnico = "unico"
+
+// jobRef is one model call as the gateway knows it: the job id (header
+// X-Request-Id; empty when there is no gateway), the role the call played in
+// the request and the backend that answered ("primario" or "fallback").
+type jobRef struct {
+	ID      string
+	Role    string
+	Backend string
+}
+
+// newJobRef builds the reference of the response used by a call.
+func newJobRef(id, role, respBackend string) jobRef {
+	b := "primario"
+	if respBackend == "fallback" {
+		b = "fallback"
+	}
+	return jobRef{ID: id, Role: role, Backend: b}
+}
+
+// ref is the job id as written in the [uso] line; the fallback adds @fallback.
+func (r jobRef) ref() string {
+	if r.Backend == "fallback" {
+		return r.ID + "@fallback"
+	}
+	return r.ID
+}
+
+// jobsField is the tail of the [uso] line: job=<id> for a request of one call,
+// jobs=<role>:<id>,... for more than one (in call order). Calls without an id
+// are left out; with no id at all nothing is written.
+func (u usage) jobsField() string {
+	var parts []string
+	for _, j := range u.jobs {
+		if j.ID == "" {
+			continue
+		}
+		if len(u.jobs) == 1 {
+			return " job=" + j.ref()
+		}
+		parts = append(parts, j.Role+":"+j.ref())
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " jobs=" + strings.Join(parts, ",")
 }
 
 // line is the fixed last line of every result that called the model.
@@ -46,6 +96,7 @@ func (u usage) line() string {
 	if u.backend != "" {
 		b.WriteString(" backend=" + u.backend)
 	}
+	b.WriteString(u.jobsField())
 	return b.String()
 }
 
@@ -71,6 +122,15 @@ func (u usage) meta() map[string]any {
 	}
 	if u.backend != "" {
 		m["backend"] = u.backend
+	}
+	var jobs []map[string]any
+	for _, j := range u.jobs {
+		if j.ID != "" {
+			jobs = append(jobs, map[string]any{"id": j.ID, "papel": j.Role, "backend": j.Backend})
+		}
+	}
+	if len(jobs) > 0 {
+		m["jobs"] = jobs
 	}
 	return map[string]any{"mcpollama/usage": m}
 }
