@@ -1,6 +1,6 @@
 # Contrato de dados da Fase 12 (erros do modelo local → base de treino)
 
-> **Versão:** 1.0.0 · **Estado:** ✅ APROVADO pelo owner em 2026-11-02 20:05 (etapa 12.1) · **Data:** 2026-11-02
+> **Versão:** 1.1.1 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40) (etapa 12.1) · **Data:** 2026-11-02
 > **Fonte única:** `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (decisões D12-1 a D12-17, §5, §8, §10, §13, §14, §15).
 > Este documento só fixa regras; o raciocínio e o histórico estão no plano.
 
@@ -37,19 +37,20 @@
 - **C-1.4** O gateway que recebe o relato recusa com 404, sem gravar nada, um `job_do_erro` que não exista em `requests` dele.
 - **C-1.5** O relato grava a ocorrência, os jobs e as amostras de **todos** os jobs numa única transação, copiando-as do `content.db`; as exceções são as ocorrências `distribuida` (C-1.10) e `fallback` (C-1.21), que não copiam amostras.
 - **C-1.6** `amostras` tem uma linha por `job_id` (PK); um job pode pertencer a mais de uma ocorrência, e a amostra é então compartilhada.
-- **C-1.7** A amostra guarda: `job_id`, `copiada_em`, `endpoint`, `modelo`, `think`, `prompt_json`, `prompt_texto`, `resposta`, `prompt_hmac`, `conteudo_hmac`, `prompt_truncado`, `prompt_json_truncado`, `tem_imagem`, `doc_hash`, `resp_final`, `resp_truncada`, `status`, `http_status`.
-- **C-1.8** O `estado` da ocorrência é um de: `nova`, `confirmada`, `descartada`, `sem_pedido`, `distribuida`, `fallback`, `apagada`; a `particao` é um de: `treino`, `teste`, `quarentena`.
+- **C-1.7** A amostra guarda: `job_id`, `copiada_em`, `endpoint`, `modelo`, `think`, `prompt_json`, `prompt_texto`, `resposta`, `prompt_hmac`, `conteudo_hmac`, `key_id`, `prompt_truncado`, `prompt_json_truncado`, `tem_imagem`, `doc_hash`, `resp_final`, `resp_truncada`, `status`, `http_status`.
+- **C-1.8** O `estado` da ocorrência é um de: `nova`, `confirmada`, `descartada`, `sem_pedido`, `distribuida`, `fallback`, `apagada`; a `particao` é um de: `treino`, `teste`, `quarentena`, ou **vazia** (pendente) enquanto o grupo não tiver amostra exportável (C-4.6).
 - **C-1.9** Toda ocorrência nasce `nova`, exceto: `sem_pedido` quando o conteúdo do **`job_do_erro`** já expirou do `content.db` ou não tem `prompt_json` (job anterior à 0.13.0); e `distribuida` quando os jobs da lista têm backends diferentes. `fallback` quando o gateway que recebe é de fallback (C-1.21). Precedência, se mais de um valer: `distribuida`, depois `fallback`, depois `sem_pedido`.
 - **C-1.9a** Se só jobs que **não** são o `job_do_erro` expiraram, a ocorrência nasce `nova`: as amostras existentes são copiadas e as dos expirados ficam só como referência em `ocorrencia_jobs`.
 - **C-1.10** Numa ocorrência `distribuida` o gateway guarda só a ocorrência e as referências dos jobs (com o backend de cada um), **nenhuma amostra**, nem as locais; a resposta traz `estado=distribuida`, `amostras_copiadas=0` e `jobs_externos` = número de jobs de outro backend.
 - **C-1.11** Os jobs de outro backend, numa ocorrência distribuída, são aceitos só como referência, sem validação local; o relato vai ao gateway do `job_do_erro`.
-- **C-1.12** Transições permitidas, e só elas: `nova`→`confirmada` (confirmar), `nova`, `sem_pedido`, `distribuida` ou `fallback`→`descartada` (descartar: o admin julgou que não foi erro do modelo, e o caso sai também da estatística de erros), `confirmada`→`nova` (alterar a correção, C-6.5) e qualquer estado→`apagada` (apagar). `descartada` não volta a `nova`; `sem_pedido`, `distribuida` e `fallback` nunca são confirmadas.
+- **C-1.12** Transições permitidas, e só elas: `nova`→`confirmada` (confirmar), `nova`, `confirmada`, `sem_pedido`, `distribuida` ou `fallback`→`descartada` (descartar: o admin julgou que não foi erro do modelo, e o caso sai também da estatística de erros), `confirmada`→`nova` (alterar a correção, C-6.5) e qualquer estado→`apagada` (apagar). `descartada` não volta a `nova`; `sem_pedido`, `distribuida` e `fallback` nunca são confirmadas.
 - **C-1.12a** Confirmar exige `resposta_correta` não vazia; sem ela, a ação é recusada.
+- **C-1.12b** Descartar uma ocorrência `confirmada` (1.1.0) apaga o embedding, zera `exemplo_publico`, invalida (`valido=0`) todo retrato que a lista e **não** libera a vaga dela na cota (C-4.11a). O histórico grava `descartou`. Uma exportação já baixada não é desfeita pelo servidor; as linhas `exportou` anteriores ficam no histórico como registro.
 - **C-1.13** Confirmar, descartar, completar a correção, marcar exemplo público, apagar e liberar quarentena são ações exclusivas do admin, com sessão, CSRF e same-site; cada uma grava no histórico.
 - **C-1.14** `sem_pedido`, `distribuida`, `fallback` e `nova` contam só na estatística de erros: nunca entram na exportação, nos exemplos nem na avaliação. `descartada` e `apagada` não contam na estatística de erros; `descartada` conta só na taxa de descarte por regra automática (D12-8).
 - **C-1.15** Uma ocorrência em partição `quarentena` fica fora da exportação de treino e de teste, do índice de exemplos e da avaliação, e conta só na estatística.
 - **C-1.16** `categoria` ∈ {`numeracao_errada`, `contagem_errada`, `calculo_errado`, `inventou`, `omitiu`, `formato_invalido`, `resumo_infiel`, `traducao_errada`, `idioma_errado`, `truncado`, `ignorou_instrucao`, `outro`}; `origem` ∈ {`claude`, `usuario`, `automatico`}; `severidade` ∈ {`baixa`, `media`, `alta`}; valor fora do enum é recusado.
-- **C-1.17** Limites do relato: corpo ≤ 256 KB, `descricao` ≤ 4 KB, `resposta_correta` ≤ 128 KB e no máximo **64 jobs** na lista; acima disso o relato é recusado.
+- **C-1.17** Limites do relato: corpo ≤ 256 KB, `descricao` ≤ 4 KB, `resposta_correta` ≤ 128 KB e no máximo **64 jobs** na lista; acima disso o relato é recusado com mensagem clara. O `--max-chunks` da estação não é limitado: um pedido com mais de 64 chamadas simplesmente não pode ser relatado (1.1.1, documentado no `RELATAR-ERROS-IA.md`).
 - **C-1.18** Os dados de estação, projeto e origem do relato são declarados e não autenticados; nada entra no treino, nos exemplos ou na avaliação sem confirmação do admin.
 - **C-1.19** Candidato automático nasce `nova`, com `origem=automatico` e `resposta_correta` vazia; um relato humano da mesma ocorrência o substitui, e o histórico grava `alterou` com `campo=origem`.
 - **C-1.20** Os candidatos automáticos têm só as regras: JSON inválido (pedido com `format` = `"json"` ou schema, e texto reprovado em `json.Valid`), resposta só de espaços, e `fim=length` com `num_predict` ≥ 256 (ou ausente).
@@ -81,7 +82,7 @@
 - **C-3.7** (item 6) A tool é `generate`, `chat`, `summarize_file`, `extract` ou `translate`.
 - **C-3.8** (item 7) `tem_imagem=0`.
 - **C-3.9** (item 8) A ocorrência não é `distribuida` nem `fallback`, e a partição não é `quarentena`.
-- **C-3.10** (item 9) No `translate`, a ocorrência só entra se o `job_do_erro` for uma parte (`mapN`) e a `resposta_correta` for a tradução certa **daquela parte**; erro no texto montado do `translate` não entra.
+- **C-3.10** (item 9) No `translate`, a ocorrência só entra se o `job_do_erro` for uma parte (`mapN`) ou a chamada única (`unico`, arquivo de uma parte, sem texto montado; 1.1.1) e a `resposta_correta` for a tradução certa **daquela chamada**; erro no texto montado do `translate` não entra.
 - **C-3.11** A exportação aceita `parte=treino` ou `parte=teste`, exporta só amostras da partição pedida, e nenhuma amostra de `quarentena`.
 - **C-3.12** A exportação é restrita ao admin (sessão + same-site), gerada na hora em streaming, não fica guardada no servidor, e grava `exportou` no histórico.
 - **C-3.13** Cada linha do JSONL é `{"messages":[system, user, assistant],"meta":{...}}`; o `assistant` é a `resposta_correta`, e `system`/`user` vêm do `prompt_json`.
@@ -94,16 +95,16 @@
 - **C-4.1** Nas tools de arquivo, o mcpollama calcula uma vez o sha256 do texto extraído do documento inteiro e envia, em **cada** chamada do pedido (map, reduce e partes), o cabeçalho `X-Mcpollama-Doc` com esse valor.
 - **C-4.2** O gateway grava em `requests.doc_hash` somente `HMAC-SHA256(chave, valor do X-Mcpollama-Doc)`; o sha256 puro nunca é gravado (nem em `requests`, amostras, ocorrências, histórico ou logs).
 - **C-4.3** A chave do HMAC fica num arquivo 0600 gerado pelo instalador (`--doc-key-file`), usa só a biblioteca padrão e fica fora do backup comum.
-- **C-4.3a** Todos os gateways que atendem as mesmas estações (primário, fallback e backends do pool) usam a **mesma chave**, copiada por canal protegido. Cada hash gravado leva `key_id` (os 16 primeiros hex do sha256 da chave), e o agrupamento só compara hashes com o mesmo `key_id`. Sem `--doc-key-file`, o gateway não aceita relatos (o `/api/feedback` responde 503 com mensagem explícita).
+- **C-4.3a** Todos os **gateways** que calculam e guardam HMACs (primário e fallback) usam a **mesma chave**, copiada por canal protegido. Os servidores Ollama do pool, que ficam atrás de um gateway, não recebem a chave, porque não calculam nem guardam HMAC (1.1.0). Cada hash gravado leva `key_id` (os 16 primeiros hex do sha256 da chave), e o agrupamento só compara hashes com o mesmo `key_id`. Sem `--doc-key-file`, o gateway não aceita relatos (o `/api/feedback` responde 503 com mensagem explícita).
 - **C-4.4** Trocar a chave só é feito com o owner, e quebra os grupos antigos.
 - **C-4.5** Um **grupo** é um componente conectado de ocorrências ligadas pelo mesmo `doc_hash`, pelo mesmo `conteudo_hmac` (C-2.12) ou por um job em comum; o grupo inteiro cai do mesmo lado. Entram nos componentes **todas as ocorrências não apagadas**, inclusive `nova` e `descartada`, para não haver ligação oculta.
-- **C-4.6** Os 30 primeiros grupos confirmados de cada categoria vão para o **teste** (cota). "Primeiros" segue a **ordem de confirmação**, e a categoria do grupo é a da ocorrência que foi confirmada primeiro nele. A partição é atribuída no momento da primeira confirmação do grupo.
-- **C-4.7** Depois da cota, um grupo vai para o teste se `sha256(id do grupo) mod 100 < 15`, senão vai para o treino.
+- **C-4.6** (1.1.0) A cota conta só grupos **com ao menos uma amostra exportável**, isto é, que passe em **todo** o predicado do cap. 3 (C-3.1). Os 30 primeiros desses grupos de cada categoria vão para o **teste**. "Primeiros" segue o momento em que o grupo passa a ter a primeira amostra exportável, e a categoria do grupo é a da ocorrência dessa primeira amostra. A partição é atribuída nesse momento; antes dele, o grupo fica com a partição **pendente** (vazia, C-1.8).
+- **C-4.7** Depois da cota, um grupo (no momento da C-4.6) vai para o teste se `sha256(id do grupo) mod 100 < 15`, senão vai para o treino.
 - **C-4.8** A partição, depois de atribuída, é estável: o mesmo grupo mantém o lado em reprocessamentos e novos relatos. Quando grupos do **mesmo** lado se fundem, o resultado usa o menor `grupo_id` anterior, mantém o lado e não é reavaliado pela cota nem pelos 15%.
-- **C-4.9** Se uma ocorrência nova ligar grupos que estão em lados diferentes, o componente inteiro (todos os grupos unidos mais a nova) vai para `quarentena`.
+- **C-4.9** (1.1.0) Quando uma ocorrência nova liga grupos: (a) se entre eles há grupos já atribuídos a **lados opostos** (treino e teste), o componente inteiro (todos os grupos unidos mais a nova) vai para `quarentena`; (b) se só um lado aparece entre os grupos atribuídos, o componente inteiro herda esse lado; (c) se nenhum tem lado, o componente fica pendente até a C-4.6.
 - **C-4.10** Ao entrar em quarentena, os retratos que tinham casos desse componente passam a `valido=0`, e o índice de exemplos congelado que usava algum deles também é invalidado.
 - **C-4.11** O admin libera uma quarentena escolhendo um lado para o componente inteiro, pela rota `POST /monitor/api/treino/{id}/liberar-quarentena`; o histórico grava `alterou` com `campo=particao`.
-- **C-4.11a** Desconfirmar ou apagar uma ocorrência de teste **não libera** a vaga dela na cota, e invalida (`valido=0`) todo retrato que a lista.
+- **C-4.11a** Desconfirmar, descartar (C-1.12b) ou apagar uma ocorrência de teste **não libera** a vaga dela na cota, e invalida (`valido=0`) todo retrato que a lista.
 - **C-4.12** Nenhum `job_id`, `doc_hash` ou `grupo_id` aparece ao mesmo tempo em amostras exportáveis de treino e de teste.
 - **C-4.13** Há um retrato por avaliação. Ele é uma lista congelada de (`ocorrencia_id`, `job_id`, `prompt_hmac`, `categoria`) mais o hash do índice de exemplos congelado, o ID/hash da versão das instruções e `valido`; depois de criado não muda, exceto `valido`→0.
 - **C-4.14** Linha de base e candidato são sempre comparados no mesmo retrato; um retrato novo exige uma linha de base nova.
@@ -185,7 +186,7 @@
 | C-5.1 a C-5.14 | D12-17, §8.5, §14 itens 4 e 7, §15.2 (B5) |
 | C-6.1 a C-6.9 | D12-10, §8.2, §13 riscos 3 e 11 |
 | C-6.10 | §2.4, §8.2, risco 8 |
-| C-7.1 a C-7.8 | D12-16, D12-10, §8.2 |
+| C-7.1 a C-7.9 | D12-16, D12-10, §8.2 |
 | C-8.1 a C-8.10 | D12-15, §13 riscos 4 e 5, §14 item 3, §15.2 (B1, B2), §15.3 (C4) |
 | C-1.9a, C-1.12a, C-1.21, C-2.12, C-4.3a, C-4.11a, C-5.15, C-5.16, C-7.9 e os acréscimos marcados nas demais | revisão do contrato pelo owner (2026-11-02 19:5x): as 21 lacunas + chave compartilhada, pedidos sem documento e variação do bakeoff |
 
@@ -201,3 +202,17 @@ no lugar do `prompt_sha256` do plano (§8.2).
 Ajuste de 2026-11-02 20:00 (revisão externa): o gateway de fallback ganhou o estado próprio `fallback` (C-1.21). Antes, a C-1.21 reaproveitava `distribuida`, que pela C-1.9 significa jobs em backends diferentes.
 
 Ajuste de 2026-11-02 20:02 (revisão externa): a C-1.12 passou a permitir descartar também `sem_pedido`, `distribuida` e `fallback`, para que relatos falsos ou equivocados nesses estados não fiquem na estatística.
+
+## Versão 1.1.0 (owner, 2026-11-02 20:33)
+
+Seis correções de lacunas achadas na sincronização do plano, aprovadas pelo owner com as precisões da revisão externa:
+1. a cota conta só grupos com amostra exportável; a categoria e a ordem vêm da primeira amostra exportável; antes disso, a partição fica pendente (C-4.6, C-4.7, C-1.8);
+2. `key_id` na amostra (C-1.7);
+3. quarentena só quando grupos já atribuídos a lados opostos se ligam; um lado só é herdado; nenhum lado fica pendente (C-4.9);
+4. a chave vai só aos gateways que calculam e guardam HMACs, não aos Ollamas do pool (C-4.3a);
+5. `confirmada`→`descartada` direto, com efeitos explícitos (C-1.12, C-1.12b, C-4.11a);
+6. rastreabilidade C-7.1 a C-7.9.
+
+## Versão 1.1.1 (owner, 2026-11-02 20:40)
+
+Achados M-1 e M-2 da revisão do código da 12.2: a C-3.10 aceita `unico` no `translate` (arquivo de uma parte não tem texto montado), e a C-1.17 documenta que pedido com mais de 64 chamadas não pode ser relatado, sem teto na flag `--max-chunks`.

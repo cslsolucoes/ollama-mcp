@@ -30,7 +30,7 @@ nível local é rascunho. Relate também quando o usuário apontar o erro.
 | --- | --- | --- |
 | `projeto` | nome do projeto/pasta (ex.: `GestorERP`) | sim |
 | `jobs` | o `job=` (ou a lista `jobs=<papel>:<id>,…`) da linha `[uso]` da resposta errada, inteira e sem editar | sim |
-| `job_do_erro` | qual chamada produziu o erro. Padrão: a `final`. Num arquivo grande, se o erro já estava numa parte (`map3`, por exemplo), indique essa parte. No **`translate`** não existe `final` (as partes são só concatenadas): para o relato servir ao treino, aponte a parte (`mapN`) e dê a tradução certa **daquela parte**; um erro no texto montado conta só na estatística | se não for a `final` |
+| `job_do_erro` | qual chamada produziu o erro. Padrão: a `final`. Num arquivo grande, se o erro já estava numa parte (`map3`, por exemplo), indique essa parte. No **`translate`** não existe `final` (as partes são só concatenadas): para o relato servir ao treino, aponte a parte (`mapN`), ou a chamada `unico` se o arquivo coube numa só, e dê a tradução certa **daquela chamada**; um erro no texto montado conta só na estatística | se não for a `final` |
 | `categoria` | uma de: `numeracao_errada`, `contagem_errada`, `calculo_errado`, `inventou`, `omitiu`, `formato_invalido`, `resumo_infiel`, `traducao_errada`, `idioma_errado`, `truncado`, `ignorou_instrucao`, `outro` | sim |
 | `erro` | o que estava errado, objetivo e curto (ex.: "pulou a seção 7.2 e numerou 7.3 como 7.2") | sim |
 | `resposta_correta` | o que **aquela chamada** (`job_do_erro`) deveria ter respondido, completo e no mesmo formato pedido. Na `final`, é a resposta inteira que o usuário deveria ter recebido. É o que ensina o modelo | sim, se você conseguiu corrigir |
@@ -57,3 +57,7 @@ o registro só fica elegível para medir, para os exemplos e para o treino depoi
 - Se você não tem certeza da resposta certa, deixe `resposta_correta` vazia e descreva o erro: o registro serve para estatística,
   mas não entra no treino.
 - Não "melhore" além do pedido. O exemplo ensina o que foi pedido, não um estilo novo.
+
+## 5. Limite
+
+Um pedido com mais de **64 chamadas** ao modelo (arquivo muito grande com `--max-chunks` acima do padrão de 40) não pode ser relatado: a tool `reportar_erro` recusa com mensagem clara. Nesse caso, avise o usuário e siga o trabalho.
