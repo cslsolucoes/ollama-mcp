@@ -13,37 +13,9 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
 feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
-### mcpollama-gateway 0.12.6 (correção do travamento do /monitor)
+Em planejamento: **Fase 12** (registro dos erros do modelo local → base de treino), aguardando ajustes do owner:
+`.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; instruções para o Claude em `docs/RELATAR-ERROS-IA.md`.
 
-Incidente de 2026-11-01 (gateway `0.12.5-4cd3290`): o `/monitor/api/state` parou de responder, enquanto `/api/*` e
-`/monitor/api/series` seguiram normais. Os pedidos do painel se acumularam até o `limit_conn 80` do nginx e a estação do
-owner passou a receber **429** em tudo (o painel mostrava "sem conexão").
-
-Causa, provada por dump de goroutines (SIGQUIT, 211 goroutines):
-- uma goroutine do `apiStream` estava em `refreshExtras` -> `store.Stats` (o segundo `rows.Err()`), presa em
-  `database/sql.closingMutex.RLock` havia 112 min, **segurando o `extraMu`** do monitor;
-- outra, `database/sql.Rows.awaitDone` -> `Rows.close`, presa no `closingMutex.Lock` pelo mesmo tempo. Ela existe porque
-  o `Stats` recebia o contexto do pedido SSE: o cliente fechou e o cancelamento correu contra o `rows.Err()` final
-  (impasse no `database/sql`);
-- outras 87 esperavam o `extraMu`. Como o refresh segurava o mutex do monitor, o painel inteiro travou.
-
-Correção:
-- `store.Stats`: removido o segundo `rows.Err()` (o erro já é checado logo após o laço); retorna `st, nil`.
-- `monitor`: o refresh do cache compartilhado (Stats hoje e 15 min, History, Events, e as listas de jobs ao vivo e
-  concluídos) usa `context.Background()`, nunca o contexto do visitante, então o `database/sql` nem cria o `awaitDone`.
-  O `Stats` do cache de `/monitor/api/stats` também.
-- Novo `swrCache` (`monitor/swr.go`): o mutex só protege o valor e as flags, nunca a consulta. Quem chama recebe na hora o
-  último valor em cache; vencido o TTL, **um** refresh roda numa goroutine (um refresh preso custa uma goroutine, não uma
-  por visitante). A primeira chamada, sem cache, espera o refresh no máximo 2 s e depois devolve vazio. Refresh com erro
-  mantém os valores anteriores.
-- `readSource` (interface mínima: `Stats`, `History`, `Events`, `Jobs`) para permitir a injeção no teste; em produção é o
-  `*store.Store`.
-
-Prova: `TestStateSurvivesHungDatabaseRead` (`monitor/hang_regress_test.go`) injeta um `Stats` que bloqueia para sempre e
-dispara 20 goroutines x 5 pedidos a `/monitor/api/state`. No código antigo **falha**
-(`state() travado: o mutex do monitor segura a leitura do banco`, 10,03 s); no novo passa em ~0,5 s, todas as respostas
-abaixo de 500 ms, 1 só chamada a `Stats` e sem goroutines acumuladas. Os testes de `jobs_test.go` que dependiam de
-recálculo imediato do cache agora esperam o refresh (`settleState`).
 
 ## mcpollama
 
@@ -157,6 +129,40 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
+
+### [0.12.6] - 2026-11-01 (tag `gateway-v0.12.6`)
+
+Binário `0.12.6-a155513` implantado às 21:45, com a fila vazia (5 leituras do `/monitor/api/state` logo depois: 45–80 ms).
+
+Incidente de 2026-11-01 (gateway `0.12.5-4cd3290`): o `/monitor/api/state` parou de responder, enquanto `/api/*` e
+`/monitor/api/series` seguiram normais. Os pedidos do painel se acumularam até o `limit_conn 80` do nginx e a estação do
+owner passou a receber **429** em tudo (o painel mostrava "sem conexão").
+
+Causa, provada por dump de goroutines (SIGQUIT, 211 goroutines):
+- uma goroutine do `apiStream` estava em `refreshExtras` -> `store.Stats` (o segundo `rows.Err()`), presa em
+  `database/sql.closingMutex.RLock` havia 112 min, **segurando o `extraMu`** do monitor;
+- outra, `database/sql.Rows.awaitDone` -> `Rows.close`, presa no `closingMutex.Lock` pelo mesmo tempo. Ela existe porque
+  o `Stats` recebia o contexto do pedido SSE: o cliente fechou e o cancelamento correu contra o `rows.Err()` final
+  (impasse no `database/sql`);
+- outras 87 esperavam o `extraMu`. Como o refresh segurava o mutex do monitor, o painel inteiro travou.
+
+Correção:
+- `store.Stats`: removido o segundo `rows.Err()` (o erro já é checado logo após o laço); retorna `st, nil`.
+- `monitor`: o refresh do cache compartilhado (Stats hoje e 15 min, History, Events, e as listas de jobs ao vivo e
+  concluídos) usa `context.Background()`, nunca o contexto do visitante, então o `database/sql` nem cria o `awaitDone`.
+  O `Stats` do cache de `/monitor/api/stats` também.
+- Novo `swrCache` (`monitor/swr.go`): o mutex só protege o valor e as flags, nunca a consulta. Quem chama recebe na hora o
+  último valor em cache; vencido o TTL, **um** refresh roda numa goroutine (um refresh preso custa uma goroutine, não uma
+  por visitante). A primeira chamada, sem cache, espera o refresh no máximo 2 s e depois devolve vazio. Refresh com erro
+  mantém os valores anteriores.
+- `readSource` (interface mínima: `Stats`, `History`, `Events`, `Jobs`) para permitir a injeção no teste; em produção é o
+  `*store.Store`.
+
+Prova: `TestStateSurvivesHungDatabaseRead` (`monitor/hang_regress_test.go`) injeta um `Stats` que bloqueia para sempre e
+dispara 20 goroutines x 5 pedidos a `/monitor/api/state`. No código antigo **falha**
+(`state() travado: o mutex do monitor segura a leitura do banco`, 10,03 s); no novo passa em ~0,5 s, todas as respostas
+abaixo de 500 ms, 1 só chamada a `Stats` e sem goroutines acumuladas. Os testes de `jobs_test.go` que dependiam de
+recálculo imediato do cache agora esperam o refresh (`settleState`).
 
 ### [0.12.5] - 2026-10-31 (tag `gateway-v0.12.5`)
 
@@ -308,6 +314,7 @@ Primeira versão em produção, às 12:12:40 (`0.9.0-2cb599d`; etapa 2 do instal
 
 - 2026-10-30 14:45: `limit_conn` do nginx de 12 para **30** por IP (`339517e`).
 
+[0.12.6]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.6
 [0.12.5]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.5
 [0.12.4]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.4
 [0.12.3]: https://github.com/cslsolucoes/ollama-mcp/releases/tag/gateway-v0.12.3

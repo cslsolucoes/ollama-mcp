@@ -766,6 +766,7 @@ Se a partida falhar por flag inválida, o serviço entra em laço (`Restart=alwa
 | Login do monitor **503** `administração desabilitada` | Gateway subiu sem `--admin-file` | Conferir a unit e o arquivo `/etc/mcpollama-gateway/admin` |
 | `/monitor` abre mas sem botões | Não está logado, ou `somente leitura` | Entrar com o usuário `admin` |
 | Página "sem conexão com o servidor" | Gateway parado, ou o nginx sem `location /monitor` | `systemctl status`; conferir `ollama.conf` |
+| "Sem conexão com o servidor" **e** 429 em **tudo** que sai da estação, com o gateway `active` | **Painel travado** (incidente de 2026-11-01, até a 0.12.5): o `/monitor/api/state` não responde, os pedidos se acumulam até o `limit_conn 80` do nginx (`ss -tn state established '( dport = :11500 )'` mostra ~80) | Confirmar: `curl -s -o /dev/null -w '%{http_code}' --max-time 8 -H 'X-Real-IP: <ip da estação>' http://127.0.0.1:11500/monitor/api/state` dá `000`. Com as GPUs ociosas: `systemctl restart mcpollama-gateway` (ou `kill -QUIT <pid>` para gravar o retrato das goroutines no journal; o systemd sobe de novo). Corrigido na **0.12.6** |
 | GPUs vazias ou erro `nvidia-smi:` / `aer:` no rodapé das GPUs | `nvidia-smi` sem acesso sob o sandbox da unit, ou AER ausente | Ver o texto do erro; não afeta a fila. Pendência 9.3 da revisão |
 | Modelo recarregando a cada pedido (`load_ms` alto, ~16–22 s) | Algo mudou o contexto/residência: reinício do Ollama, `ollama-warm` parado, cliente que ainda manda `num_ctx` (o gateway remove), ou o Ollama foi tocado direto | `ollama ps` antes e depois; consulta de `load_ms` (seção 8); `systemctl status ollama-warm` |
 | `ia-local` lento, raciocinando | Está usando `qwen3-ia-think` ou mandando `reasoning_effort` | Na coluna Raciocínio do `/monitor` deve estar `desligado`; ajustar `OPENAI_MODEL=qwen3-ia` no `csl-ollama.env` |
@@ -869,7 +870,7 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje (`0.12.3`, em produção desde 2026-10-30 22:35)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
+**O gateway de hoje (`0.12.6`, em produção desde 2026-11-01)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
 **pool de backends** (seção 16). Em produção o pool tem **um único backend, o `gpu-local`** (o Ollama do próprio servidor,
 `127.0.0.1:11434`): sem `--backends` tudo se comporta como antes da 10.4. Com `--backends`, o gateway repassa o trabalho que
 **ainda não começou** a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (`--overload-wait` e

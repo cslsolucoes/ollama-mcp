@@ -69,10 +69,10 @@ Em produção (2026-10-30):
 
 | Componente | Versão (tag) | Onde |
 | --- | --- | --- |
-| `mcpollama-mcp` | **0.9.1** (`mcpollama-v0.9.1`, `0.9.1-755f168`; sessões reiniciadas em 2026-10-30 23:31). Rótulo padrão `<máquina>/<usuário>` | `D:\MCP\mcpollama-mcp.exe` (estações) |
-| `mcpollama-gateway` | **0.12.3** (`gateway-v0.12.3`, `0.12.3-55fd624`, desde 2026-10-30 22:35), com o pool de backends; fila 64 por cliente/IP e 128 no total | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
+| `mcpollama-mcp` | **0.9.2** (`mcpollama-v0.9.2`, `0.9.2-f367b35`; sessões reiniciadas em 2026-11-01 00:11). Rótulo padrão `<máquina>/<usuário>` + cabeçalho `X-Mcpollama-Station` (máquina, usuário, domínio, MAC via WMI) | `D:\MCP\mcpollama-mcp.exe` (estações) |
+| `mcpollama-gateway` | **0.12.6** (`gateway-v0.12.6`, `0.12.6-a155513`, desde 2026-11-01), com o pool de backends; fila 64 por cliente/IP e 128 no total; o painel não trava mais quando uma leitura do banco empaca | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
 
-Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `gateway-v0.11.1`, `gateway-v0.12.0`, `gateway-v0.12.1`, `gateway-v0.12.2` e `gateway-v0.12.3`. O histórico de versões está no
+Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `mcpollama-v0.9.2`, `gateway-v0.11.1`, `gateway-v0.12.0` … `gateway-v0.12.6`. O histórico de versões está no
 [CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5, desde o `0.9.0`) segue no binário atual, **desligado por padrão**.
 
 | Fase | Assunto | Estado |
@@ -265,7 +265,7 @@ preservados) e erros de desenho aparecem em `#msg`.
   `content.db` (texto dos jobs, 7 dias). O que sobrevive a reinício ou reboot fica marcado como
   `interrompido_reboot` ou `interrompido_gateway`.
 
-**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`; `0.12.3` desde 2026-10-30 22:35).** O gateway tem um **registro de backends**
+**Pool de backends (Fase 10.4 a 10.6, em produção desde a `0.12.0`; `0.12.6` desde 2026-11-01).** O gateway tem um **registro de backends**
 (`backends.json`, modo 0600, lido só na partida), saúde ativa e passiva, disjuntor, histerese e "drenar" no monitor, e repassa a
 geração que **ainda não começou** a um Ollama secundário da LAN quando o primário está sobrecarregado ou doente. **Hoje o pool
 tem um único backend, o `gpu-local`** (o Ollama do próprio servidor, sem `--backends`): o comportamento é o mesmo de antes do
