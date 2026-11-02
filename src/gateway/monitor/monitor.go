@@ -138,9 +138,11 @@ type Handler struct {
 	done      chan struct{} // closed by Close: ends the event streams
 	closeOnce sync.Once
 
-	extraMu  sync.Mutex
-	extraAt  time.Time
-	extra    extras
+	// src is where the cached part of the state reads the database; it is
+	// cfg.Store in production (an interface only so a test can make it hang).
+	src readSource
+
+	extras   swrCache[extras]
 	series   seriesRing
 	bucketMu sync.Mutex
 	bucket   bucketAcc
@@ -172,6 +174,9 @@ func New(cfg Config) (*Handler, error) {
 	}
 	h := &Handler{cfg: cfg, mux: http.NewServeMux(), started: time.Now(), csp: csp, verifySem: make(chan struct{}, verifySlots),
 		sseByIP: map[string]int{}, statsCache: map[string]statsEntry{}, done: make(chan struct{})}
+	if cfg.Store != nil {
+		h.src = cfg.Store
+	}
 	h.routes()
 	return h, nil
 }
@@ -314,46 +319,75 @@ type State struct {
 
 const extrasTTL = 2 * time.Second
 
-// refreshExtras recomputes the database-backed part at most every extrasTTL,
-// however many viewers there are.
-func (h *Handler) refreshExtras(ctx context.Context) extras {
-	h.extraMu.Lock()
-	defer h.extraMu.Unlock()
-	if time.Since(h.extraAt) < extrasTTL {
-		return h.extra
-	}
-	var e extras
-	e.recent, e.events = []store.Row{}, []store.Event{}
-	if s := h.cfg.Store; s != nil {
-		now := time.Now()
-		midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		if st, err := s.Stats(ctx, now.Sub(midnight), "hoje"); err == nil {
-			e.cards.DoneToday, e.cards.ErrorsToday = st.OK, st.Errors
-		}
-		if st, err := s.Stats(ctx, 15*time.Minute, "15m"); err == nil {
-			e.cards.WaitP50MS, e.cards.WaitP95MS = st.WaitP50, st.WaitP95
-			e.cards.TokensPerSec, e.cards.PerMinute = st.TokensPerSec, st.PerMinute
-		}
-		if rows, err := s.History(ctx, store.HistoryQuery{Limit: 50}); err == nil {
-			e.recent = coarseRows(rows) // open: no exact size (revisão 10.L, H2)
-		}
-		if ev, err := s.Events(ctx, 10); err == nil {
-			e.events = ev
-		}
-	}
-	h.extra, h.extraAt = e, time.Now()
-	return e
+// extrasFirstWait is how long the very first state waits for the database part
+// (a var so a test can shorten it).
+var extrasFirstWait = 2 * time.Second
+
+// readSource is the part of the store the cached state reads.
+type readSource interface {
+	Stats(ctx context.Context, window time.Duration, label string) (store.Stats, error)
+	History(ctx context.Context, q store.HistoryQuery) ([]store.Row, error)
+	Events(ctx context.Context, limit int) ([]store.Event, error)
+	Jobs(ctx context.Context, q store.JobQuery) ([]store.JobRow, error)
 }
 
-func (h *Handler) state(ctx context.Context) State {
+// refreshExtras returns the database-backed part of the state at once, from
+// the cache. When it is older than extrasTTL one refresh runs in the
+// background (see swrCache); no visitor ever waits for the database holding a
+// lock. If the refresh fails, the previous values stay.
+func (h *Handler) refreshExtras() extras {
+	return h.extras.get(time.Now, extrasTTL, extrasFirstWait, h.loadExtras)
+}
+
+// loadExtras runs the queries. It uses context.Background(), never the context
+// of a visitor: when a stream's client left in the middle of the last read, the
+// cancellation raced database/sql's Rows.close and deadlocked it (incident of
+// 2026-11-01), with the monitor mutex held. Background has no Done channel, so
+// database/sql does not even start its awaitDone goroutine.
+func (h *Handler) loadExtras() (extras, bool) {
+	var e extras
+	e.recent, e.events = []store.Row{}, []store.Event{}
+	s := h.src
+	if s == nil {
+		return e, true
+	}
+	ctx := context.Background()
+	ok := true
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if st, err := s.Stats(ctx, now.Sub(midnight), "hoje"); err == nil {
+		e.cards.DoneToday, e.cards.ErrorsToday = st.OK, st.Errors
+	} else {
+		ok = false
+	}
+	if st, err := s.Stats(ctx, 15*time.Minute, "15m"); err == nil {
+		e.cards.WaitP50MS, e.cards.WaitP95MS = st.WaitP50, st.WaitP95
+		e.cards.TokensPerSec, e.cards.PerMinute = st.TokensPerSec, st.PerMinute
+	} else {
+		ok = false
+	}
+	if rows, err := s.History(ctx, store.HistoryQuery{Limit: 50}); err == nil {
+		e.recent = coarseRows(rows) // open: no exact size (revisão 10.L, H2)
+	} else {
+		ok = false
+	}
+	if ev, err := s.Events(ctx, 10); err == nil {
+		e.events = ev
+	} else {
+		ok = false
+	}
+	return e, ok
+}
+
+func (h *Handler) state() State {
 	snap := h.cfg.Queue.Snapshot()
 	snap.Running, snap.Waiting = coarseItems(snap.Running), coarseItems(snap.Waiting) // open: no exact size (revisão 10.L, H2)
-	ex := h.refreshExtras(ctx)
+	ex := h.refreshExtras()
 	st := State{
 		Now: snap.Now, Version: h.cfg.Version, BootID: h.cfg.BootID,
 		UptimeS: int64(time.Since(h.started).Seconds()),
 		Queue:   snap, Cards: ex.cards, Recent: ex.recent, Events: ex.events,
-		AdminEnabled: h.cfg.Admin != nil, Jobs: h.liveJobs(ctx), JobsLimit: liveJobsLimit, RecentDone: h.recentDone(ctx), KeepDoneMS: h.cfg.KeepDone.Milliseconds(), ContentOn: h.cfg.Content != nil,
+		AdminEnabled: h.cfg.Admin != nil, Jobs: h.liveJobs(), JobsLimit: liveJobsLimit, RecentDone: h.recentDone(), KeepDoneMS: h.cfg.KeepDone.Milliseconds(), ContentOn: h.cfg.Content != nil,
 	}
 	st.Cards.Running, st.Cards.Waiting = len(snap.Running), len(snap.Waiting)
 	st.Backends = h.cfg.Queue.PoolStatus()
@@ -376,7 +410,7 @@ func (h *Handler) state(ctx context.Context) State {
 }
 
 func (h *Handler) apiState(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, h.state(r.Context()))
+	writeJSON(w, http.StatusOK, h.state())
 }
 
 // sseEnter takes one stream slot for ip; false when the global or the per-IP
@@ -422,7 +456,7 @@ func (h *Handler) apiStream(w http.ResponseWriter, r *http.Request) {
 	hd.Set("X-Accel-Buffering", "no") // nginx: do not buffer the stream
 	rc := http.NewResponseController(w)
 	send := func() bool {
-		b, err := json.Marshal(h.state(r.Context())) // compact: newlines in data are escaped
+		b, err := json.Marshal(h.state()) // compact: newlines in data are escaped
 		if err != nil {
 			return false
 		}
@@ -623,7 +657,9 @@ func (h *Handler) stats(ctx context.Context, d time.Duration, label string) (sto
 		return e.st, nil
 	}
 	h.statsN.Add(1)
-	st, err := h.cfg.Store.Stats(ctx, d, label)
+	// Background, not the visitor's ctx: this runs under statsMu, and a ctx
+	// cancelled mid-read once deadlocked database/sql (incident of 2026-11-01).
+	st, err := h.cfg.Store.Stats(context.Background(), d, label)
 	if err != nil {
 		return st, err
 	}

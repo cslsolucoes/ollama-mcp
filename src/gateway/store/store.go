@@ -820,7 +820,9 @@ func (s *Store) Stats(ctx context.Context, window time.Duration, label string) (
 		st.PerMinute = float64(st.Total) / (secs / 60)
 		st.TokensPerSec = float64(st.EvalTokens) / secs
 	}
-	return st, rows.Err()
+	// rows.Err() was already checked right after the loop. A second call here
+	// raced the context's awaitDone goroutine (incident of 2026-11-01).
+	return st, nil
 }
 
 // Percentile returns the p-th percentile (nearest rank) of v; 0 for empty.

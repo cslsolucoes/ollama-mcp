@@ -320,6 +320,7 @@ func TestFinishedRequestStaysVisibleForFiveMinutesThenGoes(t *testing.T) {
 		t.Fatalf("gone too early: %v", ids)
 	}
 	f.clock.Add(2 * time.Second)
+	settleState(f.h) // the stale list is served once while the refresh runs
 	if ids := recentIDs(t, f); len(ids) != 0 {
 		t.Fatalf("still listed after 5 min: %v", ids)
 	}
@@ -349,9 +350,31 @@ func TestKeepDoneFlagZeroHidesAndOtherValuesApply(t *testing.T) {
 		t.Fatalf("live log %d keep %d", len(st.Jobs), st.KeepDoneMS)
 	}
 	g.clock.Add(35 * time.Second) // addJob ends its jobs 1 s after "now"
+	settleState(g.h)
 	if ids := recentIDs(t, g); len(ids) != 0 {
 		t.Fatalf("30 s later: %v", ids)
 	}
+}
+
+// settleState makes the cached parts fresh: it waits for any refresh already
+// running (it may hold older data), triggers a new one and waits for it. The
+// state serves the stale value meanwhile, by design (see swrCache).
+func settleState(h *Handler) {
+	idle := func() {
+		for i := 0; i < 500; i++ {
+			busy := false
+			for _, c := range []interface{ isBusy() bool }{&h.extras, &h.jobs.live, &h.jobs.done} {
+				busy = busy || c.isBusy()
+			}
+			if !busy {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	idle()
+	h.state()
+	idle()
 }
 
 var _ = httptest.NewRecorder

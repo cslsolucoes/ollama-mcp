@@ -47,68 +47,52 @@ type jobsCacheEntry struct {
 }
 
 type jobsCache struct {
-	mu   sync.Mutex
-	live struct {
-		at   time.Time
-		rows []store.JobRow
-	}
-	done struct {
-		at   time.Time
-		rows []store.JobRow
-	}
+	mu      sync.Mutex // byQuery only
+	live    swrCache[[]store.JobRow]
+	done    swrCache[[]store.JobRow]
 	byQuery map[string]jobsCacheEntry
 }
 
 // liveJobs is the list the event stream carries, recomputed at most every
-// liveJobsTTL however many panels are open.
-func (h *Handler) liveJobs(ctx context.Context) []store.JobRow {
-	if h.cfg.Store == nil {
+// liveJobsTTL however many panels are open. Like the extras, it never makes a
+// visitor wait for the database (see swrCache).
+func (h *Handler) liveJobs() []store.JobRow {
+	if h.src == nil {
 		return []store.JobRow{}
 	}
-	c := &h.jobs
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if h.cfg.Now().Sub(c.live.at) < liveJobsTTL && c.live.rows != nil {
-		return c.live.rows
-	}
-	rows, err := h.cfg.Store.Jobs(ctx, store.JobQuery{Limit: liveJobsLimit})
-	if err != nil {
-		h.logf("monitor: jobs: %v", err)
-		if c.live.rows != nil {
-			return c.live.rows
+	rows := h.jobs.live.get(h.cfg.Now, liveJobsTTL, extrasFirstWait, func() ([]store.JobRow, bool) {
+		rows, err := h.src.Jobs(context.Background(), store.JobQuery{Limit: liveJobsLimit}) // not a visitor's ctx: see loadExtras
+		if err != nil {
+			h.logf("monitor: jobs: %v", err)
+			return nil, false
 		}
+		return coarseJobRows(rows), true
+	})
+	if rows == nil {
 		return []store.JobRow{}
 	}
-	rows = coarseJobRows(rows)
-	c.live.at, c.live.rows = h.cfg.Now(), rows
 	return rows
 }
 
 // recentDone lists the requests that ended within KeepDone (cached like the live
 // list). It is a view of the job log: the queue does not know about it.
-func (h *Handler) recentDone(ctx context.Context) []store.JobRow {
-	if h.cfg.Store == nil || h.cfg.KeepDone <= 0 {
+func (h *Handler) recentDone() []store.JobRow {
+	if h.src == nil || h.cfg.KeepDone <= 0 {
 		return []store.JobRow{}
 	}
-	c := &h.jobs
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	now := h.cfg.Now()
-	if now.Sub(c.done.at) < liveJobsTTL && c.done.rows != nil {
-		return c.done.rows
-	}
-	rows, err := h.cfg.Store.Jobs(ctx, store.JobQuery{FinishedSince: now.Add(-h.cfg.KeepDone), Limit: liveJobsLimit})
-	if err != nil {
-		h.logf("monitor: concluídos recentes: %v", err)
-		if c.done.rows != nil {
-			return c.done.rows
+	rows := h.jobs.done.get(h.cfg.Now, liveJobsTTL, extrasFirstWait, func() ([]store.JobRow, bool) {
+		rows, err := h.src.Jobs(context.Background(), store.JobQuery{FinishedSince: h.cfg.Now().Add(-h.cfg.KeepDone), Limit: liveJobsLimit})
+		if err != nil {
+			h.logf("monitor: concluídos recentes: %v", err)
+			return nil, false
 		}
+		// ordered by when they ended, newest first
+		sort.SliceStable(rows, func(i, j int) bool { return rows[i].FinishedAt > rows[j].FinishedAt })
+		return coarseJobRows(rows), true
+	})
+	if rows == nil {
 		return []store.JobRow{}
 	}
-	// ordered by when they ended, newest first
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].FinishedAt > rows[j].FinishedAt })
-	rows = coarseJobRows(rows)
-	c.done.at, c.done.rows = now, rows
 	return rows
 }
 
