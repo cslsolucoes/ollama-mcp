@@ -1,12 +1,12 @@
 # Plano — Fase 12: o MCP organiza os erros do modelo local e gera o histórico para treinar o servidor de IA
 
-> **Estado:** 📝 PLANO, **não aprovado**. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
-> achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). Aguarda a aprovação final. Nada da Fase 12 foi implementado.
+> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2). Contrato de dados **1.0.0 aprovado** em 2026-11-02 20:05 (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
+> achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). O código começa na 12.2.
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
 > **Versões alvo:** mcpollama `0.10.0` (ID do job visível + tool `reportar_erro`) e gateway `0.13.0` (captura canônica, base de treino,
 > aba Erros, melhora sem treino).
-> **Última atualização deste documento:** 2026-11-02 16:05. Fatos de código levantados em 2026-11-02, com `arquivo:linha` relativos a `src/`.
+> **Última atualização deste documento:** 2026-11-02 20:07. Fatos de código levantados em 2026-11-02, com `arquivo:linha` relativos a `src/`.
 > **Origem (owner, 2026-11-01 21:31):** "preparar o MCP para se organizar e gerar as informações necessárias para que possamos evoluir
 > e treinar a IA para que determinados erros não ocorram", mais um md que instrua o Claude dos projetos a relatar os erros e o que foi
 > feito para corrigir, gerando histórico para treinar o servidor de IA.
@@ -361,20 +361,20 @@ Todas as etapas seguintes testam contra esse contrato. Se o código divergir del
 - **`treino.db`**: pacote novo `gateway/treino`, migração no molde de `store.migrate`, consultas da aba com `context.Background()` e cache em
   segundo plano (padrão 0.12.6). Tabelas:
   - `ocorrencias`:
-    - identificação: `id` (hex 32), `criada_em`, `atualizada_em`, `estado` (`nova`/`confirmada`/`descartada`/`sem_pedido`/`distribuida`/`apagada`);
+    - identificação: `id` (hex 32), `criada_em`, `atualizada_em`, `estado` (`nova`/`confirmada`/`descartada`/`sem_pedido`/`distribuida`/`fallback`/`apagada`; transições na C-1.12 do contrato);
     - o erro: `categoria`, `severidade`, `descricao`, `resposta_correta`, `correcao_aplicada`;
     - origem: `origem`, `projeto`, `tool`, `estacao_computer/user/domain/mac`, `client_ip`, `client_label`;
     - ligação e treino: `job_do_erro`, `doc_hash`, `grupo_id`, `particao` (`treino`/`teste`/`quarentena`), `distribuida` (0/1), `exemplo_publico` (0/1, D12-15b);
     - revisão: `revisada_por`, `revisada_em`.
   - `ocorrencia_jobs`: `ocorrencia_id`, `job_id`, `papel` (`map1..`, `reduce1..`, `final`, `unico`), `backend`, `ordem`. PK
     (`ocorrencia_id`, `job_id`).
-  - `amostras`: `job_id PK`, `copiada_em`, `endpoint`, `modelo`, `think`, `prompt_json`, `prompt_texto`, `resposta`, `prompt_sha256`,
+  - `amostras`: `job_id PK`, `copiada_em`, `endpoint`, `modelo`, `think`, `prompt_json`, `prompt_texto`, `resposta`, `prompt_hmac`, `conteudo_hmac`, `key_id`,
     `prompt_truncado`, **`prompt_json_truncado`**, **`tem_imagem`**, **`doc_hash`** (o HMAC), `resp_final`, `resp_truncada`, `status`, `http_status`.
     Um job pode pertencer a mais de uma ocorrência. **(3ª rev.)** Todas as marcas que o predicado da D12-7 confere são **copiadas para a
     amostra no relato**, para que a exportação não dependa do `content.db`, que expira em 7 dias.
   - `historico`: `id`, `quando`, `ocorrencia_id`, `acao` (`criou`/`alterou`/`confirmou`/`desconfirmou`/`descartou`/`apagou`/`exportou`), `campo`,
     `antes`, `depois`, `quem`, `ip`. Nos campos de conteúdo, `antes`/`depois` guardam **só hash e tamanho** (D12-10).
-  - `retratos` (D12-7a): `id`, `criado_em`, `categoria`, lista de (`ocorrencia_id`, `job_id`, `prompt_sha256`), o hash do índice de exemplos congelado, o ID/hash da versão das instruções (D12-15a) e `valido` (0 quando uma quarentena o invalida).
+  - `retratos` (D12-7a): `id`, `criado_em`, `categoria`, um por avaliação; lista de (`ocorrencia_id`, `job_id`, `prompt_hmac`, `categoria`), o hash do índice de exemplos congelado, o ID/hash da versão das instruções (D12-15a) e `valido` (0 quando uma quarentena o invalida).
   - `embeddings` (D12-15b): `ocorrencia_id`, `vetor` (768 floats), `modelo` (`nomic-embed-text`). Calculado ao **confirmar**.
 - **Teto:** 2 GiB; acima disso, novos relatos são recusados, com evento e aviso no monitor (D12-10).
 
@@ -418,7 +418,7 @@ Todas as etapas seguintes testam contra esse contrato. Se o código divergir del
     - `contagem_errada` e `calculo_errado`: número final igual;
     - `truncado`: `fim=stop` e conteúdo completo;
   - **humana às cegas** em `resumo_infiel`, `inventou`, `traducao_errada` e `ignorou_instrucao`: o modo `blind` do `bakeoff` embaralha a
-    saída do modelo atual e a do candidato, e **só o owner** (ou outra pessoa da rede) escolhe sem saber qual é qual. **(2ª rev.) O Claude
+    saída do modelo atual e a do candidato, e **só o owner** escolhe sem saber qual é qual (decisão do owner na 2ª revisão; outra pessoa só em casos anonimizados). **(2ª rev.) O Claude
     não avalia casos com conteúdo de cliente**, porque isso mandaria o documento para fora da rede; só casos anonimizados;
   - **sem critério nesta fase:** `outro` e `idioma_errado` ficam **fora da avaliação** e contam só na estatística.
 - **Mínimos:** uma categoria só é **reportada** com ≥ 20 casos de teste, e só **decide** com ≥ 30. Com a **cota** da D12-7a (os 30 primeiros
@@ -584,9 +584,9 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 
 | # | Etapa | Modelo | Aceite | Estado |
 | --- | --- | --- | --- | --- |
-| 12.0 | Aprovação do plano e das decisões abertas (§14) | owner | owner aprova | **pendente** |
-| 12.1 | **Contrato de dados** (`docs/CONTRATO-DADOS-TREINO.md`, §8.1): unidade do erro, pedido canônico, regra de exportação, partição, avaliação, retenção, histórico, privacidade dos exemplos | sonnet + owner | owner aprova o contrato | pendente |
-| 12.2 | mcpollama: `job=`/`jobs=<papel>:<id>` com o backend de cada ID, na `[uso]` e em `_meta` (D12-1); cabeçalho `X-Mcpollama-Doc` (D12-7a) | sonnet | teste com gateway falso: IDs e papéis certos no map-reduce e no fallback; o mesmo `X-Mcpollama-Doc` em todas as chamadas de um documento | pendente |
+| 12.0 | Aprovação do plano e das decisões abertas (§14) | owner | owner aprova | ✅ **concluída** (2026-11-02 19:45) |
+| 12.1 | **Contrato de dados** (`docs/CONTRATO-DADOS-TREINO.md`, §8.1): unidade do erro, pedido canônico, regra de exportação, partição, avaliação, retenção, histórico, privacidade dos exemplos | sonnet + owner | owner aprova o contrato | ✅ **concluída** (2026-11-02 20:05): `docs/CONTRATO-DADOS-TREINO.md` 1.0.0, 119 regras; rascunho em Sonnet, conferência e fechamento em Opus; 2 ajustes por revisão externa (estado `fallback`; descartar estados de estatística) |
+| 12.2 | mcpollama: `job=`/`jobs=<papel>:<id>` com o backend de cada ID, na `[uso]` e em `_meta` (D12-1); cabeçalho `X-Mcpollama-Doc` (D12-7a) | sonnet | teste com gateway falso: IDs e papéis certos no map-reduce e no fallback; o mesmo `X-Mcpollama-Doc` em todas as chamadas de um documento | ▶️ **em progresso** (2026-11-02 20:07) |
 | 12.3 | gateway: `prompt_json` no `content.db` na **entrada** (D12-13) | sonnet | teste: o `prompt_json` é igual ao corpo que o Ollama falso recebeu, inclusive todo o histórico de `chat`; migração de banco antigo; teto de 16 MiB **por campo** com marca própria, e o predicado recusa `prompt_json_truncated=1` mesmo depois de o `content.db` expirar; imagem vira marcador + `tem_imagem=1`; `requests.doc_hash` gravado e o cabeçalho removido antes do Ollama | pendente |
 | 12.4 | gateway: `treino.db` (ocorrências, jobs, amostras, histórico) + `POST /api/feedback` em rota própria (D12-4, 5, 10, 16) | sonnet | testes: validação, transação, `sem_pedido`, teto, histórico; ataques 9.5/10.L/10.5 ok | pendente |
 | 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis; o automático não atrasa nem quebra a tool; deduplicação | pendente |
@@ -741,3 +741,11 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   partição `quarentena`, retrato com a versão das instruções e `valido`); §8.3 (`jobs_externos`); aceites 12.3 e 12.6; risco 11; §14 itens 8 e
   9; `RELATAR-ERROS-IA.md` (§3 candidato, §4 exceção do `translate`). **Erros do coordenador:** os dois bloqueadores (C1, C2) nasceram na
   edição de 15:54, que tinha sido relatada como completa.
+- 2026-11-02 19:47: **plano aprovado** pelo owner (19:45, "ok, execute o plano"); 12.0 concluída. Início da 12.1: rascunho do
+  `docs/CONTRATO-DADOS-TREINO.md` delegado ao Sonnet, só a partir do plano, sem decisões novas (lacunas vão para "Questões para o owner").
+- 2026-11-02 20:07: **12.1 concluída.** Contrato de dados 1.0.0 aprovado pelo owner (20:05), com 119 regras `C-x.y`.
+  - O que deu certo: o rascunho do Sonnet (109 regras + 22 lacunas) ficou fiel ao plano. A conferência em Opus corrigiu 4 pontos: C-1.5 × distribuída, C-2.10 × imagem, a sugestão da questão 7 (`--max-chunks` já inclui os reduces) e a questão "quem avalia às cegas", resolvida pela decisão anterior do owner.
+  - Lacunas: o owner aceitou as 21 sugestões conservadoras e acrescentou três pontos, a chave HMAC compartilhada (C-4.3a, C-1.21), o agrupamento por `conteudo_hmac` (C-2.12, C-4.5, C-4.15) e o controle de variação do bakeoff (C-5.15, C-5.16). Por coerência, `prompt_sha256` virou `prompt_hmac` e a imagem virou `imagem_hmac`.
+  - O que não deu certo: a C-1.21 reaproveitava o estado `distribuida` para o fallback (erro do coordenador, apontado pela revisão externa), e a C-1.12 não deixava descartar estados de estatística. Solução: estado próprio `fallback`, flag `--role`, precedência na C-1.9 e descarte permitido, com a C-1.14 alinhada.
+  - Plano: §8.2 alinhada (estado `fallback`, `prompt_hmac`/`conteudo_hmac`/`key_id`, retrato por avaliação). Onde houver divergência, **o contrato prevalece**. `docs/README.md` passou a indexar o contrato e o `RELATAR-ERROS-IA.md`.
+  - Início da 12.2.
