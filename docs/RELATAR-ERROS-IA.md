@@ -1,10 +1,18 @@
 # Relatar os erros do modelo local (qwen3-ia): instruções para o Claude
 
+> ⏳ **Instrução futura:** entra em vigor quando existir a tool `reportar_erro` (mcpollama 0.10.0, Fase 12). Até lá, **não** relate
+> por outro meio.
+>
 > Fonte única destas instruções. Vale para **todo projeto que usa o servidor MCP `mcpOllama`** (tools `generate`, `chat`,
 > `summarize_file`, `extract`, `translate`, `embed`).
-> **Para quê:** cada erro registrado vira um exemplo de treino. Com ele, o modelo do servidor de IA é ajustado (ajuste fino LoRA)
-> para não repetir aquele tipo de erro. Plano: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`
-> (repositório `cslsolucoes/ollama-mcp`).
+> **Para quê:** cada erro registrado entra numa base de erros do servidor de IA. **Depois que o administrador confirma a correção**, o
+> registro passa a servir para três coisas:
+> - **medir** o modelo por tipo de erro;
+> - **melhorar as respostas sem treino** (instruções melhores e exemplos de correções parecidas);
+> - mais adiante, **treinar** o modelo (ajuste fino LoRA).
+>
+> Registro sem resposta certa, ou não confirmado, serve só para estatística. Plano:
+> `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (repositório `cslsolucoes/ollama-mcp`).
 
 ## 1. Quando relatar
 
@@ -21,19 +29,20 @@ nível local é rascunho. Relate também quando o usuário apontar o erro.
 | Campo | Conteúdo | Obrigatório |
 | --- | --- | --- |
 | `projeto` | nome do projeto/pasta (ex.: `GestorERP`) | sim |
-| `job_id` | o `job=` (ou a lista `jobs=`) da linha `[uso]` da resposta errada | sim |
+| `jobs` | o `job=` (ou a lista `jobs=<papel>:<id>,…`) da linha `[uso]` da resposta errada, inteira e sem editar | sim |
+| `job_do_erro` | qual chamada produziu o erro. Padrão: a `final`. Num arquivo grande, se o erro já estava numa parte (`map3`, por exemplo), indique essa parte. No **`translate`** não existe `final` (as partes são só concatenadas): para o relato servir ao treino, aponte a parte (`mapN`) e dê a tradução certa **daquela parte**; um erro no texto montado conta só na estatística | se não for a `final` |
 | `categoria` | uma de: `numeracao_errada`, `contagem_errada`, `calculo_errado`, `inventou`, `omitiu`, `formato_invalido`, `resumo_infiel`, `traducao_errada`, `idioma_errado`, `truncado`, `ignorou_instrucao`, `outro` | sim |
 | `erro` | o que estava errado, objetivo e curto (ex.: "pulou a seção 7.2 e numerou 7.3 como 7.2") | sim |
-| `resposta_correta` | o que o modelo **deveria** ter respondido, completo, no mesmo formato pedido. É o que ensina o modelo | sim, se você conseguiu corrigir |
+| `resposta_correta` | o que **aquela chamada** (`job_do_erro`) deveria ter respondido, completo e no mesmo formato pedido. Na `final`, é a resposta inteira que o usuário deveria ter recebido. É o que ensina o modelo | sim, se você conseguiu corrigir |
 | `correcao_aplicada` | o que foi feito para seguir o trabalho (ex.: "conferi no documento e corrigi a numeração à mão"; "refiz com `think:true`"; "subi para o haiku") | sim |
 | `severidade` | `baixa` (cosmético), `media` (exigiu correção), `alta` (teria causado dano se não conferido) | sim |
 | `origem` | `claude` ou `usuario` | sim |
 
 ## 3. Como registrar
 
-Use a tool **`reportar_erro`** do `mcpOllama` (mcpollama 0.10.0 em diante), com os campos da §2 e o `job_id` da linha `[uso]` da
-resposta errada. O servidor de IA guarda o **pedido exato** e a **resposta errada** daquele job junto com a sua correção, e o registro
-entra na base de treino. A tool devolve o número do registro; cite-o no seu relato ao usuário.
+Use a tool **`reportar_erro`** do `mcpOllama` (mcpollama 0.10.0 em diante), com os campos da §2 e os `jobs` da linha `[uso]` da
+resposta errada. O servidor de IA guarda o **pedido exato** e a **resposta errada** daquele job junto com a sua correção, como **candidato**:
+o registro só fica elegível para medir, para os exemplos e para o treino depois que o administrador conferir a correção e confirmar. A tool devolve o número do registro; cite-o no seu relato ao usuário.
 
 - **Não** copie o conteúdo do documento, a resposta errada ou a resposta certa para pastas de projeto, relatórios, commits ou chat: o
   servidor já guarda o necessário, com acesso restrito.
@@ -42,7 +51,8 @@ entra na base de treino. A tool devolve o número do registro; cite-o no seu rel
 
 ## 4. Boa correção = bom treino
 
-- A `resposta_correta` deve ser **a resposta inteira que o modelo deveria dar**, não só o trecho corrigido.
+- A `resposta_correta` deve ser **a resposta inteira que aquela chamada (`job_do_erro`) deveria dar**, não só o trecho corrigido. No
+  `translate`, com `job_do_erro=mapN`, é a tradução inteira **daquela parte**, não do documento.
 - Siga o **formato pedido** (se a tool pediu JSON, a resposta certa é JSON válido).
 - Se você não tem certeza da resposta certa, deixe `resposta_correta` vazia e descreva o erro: o registro serve para estatística,
   mas não entra no treino.
