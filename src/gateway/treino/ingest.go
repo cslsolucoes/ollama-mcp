@@ -28,21 +28,26 @@ type Job struct {
 // busy is true while the job has not ended (C-1.4a).
 func (j Job) busy() bool { return j.Status == queue.StatusQueued || j.Status == queue.StatusRunning }
 
-// sameOrigin is C-1.11a: the declared station (machine and user) of the job
-// equals the reporter's, or, when the job has no station, the same IP.
+// sameOrigin is C-1.11a (1.1.3): the verified IP of the report equals the one
+// the gateway recorded for the job (the same calculation: proxy.ClientIP, which
+// trusts X-Real-Ip only from a loopback peer, then proxy.FairIP), and, when the
+// job has a declared station, the station (machine and user) equals too. The
+// station alone is declared and can be forged, so it never decides by itself.
 func sameOrigin(j Job, o Origin) bool {
+	ipOK := o.ClientIP != "" && j.ClientIP != "" && proxy.FairIP(o.ClientIP) == j.ClientIP
 	if j.StationComputer != "" && j.StationUser != "" {
-		return o.Computer == j.StationComputer && o.User == j.StationUser
+		return o.Computer == j.StationComputer && o.User == j.StationUser && ipOK
 	}
-	return o.ClientIP != "" && j.ClientIP != "" && proxy.FairIP(o.ClientIP) == j.ClientIP
+	return ipOK
 }
 
 // sameOccOrigin is the same rule for an occurrence already stored.
 func sameOccOrigin(computer, user, ip string, o Origin) bool {
+	ipOK := o.ClientIP != "" && ip != "" && proxy.FairIP(ip) == proxy.FairIP(o.ClientIP)
 	if computer != "" && user != "" {
-		return o.Computer == computer && o.User == user
+		return o.Computer == computer && o.User == user && ipOK
 	}
-	return o.ClientIP != "" && ip == o.ClientIP
+	return ipOK
 }
 
 // Content is what the content database (content.db) holds for a job.
@@ -194,8 +199,9 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 		role = RolePrimario
 	}
 	maxB := s.opts.MaxBytes
-	size := s.Size() // read before the transaction: a new pool connection must not wait for its lock
-	if sz := size; sz >= maxB {
+	// A first look, to refuse early; the binding measure is taken in the writers'
+	// turn, just before the transaction (C-6.2, 1.1.3).
+	if sz := s.Size(); sz >= maxB {
 		s.capRefused(sz)
 		return Result{}, ErrCapReached
 	}
@@ -242,7 +248,11 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 	who := Actor{Who: o.Who(), IP: o.ClientIP}
 
 	var res Result
-	err = s.withTx(ctx, func(tx *sql.Tx) error {
+	err = s.withTxSized(ctx, func(tx *sql.Tx, size int64) error {
+		if size >= maxB { // measured in this writer's turn: no window between measuring and writing
+			s.capRefused(size)
+			return ErrCapReached
+		}
 		now := s.opts.Now()
 		// An occurrence of this job and of the same origin already there (not erased)?
 		var exID, exOrigem, exEstado string

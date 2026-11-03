@@ -6,12 +6,31 @@ package treino
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+func httptestRequest(body, remote string) *http.Request {
+	req := httptest.NewRequest("POST", "/api/feedback", strings.NewReader(body))
+	req.RemoteAddr = remote
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Real-Ip", "10.0.0.7")
+	req.Header.Set("X-Mcpollama-Station", "computer=PC01;user=ana")
+	return req
+}
+
+func httptestRecord(h http.Handler, req *http.Request) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
+}
 
 func ingestAs(t *testing.T, s *Store, r Report, o Origin, f Source) Result {
 	t.Helper()
@@ -155,9 +174,12 @@ func TestReplacementDropsTheSamplesOfJobsThatLeftTheList(t *testing.T) { // C-1.
 func TestReplacementHistoryCoversStationAndOrigin(t *testing.T) { // C-1.12d, C-1.19
 	s := openStore(t, Options{})
 	f := newFake()
-	f.add(1)
-	oa := Origin{Computer: "PC01", User: "ana", Domain: "d1", MAC: "AAAAAAAAAAAA", ClientIP: "10.0.0.7", ClientLabel: "L1"}
-	ob := Origin{Computer: "PC01", User: "ana", Domain: "d2", MAC: "BBBBBBBBBBBB", ClientIP: "10.0.0.8", ClientLabel: "L2"}
+	id := f.add(1)
+	j := f.jobs[id]
+	j.ClientIP = "2001:db8::/64" // the job log groups IPv6 by /64
+	f.jobs[id] = j
+	oa := Origin{Computer: "PC01", User: "ana", Domain: "d1", MAC: "AAAAAAAAAAAA", ClientIP: "2001:db8::1", ClientLabel: "L1"}
+	ob := Origin{Computer: "PC01", User: "ana", Domain: "d2", MAC: "BBBBBBBBBBBB", ClientIP: "2001:db8::2", ClientLabel: "L2"}
 	auto := report(jr(1, "unico", "primario"))
 	auto.Origem = "automatico"
 	ra := ingestAs(t, s, auto, oa, f)
@@ -167,7 +189,7 @@ func TestReplacementHistoryCoversStationAndOrigin(t *testing.T) { // C-1.12d, C-
 	}
 	for campo, want := range map[string][2]string{
 		"origem": {"automatico", "claude"}, "estacao_domain": {"d1", "d2"}, "estacao_mac": {"AAAAAAAAAAAA", "BBBBBBBBBBBB"},
-		"client_ip": {"10.0.0.7", "10.0.0.8"}, "client_label": {"L1", "L2"},
+		"client_ip": {"2001:db8::1", "2001:db8::2"}, "client_label": {"L1", "L2"},
 	} {
 		a, d := histRows(t, s, ra.OcorrenciaID, "alterou", campo)
 		if len(a) != 1 || a[0] != want[0] || d[0] != want[1] {
@@ -181,7 +203,7 @@ func TestReplacementHistoryCoversStationAndOrigin(t *testing.T) { // C-1.12d, C-
 	}
 	var dom, mac, ip, lb string
 	s.db.QueryRow(`SELECT estacao_domain, estacao_mac, client_ip, client_label FROM ocorrencias WHERE id=?`, ra.OcorrenciaID).Scan(&dom, &mac, &ip, &lb)
-	if dom != "d2" || mac != "BBBBBBBBBBBB" || ip != "10.0.0.8" || lb != "L2" {
+	if dom != "d2" || mac != "BBBBBBBBBBBB" || ip != "2001:db8::2" || lb != "L2" {
 		t.Errorf("fields: %s %s %s %s", dom, mac, ip, lb)
 	}
 }
@@ -306,7 +328,10 @@ func TestOriginByIPWhenTheJobHasNoStation(t *testing.T) { // C-1.11a
 		{"station on the job, reporter without one", mk(true, "10.0.0.7"), Origin{ClientIP: "10.0.0.7"}, EstadoSemPedido},
 		{"same machine, other user", mk(true, "10.0.0.7"), Origin{Computer: "PC01", User: "carla", ClientIP: "10.0.0.7"}, EstadoSemPedido},
 		{"same user, other machine", mk(true, "10.0.0.7"), Origin{Computer: "PC09", User: "ana", ClientIP: "10.0.0.7"}, EstadoSemPedido},
-		{"same machine and user, other IP", mk(true, "10.0.0.7"), Origin{Computer: "PC01", User: "ana", ClientIP: "10.9.9.9"}, EstadoNova},
+		{"same machine and user, other IP", mk(true, "10.0.0.7"), Origin{Computer: "PC01", User: "ana", ClientIP: "10.9.9.9"}, EstadoSemPedido},
+		{"same IP, other station", mk(true, "10.0.0.7"), Origin{Computer: "PC09", User: "bob", ClientIP: "10.0.0.7"}, EstadoSemPedido},
+		{"same station and same IP", mk(true, "10.0.0.7"), Origin{Computer: "PC01", User: "ana", ClientIP: "10.0.0.7"}, EstadoNova},
+		{"same station, no IP on the report", mk(true, "10.0.0.7"), Origin{Computer: "PC01", User: "ana"}, EstadoSemPedido},
 	}
 	for _, c := range cases {
 		s := openStore(t, Options{})
@@ -337,6 +362,12 @@ func TestDedupeNeverCrossesOrigins(t *testing.T) { // C-1.11a
 	rd := ingestAs(t, s, auto, sameMachine, f)
 	if rd.OcorrenciaID == ra.OcorrenciaID || rd.Estado == ra.Estado {
 		t.Errorf("another user of the same machine saw A's occurrence: %+v", rd)
+	}
+	// the same station from another IP is another origin (the station alone is declared)
+	otherIP := Origin{Computer: "PC01", User: "ana", ClientIP: "10.0.0.8"}
+	re := ingestAs(t, s, auto, otherIP, f)
+	if re.OcorrenciaID == ra.OcorrenciaID || re.Estado == ra.Estado {
+		t.Errorf("the same station from another IP saw A's occurrence: %+v", re)
 	}
 	// without a station the origin is the IP
 	s2 := openStore(t, Options{})
@@ -573,5 +604,96 @@ func TestQuotaTableExistsAndNothingTouchesIt(t *testing.T) { // C-4.11b
 	m := rowCols(t, s, c)
 	if m["grupo_id"] != nil && m["grupo_id"] != "" || m["particao"] != "" {
 		t.Errorf("the erased row kept group data: %v", m)
+	}
+}
+
+// C-1.11a (1.1.3): in a list, a part of the same station but another IP, or of the
+// same IP but another station, is a reference only; the part that matches on both is copied.
+func TestPartsAreCopiedOnlyWhenStationAndIPBothMatch(t *testing.T) {
+	s := openStore(t, Options{})
+	f := newFake()
+	for i := 1; i <= 4; i++ {
+		f.add(i)
+	}
+	set := func(n int, mut func(*Job)) {
+		j := f.jobs[mkID(n)]
+		mut(&j)
+		f.jobs[mkID(n)] = j
+	}
+	set(1, func(j *Job) { j.ClientIP = "10.0.0.99" })                    // same station, other IP
+	set(2, func(j *Job) { j.StationComputer, j.StationUser = "X", "y" }) // same IP, other station
+	r := ingest(t, s, report(jr(1, "map1", "primario"), jr(2, "map2", "primario"), jr(3, "map3", "primario"), jr(4, "final", "primario")), "", f)
+	if r.Estado != EstadoNova || r.AmostrasCopiadas != 2 || r.JobsOutraOrigem != 2 {
+		t.Fatalf("result = %+v", r)
+	}
+	var n int
+	s.db.QueryRow(`SELECT COUNT(*) FROM amostras WHERE job_id IN (?,?)`, mkID(1), mkID(2)).Scan(&n)
+	if n != 0 || len(jobRows(t, s, r.OcorrenciaID)) != 4 {
+		t.Errorf("samples of the other origins: %d", n)
+	}
+}
+
+// The IP that counts is the one the gateway verifies: X-Real-Ip is believed only
+// from a loopback peer (the local nginx), so a client cannot claim another IP.
+func TestRealIPIsTrustedOnlyFromLoopback(t *testing.T) {
+	h, s, _ := newHandler(t, "")
+	via := func(remote string) Result {
+		req := httptestRequest(goodBody(nil), remote)
+		w := httptestRecord(h, req)
+		var res Result
+		json.Unmarshal(w.Body.Bytes(), &res)
+		return res
+	}
+	if r := via("127.0.0.1:5555"); r.Estado != EstadoNova { // the nginx says 10.0.0.7, the job's IP
+		t.Errorf("through the loopback nginx: %+v", r)
+	}
+	if r := via("10.9.9.9:5555"); r.Estado != EstadoSemPedido || r.JobsOutraOrigem == 0 { // the same header from a stranger is ignored
+		t.Errorf("X-Real-Ip from a non-loopback peer was believed: %+v", r)
+	}
+	_ = s
+}
+
+// ---- C-6.2 (1.1.3): the ceiling is measured in the writer's turn -------------------------------
+
+func TestConcurrentReportsNearTheCeilingDoNotOvershoot(t *testing.T) {
+	s := openStore(t, Options{})
+	f := newFake()
+	const n = 8
+	for i := 1; i <= n; i++ {
+		id := f.add(i)
+		c := f.conts[id]
+		c.Response = strings.Repeat("x", 100000)
+		f.conts[id] = c
+	}
+	s.opts.MaxBytes = s.Size() + 150000 // room for one 100 KB sample, not for two
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	start := make(chan struct{})
+	for i := 1; i <= n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, errs[i-1] = s.Ingest(ctx, mustValid(t, report(jr(i, "unico", "primario"))), stationO, "", f, testKey(t))
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	ok, capped := 0, 0
+	for _, e := range errs {
+		switch {
+		case e == nil:
+			ok++
+		case errors.Is(e, ErrCapReached):
+			capped++
+		default:
+			t.Errorf("unexpected error: %v", e)
+		}
+	}
+	if ok != 1 || capped != n-1 {
+		t.Errorf("%d accepted and %d refused with 507; want 1 and %d", ok, capped, n-1)
+	}
+	if got := count(t, s, "amostras"); got != 1 {
+		t.Errorf("amostras = %d", got)
 	}
 }

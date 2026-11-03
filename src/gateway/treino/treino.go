@@ -177,6 +177,7 @@ func Open(path string, o Options) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("treino: schema: %w", err)
@@ -184,6 +185,21 @@ func Open(path string, o Options) (*Store, error) {
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("treino: migrate: %w", err)
+	}
+	// Open every pooled connection now. A connection opened later applies the
+	// journal_mode pragma, which fails with SQLITE_BUSY while another connection is
+	// writing; with all four idle in the pool none is opened during a write.
+	var warm []*sql.Conn
+	for i := 0; i < 4; i++ {
+		c, err := db.Conn(context.Background())
+		if err != nil {
+			db.Close()
+			return nil, fmt.Errorf("treino: pool: %w", err)
+		}
+		warm = append(warm, c)
+	}
+	for _, c := range warm {
+		c.Close()
 	}
 	st := &Store{db: db, path: path, opts: o, evAt: map[string]time.Time{}, wsem: make(chan struct{}, 1)}
 	return st, nil
@@ -318,6 +334,14 @@ func (s *Store) release() { <-s.wsem }
 
 // withTx runs f in a transaction, in the writers' turn.
 func (s *Store) withTx(ctx context.Context, f func(tx *sql.Tx) error) error {
+	return s.withTxSized(ctx, func(tx *sql.Tx, _ int64) error { return f(tx) })
+}
+
+// withTxSized is withTx that also hands f the live size of the database, measured
+// after the writers' turn was obtained and before the transaction opens: nobody
+// else writes in between, and the measure opens no pool connection that would
+// wait for a write lock held by this very transaction (C-6.2, 1.1.3).
+func (s *Store) withTxSized(ctx context.Context, f func(tx *sql.Tx, size int64) error) error {
 	if err := s.acquire(ctx); err != nil {
 		return err
 	}
@@ -325,11 +349,12 @@ func (s *Store) withTx(ctx context.Context, f func(tx *sql.Tx) error) error {
 	if s.closed {
 		return ErrClosed
 	}
+	size := s.Size()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	if err := f(tx); err != nil {
+	if err := f(tx, size); err != nil {
 		_ = tx.Rollback()
 		return err
 	}

@@ -29,7 +29,7 @@ func do(h http.Handler, method, body string, hdr map[string]string) *httptest.Re
 func doCtx(ctx context.Context, h http.Handler, method, body string, hdr map[string]string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, "/api/feedback", strings.NewReader(body)).WithContext(ctx)
 	req.RemoteAddr = "127.0.0.1:5555"
-	req.Header.Set("X-Real-Ip", "10.1.2.3")
+	req.Header.Set("X-Real-Ip", "10.0.0.7")
 	if _, ok := hdr["Content-Type"]; !ok {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -176,7 +176,7 @@ func TestFeedbackAnswerAndStation(t *testing.T) { // §8.3, C-1.18
 		Scan(&c, &u, &d, &m, &ip, &lb, &tool, &job); err != nil {
 		t.Fatal(err)
 	}
-	if c != "PC01" || u != "ana" || d != "csl" || m != "AABBCCDDEEFF" || ip != "10.1.2.3" || lb != "PC01/ana" || tool != "extract" || job != mkID(3) {
+	if c != "PC01" || u != "ana" || d != "csl" || m != "AABBCCDDEEFF" || ip != "10.0.0.7" || lb != "PC01/ana" || tool != "extract" || job != mkID(3) {
 		t.Errorf("origin: %s %s %s %s %s %s %s %s", c, u, d, m, ip, lb, tool, job)
 	}
 	// a malformed station header is ignored, never a refusal
