@@ -1,6 +1,6 @@
 # Contrato de dados da Fase 12 (erros do modelo local → base de treino)
 
-> **Versão:** 1.1.1 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40) (etapa 12.1) · **Data:** 2026-11-02
+> **Versão:** 1.1.2 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (etapa 12.1) · **Data:** 2026-11-02
 > **Fonte única:** `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (decisões D12-1 a D12-17, §5, §8, §10, §13, §14, §15).
 > Este documento só fixa regras; o raciocínio e o histórico estão no plano.
 
@@ -35,6 +35,7 @@
 - **C-1.2** Uma ocorrência tem um ou mais jobs em `ocorrencia_jobs` (PK `ocorrencia_id`+`job_id`), cada um com `papel` ∈ {`map1..`, `reduce1..`, `final`, `unico`}, `backend` ∈ {`primario`, `fallback`} e `ordem`.
 - **C-1.3** Cada ocorrência tem exatamente um `job_do_erro`, que pertence à lista de jobs dela; quando não informado, o padrão é o job de papel `final`; com um único job, é o `unico`. Em `translate` (sem `final`) e em qualquer lista com mais de um job e sem `final`, o `job_do_erro` é **obrigatório** e o relato sem ele é recusado.
 - **C-1.4** O gateway que recebe o relato recusa com 404, sem gravar nada, um `job_do_erro` que não exista em `requests` dele.
+- **C-1.4a** (1.1.2) Se o `job_do_erro` ou qualquer job local da lista ainda está `na_fila` ou `em_execucao` em `requests`, o relato é recusado com **409** e `Retry-After`, sem gravar nada (a amostra não pode ser congelada incompleta).
 - **C-1.5** O relato grava a ocorrência, os jobs e as amostras de **todos** os jobs numa única transação, copiando-as do `content.db`; as exceções são as ocorrências `distribuida` (C-1.10) e `fallback` (C-1.21), que não copiam amostras.
 - **C-1.6** `amostras` tem uma linha por `job_id` (PK); um job pode pertencer a mais de uma ocorrência, e a amostra é então compartilhada.
 - **C-1.7** A amostra guarda: `job_id`, `copiada_em`, `endpoint`, `modelo`, `think`, `prompt_json`, `prompt_texto`, `resposta`, `prompt_hmac`, `conteudo_hmac`, `key_id`, `prompt_truncado`, `prompt_json_truncado`, `tem_imagem`, `doc_hash`, `resp_final`, `resp_truncada`, `status`, `http_status`.
@@ -43,14 +44,17 @@
 - **C-1.9a** Se só jobs que **não** são o `job_do_erro` expiraram, a ocorrência nasce `nova`: as amostras existentes são copiadas e as dos expirados ficam só como referência em `ocorrencia_jobs`.
 - **C-1.10** Numa ocorrência `distribuida` o gateway guarda só a ocorrência e as referências dos jobs (com o backend de cada um), **nenhuma amostra**, nem as locais; a resposta traz `estado=distribuida`, `amostras_copiadas=0` e `jobs_externos` = número de jobs de outro backend.
 - **C-1.11** Os jobs de outro backend, numa ocorrência distribuída, são aceitos só como referência, sem validação local; o relato vai ao gateway do `job_do_erro`.
+- **C-1.11a** (1.1.2) **Mesma origem:** a amostra de um job local só é copiada se a origem do relato bate com a do job em `requests`: a estação declarada (máquina **e** usuário) igual, ou, se o job não tem estação, o mesmo IP de origem. Um job de outra origem fica só como referência em `ocorrencia_jobs` e é contado em `jobs_outra_origem` na resposta. Se for o `job_do_erro`, a ocorrência nasce `sem_pedido`. A ação "Marcar erro" do admin no monitor (12.6) não tem essa restrição.
 - **C-1.12** Transições permitidas, e só elas: `nova`→`confirmada` (confirmar), `nova`, `confirmada`, `sem_pedido`, `distribuida` ou `fallback`→`descartada` (descartar: o admin julgou que não foi erro do modelo, e o caso sai também da estatística de erros), `confirmada`→`nova` (alterar a correção, C-6.5) e qualquer estado→`apagada` (apagar). `descartada` não volta a `nova`; `sem_pedido`, `distribuida` e `fallback` nunca são confirmadas.
 - **C-1.12a** Confirmar exige `resposta_correta` não vazia; sem ela, a ação é recusada.
 - **C-1.12b** Descartar uma ocorrência `confirmada` (1.1.0) apaga o embedding, zera `exemplo_publico`, invalida (`valido=0`) todo retrato que a lista e **não** libera a vaga dela na cota (C-4.11a). O histórico grava `descartou`. Uma exportação já baixada não é desfeita pelo servidor; as linhas `exportou` anteriores ficam no histórico como registro.
+- **C-1.12c** (1.1.2) Só ocorrências `nova` ou `confirmada` podem ter campos editados (`resposta_correta`, `descricao`, `correcao_aplicada`). Nos estados de estatística (`sem_pedido`, `distribuida`, `fallback`) e em `descartada`, a edição é recusada.
+- **C-1.12d** (1.1.2) A substituição do candidato automático pelo relato humano (C-1.19) recalcula o estado pela precedência da C-1.9 sobre a lista nova: se der `distribuida` ou `fallback`, o estado muda, as amostras copiadas pela substituída que ninguém mais usa saem (C-6.4) e nada novo é copiado. A lista de jobs é **trocada** pela nova (não somada), e cada campo alterado, inclusive os da estação e da origem, grava `alterou`.
 - **C-1.13** Confirmar, descartar, completar a correção, marcar exemplo público, apagar e liberar quarentena são ações exclusivas do admin, com sessão, CSRF e same-site; cada uma grava no histórico.
 - **C-1.14** `sem_pedido`, `distribuida`, `fallback` e `nova` contam só na estatística de erros: nunca entram na exportação, nos exemplos nem na avaliação. `descartada` e `apagada` não contam na estatística de erros; `descartada` conta só na taxa de descarte por regra automática (D12-8).
 - **C-1.15** Uma ocorrência em partição `quarentena` fica fora da exportação de treino e de teste, do índice de exemplos e da avaliação, e conta só na estatística.
 - **C-1.16** `categoria` ∈ {`numeracao_errada`, `contagem_errada`, `calculo_errado`, `inventou`, `omitiu`, `formato_invalido`, `resumo_infiel`, `traducao_errada`, `idioma_errado`, `truncado`, `ignorou_instrucao`, `outro`}; `origem` ∈ {`claude`, `usuario`, `automatico`}; `severidade` ∈ {`baixa`, `media`, `alta`}; valor fora do enum é recusado.
-- **C-1.17** Limites do relato: corpo ≤ 256 KB, `descricao` ≤ 4 KB, `resposta_correta` ≤ 128 KB e no máximo **64 jobs** na lista; acima disso o relato é recusado com mensagem clara. O `--max-chunks` da estação não é limitado: um pedido com mais de 64 chamadas simplesmente não pode ser relatado (1.1.1, documentado no `RELATAR-ERROS-IA.md`).
+- **C-1.17** Limites do relato: corpo ≤ 256 KB, `descricao` (obrigatória) ≤ 4 KB, `resposta_correta` ≤ 128 KB, `correcao_aplicada` ≤ 4 KB, `projeto` ≤ 128 bytes e no máximo **64 jobs** na lista; campo JSON desconhecido também é recusado (1.1.2); acima disso o relato é recusado com mensagem clara. O `--max-chunks` da estação não é limitado: um pedido com mais de 64 chamadas simplesmente não pode ser relatado (1.1.1, documentado no `RELATAR-ERROS-IA.md`).
 - **C-1.18** Os dados de estação, projeto e origem do relato são declarados e não autenticados; nada entra no treino, nos exemplos ou na avaliação sem confirmação do admin.
 - **C-1.19** Candidato automático nasce `nova`, com `origem=automatico` e `resposta_correta` vazia; um relato humano da mesma ocorrência o substitui, e o histórico grava `alterou` com `campo=origem`.
 - **C-1.20** Os candidatos automáticos têm só as regras: JSON inválido (pedido com `format` = `"json"` ou schema, e texto reprovado em `json.Valid`), resposta só de espaços, e `fim=length` com `num_predict` ≥ 256 (ou ausente).
@@ -105,6 +109,7 @@
 - **C-4.10** Ao entrar em quarentena, os retratos que tinham casos desse componente passam a `valido=0`, e o índice de exemplos congelado que usava algum deles também é invalidado.
 - **C-4.11** O admin libera uma quarentena escolhendo um lado para o componente inteiro, pela rota `POST /monitor/api/treino/{id}/liberar-quarentena`; o histórico grava `alterou` com `campo=particao`.
 - **C-4.11a** Desconfirmar, descartar (C-1.12b) ou apagar uma ocorrência de teste **não libera** a vaga dela na cota, e invalida (`valido=0`) todo retrato que a lista.
+- **C-4.11b** (1.1.2) A cota é guardada numa tabela própria, `cota_grupos` (`grupo_id`, `categoria`, `particao`, `atribuida_em`), sem nenhum conteúdo. Desconfirmar, descartar ou apagar ocorrências não mexe nela, e é ela que conta as vagas da C-4.6.
 - **C-4.12** Nenhum `job_id`, `doc_hash` ou `grupo_id` aparece ao mesmo tempo em amostras exportáveis de treino e de teste.
 - **C-4.13** Há um retrato por avaliação. Ele é uma lista congelada de (`ocorrencia_id`, `job_id`, `prompt_hmac`, `categoria`) mais o hash do índice de exemplos congelado, o ID/hash da versão das instruções e `valido`; depois de criado não muda, exceto `valido`→0.
 - **C-4.14** Linha de base e candidato são sempre comparados no mesmo retrato; um retrato novo exige uma linha de base nova.
@@ -132,7 +137,8 @@
 ## 6. Retenção e descarte
 
 - **C-6.1** O `treino.db` é um arquivo 0600, sem expiração automática.
-- **C-6.2** O teto do `treino.db` é 2 GiB; acima dele o gateway recusa novos relatos com **HTTP 507** e corpo de erro explícito, grava um evento e mostra aviso no monitor, e **não apaga nada sozinho**.
+- **C-6.2** O teto do `treino.db` é 2 GiB de **dados vivos** (páginas usadas, sem as livres e sem contar o `-wal` em dobro; 1.1.2); acima dele o gateway recusa novos relatos com **HTTP 507** e corpo de erro explícito, grava um evento e mostra aviso no monitor, e **não apaga nada sozinho**.
+- **C-6.2a** (1.1.2) O `treino.db` usa `auto_vacuum` incremental e `journal_size_limit`: depois de apagar, o espaço volta ao orçamento, e o relato que antes recebia 507 volta a ser aceito.
 - **C-6.3** Apagar é ação do admin, com histórico. Remove todo o conteúdo da ocorrência, os jobs dela e as amostras que ninguém mais usa, e deixa só uma linha mínima (`id`, `estado=apagada`, datas), sem nenhum campo de conteúdo.
 - **C-6.4** Uma amostra (e o embedding) só é removida quando nenhuma ocorrência a referencia mais (contagem de referências).
 - **C-6.5** Alterar `resposta_correta`, `descricao` ou `correcao_aplicada` de uma ocorrência `confirmada` desfaz a confirmação (volta a `nova`), apaga o embedding anterior e grava `desconfirmou` no histórico.
@@ -147,7 +153,7 @@
 - **C-7.1** `historico` tem: `id`, `quando`, `ocorrencia_id`, `acao`, `campo`, `antes`, `depois`, `quem`, `ip`.
 - **C-7.2** `acao` ∈ {`criou`, `alterou`, `confirmou`, `desconfirmou`, `descartou`, `apagou`, `exportou`}.
 - **C-7.3** Criação, cada alteração de campo, revisão, apagamento e exportação gravam uma linha de histórico, na mesma transação da mudança.
-- **C-7.4** Nos campos de conteúdo (`resposta_correta`, `descricao`, `correcao_aplicada`, pedidos e respostas), `antes` e `depois` guardam **só hash e tamanho**, nunca o texto.
+- **C-7.4** Nos campos de conteúdo (`resposta_correta`, `descricao`, `correcao_aplicada`, pedidos e respostas), `antes` e `depois` guardam **só** `hmac=<hex> key_id=<id> bytes=<n>`: HMAC-SHA256 do texto com a chave da C-4.3, nunca o texto nem o sha256 puro (1.1.2).
 - **C-7.5** `quem` é a estação declarada (relato) ou `admin` (ação no monitor); `ip` é o IP de origem; `quando` é o horário do gateway.
 - **C-7.6** Nenhuma linha de `historico` contém texto de documento, pedido, resposta ou correção (teste que varre a tabela depois de um ciclo completo).
 - **C-7.7** A exportação grava uma linha `exportou` **por ocorrência exportada**, com a parte (`treino` ou `teste`) em `campo` e quem baixou.
@@ -216,3 +222,17 @@ Seis correções de lacunas achadas na sincronização do plano, aprovadas pelo 
 ## Versão 1.1.1 (owner, 2026-11-02 20:40)
 
 Achados M-1 e M-2 da revisão do código da 12.2: a C-3.10 aceita `unico` no `translate` (arquivo de uma parte não tem texto montado), e a C-1.17 documenta que pedido com mais de 64 chamadas não pode ser relatado, sem teto na flag `--max-chunks`.
+
+## Versão 1.1.2 (owner, 2026-11-02 23:40)
+
+Achados da revisão independente da 12.4 e decisões do owner:
+- **C-7.4:** o histórico usa HMAC com a chave, mais o tamanho; nunca o sha256 puro.
+- **C-4.11b:** a cota fica numa tabela própria (`cota_grupos`), que apagar não altera.
+- **C-1.11a:** a amostra só é copiada de job da mesma origem do relato (estação, ou IP quando o job não tem estação); os outros jobs ficam como referência.
+- **C-1.12c:** só `nova` e `confirmada` podem ser editadas.
+
+Correções sem decisão nova:
+- **C-1.4a:** job ainda na fila ou em execução recebe 409.
+- **C-1.12d:** a substituição do automático respeita a precedência e troca a lista de jobs.
+- **C-6.2 e C-6.2a:** o teto conta só os dados vivos, com `auto_vacuum`.
+- **C-1.17:** os limites que o gateway já aplicava foram documentados.
