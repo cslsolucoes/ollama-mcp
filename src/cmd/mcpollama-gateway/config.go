@@ -63,6 +63,11 @@ environment variable; the flag wins.
   --max-body-bytes N      request body ceiling               (MCPGW_MAX_BODY_BYTES, default 33554432)
   --admin-file FILE       "user:pbkdf2-sha256$..." line, mode 0600; without it the monitor is
                           read only                          (MCPGW_ADMIN_FILE)
+  --doc-key-file FILE     absolute path of the HMAC key of the training data (Fase 12): at least 32 random bytes
+                          written as hex (64 characters), mode 0600 on Linux. With it the gateway keeps requests.doc_hash
+                          (HMAC of X-Mcpollama-Doc, with the key id) and replaces each image of the stored prompt JSON by
+                          {"imagem_hmac":"<hex>"}. Without it doc_hash stays empty and the markers carry no hash. All gateways of
+                          the same stations must use the same key  (MCPGW_DOC_KEY_FILE)
   --gpu-interval D        nvidia-smi and CPU/RAM sampling period (MCPGW_GPU_INTERVAL, default 1s; 0 disables both)
   --nvidia-smi PATH       nvidia-smi binary                  (MCPGW_NVIDIA_SMI, default nvidia-smi)
   --aer-path FILE         correctable AER counter of the bridge 00:1b.4; "-" disables
@@ -82,8 +87,9 @@ environment variable; the flag wins.
   --content-db FILE       SQLite file of the job text, created 0600; the text is never in --db
                                                              (MCPGW_CONTENT_DB, default /var/lib/mcpollama-gateway/content.db)
   --content-max-bytes N   total cap of the stored text; above it the oldest jobs are deleted and an event
-                          is written                         (MCPGW_CONTENT_MAX_BYTES, default 2147483648 = 2 GiB)
-  --content-max-job-bytes N  cap of the prompt and of the answer of one job, each; above it the text is cut
+                          is written; the prompt JSON counts in it (MCPGW_CONTENT_MAX_BYTES, default 4294967296 = 4 GiB)
+  --content-max-job-bytes N  cap of the flat prompt, of the prompt JSON and of the answer of one job, each
+                          (own truncation mark each); above it the text is cut
                           and the job is marked truncated    (MCPGW_CONTENT_MAX_JOB_BYTES, default 16777216 = 16 MiB)
   --monitor-keep-done D   how long a finished request stays visible in the monitor ("Concluídos nos últimos
                           5 min", display only; it holds no slot); 0 hides it  (MCPGW_MONITOR_KEEP_DONE, default 5m)
@@ -135,6 +141,7 @@ type Config struct {
 	StripOptions   []string
 	MaxBodyBytes   int64
 	AdminFile      string
+	DocKeyFile     string
 	GPUInterval    time.Duration
 	NvidiaSMI      string
 	AERPath        string
@@ -190,6 +197,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fStrip   = fs.String("strip-options", "", "")
 		fBody    = fs.Int64("max-body-bytes", 0, "")
 		fAdmin   = fs.String("admin-file", "", "")
+		fDocKey  = fs.String("doc-key-file", "", "")
 		fGPUInt  = fs.Duration("gpu-interval", 0, "")
 		fSMI     = fs.String("nvidia-smi", "", "")
 		fAER     = fs.String("aer-path", "", "")
@@ -312,6 +320,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		AgeAfter:       dur("age-after", "MCPGW_AGE_AFTER", 5*time.Minute, fAge),
 		StartStagger:   dur("start-stagger", "MCPGW_START_STAGGER", 300*time.Millisecond, fStagger),
 		AdminFile:      str("admin-file", "MCPGW_ADMIN_FILE", "", fAdmin),
+		DocKeyFile:     str("doc-key-file", "MCPGW_DOC_KEY_FILE", "", fDocKey),
 		GPUInterval:    dur("gpu-interval", "MCPGW_GPU_INTERVAL", time.Second, fGPUInt),
 		SampleStore:    dur("sample-store-interval", "MCPGW_SAMPLE_STORE_INTERVAL", 5*time.Second, fSStore),
 		NvidiaSMI:      str("nvidia-smi", "MCPGW_NVIDIA_SMI", "nvidia-smi", fSMI),
@@ -322,7 +331,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		RetentionGPU:   dur("retention-gpu", "MCPGW_RETENTION_GPU", 7*24*time.Hour, fRetGPU),
 		KeepDone:       dur("monitor-keep-done", "MCPGW_MONITOR_KEEP_DONE", 5*time.Minute, fKeepDn),
 		LogContent:     boolTrue("log-content", "MCPGW_LOG_CONTENT", fLogCont),
-		ContentMax:     int64v("content-max-bytes", "MCPGW_CONTENT_MAX_BYTES", 2<<30, fContMax),
+		ContentMax:     int64v("content-max-bytes", "MCPGW_CONTENT_MAX_BYTES", 4<<30, fContMax),
 		ContentMaxJob:  int64v("content-max-job-bytes", "MCPGW_CONTENT_MAX_JOB_BYTES", 16<<20, fContJob),
 		RetentionCont:  dur("retention-content", "MCPGW_RETENTION_CONTENT", 7*24*time.Hour, fRetCont),
 		RetentionJobGP: dur("retention-job-gpu", "MCPGW_RETENTION_JOB_GPU", 7*24*time.Hour, fRetJob),
@@ -480,6 +489,9 @@ func (c Config) validate() error {
 	}
 	if !c.NonLoopback && !isLoopbackAddr(c.Listen) {
 		return fmt.Errorf("--listen %q is not on the loopback: the gateway trusts the nginx (X-Real-IP); use --non-loopback-listen only if you know why", c.Listen)
+	}
+	if c.DocKeyFile != "" && !filepath.IsAbs(c.DocKeyFile) && !strings.HasPrefix(c.DocKeyFile, "/") {
+		return errors.New("--doc-key-file must be an absolute path")
 	}
 	if c.DB == "" {
 		return errors.New("--db is required")

@@ -25,6 +25,7 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/content"
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
 	"github.com/cslsoftwares/mcpollama/gateway/joblog"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/monitor"
@@ -80,6 +81,22 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		}
 	} else {
 		logf("sem --admin-file: o monitor é somente leitura")
+	}
+
+	// HMAC key of the training data (Fase 12, C-4.3). Optional: without it the
+	// gateway works as before, keeping no doc_hash and no hash in image markers.
+	// A key that is named but cannot be used (bad mode, too short, not hex) is a
+	// refusal to start, never a silent fallback to "no key". The key is not logged.
+	var docKey *hmackey.Key
+	if cfg.DocKeyFile != "" {
+		docKey, err = hmackey.Load(cfg.DocKeyFile)
+		if err != nil {
+			fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
+			return 2
+		}
+		logf("chave HMAC dos dados de treino carregada (key_id %s)", docKey.ID())
+	} else {
+		logf("sem --doc-key-file: doc_hash não é gravado e o marcador de imagem não leva hash")
 	}
 
 	bootID := store.BootID("")
@@ -249,7 +266,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		return 1
 	}
 	px, err := proxy.New(proxy.Config{
-		Journal: jr, Backend: pool.DefaultPrimaryID, Pool: pl,
+		Journal: jr, Backend: pool.DefaultPrimaryID, Pool: pl, DocKey: docKey,
 		Upstream: cfg.Ollama, Queue: q, PriorityNets: cfg.PriorityNets, AllowedModels: cfg.AllowedModels,
 		MaxBodyBytes: cfg.MaxBodyBytes, RunTimeout: cfg.RunTimeout, Logf: dbg,
 		DefaultThink: cfg.DefaultThink, ThinkSuffix: cfg.ThinkSuffix,

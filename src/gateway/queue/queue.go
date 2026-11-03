@@ -194,6 +194,11 @@ type Request struct {
 	StationDomain   string
 	StationMAC      string
 
+	// DocHash is HMAC-SHA256(key, X-Mcpollama-Doc) and DocKeyID the id of that key
+	// (Fase 12, C-4.2, C-4.3a); both "" without a key or a valid header. Never a plain sha256.
+	DocHash  string
+	DocKeyID string
+
 	// OnAccepted, when set, is called once with the "na_fila" Record after the
 	// line accepted the request (never for a rejection). It runs in the caller's
 	// goroutine, outside the lock, BEFORE Acquire waits for the slot, so the job
@@ -252,6 +257,10 @@ type Record struct {
 	StationUser     string
 	StationDomain   string
 	StationMAC      string
+
+	// Fase 12: see Request.DocHash.
+	DocHash  string
+	DocKeyID string
 }
 
 type state int
@@ -574,6 +583,7 @@ func (m *Manager) endRecord(t *Ticket, now time.Time, r Result) Record {
 		Backend: t.backend, FailoverRule: t.rule,
 		StationComputer: t.req.StationComputer, StationUser: t.req.StationUser,
 		StationDomain: t.req.StationDomain, StationMAC: t.req.StationMAC,
+		DocHash: t.req.DocHash, DocKeyID: t.req.DocKeyID,
 	}
 	if rec.PriorityFinal == 0 {
 		rec.PriorityFinal = t.level

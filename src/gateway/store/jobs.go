@@ -35,8 +35,8 @@ import (
 func (s *Store) JobEnqueued(r queue.Record) error {
 	args := s.recordArgs(r)
 	_, err := s.jdb.Exec(`INSERT INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule,station_computer,station_user,station_domain,station_mac)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule,station_computer,station_user,station_domain,station_mac,doc_hash,doc_key_id)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))
 		ON CONFLICT(id) DO NOTHING`, args...)
 	return err
 }
@@ -352,4 +352,17 @@ func (s *Store) Job(ctx context.Context, id string) (JobRow, bool, error) {
 	}
 	j.PeakPowerW, j.PeakClockMHz = pw.Float64, ck.Float64
 	return j, true, nil
+}
+
+// JobDoc returns the document HMAC and the id of the key that made it, as
+// stored for a job (Fase 12, C-4.2, C-4.3a); both "" when none was recorded.
+// The value is never put in the monitor's JSON. Use the caller's own context,
+// not a monitor request context held under a shared mutex.
+func (s *Store) JobDoc(ctx context.Context, id string) (docHash, keyID string, err error) {
+	var h, k sql.NullString
+	err = s.db.QueryRowContext(ctx, `SELECT doc_hash, doc_key_id FROM requests WHERE id=?`, id).Scan(&h, &k)
+	if err == sql.ErrNoRows {
+		return "", "", nil
+	}
+	return h.String, k.String, err
 }

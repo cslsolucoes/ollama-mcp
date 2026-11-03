@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 )
 
@@ -47,7 +48,7 @@ const maxLine = 4 << 20
 // extractPrompt builds the text shown in the job log from the body that goes to
 // the model: system, prompt, messages and input, each under a label. Values
 // that are not plain strings are kept as the JSON they came as.
-func extractPrompt(kind routeKind, body []byte) string {
+func extractPrompt(kind routeKind, body []byte, key *hmackey.Key) string {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(body, &m); err != nil {
 		return string(body)
@@ -90,7 +91,7 @@ func extractPrompt(kind routeKind, body []byte) string {
 				if !ok {
 					c = json.RawMessage(`""`)
 				}
-				section(role, c)
+				section(role, redactParts(c, key))
 				if imgs, ok := mm["images"]; ok {
 					var l []json.RawMessage
 					if json.Unmarshal(imgs, &l) == nil && len(l) > 0 {
@@ -113,6 +114,29 @@ func extractPrompt(kind routeKind, body []byte) string {
 		}
 	}
 	return b.String()
+}
+
+// redactParts keeps image data out of the flat text: the content of a message
+// that is an array of parts (/v1) goes through the same scan as the prompt JSON,
+// so an image_url part shows as {"imagem_hmac":"<hex>"} and never as the data
+// URI. It reuses the scan by wrapping the value as a message body. If the scan
+// fails, the parts are not shown at all (fail closed).
+func redactParts(raw json.RawMessage, key *hmackey.Key) json.RawMessage {
+	t := bytes.TrimLeft(raw, " \t\r\n")
+	if len(t) == 0 || t[0] != '[' {
+		return raw
+	}
+	const pre, post = `{"messages":[{"content":`, `}]}`
+	wrapped := make([]byte, 0, len(pre)+len(raw)+len(post))
+	wrapped = append(append(append(wrapped, pre...), raw...), post...)
+	out, has, ok := spliceImages(wrapped, key)
+	if !ok {
+		return json.RawMessage(`"[partes da mensagem omitidas: conteúdo ilegível]"`)
+	}
+	if !has {
+		return raw
+	}
+	return json.RawMessage(out[len(pre) : len(out)-len(post)])
 }
 
 // textOf decodes a JSON string; anything else is kept as its JSON text.

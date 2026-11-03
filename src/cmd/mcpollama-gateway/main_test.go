@@ -294,7 +294,7 @@ func TestParseConfigJobLogFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !c.LogContent || c.ContentMax != 2<<30 || c.ContentMaxJob != 16<<20 || c.RetentionCont != 7*24*time.Hour ||
+	if !c.LogContent || c.ContentMax != 4<<30 || c.ContentMaxJob != 16<<20 || c.RetentionCont != 7*24*time.Hour ||
 		c.RetentionJobGP != 7*24*time.Hour || c.KeepDone != 5*time.Minute || filepath.ToSlash(c.ContentDB) != "/var/lib/mcpollama-gateway/content.db" {
 		t.Fatalf("defaults: %+v", c)
 	}

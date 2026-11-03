@@ -33,15 +33,44 @@ func (j *Journal) logf(format string, a ...any) {
 	}
 }
 
-// Enqueued writes the entry of the job and its prompt, durably.
+// Enqueued writes the entry of the job and its prompt, durably. It keeps no
+// prompt_json: the proxy uses EnqueuedJSON, which writes the two together.
 func (j *Journal) Enqueued(rec queue.Record, prompt string) {
+	j.enqueue(rec, prompt, proxy.PromptJSON{}, false)
+}
+
+var _ proxy.JSONJournal = (*Journal)(nil)
+
+// WantsPromptJSON is false when the content is not recorded: the proxy then
+// builds neither the flat text nor the prompt JSON.
+func (j *Journal) WantsPromptJSON() bool { return j.Content != nil }
+
+// EnqueuedJSON writes the entry of the job, the flat prompt and the canonical
+// request (prompt_json, tem_imagem) in the same call, at the entry of the line
+// (Fase 12, C-2.1).
+func (j *Journal) EnqueuedJSON(rec queue.Record, prompt string, pj proxy.PromptJSON) {
+	j.enqueue(rec, prompt, pj, true)
+}
+
+func (j *Journal) enqueue(rec queue.Record, prompt string, pj proxy.PromptJSON, withJSON bool) {
 	if err := j.Store.JobEnqueued(rec); err != nil {
 		j.logf("joblog: entrada de %s: %v", rec.ID, err)
 	}
-	if j.Content != nil {
-		if _, _, err := j.Content.SavePrompt(rec.ID, prompt, time.Now()); err != nil {
-			j.logf("joblog: prompt de %s: %v", rec.ID, err)
-		}
+	if j.Content == nil {
+		return
+	}
+	var err error
+	switch {
+	case withJSON && pj.Failed:
+		// The body could not be scanned for images: keep no JSON (fail closed).
+		_, err = j.Content.SavePromptJSONFailed(rec.ID, prompt, time.Now())
+	case withJSON:
+		_, err = j.Content.SavePromptJSON(rec.ID, prompt, pj.JSON, pj.HasImage, time.Now())
+	default:
+		_, _, err = j.Content.SavePrompt(rec.ID, prompt, time.Now())
+	}
+	if err != nil {
+		j.logf("joblog: prompt de %s: %v", rec.ID, err)
 	}
 }
 

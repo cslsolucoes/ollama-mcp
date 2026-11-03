@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
 	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 )
@@ -39,6 +40,7 @@ const (
 	HeaderStation  = "X-Mcpollama-Station" // computer=..;user=..;domain=..;mac=.. (declared, not authenticated)
 	HeaderTool     = "X-Mcpollama-Tool"
 	HeaderPriority = "X-Mcpollama-Priority"
+	HeaderDoc      = "X-Mcpollama-Doc" // sha256 of the whole document (64 lower-case hex); stored only as an HMAC, never forwarded
 )
 
 // Response headers set by the gateway.
@@ -93,6 +95,11 @@ type Config struct {
 	// with its own bearer token. The client's Authorization header is never
 	// forwarded to any backend. nil means the single Upstream.
 	Pool *pool.Pool
+	// DocKey, when set (--doc-key-file), turns the X-Mcpollama-Doc header into
+	// requests.doc_hash (HMAC) and the images of the prompt_json into HMAC
+	// markers. nil: doc_hash stays empty and the image markers carry no hash
+	// (Fase 12, C-2.5, C-4.2). The key is never logged or returned.
+	DocKey *hmackey.Key
 
 	Logf func(format string, args ...any)
 }
@@ -188,7 +195,7 @@ func New(cfg Config) (*Handler, error) {
 			pr.SetURL(target)
 			pr.Out.Host = target.Host
 			for _, k := range []string{"X-Real-Ip", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
-				"Authorization", "Cookie", HeaderClient, HeaderStation, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID} {
+				"Authorization", "Cookie", HeaderClient, HeaderStation, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID, HeaderDoc} {
 				pr.Out.Header.Del(k)
 			}
 			// The only credential that reaches a backend is its own.
@@ -478,10 +485,33 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	st := parseStation(r.Header.Values(HeaderStation))
 	qreq.StationComputer, qreq.StationUser, qreq.StationDomain, qreq.StationMAC = st.Computer, st.User, st.Domain, st.MAC
 
+	// X-Mcpollama-Doc (C-2.11, C-4.2): read here, never forwarded (Rewrite drops
+	// it). Only one well-formed value counts; the gateway keeps just its HMAC,
+	// and the key id that goes with it. Without a key nothing is kept.
+	if v := r.Header.Values(HeaderDoc); len(v) == 1 {
+		if dh := h.cfg.DocKey.DocHash(v[0]); dh != "" {
+			qreq.DocHash, qreq.DocKeyID = dh, h.cfg.DocKey.ID()
+		}
+	}
+
 	jr := h.cfg.Journal
 	if jr != nil {
-		prompt := extractPrompt(routeKinds[path], body)
-		qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, prompt) }
+		// body is the policy's output: exactly what the Ollama will receive. The
+		// text and the JSON are built once the line accepted the request (a
+		// rejected one never pays for the scan), and not at all when the journal
+		// does not record content.
+		kind, key := routeKinds[path], h.cfg.DocKey
+		if jj, ok := jr.(JSONJournal); ok {
+			if jj.WantsPromptJSON() {
+				qreq.OnAccepted = func(rec queue.Record) {
+					jj.EnqueuedJSON(rec, extractPrompt(kind, body, key), buildPromptJSON(body, key))
+				}
+			} else {
+				qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, "") }
+			}
+		} else {
+			qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, extractPrompt(kind, body, key)) }
+		}
 	}
 	tk, err := h.cfg.Queue.Acquire(r.Context(), qreq)
 	if err != nil {

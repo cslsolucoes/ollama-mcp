@@ -37,3 +37,6 @@ referencias/*
 /.cursor/
 /.claude/
 /.vscode/
+
+# pastas de smoke test geradas por outras ferramentas (podem conter imagens de clientes)
+.workspace/ollama-native-smoke-*/

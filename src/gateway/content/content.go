@@ -10,7 +10,7 @@
 //   - the file is created 0600 (the -wal and -shm inherit it);
 //   - a total cap (MaxBytes): above it the oldest jobs are deleted and an event
 //     is reported;
-//   - a cap per part (MaxJobBytes, the prompt and the answer each): above it the
+//   - a cap per part (MaxJobBytes, the flat prompt, the prompt JSON and the answer each): above it the
 //     text is cut and the row is marked truncated;
 //   - a retention (Keep, 7 days by default);
 //   - the monitor serves the text only to the logged-in administrator.
@@ -37,8 +37,8 @@ import (
 
 // Defaults of Options.
 const (
-	DefaultMaxBytes    = 2 << 30  // 2 GiB, all jobs together
-	DefaultMaxJobBytes = 16 << 20 // 16 MiB, the prompt and the answer each
+	DefaultMaxBytes    = 4 << 30  // 4 GiB, all jobs together (contract C-2.8; was 2 GiB before Fase 12)
+	DefaultMaxJobBytes = 16 << 20 // 16 MiB, the flat prompt, the prompt JSON and the answer each (C-2.3, C-2.4)
 	DefaultKeep        = 7 * 24 * time.Hour
 	DefaultFlushEvery  = 2 * time.Second
 )
@@ -47,9 +47,50 @@ const schema = `
 CREATE TABLE IF NOT EXISTS job_content(
   job_id TEXT PRIMARY KEY, created_at INTEGER, updated_at INTEGER,
   prompt BLOB, prompt_bytes INTEGER, prompt_sha256 TEXT, prompt_truncated INTEGER,
-  response BLOB, resp_bytes INTEGER, resp_truncated INTEGER, resp_final INTEGER);
+  response BLOB, resp_bytes INTEGER, resp_truncated INTEGER, resp_final INTEGER,
+  prompt_json BLOB, prompt_json_truncated INTEGER NOT NULL DEFAULT 0, tem_imagem INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS idx_content_created ON job_content(created_at);
 `
+
+// migrate adds the columns of Fase 12 (contract C-2.7) to a database made by an
+// older version: prompt_json (the request body as the Ollama received it, image
+// markers in place), its own truncation mark and tem_imagem. Each step checks
+// PRAGMA table_info first, so a second start changes nothing and no row is lost.
+// Old rows keep prompt_json NULL: "no JSON was kept for this job".
+func migrate(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(job_content)`)
+	if err != nil {
+		return err
+	}
+	have := map[string]bool{}
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		have[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, c := range []struct{ name, ddl string }{
+		{"prompt_json", `ALTER TABLE job_content ADD COLUMN prompt_json BLOB`},
+		{"prompt_json_truncated", `ALTER TABLE job_content ADD COLUMN prompt_json_truncated INTEGER NOT NULL DEFAULT 0`},
+		{"tem_imagem", `ALTER TABLE job_content ADD COLUMN tem_imagem INTEGER NOT NULL DEFAULT 0`},
+	} {
+		if !have[c.name] {
+			if _, err := db.Exec(c.ddl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 // Options configures Open. Zero values take the defaults.
 type Options struct {
@@ -115,9 +156,13 @@ func Open(path string, o Options) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("content: schema: %w", err)
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("content: migração: %w", err)
+	}
 	s := &Store{db: db, opts: o, stop: make(chan struct{})}
 	var sum int64
-	if err := db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err != nil {
+	if err := db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("content: %w", err)
 	}
@@ -190,9 +235,42 @@ func cutUTF8String(s string, n int) string {
 	return s[:n]
 }
 
-// SavePrompt stores the prompt of a job. It is idempotent (the first one wins),
-// synchronous and durable. It returns the stored size and whether it was cut.
+// SavePrompt stores the flat text of the prompt of a job and nothing else (no
+// prompt_json). It is idempotent (the first one wins), synchronous and durable.
+// It returns the stored size and whether it was cut. The proxy uses
+// SavePromptJSON; this form stays for callers that only have the text.
 func (s *Store) SavePrompt(id, prompt string, now time.Time) (stored int, truncated bool, err error) {
+	r, err := s.SavePromptJSON(id, prompt, nil, false, now)
+	return r.Stored, r.Truncated, err
+}
+
+// PromptSaved is what SavePromptJSON reports.
+type PromptSaved struct {
+	Stored        int  // bytes of the flat text kept
+	Truncated     bool // the flat text was cut at the per-job cap (prompt_truncated)
+	JSONStored    int  // bytes of prompt_json kept
+	JSONTruncated bool // prompt_json was cut at its own per-job cap (prompt_json_truncated)
+}
+
+// SavePromptJSON stores, in ONE statement, the flat text of the prompt and the
+// request body (pj) as the Ollama received it, with the images already replaced
+// by their markers (contract C-2.1, C-2.2, C-2.5). hasImage becomes tem_imagem.
+// The two parts have separate caps and separate truncation marks (C-2.3): cutting
+// one never marks the other. pj nil keeps the column NULL. It is idempotent
+// (the first one wins), synchronous and durable.
+func (s *Store) SavePromptJSON(id, prompt string, pj []byte, hasImage bool, now time.Time) (PromptSaved, error) {
+	return s.savePrompt(id, prompt, pj, hasImage, false, now)
+}
+
+// SavePromptJSONFailed stores the flat text of a job whose body could not be
+// scanned for images (fail closed): prompt_json stays NULL, tem_imagem=1 and
+// prompt_json_truncated=1, so the job can never be exported.
+func (s *Store) SavePromptJSONFailed(id, prompt string, now time.Time) (PromptSaved, error) {
+	return s.savePrompt(id, prompt, nil, true, true, now)
+}
+
+func (s *Store) savePrompt(id, prompt string, pj []byte, hasImage, failed bool, now time.Time) (PromptSaved, error) {
+	var res PromptSaved
 	// Hash the string as it is and copy only what is stored: a 32 MiB prompt
 	// must not be copied whole once more (revisão 10.L, M1).
 	hs := sha256.New()
@@ -205,23 +283,39 @@ func (s *Store) SavePrompt(id, prompt string, now time.Time) (stored int, trunca
 	hs.Sum(sum[:0])
 	keep := prompt
 	if int64(len(keep)) > s.opts.MaxJobBytes {
-		keep, truncated = cutUTF8String(keep, int(s.opts.MaxJobBytes)), true
+		keep, res.Truncated = cutUTF8String(keep, int(s.opts.MaxJobBytes)), true
 	}
 	b := []byte(keep)
 	trunc := 0
-	if truncated {
+	if res.Truncated {
 		trunc = 1
 	}
-	res, err := s.db.Exec(`INSERT OR IGNORE INTO job_content(job_id,created_at,updated_at,prompt,prompt_bytes,prompt_sha256,prompt_truncated,response,resp_bytes,resp_truncated,resp_final)
-		VALUES(?,?,?,?,?,?,?,x'',0,0,0)`,
-		id, now.UnixMilli(), now.UnixMilli(), b, len(prompt), hex.EncodeToString(sum[:]), trunc)
+	var jb any // NULL when there is no JSON
+	jtrunc, img := 0, 0
+	if pj != nil {
+		kj := pj
+		if int64(len(kj)) > s.opts.MaxJobBytes {
+			kj, res.JSONTruncated, jtrunc = cutUTF8(kj, int(s.opts.MaxJobBytes)), true, 1
+		}
+		jb, res.JSONStored = kj, len(kj)
+	}
+	if hasImage {
+		img = 1
+	}
+	if failed {
+		jtrunc, res.JSONTruncated = 1, true
+	}
+	r, err := s.db.Exec(`INSERT OR IGNORE INTO job_content(job_id,created_at,updated_at,prompt,prompt_bytes,prompt_sha256,prompt_truncated,response,resp_bytes,resp_truncated,resp_final,prompt_json,prompt_json_truncated,tem_imagem)
+		VALUES(?,?,?,?,?,?,?,x'',0,0,0,?,?,?)`,
+		id, now.UnixMilli(), now.UnixMilli(), b, len(prompt), hex.EncodeToString(sum[:]), trunc, jb, jtrunc, img)
 	if err != nil {
-		return 0, truncated, err
+		return PromptSaved{Truncated: res.Truncated, JSONTruncated: res.JSONTruncated}, err
 	}
-	if n, _ := res.RowsAffected(); n > 0 {
-		s.added(int64(len(b)))
+	res.Stored = len(b)
+	if n, _ := r.RowsAffected(); n > 0 {
+		s.added(int64(len(b) + res.JSONStored))
 	}
-	return len(b), truncated, nil
+	return res, nil
 }
 
 // added accounts for stored bytes and starts the total cap when it is passed.
@@ -298,7 +392,7 @@ const (
 // truth and not on a counter that a failed run left behind.
 func (s *Store) resyncTotal() {
 	var sum int64
-	if err := s.db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
+	if err := s.db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
 		s.total.Store(sum)
 	}
 }
@@ -335,7 +429,7 @@ func (s *Store) enforceCap() (removed int64, err error) {
 	target := s.opts.MaxBytes / 10 * 9
 	var freed int64
 	for s.total.Load() > target && !s.closed.Load() {
-		rows, err := s.db.Query(`SELECT job_id, COALESCE(length(prompt),0)+COALESCE(length(response),0) FROM job_content ORDER BY created_at, rowid LIMIT ?`, capBatch)
+		rows, err := s.db.Query(`SELECT job_id, COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0) FROM job_content ORDER BY created_at, rowid LIMIT ?`, capBatch)
 		if err != nil {
 			s.logf("content: teto: %v", err)
 			return removed, err
@@ -386,7 +480,7 @@ func (s *Store) enforceCap() (removed int64, err error) {
 	}
 	// Re-read the real total: it corrects any drift of the running counter.
 	var sum int64
-	if err := s.db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
+	if err := s.db.QueryRow(`SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
 		s.total.Store(sum)
 	}
 	s.logf("content: teto de %d bytes removeu os %d jobs mais antigos (%d bytes)", s.opts.MaxBytes, removed, freed)
@@ -551,7 +645,7 @@ func (s *Store) Get(ctx context.Context, id string) (c Content, ok bool, err err
 // Info returns the sizes of a job without reading the text.
 func (s *Store) Info(ctx context.Context, id string) (in Info, ok bool, err error) {
 	var pt, rt, rf int
-	err = s.db.QueryRowContext(ctx, `SELECT job_id,prompt_bytes,resp_bytes,prompt_sha256,prompt_truncated,resp_truncated,resp_final,COALESCE(length(prompt),0)+COALESCE(length(response),0) FROM job_content WHERE job_id=?`, id).
+	err = s.db.QueryRowContext(ctx, `SELECT job_id,prompt_bytes,resp_bytes,prompt_sha256,prompt_truncated,resp_truncated,resp_final,COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0) FROM job_content WHERE job_id=?`, id).
 		Scan(&in.JobID, &in.PromptBytes, &in.RespBytes, &in.PromptSHA256, &pt, &rt, &rf, &in.Stored)
 	if err == sql.ErrNoRows {
 		return Info{}, false, nil
@@ -581,7 +675,7 @@ func (s *Store) Maintain(ctx context.Context, now time.Time) error {
 	}
 	if n, _ := r.RowsAffected(); n > 0 {
 		var sum int64
-		if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0)),0) FROM job_content`).Scan(&sum); err == nil {
 			s.total.Store(sum)
 		}
 		s.logf("content: retenção de %s removeu %d jobs", s.opts.Keep, n)
@@ -611,4 +705,27 @@ func (s *Store) RunMaintenance(ctx context.Context, every time.Duration) {
 		case <-t.C:
 		}
 	}
+}
+
+// PromptJSON is the stored request body of a job (Fase 12).
+type PromptJSON struct {
+	JSON      []byte // nil when no JSON was kept (rows written before Fase 12, or SavePrompt)
+	Truncated bool   // prompt_json_truncated
+	HasImage  bool   // tem_imagem
+}
+
+// GetPromptJSON returns the prompt_json of a job; ok is false when the job has
+// no row. The context is the caller's: never pass a monitor request context
+// under a shared mutex (pattern of 0.12.6).
+func (s *Store) GetPromptJSON(ctx context.Context, id string) (p PromptJSON, ok bool, err error) {
+	var pj []byte
+	var tr, img int
+	err = s.db.QueryRowContext(ctx, `SELECT prompt_json,prompt_json_truncated,tem_imagem FROM job_content WHERE job_id=?`, id).Scan(&pj, &tr, &img)
+	if err == sql.ErrNoRows {
+		return PromptJSON{}, false, nil
+	}
+	if err != nil {
+		return PromptJSON{}, false, err
+	}
+	return PromptJSON{JSON: pj, Truncated: tr != 0, HasImage: img != 0}, true, nil
 }

@@ -33,7 +33,7 @@ type rig struct {
 	upstrFn http.HandlerFunc
 }
 
-func newRig(t *testing.T, up http.HandlerFunc, flush time.Duration) *rig {
+func newRig(t *testing.T, up http.HandlerFunc, flush time.Duration, mods ...func(*proxy.Config)) *rig {
 	t.Helper()
 	r := &rig{dir: t.TempDir()}
 	r.gwPath, r.contDB = filepath.Join(r.dir, "gw.db"), filepath.Join(r.dir, "content.db")
@@ -51,7 +51,11 @@ func newRig(t *testing.T, up http.HandlerFunc, flush time.Duration) *rig {
 	r.jr.Running = r.q.RunningIDs
 	upsrv := httptest.NewServer(up)
 	uu, _ := url.Parse(upsrv.URL)
-	h, err := proxy.New(proxy.Config{Upstream: uu, Queue: r.q, Journal: r.jr})
+	pcfg := proxy.Config{Upstream: uu, Queue: r.q, Journal: r.jr}
+	for _, m := range mods {
+		m(&pcfg)
+	}
+	h, err := proxy.New(pcfg)
 	if err != nil {
 		t.Fatal(err)
 	}

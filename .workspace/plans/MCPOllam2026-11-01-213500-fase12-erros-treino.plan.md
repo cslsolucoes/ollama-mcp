@@ -1,6 +1,6 @@
 # Plano — Fase 12: o MCP organiza os erros do modelo local e gera o histórico para treinar o servidor de IA
 
-> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída; próxima: 12.3). Contrato de dados **1.1.1 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
+> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.3 concluída; próxima: 12.4). Contrato de dados **1.1.1 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
 > achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). O código começa na 12.2.
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
@@ -599,7 +599,7 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 | 12.0 | Aprovação do plano e das decisões abertas (§14) | owner | owner aprova | ✅ **concluída** (2026-11-02 19:45) |
 | 12.1 | **Contrato de dados** (`docs/CONTRATO-DADOS-TREINO.md`, §8.1): unidade do erro, pedido canônico, regra de exportação, partição, avaliação, retenção, histórico, privacidade dos exemplos | sonnet + owner | owner aprova o contrato | ✅ **concluída** (2026-11-02 20:05): `docs/CONTRATO-DADOS-TREINO.md` 1.0.0, 119 regras; rascunho em Sonnet, conferência e fechamento em Opus; 2 ajustes por revisão externa (estado `fallback`; descartar estados de estatística) |
 | 12.2 | mcpollama: `job=`/`jobs=<papel>:<id>` com o backend de cada ID, na `[uso]` e em `_meta` (D12-1); cabeçalho `X-Mcpollama-Doc` (D12-7a) | sonnet | teste com gateway falso: IDs e papéis certos no map-reduce e no fallback; o mesmo `X-Mcpollama-Doc` em todas as chamadas de um documento (contrato C-4.1; papel e backend de cada ID: C-1.2) | ✅ **concluída** (2026-11-02 20:16, sem commit ainda): Sonnet implementou, Opus revisou e repetiu o gate |
-| 12.3 | gateway: `prompt_json` no `content.db` na **entrada** (D12-13; C-2.1 a C-2.8, C-2.10 a C-2.12), a partir do corpo depois de `applyPolicy`; `requests.doc_hash` como HMAC com `key_id` e flag `--doc-key-file` (C-4.2, C-4.3, C-4.3a) | sonnet | teste, um por regra: o `prompt_json` é igual, byte a byte, ao corpo que o Ollama falso recebeu, exceto pelas imagens, inclusive todo o histórico de `chat` (C-2.10); migração idempotente de banco antigo sem perder dados (C-2.7); teto de 16 MiB **por campo** com marca própria (`prompt_truncated`, `prompt_json_truncated`), `resp_final`/`resp_truncated` (C-2.3, C-2.4), e o predicado recusa `prompt_json_truncated=1` mesmo depois de o `content.db` expirar; imagem vira `{"imagem_hmac":"<hex>"}` + `tem_imagem=1` e fica não exportável (C-2.5, C-2.6); teto total de 4 GiB apagando os mais antigos (C-2.8); `prompt_hmac` e `conteudo_hmac` calculados como na C-2.12 e nunca como sha256 puro; `requests.doc_hash` gravado só como HMAC com `key_id`, o sha256 puro ausente de todo banco e log (C-4.2), e o cabeçalho `X-Mcpollama-Doc` removido antes do Ollama e ausente do `prompt_json` (C-2.11); sem `--doc-key-file` o gateway não aceita relatos (C-4.3a, verificado na 12.4) | pendente |
+| 12.3 | gateway: `prompt_json` no `content.db` na **entrada** (D12-13; C-2.1 a C-2.8, C-2.10 a C-2.12), a partir do corpo depois de `applyPolicy`; `requests.doc_hash` como HMAC com `key_id` e flag `--doc-key-file` (C-4.2, C-4.3, C-4.3a) | sonnet | teste, um por regra: o `prompt_json` é igual, byte a byte, ao corpo que o Ollama falso recebeu, exceto pelas imagens, inclusive todo o histórico de `chat` (C-2.10); migração idempotente de banco antigo sem perder dados (C-2.7); teto de 16 MiB **por campo** com marca própria (`prompt_truncated`, `prompt_json_truncated`), `resp_final`/`resp_truncated` (C-2.3, C-2.4), e o predicado recusa `prompt_json_truncated=1` mesmo depois de o `content.db` expirar; imagem vira `{"imagem_hmac":"<hex>"}` + `tem_imagem=1` e fica não exportável (C-2.5, C-2.6); teto total de 4 GiB apagando os mais antigos (C-2.8); `prompt_hmac` e `conteudo_hmac` calculados como na C-2.12 e nunca como sha256 puro; `requests.doc_hash` gravado só como HMAC com `key_id`, o sha256 puro ausente de todo banco e log (C-4.2), e o cabeçalho `X-Mcpollama-Doc` removido antes do Ollama e ausente do `prompt_json` (C-2.11); sem `--doc-key-file` o gateway não aceita relatos (C-4.3a, verificado na 12.4) | ✅ **concluída** (2026-11-02 22:35, sem commit ainda): Sonnet implementou; revisão Opus (1 bloqueador, 2 importantes, 6 menores) corrigida; gate refeito pelo coordenador |
 | 12.4 | gateway: `treino.db` (ocorrências, jobs, amostras, histórico) + `POST /api/feedback` em rota própria (D12-4, 5, 10, 16); flag `--role` (C-1.21) | sonnet | testes, um por regra do contrato nesta etapa (C-0.4): validação dos enums e limites (C-1.16, C-1.17: corpo 256 KB, `descricao` 4 KB, `resposta_correta` 128 KB, 64 jobs); `job_do_erro` inexistente → 404 sem gravar nada (C-1.4) e obrigatório em `translate`/listas sem `final` (C-1.3); transação única com as amostras de todos os jobs (C-1.5); `sem_pedido` só pelo `job_do_erro` expirado ou sem `prompt_json`, e `nova` quando expiram só os outros (C-1.9, C-1.9a); `distribuida` sem amostras com `jobs_externos` (C-1.10) e `fallback` com `--role fallback` sem amostras (C-1.21), com a precedência da C-1.9; transições da C-1.12 e confirmar sem `resposta_correta` recusado (C-1.12a); candidato automático substituído por relato humano com `alterou`/`campo=origem` (C-1.19); 503 sem `--doc-key-file` (C-4.3a); 507 no teto de 2 GiB sem apagar nada (C-6.2); apagar deixa só a linha mínima e respeita a contagem de referências (C-6.3, C-6.4); alterar a correção desfaz a confirmação e apaga o embedding (C-6.5); histórico sem texto, só hash e tamanho, e sem expirar (C-7.4, C-7.6, C-7.9); consultas com `context.Background()` (C-6.10); ataques 9.5/10.L/10.5 ok | pendente |
 | 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8; C-1.3, C-1.19, C-1.20); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis (até 64, C-1.17) e o backend de cada um; `job_do_erro` padrão `final`/`unico` e obrigatório em `translate` e em listas sem `final` (C-1.3); enums e limites (C-1.16, C-1.17); relato ao gateway do `job_do_erro` (C-1.11); os automáticos são só as três regras da C-1.20 (inclui `num_predict` ausente), nascem `nova` sem `resposta_correta` (C-1.19); o automático não atrasa nem quebra a tool; deduplicação (relato humano substitui o automático) | pendente |
 | 12.6 | monitor: aba "Erros (treino)", "Marcar erro", confirmar/completar/descartar/apagar/exemplo público/**liberar quarentena** (rota `POST /monitor/api/treino/{id}/liberar-quarentena`), exportação com predicado e partição (D12-6, 7, 7a; C-1.13, C-3.x, C-4.x) | sonnet | Firefox headless 570–1400 px; ações só do admin com sessão, CSRF e same-site, cada uma no histórico (C-1.13); o predicado exclui cada caso proibido, inclusive imagem, `distribuida`, `fallback`, `quarentena` e `translate` montado, **um teste por condição, com um caso que falha só nela** (C-3.16); exportação por `parte=treino\|teste` só da partição pedida, em streaming, sem guardar no servidor, com `meta` sem texto livre e uma linha `exportou` **por ocorrência** (C-3.11 a C-3.15, C-7.7); grupos por `doc_hash`, por `conteudo_hmac` ou por job em comum, com todas as não apagadas, inclusive `nova` e `descartada` (C-4.5, C-4.15); cota de 30 grupos por categoria na **ordem de confirmação**, partição atribuída na primeira confirmação (C-4.6, C-4.7); partição estável e fusão de grupos do mesmo lado pelo menor `grupo_id` sem reavaliar (C-4.8); **união de lados diferentes vai para quarentena e invalida os retratos e o índice de exemplos** (C-4.9, C-4.10, teste dedicado); `liberar-quarentena` grava `alterou`/`campo=particao` (C-4.11); desconfirmar/apagar ocorrência de teste não libera a vaga e invalida os retratos que a listam (C-4.11a); nenhum `job_id`, `doc_hash` ou `grupo_id` em treino e teste ao mesmo tempo (C-4.12); `doc_hash` guardado como HMAC com `key_id`, nunca o sha256 puro (C-4.2); ocorrência distribuída e `fallback` sem amostras; descartar vale também para `sem_pedido`/`distribuida`/`fallback` (C-1.12); histórico sem texto sensível (C-7.6); alterar `resposta_correta`, `descricao` ou `correcao_aplicada` confirmada desfaz a confirmação (C-6.5); embedding só ao marcar `exemplo_publico` (C-6.6); consultas com `context.Background()` e cache em segundo plano (C-6.10) | pendente |
@@ -854,3 +854,81 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
     - `go test -count=1 ./...` 20 ok, 0 FAIL;
     - `-race -count=1` 20 ok, 0 FAIL, sem data race.
   - **Incidente (Sonnet):** um comando de mutação com heredoc aninhado travou e foi para segundo plano; os arquivos foram restaurados a partir das cópias e conferidos com `diff`/`cmp`. Nenhum processo `go` ficou rodando (conferido). Rascunhos do scratchpad foram sobrescritos, sem efeito no repositório.
+- 2026-11-02 20:56: **12.2 publicada** (`1fd5b27` docs, `1bb42fc` código; varredura de segredos 0; push autorizado pelo owner). **Início da 12.3** (gateway) no Sonnet, com o escopo do aceite da §12: `prompt_json` na entrada, tetos separados, imagem → `imagem_hmac`, remoção e HMAC do `X-Mcpollama-Doc`, `--doc-key-file`, migrações, `content.db` com 4 GiB e funções `prompt_hmac`/`conteudo_hmac`; mais os ataques 9.5, 10.L e 10.5 de novo e prova por mutação.
+- 2026-11-02 21:57: **12.3 implementada** pelo Sonnet (54 min, 42 mutações, todas com FAIL e restauradas com `cmp`). Gate refeito pelo coordenador. Revisão independente em Opus em andamento.
+  - **Arquivos novos:**
+    - `gateway/hmackey/`: `Load` (hex ≥ 64, recusa permissão de grupo/outros e lê pelo handle, sem TOCTOU), `ID`, `MAC`, `DocHash`, `PromptHMAC` e `ContentHMAC`, com vetores fixos calculados por `openssl`;
+    - `proxy/promptjson.go`: o marcador de imagem por splice de bytes, com chave insensível a maiúsculas e a escapes `\u`;
+    - testes `fase12_*` em `content`, `store`, `joblog` e `cmd`, mais `proxy/promptjson_test.go`.
+  - **Arquivos alterados:**
+    - `content.go`: `prompt_json`, `prompt_json_truncated` e `tem_imagem` por migração idempotente; `SavePromptJSON` com tetos separados; teto total de 4 GiB, contando o JSON;
+    - `proxy.go`: remove o `X-Mcpollama-Doc` e grava só o HMAC e o `key_id`;
+    - `queue.go`: `DocHash`/`DocKeyID`, fora do snapshot e do monitor;
+    - `store`: colunas `doc_hash`/`doc_key_id`;
+    - `joblog`: `EnqueuedJSON`;
+    - `config.go`/`main.go`: `--doc-key-file` (`MCPGW_DOC_KEY_FILE`, absoluto); com chave inválida, não sobe (exit 2); o log mostra só o `key_id`;
+    - o `deploy/gateway/mcpollama-gateway.service` não foi tocado, porque não fixa `--content-max-bytes`.
+  - **Gate (coordenador):**
+    - `go build ./...` 0; `go vet ./...` 0; `gofmt -l` vazio;
+    - `go test -count=1 ./...` **21 ok**, 0 FAIL;
+    - `-race -count=1` 21 ok, 0 FAIL.
+  - **Ataques (Sonnet; o resultado é dele, não repetido pelo coordenador):**
+    - Fase 9: 463 PASS, 0 FAIL. O `fase9_adv_test.go` do monitor **já não compilava no HEAD**, desde a 0.12.6 (`h.extraAt` sumiu). Foi adaptado só na cópia temporária, zerando `extras.have/at` sob o mutex.
+    - 10.5: 244 PASS, 0 FAIL.
+    - 10.L: 150 PASS, **1 FAIL** (D3 `TestAdvLTotalCapUnderConcurrency`, contador diferente da soma real por 8 a 16 KiB). Medido como **preexistente**, num binário do HEAD limpo em worktree. Isolado, 40 execuções: HEAD 5 falhas, 12.3 2 falhas. Pacote completo, 6 execuções: 1 e 1. É uma corrida entre `enforceCap` e o sink. Fora do escopo, mas vira **pendência**.
+  - **Flake:** `-race` no `gateway/models` (`TestLatestNeverQueriesAndLoopRespectsInterval`, "cache empty"), pacote não tocado. Deu 6/6 ok de novo no Sonnet e ok no gate do coordenador. **Pendência:** acompanhar.
+  - **Decisões de implementação:**
+    - o embed também grava `prompt_json`, porque o texto achatado do embed já era gravado;
+    - imagem: HMAC da string decodificada (`images`) ou dos bytes brutos (`image_url`); `images` vazio não conta;
+    - `key_id` é o sha256 dos bytes da chave;
+    - `prompt_hmac`/`conteudo_hmac` usam o digest sha256 bruto (32 bytes) como mensagem; a 12.4 tem de usar `hmackey`;
+    - `doc_key_id` só é gravado com um `doc_hash` válido.
+  - **Achado preexistente:** no `/v1`, o texto achatado (`extractPrompt`) guarda o data-URI da imagem em base64, até 16 MiB. **Pendência**, com correção pequena em `journal.go`.
+  - **Pendências para a 12.4:** `GetPromptJSON`/`JobDoc` nas amostras; copiar as marcas; 503 sem chave; usar `Key.ID`/`PromptHMAC`/`ContentHMAC`.
+  - **Pendências para a 12.10:** o instalador gera a chave (32 bytes hex, 0600, fora do backup); a mesma chave vai para o fallback; `--doc-key-file` na unit; CHANGELOG e MANUAL-GATEWAY.
+- 2026-11-02 22:07: **revisão independente da 12.3** (Opus, só leitura): **corrigir antes de publicar**.
+  - **B1, bloqueador:** o `promptjson.go` falha **aberto**. O decoder roda sem `UseNumber()`, então um número como `1e400` num campo desconhecido passa pela política, derruba a varredura e faz o corpo ser gravado com a imagem em claro e `tem_imagem=0`. O teste `TestBuildPromptJSONInvalidBody` exigia justamente esse comportamento.
+  - **I1:** as chaves são comparadas com `ToLower`, enquanto o Ollama casa nomes por *case folding* Unicode: `imageſ` e `meſſages` escapam. O `CanonicalContent` tem o mesmo problema.
+  - **I2:** DoS por custo O(tokens × profundidade) antes da fila, pago mesmo com `--log-content=false`.
+  - **Menores:**
+    - M1: cópias extras de imagem grande;
+    - M2: `Load` sem `LimitReader`;
+    - M3: `Key` imprimível por `fmt`;
+    - M4: `JobDoc` lia pelo `jdb`;
+    - M5: data-URI em claro no texto achatado do `/v1`, preexistente desde a 10.L;
+    - M6: rollback para 0.12.6 é seguro, mas o teto antigo não vê o `prompt_json`; documentar no MANUAL na 12.10.
+  - **Pontos conferidos sem achado:**
+    - o `X-Mcpollama-Doc` é removido em todas as rotas, inclusive no pool;
+    - nenhum sha256 puro é gravado;
+    - os tetos estão certos e as migrações são idempotentes;
+    - nenhum lock novo e nenhuma consulta sob mutex.
+  - **Correções:** B1, I1, I2, M1 a M5 e os testes que faltavam foram delegados ao Sonnet da 12.3.
+- 2026-11-02 22:35: **correções da revisão da 12.3 concluídas** (Sonnet, 19 mutações FAIL-CONFIRMED e restauradas com `cmp`). Gate refeito pelo coordenador.
+  - **B1:**
+    - `UseNumber()`; a varredura que não termina **falha fechada**: `SavePromptJSONFailed` grava `prompt_json` NULL, `tem_imagem=1` e `prompt_json_truncated=1`;
+    - o teste foi invertido (`TestBuildPromptJSONFailsClosed`), e o novo `TestHugeNumberDoesNotLeakTheImage` cobre o caso: o base64 não aparece no `content.db` nem no `-wal`;
+    - JSON válido que não é objeto passa como veio.
+  - **I1:** `strings.EqualFold`, também no `CanonicalContent`; testes com `imageſ` e `meſſages`.
+  - **I2:**
+    - o rastreio passou a ser incremental, com máscara de regras por frame;
+    - 9.000 níveis e 300 mil tokens: < 2 s e < 400 MiB, testado;
+    - sem varredura com `--log-content=false` (`WantsPromptJSON`);
+    - pedido rejeitado não paga a varredura, porque ela foi para o `OnAccepted`.
+  - **Menores:**
+    - **M1:** HMAC sobre a fatia; 16 MiB com < 1 MiB alocado;
+    - **M2:** `LimitReader(4097)`;
+    - **M3:** `Key` com `String`/`GoString`/`Format` só com o `key_id`;
+    - **M4:** `JobDoc` por `s.db`;
+    - **M5:** o texto achatado do `/v1` também troca o `image_url` pelo marcador (`redactParts`); `extractPrompt` ganhou `key`; nenhum teste 10.L precisou de ajuste.
+  - **Gate (coordenador, 22:33):**
+    - `go build` 0; `go vet` 0; `gofmt -l` vazio;
+    - `go test -count=1 ./...` 21 ok, 0 FAIL;
+    - `-race -count=1 ./...` 21 ok, 0 FAIL, sem data race.
+  - **Flake do `gateway/models`** (`TestLatestNeverQueriesAndLoopRespectsInterval`, "cache empty", `models_test.go:186`), medido pelo coordenador com `-race -count=10`: **1/10 no código atual e 1/10 no HEAD limpo** (worktree temporário, já removido). É **preexistente** e não tem relação com a 12.3. **Pendência:** corrigir à parte.
+  - **Ataques (Sonnet, depois das correções):**
+    - Fase 9: 470 PASS, 0 FAIL;
+    - 10.L: 155 PASS, 0 FAIL (o D3 passou nesta rodada, mas a corrida preexistente continua como pendência);
+    - 10.5: 244 PASS, 0 FAIL;
+    - 0 vetores com FALHA.
+  - **Pasta estranha:** `.workspace/ollama-native-smoke-9a43a4940cd642fab73f0dd56e329413/` (imagens `native_jpg_*.jpg`) apareceu, criada por outra sessão ou ferramenta, nem pelo coordenador nem pelo Sonnet. Não foi tocada e fica fora de commit, porque pode conter imagem de cliente. Perguntar ao owner.
+  - **Revisão adversarial completa do gateway:** fica para a 12.9, conforme o plano.

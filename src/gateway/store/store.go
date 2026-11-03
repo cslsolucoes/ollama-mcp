@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS requests(
   status TEXT, http_status INTEGER, error_class TEXT,
   prompt_eval_count INTEGER, eval_count INTEGER, load_ms INTEGER, boot_id TEXT, think TEXT,
   responded INTEGER, resp_bytes INTEGER, backend TEXT, failover_rule TEXT,
-  station_computer TEXT, station_user TEXT, station_domain TEXT, station_mac TEXT);
+  station_computer TEXT, station_user TEXT, station_domain TEXT, station_mac TEXT,
+  doc_hash TEXT, doc_key_id TEXT);
 CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, ts INTEGER, usuario TEXT, ip TEXT, acao TEXT, request_id TEXT,
   antes TEXT, depois TEXT, motivo TEXT);
@@ -302,6 +303,9 @@ func migrate(db *sql.DB) error {
 		{"station_user", `ALTER TABLE requests ADD COLUMN station_user TEXT`},
 		{"station_domain", `ALTER TABLE requests ADD COLUMN station_domain TEXT`},
 		{"station_mac", `ALTER TABLE requests ADD COLUMN station_mac TEXT`},
+		// Fase 12 (contract C-4.2): HMAC of X-Mcpollama-Doc and the id of the key; same idempotent rule.
+		{"doc_hash", `ALTER TABLE requests ADD COLUMN doc_hash TEXT`},
+		{"doc_key_id", `ALTER TABLE requests ADD COLUMN doc_key_id TEXT`},
 	} {
 		if !have[c.name] {
 			if _, err := db.Exec(c.ddl); err != nil {
@@ -559,12 +563,13 @@ func ms(t time.Time) int64 {
 // keeps the rowid (the row cap relies on it) and the backend written at the
 // start. INSERT OR REPLACE would drop both.
 const upsertRecordSQL = `INSERT INTO requests(id,client_ip,client_label,tool,endpoint,model,lane,priority_in,priority_final,bytes_in,
-		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule,station_computer,station_user,station_domain,station_mac)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))
+		enqueued_at,started_at,finished_at,wait_ms,run_ms,status,http_status,error_class,prompt_eval_count,eval_count,load_ms,boot_id,think,responded,resp_bytes,backend,failover_rule,station_computer,station_user,station_domain,station_mac,doc_hash,doc_key_id)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))
 		ON CONFLICT(id) DO UPDATE SET station_computer=COALESCE(excluded.station_computer, requests.station_computer),
 		station_user=COALESCE(excluded.station_user, requests.station_user),
 		station_domain=COALESCE(excluded.station_domain, requests.station_domain),
-		station_mac=COALESCE(excluded.station_mac, requests.station_mac), client_ip=excluded.client_ip, client_label=excluded.client_label, tool=excluded.tool,
+		station_mac=COALESCE(excluded.station_mac, requests.station_mac),
+		doc_hash=COALESCE(excluded.doc_hash, requests.doc_hash), doc_key_id=COALESCE(excluded.doc_key_id, requests.doc_key_id), client_ip=excluded.client_ip, client_label=excluded.client_label, tool=excluded.tool,
 		endpoint=excluded.endpoint, model=excluded.model, lane=excluded.lane, priority_in=excluded.priority_in,
 		priority_final=excluded.priority_final, bytes_in=excluded.bytes_in, enqueued_at=excluded.enqueued_at,
 		started_at=excluded.started_at, finished_at=excluded.finished_at, wait_ms=excluded.wait_ms, run_ms=excluded.run_ms,
@@ -578,7 +583,7 @@ func (s *Store) recordArgs(r queue.Record) []any {
 	return []any{r.ID, r.ClientIP, r.ClientLabel, r.Tool, r.Endpoint, r.Model, string(r.Lane), r.PriorityIn.String(), r.PriorityFinal.String(), r.BytesIn,
 		ms(r.EnqueuedAt), ms(r.StartedAt), ms(r.FinishedAt), r.WaitMS, r.RunMS, r.Status, r.HTTPStatus, r.ErrorClass,
 		r.PromptEval, r.Eval, r.LoadMS, s.opts.BootID, r.Think, boolInt(r.Responded), r.RespBytes, r.Backend, r.FailoverRule,
-		r.StationComputer, r.StationUser, r.StationDomain, r.StationMAC}
+		r.StationComputer, r.StationUser, r.StationDomain, r.StationMAC, r.DocHash, r.DocKeyID}
 }
 
 func boolInt(b bool) int {
