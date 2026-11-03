@@ -793,3 +793,15 @@ func parseCounters(tail []byte) counters {
 	c.totalNS, _ = lastNum(reTD, t)
 	return c
 }
+
+// ParseStation is parseStation for the feedback route (Fase 12.4): the same
+// strict reading of X-Mcpollama-Station, an empty Station when malformed.
+func ParseStation(vals []string) Station { return parseStation(vals) }
+
+// ClientLabel is the cleaned X-Mcpollama-Client of a request ("" when absent,
+// the invalid-label mark when malformed), as the proxy records it.
+func ClientLabel(r *http.Request) string { return cleanLabel(r.Header.Get(HeaderClient)) }
+
+// FairIP is fairIP for the feedback route (Fase 12.4, C-1.11a): the address as the
+// job log records it (IPv6 grouped by /64).
+func FairIP(ip string) string { return fairIP(ip) }

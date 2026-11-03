@@ -68,6 +68,11 @@ environment variable; the flag wins.
                           (HMAC of X-Mcpollama-Doc, with the key id) and replaces each image of the stored prompt JSON by
                           {"imagem_hmac":"<hex>"}. Without it doc_hash stays empty and the markers carry no hash. All gateways of
                           the same stations must use the same key  (MCPGW_DOC_KEY_FILE)
+  --treino-db FILE        absolute path of treino.db (Fase 12), the training database, created 0600, ceiling 2 GiB with its -wal
+                          (HTTP 507 above it, nothing deleted). It turns on POST /api/feedback, which also needs --doc-key-file
+                          (503 without it). Without this flag the feature is off and the route answers 503  (MCPGW_TREINO_DB)
+  --role primario|fallback  role of this gateway for the reports (default primario). On a "fallback" gateway every report whose
+                          jobs run on one backend is recorded as estado fallback, with no sample copied  (MCPGW_ROLE)
   --gpu-interval D        nvidia-smi and CPU/RAM sampling period (MCPGW_GPU_INTERVAL, default 1s; 0 disables both)
   --nvidia-smi PATH       nvidia-smi binary                  (MCPGW_NVIDIA_SMI, default nvidia-smi)
   --aer-path FILE         correctable AER counter of the bridge 00:1b.4; "-" disables
@@ -142,6 +147,8 @@ type Config struct {
 	MaxBodyBytes   int64
 	AdminFile      string
 	DocKeyFile     string
+	TreinoDB       string
+	Role           string
 	GPUInterval    time.Duration
 	NvidiaSMI      string
 	AERPath        string
@@ -198,6 +205,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fBody    = fs.Int64("max-body-bytes", 0, "")
 		fAdmin   = fs.String("admin-file", "", "")
 		fDocKey  = fs.String("doc-key-file", "", "")
+		fTreino  = fs.String("treino-db", "", "")
+		fRole    = fs.String("role", "", "")
 		fGPUInt  = fs.Duration("gpu-interval", 0, "")
 		fSMI     = fs.String("nvidia-smi", "", "")
 		fAER     = fs.String("aer-path", "", "")
@@ -321,6 +330,8 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		StartStagger:   dur("start-stagger", "MCPGW_START_STAGGER", 300*time.Millisecond, fStagger),
 		AdminFile:      str("admin-file", "MCPGW_ADMIN_FILE", "", fAdmin),
 		DocKeyFile:     str("doc-key-file", "MCPGW_DOC_KEY_FILE", "", fDocKey),
+		TreinoDB:       str("treino-db", "MCPGW_TREINO_DB", "", fTreino),
+		Role:           strings.ToLower(strings.TrimSpace(str("role", "MCPGW_ROLE", "primario", fRole))),
 		GPUInterval:    dur("gpu-interval", "MCPGW_GPU_INTERVAL", time.Second, fGPUInt),
 		SampleStore:    dur("sample-store-interval", "MCPGW_SAMPLE_STORE_INTERVAL", 5*time.Second, fSStore),
 		NvidiaSMI:      str("nvidia-smi", "MCPGW_NVIDIA_SMI", "nvidia-smi", fSMI),
@@ -492,6 +503,15 @@ func (c Config) validate() error {
 	}
 	if c.DocKeyFile != "" && !filepath.IsAbs(c.DocKeyFile) && !strings.HasPrefix(c.DocKeyFile, "/") {
 		return errors.New("--doc-key-file must be an absolute path")
+	}
+	if c.TreinoDB != "" && !filepath.IsAbs(c.TreinoDB) && !strings.HasPrefix(c.TreinoDB, "/") {
+		return errors.New("--treino-db must be an absolute path")
+	}
+	if c.TreinoDB != "" && (c.TreinoDB == c.DB || c.TreinoDB == c.ContentDB) {
+		return errors.New("--treino-db must be a different file from --db and --content-db")
+	}
+	if c.Role != "primario" && c.Role != "fallback" {
+		return errors.New("--role must be primario or fallback")
 	}
 	if c.DB == "" {
 		return errors.New("--db is required")

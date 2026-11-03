@@ -309,3 +309,29 @@ func TestSavePromptJSONFailedFailsClosed(t *testing.T) {
 		t.Fatal("the flat text must still be kept")
 	}
 }
+
+// Probe (12.4, M-1): the row, the canonical request and the bytes, without reading the text.
+func TestProbeReportsRowJSONAndBytes(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "c.db"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if p, err := s.Probe(ctx, "nao-existe"); err != nil || p.OK {
+		t.Fatalf("unknown job: %+v %v", p, err)
+	}
+	if _, err := s.SavePromptJSON("a", "texto", []byte(`{"prompt":"x"}`), false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.Probe(ctx, "a")
+	if err != nil || !p.OK || !p.HasJSON || p.Bytes != int64(len("texto")+len(`{"prompt":"x"}`)) {
+		t.Fatalf("with json: %+v %v", p, err)
+	}
+	if _, _, err := s.SavePrompt("b", "so texto", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := s.Probe(ctx, "b"); err != nil || !p.OK || p.HasJSON || p.Bytes != int64(len("so texto")) {
+		t.Fatalf("without json: %+v %v", p, err)
+	}
+}

@@ -729,3 +729,27 @@ func (s *Store) GetPromptJSON(ctx context.Context, id string) (p PromptJSON, ok 
 	}
 	return PromptJSON{JSON: pj, Truncated: tr != 0, HasImage: img != 0}, true, nil
 }
+
+// Probe says what a job holds without reading the text (Fase 12.4, M-1): the
+// row exists, a canonical request (prompt_json) is there, and the bytes the
+// three fields take. A caller that only needs to decide whether to copy a job
+// asks this first and loads the text afterwards.
+type Probe struct {
+	OK      bool
+	HasJSON bool
+	Bytes   int64
+}
+
+// Probe returns the Probe of a job; OK is false when the job has no row.
+func (s *Store) Probe(ctx context.Context, id string) (Probe, error) {
+	var jsonLen, total int64
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(length(prompt_json),0), COALESCE(length(prompt),0)+COALESCE(length(prompt_json),0)+COALESCE(length(response),0) FROM job_content WHERE job_id=?`, id).
+		Scan(&jsonLen, &total)
+	if err == sql.ErrNoRows {
+		return Probe{}, nil
+	}
+	if err != nil {
+		return Probe{}, err
+	}
+	return Probe{OK: true, HasJSON: jsonLen > 0, Bytes: total}, nil
+}

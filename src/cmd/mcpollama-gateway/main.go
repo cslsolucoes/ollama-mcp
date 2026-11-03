@@ -33,6 +33,7 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
+	"github.com/cslsoftwares/mcpollama/gateway/treino"
 )
 
 // Version is overridden at build time:
@@ -128,6 +129,24 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		}
 	} else {
 		logf("--log-content=false: o texto dos jobs não é gravado")
+	}
+
+	// Training database (Fase 12.4). Optional: without --treino-db the route
+	// POST /api/feedback answers 503. Like the job text, a database that does not
+	// open must not take the gateway down: it goes on without the feature.
+	var tr *treino.Store
+	if cfg.TreinoDB != "" {
+		tr, err = treino.Open(cfg.TreinoDB, treino.Options{Logf: logf, OnEvent: st.Event, Key: docKey})
+		if err != nil {
+			tr = nil
+			logf("registro de erros DESLIGADO: %v (POST /api/feedback responde 503)", err)
+			st.Event("treino_indisponivel", "treino.db não abriu; o gateway segue sem o registro de erros: "+err.Error())
+		} else {
+			defer tr.Close()
+			logf("registro de erros ligado (treino.db, role %s)", cfg.Role)
+		}
+	} else {
+		logf("sem --treino-db: o registro de erros (POST /api/feedback) está desligado")
 	}
 	jr := &joblog.Journal{Store: st, Content: cs, Backend: pool.DefaultPrimaryID, Logf: logf}
 	jr.RecoverResponses(context.Background())
@@ -278,6 +297,8 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	}
 
 	mux := http.NewServeMux()
+	// The feedback route is registered before the catch-all "/" (which is the proxy).
+	mux.Handle("/api/feedback", &treino.Handler{Store: tr, Source: treino.NewSource(st, cs), Key: docKey, Role: cfg.Role, Logf: logf})
 	mux.Handle("/monitor", mon)
 	mux.Handle("/monitor/", mon)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok\n") })
