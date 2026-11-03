@@ -35,6 +35,18 @@ func (l *lazyBackend) get() (tools.Backend, error) {
 // buildTools wires the registry: lazy client, a one-slot GPU queue (PERF-002)
 // and the informational defaults for list_models.
 func buildTools(cfg Config, lg *logger) []ToolEntry {
+	entries, _ := buildToolsWithClose(cfg, lg)
+	return entries
+}
+
+// newAutoReporter is tools.NewAutoReporter; a variable so a test can reach the
+// sender it starts.
+var newAutoReporter = tools.NewAutoReporter
+
+// buildToolsWithClose is buildTools plus the function that stops the background
+// sender of the automatic error candidates (--auto-report); realMain defers it
+// so the goroutine ends with the server.
+func buildToolsWithClose(cfg Config, lg *logger) ([]ToolEntry, func()) {
 	opts := cfg.ollamaOptions()
 	if cfg.Debug {
 		opts.Logf = lg.debugf
@@ -47,7 +59,12 @@ func buildTools(cfg Config, lg *logger) []ToolEntry {
 		docLog = lg.debugf
 	}
 	guard, _ := cfg.guardWith(docLog)
-	return tools.New(tools.Deps{
+	var auto *tools.AutoReporter
+	if cfg.AutoReport {
+		auto = newAutoReporter(lb.get, lg.debugf)
+	}
+	entries := tools.New(tools.Deps{
+		Auto:           auto,
 		Backend:        lb.get,
 		Queue:          tools.NewQueue(1),
 		Model:          cfg.Model,
@@ -57,4 +74,5 @@ func buildTools(cfg Config, lg *logger) []ToolEntry {
 		MaxPromptChars: cfg.MaxPromptChars,
 		MaxChunks:      cfg.MaxChunks,
 	})
+	return entries, auto.Close // Close on a nil *AutoReporter is a no-op
 }

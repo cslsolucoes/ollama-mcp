@@ -301,26 +301,7 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 	if err != nil {
 		return nil, c.fail(ErrBadRequest, 0, "requisição inválida: %v", err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", userAgent)
-	if in != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if c.key != "" {
-		req.Header.Set("Authorization", "Bearer "+c.key) // the only place the token is used (SEC-002)
-	}
-	if c.label != "" {
-		req.Header.Set("X-Mcpollama-Client", c.label)
-	}
-	if c.station != "" {
-		req.Header.Set("X-Mcpollama-Station", c.station)
-	}
-	if tool := toolFrom(ctx); tool != "" {
-		req.Header.Set("X-Mcpollama-Tool", tool)
-	}
-	if doc := docFrom(ctx); doc != "" {
-		req.Header.Set("X-Mcpollama-Doc", doc)
-	}
+	c.setHeaders(ctx, req, in != nil)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		c.debugf("%s %s failed after %dms", method, path, time.Since(start).Milliseconds())
@@ -372,6 +353,32 @@ func (c *Client) sendOnce(ctx context.Context, method, path string, in any, star
 		return nil, c.statusError(method, path, resp.StatusCode, b)
 	}
 	return resp, nil
+}
+
+// setHeaders sets the headers every request of the client carries: the Bearer
+// (the only place the token is used, SEC-002), the client label, the station
+// and the tool/doc tags of ctx. One place for /api/generate and /api/feedback.
+func (c *Client) setHeaders(ctx context.Context, req *http.Request, hasBody bool) {
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	if hasBody {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.key != "" {
+		req.Header.Set("Authorization", "Bearer "+c.key)
+	}
+	if c.label != "" {
+		req.Header.Set("X-Mcpollama-Client", c.label)
+	}
+	if c.station != "" {
+		req.Header.Set("X-Mcpollama-Station", c.station)
+	}
+	if tool := toolFrom(ctx); tool != "" {
+		req.Header.Set("X-Mcpollama-Tool", tool)
+	}
+	if doc := docFrom(ctx); doc != "" {
+		req.Header.Set("X-Mcpollama-Doc", doc)
+	}
 }
 
 // fbKey carries, in the context of one call, the flag the fallback sets.

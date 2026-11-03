@@ -26,7 +26,7 @@ func TestDefaults(t *testing.T) {
 	c := parse(t, nil, nil)
 	if c.Model != "qwen3-ia" || c.EmbedModel != "nomic-embed-text" || c.MaxPromptChars != 128000 ||
 		c.ToolsVerbosity != "full" || c.Insecure || c.Debug || c.TraceFile != "" || c.AuditLogPath != "" ||
-		c.OllamaURL != "" || c.APIKey != "" || c.Timeout != 120*time.Second {
+		c.OllamaURL != "" || c.APIKey != "" || c.Timeout != 120*time.Second || c.AutoReport {
 		t.Fatalf("defaults: %+v", c)
 	}
 	if err := c.validate(); err != nil {
@@ -50,6 +50,7 @@ func TestEnvFallback(t *testing.T) {
 		t.Fatalf("StationInfo must default to true")
 	}
 	want.StationInfo, want.stationHeader = true, c.stationHeader
+	// AutoReport is off by default (C-1.20a): the zero value of want is right
 	if c != want {
 		t.Fatalf("got  %+v\nwant %+v", c, want)
 	}

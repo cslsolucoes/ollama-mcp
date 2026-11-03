@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/cslsoftwares/mcpollama/files"
 	"github.com/cslsoftwares/mcpollama/mcp"
@@ -37,6 +38,9 @@ type Backend interface {
 	Generate(ctx context.Context, req ollama.GenerateRequest) (*ollama.GenerateResponse, error)
 	Chat(ctx context.Context, req ollama.ChatRequest) (*ollama.ChatResponse, error)
 	Embed(ctx context.Context, req ollama.EmbedRequest) (*ollama.EmbedResponse, error)
+	// Feedback sends one error report to the server that ran the job in error
+	// (backend "primario" or "fallback"); see ollama.Client.Feedback.
+	Feedback(ctx context.Context, rep ollama.FeedbackReport, backend string) (*ollama.FeedbackResult, error)
 }
 
 // Deps are the collaborators of the tools. The zero value is valid for the
@@ -65,6 +69,12 @@ type Deps struct {
 	MaxPromptChars int
 	// MaxChunks caps the model calls of one file request (FILE-011); 0 means 40.
 	MaxChunks int
+	// Auto sends the automatic error candidates in the background (--auto-report);
+	// nil means off.
+	Auto *AutoReporter
+
+	// feedbackWait replaces the wait before the retry after a 409 (tests only).
+	feedbackWait func(ra time.Duration) time.Duration
 }
 
 func (d Deps) backend() (Backend, error) {
@@ -92,6 +102,7 @@ func New(d Deps) []mcp.ToolEntry {
 		d.generateTool(),
 		d.chatTool(),
 		d.embedTool(),
+		d.reportarErroTool(), // needs no --allow-root: it sends job ids and the Claude's own text
 	}
 	if d.Files != nil {
 		out = append(out, d.summarizeFileTool(), d.extractTool(), d.translateTool())

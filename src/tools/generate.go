@@ -96,7 +96,7 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 	if err := thinkExhausted(think, resp.Response, resp.DoneReason); err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	return textResult(capText(resp.Response), usage{
+	u := usage{
 		model:      orStr(resp.Model, model),
 		promptEval: resp.PromptEvalCount,
 		eval:       resp.EvalCount,
@@ -108,7 +108,17 @@ func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallRe
 		think:      think,
 		backend:    resp.Backend,
 		jobs:       []jobRef{newJobRef(resp.JobID, roleUnico, resp.Backend)},
-	}), nil
+	}
+	d.autoCheck(autoInput{Text: resp.Response, DoneReason: resp.DoneReason, NumPredict: numPredictOf(opts), Jobs: u.jobs})
+	return textResult(capText(resp.Response), u), nil
+}
+
+// numPredictOf is the num_predict of the request, nil when it did not set one.
+func numPredictOf(o *ollama.ModelOptions) *int {
+	if o == nil {
+		return nil
+	}
+	return o.NumPredict
 }
 
 // acquire takes a GPU queue slot and words the cancellation while waiting.

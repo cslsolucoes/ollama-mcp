@@ -64,6 +64,7 @@ type Config struct {
 	ClientLabel    string // --client-label: name of this agent for the server queue; empty means <hostname>/<user>
 	StationInfo    bool   // --station-info: send X-Mcpollama-Station (default true)
 	stationHeader  string // header text collected once at start; empty when off or unknown
+	AutoReport     bool   // --auto-report: send the automatic error candidates in the background (default false, C-1.20a)
 	ShowVersion    bool
 	OCR            OCRFlags // --ocr-*: off unless OCR.Lib is set
 
@@ -162,6 +163,12 @@ Every flag falls back to its environment variable; the flag wins.
   --station-info          send X-Mcpollama-Station (computer, user, domain, MAC of this
                           workstation; declared, not authenticated) for the server job
                           log; on by default, --station-info=false turns it off (MCPOLLAMA_STATION_INFO)
+  --auto-report           turns ON the automatic error candidates: an empty or token-limit-cut
+                          answer is reported in the background to the server error base, which
+                          copies the request and the answer (even of sensitive documents) to its
+                          training base, with no expiry. Never delays or fails a tool. OFF by
+                          default (MCPOLLAMA_AUTO_REPORT). The invalid-JSON rule is reserved: no
+                          tool exposes the Ollama "format" option yet, so it does not fire.
   --tools-verbosity MODE  full|compact tools/list size             (MCPOLLAMA_TOOLS_VERBOSITY)
   --trace-file FILE       opt-in trace file (later phase)          (MCPOLLAMA_TRACE)
   --audit-log-path FILE   opt-in audit log (later phase)           (MCPOLLAMA_AUDIT_LOG)
@@ -201,6 +208,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		fAudit    = fs.String("audit-log-path", "", "")
 		fLabel    = fs.String("client-label", "", "")
 		fStation  = fs.Bool("station-info", true, "")
+		fAuto     = fs.Bool("auto-report", false, "")
 		fDebug    = fs.Bool("debug", false, "")
 		fVersion  = fs.Bool("version", false, "")
 
@@ -277,6 +285,7 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		ClientLabel:    str("client-label", "MCPOLLAMA_CLIENT_LABEL", "", fLabel),
 		Debug:          boolean("debug", "MCPOLLAMA_DEBUG", fDebug),
 		StationInfo:    true,
+		AutoReport:     boolean("auto-report", "MCPOLLAMA_AUTO_REPORT", fAuto),
 		ShowVersion:    *fVersion,
 		Timeout:        defaultTimeout,
 	}

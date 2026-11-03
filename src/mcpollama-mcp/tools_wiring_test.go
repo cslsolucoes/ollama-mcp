@@ -330,7 +330,9 @@ func testConfigWith(url string) Config {
 func buildToolsFor(t *testing.T, cfg Config) []ToolEntry {
 	t.Helper()
 	var sink syncBuf
-	return buildTools(cfg, &logger{w: &sink, redact: func(s string) string { return s }})
+	entries, closeTools := buildToolsWithClose(cfg, &logger{w: &sink, redact: func(s string) string { return s }})
+	t.Cleanup(closeTools) // no background sender outlives the test (--auto-report)
+	return entries
 }
 
 func realToolsList(t *testing.T, verbosity string, extra ...string) ([]mcp.Tool, int) {
@@ -349,7 +351,7 @@ func realToolsList(t *testing.T, verbosity string, extra ...string) ([]mcp.Tool,
 
 // TEST-008: exact set on the real tools/list, full and compact.
 func TestRealToolsListExactSetFullAndCompact(t *testing.T) {
-	want := "chat,embed,generate,list_models"
+	want := "chat,embed,generate,list_models,reportar_erro"
 	for _, v := range []string{"full", "compact"} {
 		list, size := realToolsList(t, v)
 		var names []string

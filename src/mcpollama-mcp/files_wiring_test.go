@@ -56,7 +56,7 @@ func TestFileToolsExistOnlyWithAllowRoot(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	m := byID(t, lines)
-	if got := strings.Join(listNames(t, m["1"]), ","); got != "chat,embed,generate,list_models" {
+	if got := strings.Join(listNames(t, m["1"]), ","); got != "chat,embed,generate,list_models,reportar_erro" {
 		t.Fatalf("without --allow-root: %s", got)
 	}
 	if r := decode(t, m["2"]); r.Error == nil || r.Error.Code != mcp.CodeInvalidParams {
@@ -64,13 +64,13 @@ func TestFileToolsExistOnlyWithAllowRoot(t *testing.T) {
 	}
 
 	lines, _, _ = runMain(t, []string{"--ollama-url", f.srv.URL, "--allow-root", root}, nil, rpc(1, "tools/list", ""))
-	if got := strings.Join(listNames(t, lines[0]), ","); got != "chat,embed,extract,generate,list_models,summarize_file,translate" {
+	if got := strings.Join(listNames(t, lines[0]), ","); got != "chat,embed,extract,generate,list_models,reportar_erro,summarize_file,translate" {
 		t.Fatalf("with --allow-root: %s", got)
 	}
 
 	// the environment variable works, and the flag beats it
 	lines, _, _ = runMain(t, []string{"--ollama-url", f.srv.URL}, map[string]string{"MCPOLLAMA_ALLOW_ROOT": root}, rpc(1, "tools/list", ""))
-	if got := listNames(t, lines[0]); len(got) != 7 {
+	if got := listNames(t, lines[0]); len(got) != 8 {
 		t.Fatalf("MCPOLLAMA_ALLOW_ROOT: %v", got)
 	}
 	if f.hits.Load() != 0 {
@@ -176,7 +176,7 @@ func TestRealToolsListWithAllowRoot(t *testing.T) {
 		for _, tl := range list {
 			names = append(names, tl.Name)
 		}
-		if got := strings.Join(names, ","); got != "chat,embed,extract,generate,list_models,summarize_file,translate" {
+		if got := strings.Join(names, ","); got != "chat,embed,extract,generate,list_models,reportar_erro,summarize_file,translate" {
 			t.Errorf("%s: %s", v, got)
 		}
 		sizes = append(sizes, size)

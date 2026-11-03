@@ -278,6 +278,10 @@ type fileJob struct {
 	calls  int
 	u      usage
 	waited time.Duration
+
+	// lastText is the output of the last call, which the automatic rules check
+	// (the final call of a map-reduce, the last part of a translation).
+	lastText string
 }
 
 func (d Deps) maxPrompt() int {
@@ -411,6 +415,7 @@ func (j *fileJob) call(ctx context.Context, prompt, role string) (string, error)
 		j.u.backend = resp.Backend // any part served by the fallback marks the result
 	}
 	j.u.jobs = append(j.u.jobs, newJobRef(resp.JobID, role, resp.Backend))
+	j.lastText = resp.Response
 	return resp.Response, nil
 }
 
@@ -506,6 +511,8 @@ func (d Deps) runFile(ctx context.Context, path, model string, think bool, task 
 	u.think = j.think
 	u.queue = j.waited
 	u.parts = n
+	// No num_predict is ever sent by the file tools, so it is "absent" (C-1.20).
+	d.autoCheck(autoInput{Text: j.lastText, DoneReason: j.u.doneReason, Jobs: u.jobs, ErrJobIndex: len(u.jobs) - 1})
 	return textResult(body, u), nil
 }
 

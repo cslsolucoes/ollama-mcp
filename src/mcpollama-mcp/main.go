@@ -68,7 +68,9 @@ func realMain(args []string, getenv func(string) string, stdin io.Reader, stdout
 		cfg.ocrRT = rt
 		defer rt.Close()
 	}
-	if err := Run(context.Background(), stdin, stdout, errw, cfg, buildTools(cfg, lg)); err != nil {
+	entries, closeTools := buildToolsWithClose(cfg, lg)
+	defer closeTools()
+	if err := Run(context.Background(), stdin, stdout, errw, cfg, entries); err != nil {
 		fmt.Fprintln(stderr, "mcpollama-mcp: "+redact.New(cfg.secrets()...)(err.Error()))
 		return 1
 	}

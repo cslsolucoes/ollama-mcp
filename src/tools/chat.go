@@ -139,7 +139,7 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 	if err := thinkExhausted(think, resp.Message.Content, resp.DoneReason); err != nil {
 		return mcp.ToolCallResult{}, err
 	}
-	return textResult(capText(resp.Message.Content), usage{
+	u := usage{
 		model:      orStr(resp.Model, model),
 		promptEval: resp.PromptEvalCount,
 		eval:       resp.EvalCount,
@@ -151,5 +151,7 @@ func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult
 		think:      think,
 		backend:    resp.Backend,
 		jobs:       []jobRef{newJobRef(resp.JobID, roleUnico, resp.Backend)},
-	}), nil
+	}
+	d.autoCheck(autoInput{Text: resp.Message.Content, DoneReason: resp.DoneReason, NumPredict: numPredictOf(opts), Jobs: u.jobs})
+	return textResult(capText(resp.Message.Content), u), nil
 }
