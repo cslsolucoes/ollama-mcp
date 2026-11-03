@@ -1,6 +1,6 @@
 # Plano — Fase 12: o MCP organiza os erros do modelo local e gera o histórico para treinar o servidor de IA
 
-> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.4 concluída; próxima: 12.5). Contrato de dados **1.1.2 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
+> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.5 concluída; próxima: 12.6). Contrato de dados **1.1.4 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
 > achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). O código começa na 12.2.
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
@@ -601,7 +601,7 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 | 12.2 | mcpollama: `job=`/`jobs=<papel>:<id>` com o backend de cada ID, na `[uso]` e em `_meta` (D12-1); cabeçalho `X-Mcpollama-Doc` (D12-7a) | sonnet | teste com gateway falso: IDs e papéis certos no map-reduce e no fallback; o mesmo `X-Mcpollama-Doc` em todas as chamadas de um documento (contrato C-4.1; papel e backend de cada ID: C-1.2) | ✅ **concluída** (2026-11-02 20:16, sem commit ainda): Sonnet implementou, Opus revisou e repetiu o gate |
 | 12.3 | gateway: `prompt_json` no `content.db` na **entrada** (D12-13; C-2.1 a C-2.8, C-2.10 a C-2.12), a partir do corpo depois de `applyPolicy`; `requests.doc_hash` como HMAC com `key_id` e flag `--doc-key-file` (C-4.2, C-4.3, C-4.3a) | sonnet | teste, um por regra: o `prompt_json` é igual, byte a byte, ao corpo que o Ollama falso recebeu, exceto pelas imagens, inclusive todo o histórico de `chat` (C-2.10); migração idempotente de banco antigo sem perder dados (C-2.7); teto de 16 MiB **por campo** com marca própria (`prompt_truncated`, `prompt_json_truncated`), `resp_final`/`resp_truncated` (C-2.3, C-2.4), e o predicado recusa `prompt_json_truncated=1` mesmo depois de o `content.db` expirar; imagem vira `{"imagem_hmac":"<hex>"}` + `tem_imagem=1` e fica não exportável (C-2.5, C-2.6); teto total de 4 GiB apagando os mais antigos (C-2.8); `prompt_hmac` e `conteudo_hmac` calculados como na C-2.12 e nunca como sha256 puro; `requests.doc_hash` gravado só como HMAC com `key_id`, o sha256 puro ausente de todo banco e log (C-4.2), e o cabeçalho `X-Mcpollama-Doc` removido antes do Ollama e ausente do `prompt_json` (C-2.11); sem `--doc-key-file` o gateway não aceita relatos (C-4.3a, verificado na 12.4) | ✅ **concluída** (2026-11-02 22:35, sem commit ainda): Sonnet implementou; revisão Opus (1 bloqueador, 2 importantes, 6 menores) corrigida; gate refeito pelo coordenador |
 | 12.4 | gateway: `treino.db` (ocorrências, jobs, amostras, histórico) + `POST /api/feedback` em rota própria (D12-4, 5, 10, 16); flag `--role` (C-1.21) | sonnet | testes, um por regra do contrato nesta etapa (C-0.4): validação dos enums e limites (C-1.16, C-1.17: corpo 256 KB, `descricao` 4 KB, `resposta_correta` 128 KB, 64 jobs); `job_do_erro` inexistente → 404 sem gravar nada (C-1.4) e obrigatório em `translate`/listas sem `final` (C-1.3); transação única com as amostras de todos os jobs (C-1.5); `sem_pedido` só pelo `job_do_erro` expirado ou sem `prompt_json`, e `nova` quando expiram só os outros (C-1.9, C-1.9a); `distribuida` sem amostras com `jobs_externos` (C-1.10) e `fallback` com `--role fallback` sem amostras (C-1.21), com a precedência da C-1.9; transições da C-1.12 e confirmar sem `resposta_correta` recusado (C-1.12a); candidato automático substituído por relato humano com `alterou`/`campo=origem` (C-1.19); 503 sem `--doc-key-file` (C-4.3a); 507 no teto de 2 GiB sem apagar nada (C-6.2); apagar deixa só a linha mínima e respeita a contagem de referências (C-6.3, C-6.4); alterar a correção desfaz a confirmação e apaga o embedding (C-6.5); histórico sem texto, só hash e tamanho, e sem expirar (C-7.4, C-7.6, C-7.9); consultas com `context.Background()` (C-6.10); ataques 9.5/10.L/10.5 ok | ✅ **concluída** (2026-11-03 00:43, sem commit ainda): Sonnet implementou; revisão Opus (6 importantes, 6 menores) corrigida com o contrato 1.1.2; gate refeito pelo coordenador |
-| 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8; C-1.3, C-1.19, C-1.20); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis (até 64, C-1.17) e o backend de cada um; `job_do_erro` padrão `final`/`unico` e obrigatório em `translate` e em listas sem `final` (C-1.3); enums e limites (C-1.16, C-1.17); relato ao gateway do `job_do_erro` (C-1.11); os automáticos são só as três regras da C-1.20 (inclui `num_predict` ausente), nascem `nova` sem `resposta_correta` (C-1.19); o automático não atrasa nem quebra a tool; deduplicação (relato humano substitui o automático) | pendente |
+| 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8; C-1.3, C-1.19, C-1.20); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis (até 64, C-1.17) e o backend de cada um; `job_do_erro` padrão `final`/`unico` e obrigatório em `translate` e em listas sem `final` (C-1.3); enums e limites (C-1.16, C-1.17); relato ao gateway do `job_do_erro` (C-1.11); os automáticos são só as três regras da C-1.20 (inclui `num_predict` ausente), nascem `nova` sem `resposta_correta` (C-1.19); o automático não atrasa nem quebra a tool; deduplicação (relato humano substitui o automático) | ✅ **concluída** (2026-11-03 10:40, sem commit ainda): Sonnet implementou; revisão Opus (pode publicar) com ajustes; decisões do owner no contrato 1.1.4; gate refeito pelo coordenador |
 | 12.6 | monitor: aba "Erros (treino)", "Marcar erro", confirmar/completar/descartar/apagar/exemplo público/**liberar quarentena** (rota `POST /monitor/api/treino/{id}/liberar-quarentena`), exportação com predicado e partição (D12-6, 7, 7a; C-1.13, C-3.x, C-4.x) | sonnet | Firefox headless 570–1400 px; ações só do admin com sessão, CSRF e same-site, cada uma no histórico (C-1.13); o predicado exclui cada caso proibido, inclusive imagem, `distribuida`, `fallback`, `quarentena` e `translate` montado, **um teste por condição, com um caso que falha só nela** (C-3.16); exportação por `parte=treino\|teste` só da partição pedida, em streaming, sem guardar no servidor, com `meta` sem texto livre e uma linha `exportou` **por ocorrência** (C-3.11 a C-3.15, C-7.7); grupos por `doc_hash`, por `conteudo_hmac` ou por job em comum, com todas as não apagadas, inclusive `nova` e `descartada` (C-4.5, C-4.15); cota de 30 grupos **com amostra exportável** por categoria, na ordem em que cada grupo ganha a primeira amostra exportável, com a categoria dessa amostra e partição **pendente** antes disso (contrato 1.1.0: C-4.6, C-4.7, C-1.8); partição estável e fusão de grupos do mesmo lado pelo menor `grupo_id` sem reavaliar (C-4.8); **união de grupos já atribuídos a lados opostos vai para quarentena** e invalida os retratos e o índice de exemplos; um lado só é herdado; nenhum lado fica pendente (C-4.9 1.1.0, C-4.10, teste dedicado para cada caso); `liberar-quarentena` grava `alterou`/`campo=particao` (C-4.11); desconfirmar/descartar (C-1.12b)/apagar ocorrência de teste não libera a vaga e invalida os retratos que a listam (C-4.11a); nenhum `job_id`, `doc_hash` ou `grupo_id` em treino e teste ao mesmo tempo (C-4.12); `doc_hash` guardado como HMAC com `key_id`, nunca o sha256 puro (C-4.2); ocorrência distribuída e `fallback` sem amostras; descartar vale também para `sem_pedido`/`distribuida`/`fallback` (C-1.12); histórico sem texto sensível (C-7.6); alterar `resposta_correta`, `descricao` ou `correcao_aplicada` confirmada desfaz a confirmação (C-6.5); embedding só ao marcar `exemplo_publico` (C-6.6); consultas com `context.Background()` e cache em segundo plano (C-6.10) | pendente |
 | 12.7 | banco de provas: `bakeoff -suites erros` com o protocolo da §8.5 + **retrato** do teste + **linha de base** do `qwen3-ia` atual | sonnet | relatório com o ID do retrato, N, acerto e intervalo de Wilson 95% por categoria (C-5.9); um retrato por avaliação, com os campos da C-4.13; replay com o `prompt_json` igual exceto `options.seed` e `X-Mcpollama-Tool: bakeoff-erros` (C-5.1); **3 rodadas pareadas** (seed 1/2/3), acerto com 2 de 3, modelo atual e candidato intercalados, e o relatório traz os casos que mudaram entre rodadas (C-5.15); a **linha de base** registrada e o modelo atual **medido de novo** a cada comparação, com aviso se divergirem mais de 3 pontos numa categoria (C-5.14, C-5.16); pontuação da C-5.2 (100% de precisão e cobertura), `formato_invalido` compara valores (C-5.3), C-5.4 (`contagem`/`calculo`/`truncado`); humana às cegas em `blind` com 1 rodada, conteúdo de cliente só pelo owner (C-5.5, C-5.6); `outro`/`idioma_errado` fora (C-5.7); reporta com ≥ 20 e decide com ≥ 30 (C-5.8); o gate falha com 0 casos, sem categoria com 30 casos ou com retrato `valido=0`, dizendo "dados insuficientes" (C-5.13) | pendente |
 | 12.8 | **melhora sem treino** (D12-15): (a) instruções por tool; (b) exemplos recuperados por embedding, com a regra de privacidade | sonnet | **medido pela 12.7** com os limiares da §8.5 (C-5.10 a C-5.12); só fica ligado o que passar, por tool e por flag, com padrão desligado (C-8.8); exemplos só de ocorrências `confirmadas` com `exemplo_publico=1`, com embedding só para elas (C-8.1, C-6.6); busca só na partição `treino`, excluindo a ocorrência, o grupo, o documento em avaliação e todo caso em `quarentena` (C-8.3, C-8.4); nenhuma ocorrência desconfirmada, descartada, apagada, `sem_pedido`, `distribuida` ou `fallback` como exemplo (C-8.9); índice congelado com o retrato e hash registrado (C-8.5); análise das instruções só no treino, versão com ID e hash congelada antes da avaliação (C-8.6, C-8.7); k e limiar de similaridade fixados aqui, medidos pela 12.7 e registrados no retrato (C-8.10) | pendente |
@@ -627,7 +627,7 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 
 ## 14. Questões do owner (fechadas em 2026-11-02 15:50)
 
-1. D12-8: automáticos **ligados** por padrão.
+1. D12-8: automáticos **ligados** por padrão. → **Revisto em 2026-11-03 10:21: desligados por padrão** (contrato 1.1.4, C-1.20a).
 2. D12-13: `content.db` com **teto de 4 GiB e retenção de 7 dias**.
 3. D12-15b: exemplos **só públicos/anonimizados**; "mesmo projeto" fica para o futuro.
 4. §8.5: limiares de +10 pontos na categoria-alvo, no máximo −3 nas outras e no máximo −2 no S2/S3; mínimos de 20 para reportar e 30 para decidir.
@@ -1004,3 +1004,85 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
     3. Um `treino.db` criado antes do `auto_vacuum` não é migrado (não existe em produção).
     4. O 0600 não é provado no Windows.
   - Revisão adversarial completa da Fase 12 no gateway: **12.9**.
+- 2026-11-03 00:47: **12.4 publicada** (`a1a4f9f` docs/contrato 1.1.2, `a820b70` código; segredos 0; push autorizado). **Início da 12.5** no Sonnet da 12.2.
+  - **Escopo:** cliente `POST /api/feedback`, que reusa TLS, Bearer, estação e mapa de erros e escolhe o servidor pelo backend do `job_do_erro`; tool `reportar_erro`, que entende as 3 formas de `jobs`, valida antes de enviar e trata 409 com uma retentativa; automáticos com `--auto-report` (padrão true), as 3 regras da C-1.20, envio em segundo plano com fila limitada; `TOOLS.md`.
+- 2026-11-03 10:01: **revisão automática de segurança do commit `a820b70`** (12.4): 2 achados médios, ambos **procedem**.
+  - **(1) `sameOrigin`:** a estação é declarada e pode ser falsificada (o `/monitor` mostra máquina e usuário na LAN). Owner (09:59): **estação E IP**, com o job sem estação comparado só pelo IP → **contrato 1.1.3 (C-1.11a)**.
+  - **(2) TOCTOU do teto:** o tamanho era lido antes da vez de escrever → C-6.2 1.1.3: medir depois da vez e antes da transação.
+  - As correções foram delegadas ao Sonnet da 12.4. O `RELATAR-ERROS-IA.md` §5 e o `docs/README.md` foram alinhados.
+- 2026-11-03 10:01: **12.5 implementada** pelo Sonnet (30 mutações, todas FAIL e restauradas com `cmp`).
+  - **Arquivos novos:**
+    - `ollama/feedback.go`: `Client.Feedback`, que escolhe o cliente pelo backend, nunca retenta e nunca cai para o outro servidor;
+    - `tools/reportar_erro.go`: parse das 3 formas de `jobs`, validação antes de enviar, C-1.3, 409 com uma retentativa e teto de 10 s;
+    - `tools/autoreport.go`: as 3 regras e o `AutoReporter`, com fila de 16, 1 goroutine, 30 s por envio, até 3 retentativas no 409 e `Close`.
+  - **Arquivos alterados:**
+    - `api.go`: `setHeaders` extraído do `sendOnce` (SSOT);
+    - `--auto-report` (`MCPOLLAMA_AUTO_REPORT`, padrão true) e `buildToolsWithClose`;
+    - `TOOLS.md` regenerado;
+    - orçamentos de `tools/list` em `registry_test`: 4.620→6.650 e 8.330→10.360, porque o schema com 3 enums soma 2.000 B.
+  - **Gate (coordenador, 09:59):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` 22 ok;
+    - `-race` 22 ok, 0 FAIL.
+  - **Decisões:**
+    - (1) **A regra (a) da C-1.20, "JSON inválido", não tem chamador**: as tools não expõem o `format` do Ollama, e o `format` de `extract`/`summarize_file` é texto livre. **Pendência para o owner.**
+    - (2) Ordem das regras: vazio > JSON > truncado.
+    - (3) Nas tools de arquivo, só a última chamada é checada.
+    - (4) Automáticos com `projeto=mcpollama-auto` e `severidade=baixa`.
+    - (5) Nulo no texto e corpo acima de 256 KB são recusados na estação.
+  - **Sem divergência** com o `RELATAR-ERROS-IA.md`.
+  - Revisão independente em Opus em andamento.
+- 2026-11-03 10:22: **revisão independente da 12.5** (Opus, só leitura): **pode publicar**, 0 bloqueadores.
+  - **Sem vazamento:** o token não troca de servidor, nenhum redirect é seguido e a redação cobre os dois tokens.
+  - **Automáticos:** não atrasam nem falham a tool, e não geram tempestade (no máximo 1 candidato por chamada e 4 POSTs).
+  - **I-1:** a regra (a) não tem chamador, e a ajuda da flag prometia o contrário.
+  - **Menores:**
+    - M-1: falta teste do cancelamento na espera do 409;
+    - M-2: falta teste de papel repetido;
+    - M-3: id solto vira `unico`;
+    - M-4: duas linhas `[uso]`;
+    - M-5: o id e o estado vindos do servidor não são validados;
+    - M-6: 404 com gateway antigo, o que é ordem de implantação: o gateway vai antes;
+    - M-7: no modo compact, a tool perde as instruções;
+    - M-8: o `RELATAR` dizia "caracteres" onde é bytes; o `buildTools` não fecha o reporter nos testes.
+  - **Custo:** o `tools/list` cresce +43%, cerca de 500 tokens por sessão.
+  - **Decisões do owner (10:21) → contrato 1.1.4 (C-1.20a):**
+    - (a) reservada e documentada;
+    - descrição da tool **enxugada**, com alvo de metade do acréscimo;
+    - automáticos **desligados por padrão**, revendo a D12-8 e a §14 item 1.
+  - **Correção do gateway (revisão de segurança) concluída** pelo Sonnet da 12.4:
+    - `sameOrigin` exige estação **e** IP (`ClientIP`+`FairIP`, `X-Real-Ip` só de loopback); job sem estação decide pelo IP; 10 mutações FAIL, 1 equivalente;
+    - `withTxSized` mede depois da vez de escrever; o pool foi aquecido (`SetMaxIdleConns(4)`) para evitar `SQLITE_BUSY` numa conexão nova;
+    - `TestConcurrentReportsNearTheCeilingDoNotOvershoot`: 8 simultâneos → 1 aceito e 7 com 507, passou 15× com `-race`;
+    - gate do Sonnet: 22 ok, com e sem `-race`;
+    - ataques (só gateway/cmd): 576 PASS, 0 FAIL.
+- 2026-11-03 10:40: **ajustes da 12.5 concluídos** (Sonnet; 10 mutações, todas FAIL).
+  - **A:** `--auto-report` com padrão **false** e help sem prometer a regra (a).
+  - **B:** tool enxuta. Medição do `tools/list`, em bytes, com o acréscimo da tool:
+    - full base: 6.620 → **5.604** (+2.032 → +1.016, metade do acréscimo);
+    - full com tools de arquivo: 10.327 → 9.311;
+    - compact: +1.054 → +885 (só 16%; o que sobra são enums, nomes de campo e annotations obrigatórias);
+    - orçamentos em `registry_test`: 5.640 / 9.345.
+  - **Menores:**
+    - M-1: cancelamento na espera do 409;
+    - M-2: papel repetido;
+    - M-3: id solto só sozinho, lista de ids soltos recusada;
+    - M-4: mais de um campo de job recusado;
+    - M-5: `FeedbackResult.valid()`, sem ecoar valor inválido;
+    - M-8: `buildToolsFor` com `t.Cleanup`;
+    - `jobs_outra_origem` explicado.
+  - **O que não deu certo:** o teste novo `TestBuildToolsCloseStopsTheSender` contava `runtime.NumGoroutine()` e **falhou no `-race` do pacote completo**. Isolado, passava 10/10 com e sem `-race`: as goroutines de outros testes do pacote alteravam a contagem.
+  - **Solução (coordenador):**
+    - `AutoReporter.Done()`, o canal do `run()`;
+    - a variável `newAutoReporter` no `backend.go`, para o teste capturar a instância;
+    - o teste passou a esperar o `Done()`;
+    - pacote com `-race -count=5`: 5/5 ok;
+    - mutação do closer vazio: FAIL, depois restaurado com `cmp` e ok.
+  - **Gate final (coordenador, 10:39):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` 22 ok;
+    - `-race -count=1 ./...` 22 ok, 0 FAIL;
+    - inclui a correção de segurança do gateway.
+  - **Pendências:**
+    1. M-6: implantar o gateway 0.13.0 **antes** do mcpollama 0.10.0 (12.10).
+    2. M-7: no modo compact, a tool fica sem instruções; aceito, porque o `RELATAR-ERROS-IA.md` é a fonte.

@@ -1,6 +1,6 @@
 # Contrato de dados da Fase 12 (erros do modelo local → base de treino)
 
-> **Versão:** 1.1.2 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (etapa 12.1) · **Data:** 2026-11-02
+> **Versão:** 1.1.4 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21) (etapa 12.1) · **Data:** 2026-11-02
 > **Fonte única:** `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (decisões D12-1 a D12-17, §5, §8, §10, §13, §14, §15).
 > Este documento só fixa regras; o raciocínio e o histórico estão no plano.
 
@@ -44,7 +44,7 @@
 - **C-1.9a** Se só jobs que **não** são o `job_do_erro` expiraram, a ocorrência nasce `nova`: as amostras existentes são copiadas e as dos expirados ficam só como referência em `ocorrencia_jobs`.
 - **C-1.10** Numa ocorrência `distribuida` o gateway guarda só a ocorrência e as referências dos jobs (com o backend de cada um), **nenhuma amostra**, nem as locais; a resposta traz `estado=distribuida`, `amostras_copiadas=0` e `jobs_externos` = número de jobs de outro backend.
 - **C-1.11** Os jobs de outro backend, numa ocorrência distribuída, são aceitos só como referência, sem validação local; o relato vai ao gateway do `job_do_erro`.
-- **C-1.11a** (1.1.2) **Mesma origem:** a amostra de um job local só é copiada se a origem do relato bate com a do job em `requests`: a estação declarada (máquina **e** usuário) igual, ou, se o job não tem estação, o mesmo IP de origem. Um job de outra origem fica só como referência em `ocorrencia_jobs` e é contado em `jobs_outra_origem` na resposta. Se for o `job_do_erro`, a ocorrência nasce `sem_pedido`. A ação "Marcar erro" do admin no monitor (12.6) não tem essa restrição.
+- **C-1.11a** (1.1.2) **Mesma origem:** a amostra de um job local só é copiada se a origem do relato bate com a do job em `requests`: a estação declarada (máquina **e** usuário) igual **e** o mesmo IP de origem verificado pelo gateway (o mesmo cálculo que ele grava no job); se o job não tem estação, só o IP (1.1.3: a estação sozinha é declarada e pode ser falsificada). Um job de outra origem fica só como referência em `ocorrencia_jobs` e é contado em `jobs_outra_origem` na resposta. Se for o `job_do_erro`, a ocorrência nasce `sem_pedido`. A ação "Marcar erro" do admin no monitor (12.6) não tem essa restrição.
 - **C-1.12** Transições permitidas, e só elas: `nova`→`confirmada` (confirmar), `nova`, `confirmada`, `sem_pedido`, `distribuida` ou `fallback`→`descartada` (descartar: o admin julgou que não foi erro do modelo, e o caso sai também da estatística de erros), `confirmada`→`nova` (alterar a correção, C-6.5) e qualquer estado→`apagada` (apagar). `descartada` não volta a `nova`; `sem_pedido`, `distribuida` e `fallback` nunca são confirmadas.
 - **C-1.12a** Confirmar exige `resposta_correta` não vazia; sem ela, a ação é recusada.
 - **C-1.12b** Descartar uma ocorrência `confirmada` (1.1.0) apaga o embedding, zera `exemplo_publico`, invalida (`valido=0`) todo retrato que a lista e **não** libera a vaga dela na cota (C-4.11a). O histórico grava `descartou`. Uma exportação já baixada não é desfeita pelo servidor; as linhas `exportou` anteriores ficam no histórico como registro.
@@ -58,6 +58,7 @@
 - **C-1.18** Os dados de estação, projeto e origem do relato são declarados e não autenticados; nada entra no treino, nos exemplos ou na avaliação sem confirmação do admin.
 - **C-1.19** Candidato automático nasce `nova`, com `origem=automatico` e `resposta_correta` vazia; um relato humano da mesma ocorrência o substitui, e o histórico grava `alterou` com `campo=origem`.
 - **C-1.20** Os candidatos automáticos têm só as regras: JSON inválido (pedido com `format` = `"json"` ou schema, e texto reprovado em `json.Valid`), resposta só de espaços, e `fim=length` com `num_predict` ≥ 256 (ou ausente).
+- **C-1.20a** (1.1.4) A regra do JSON inválido fica **reservada**: só vale quando alguma tool expuser o `format` do Ollama (hoje nenhuma expõe; o `format` texto livre do `extract`/`summarize_file` não conta). Os candidatos automáticos vêm **desligados por padrão** (`--auto-report=false`), porque copiam para o `treino.db`, sem expiração, o pedido e a resposta, inclusive de documentos sensíveis; quem liga é a estação, de propósito.
 - **C-1.21** Nesta fase, só o gateway **primário** guarda ocorrências elegíveis, porque cada gateway tem o seu `treino.db` e a partição não é coordenada entre eles. O papel do gateway vem da flag `--role` (`primario`, o padrão, ou `fallback`). Num gateway `fallback`, toda ocorrência com jobs num só backend nasce no estado próprio **`fallback`**: guarda só a ocorrência e as referências dos jobs, **nenhuma amostra**, e conta só na estatística. A resposta traz `estado=fallback` e `amostras_copiadas=0`. O estado `distribuida` continua reservado para jobs em backends diferentes (C-1.9).
 
 ## 2. Pedido canônico
@@ -137,7 +138,7 @@
 ## 6. Retenção e descarte
 
 - **C-6.1** O `treino.db` é um arquivo 0600, sem expiração automática.
-- **C-6.2** O teto do `treino.db` é 2 GiB de **dados vivos** (páginas usadas, sem as livres e sem contar o `-wal` em dobro; 1.1.2); acima dele o gateway recusa novos relatos com **HTTP 507** e corpo de erro explícito, grava um evento e mostra aviso no monitor, e **não apaga nada sozinho**.
+- **C-6.2** O teto do `treino.db` é 2 GiB de **dados vivos**, medido **depois** de o relato obter a vez de escrever e antes da transação (sem janela entre medir e gravar; 1.1.3), (páginas usadas, sem as livres e sem contar o `-wal` em dobro; 1.1.2); acima dele o gateway recusa novos relatos com **HTTP 507** e corpo de erro explícito, grava um evento e mostra aviso no monitor, e **não apaga nada sozinho**.
 - **C-6.2a** (1.1.2) O `treino.db` usa `auto_vacuum` incremental e `journal_size_limit`: depois de apagar, o espaço volta ao orçamento, e o relato que antes recebia 507 volta a ser aceito.
 - **C-6.3** Apagar é ação do admin, com histórico. Remove todo o conteúdo da ocorrência, os jobs dela e as amostras que ninguém mais usa, e deixa só uma linha mínima (`id`, `estado=apagada`, datas), sem nenhum campo de conteúdo.
 - **C-6.4** Uma amostra (e o embedding) só é removida quando nenhuma ocorrência a referencia mais (contagem de referências).
@@ -236,3 +237,11 @@ Correções sem decisão nova:
 - **C-1.12d:** a substituição do automático respeita a precedência e troca a lista de jobs.
 - **C-6.2 e C-6.2a:** o teto conta só os dados vivos, com `auto_vacuum`.
 - **C-1.17:** os limites que o gateway já aplicava foram documentados.
+
+## Versão 1.1.3 (owner, 2026-11-03 09:59)
+
+Achados da revisão automática de segurança do commit da 12.4. A **C-1.11a** passa a exigir que a estação declarada **e** o IP verificado batam com os do job, porque a estação sozinha pode ser falsificada; quando o job não tem estação, vale só o IP (decisão do owner). A **C-6.2** passa a exigir que o teto seja medido depois de o relato obter a vez de escrever, o que fecha a janela de corrida entre medir e gravar.
+
+## Versão 1.1.4 (owner, 2026-11-03 10:21)
+
+Revisão da 12.5: a regra automática do JSON inválido fica reservada até alguma tool expor o `format`, e os automáticos passam a vir desligados por padrão (C-1.20a). O plano dizia "ligados" (D12-8, §14 item 1); prevalece esta versão.

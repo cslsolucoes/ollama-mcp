@@ -61,6 +61,6 @@ o registro só fica elegível para medir, para os exemplos e para o treino depoi
 ## 5. Limites
 
 Um pedido com mais de **64 chamadas** ao modelo (arquivo muito grande com `--max-chunks` acima do padrão de 40) não pode ser relatado: a tool `reportar_erro` recusa com mensagem clara. Nesse caso, avise o usuário e siga o trabalho.
-- Campos: `erro` (vai como `descricao`, obrigatório, até 4 KB), `resposta_correta` até 128 KB, `correcao_aplicada` até 4 KB, `projeto` até 128 caracteres. Campo desconhecido é recusado.
+- Campos: `erro` (vai como `descricao`, obrigatório, até 4 KB), `resposta_correta` até 128 KB, `correcao_aplicada` até 4 KB, `projeto` até 128 bytes. Campo desconhecido é recusado.
 - Só se relata um job **já terminado**. Logo depois da resposta, o servidor pode pedir para tentar de novo em alguns segundos.
-- Só os jobs da sua estação entram na base. Jobs de outra estação ficam só como referência.
+- Só os jobs da sua estação, relatados da mesma máquina e do mesmo endereço de rede, entram na base. Os outros ficam só como referência.
