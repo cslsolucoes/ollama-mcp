@@ -189,6 +189,21 @@ func newID() (string, error) {
 // the same origin returns that one and writes nothing. An occurrence of another
 // origin is never returned or touched: the report makes a new one.
 func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, src Source, key *hmackey.Key) (Result, error) {
+	return s.IngestWith(ctx, rep, o, role, src, key, IngestOptions{})
+}
+
+// IngestOptions changes how a report is taken.
+type IngestOptions struct {
+	// Admin is the "Marcar erro" action of the monitor (D12-6): the report comes
+	// from the logged-in administrator, so it has no same-origin restriction
+	// (C-1.11a: the samples of every local job are copied, and the occurrence of
+	// the job is found whatever its origin) and the history names "admin".
+	Admin bool
+}
+
+// IngestWith is Ingest with options.
+func (s *Store) IngestWith(ctx context.Context, rep Report, o Origin, role string, src Source, key *hmackey.Key, opts IngestOptions) (Result, error) {
+	same := func(j Job) bool { return opts.Admin || sameOrigin(j, o) }
 	if !key.Configured() {
 		return Result{}, ErrNoKey
 	}
@@ -246,6 +261,9 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 		}
 	}
 	who := Actor{Who: o.Who(), IP: o.ClientIP}
+	if opts.Admin {
+		who = AdminActor(o.ClientIP)
+	}
 
 	var res Result
 	err = s.withTxSized(ctx, func(tx *sql.Tx, size int64) error {
@@ -256,7 +274,7 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 		now := s.opts.Now()
 		// An occurrence of this job and of the same origin already there (not erased)?
 		var exID, exOrigem, exEstado string
-		have, err := s.findSameOrigin(ctx, tx, rep.JobDoErro, o, &exID, &exOrigem, &exEstado)
+		have, err := s.findSameOrigin(ctx, tx, rep.JobDoErro, o, opts.Admin, &exID, &exOrigem, &exEstado)
 		if err != nil {
 			return err
 		}
@@ -273,7 +291,7 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 			estado = EstadoDistrib
 		case role == RoleFallback:
 			estado = EstadoFallback
-		case !sameOrigin(jobErr, o):
+		case !same(jobErr):
 			estado = EstadoSemPedido
 		default:
 			has, err := s.hasSampleOrContent(ctx, tx, src, rep.JobDoErro)
@@ -316,7 +334,7 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 
 		res = Result{OcorrenciaID: id, Estado: estado, JobsExternos: externos}
 		if estado == EstadoDistrib || estado == EstadoFallback {
-			return nil // C-1.10, C-1.21: references only, no sample at all
+			return s.recompute(ctx, tx, now) // C-1.10, C-1.21: references only, no sample at all
 		}
 		budget := maxB - size
 		var written int64
@@ -326,7 +344,7 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 				res.SemPedido++ // this gateway no longer has the job: only the reference stays
 				continue
 			}
-			if !sameOrigin(jb, o) {
+			if !same(jb) {
 				res.JobsOutraOrigem++ // C-1.11a: reference only
 				continue
 			}
@@ -366,7 +384,7 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 			}
 			res.AmostrasCopiadas += n
 		}
-		return nil
+		return s.recompute(ctx, tx, now)
 	})
 	if err != nil {
 		return Result{}, err
@@ -376,7 +394,7 @@ func (s *Store) Ingest(ctx context.Context, rep Report, o Origin, role string, s
 
 // findSameOrigin looks for an occurrence of the job, not erased, made by the same
 // origin as the report (C-1.11a); an occurrence of another origin is not seen.
-func (s *Store) findSameOrigin(ctx context.Context, tx *sql.Tx, job string, o Origin, id, origem, estado *string) (bool, error) {
+func (s *Store) findSameOrigin(ctx context.Context, tx *sql.Tx, job string, o Origin, anyOrigin bool, id, origem, estado *string) (bool, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT id, COALESCE(origem,''), estado, COALESCE(estacao_computer,''), COALESCE(estacao_user,''), COALESCE(client_ip,'')
 		FROM ocorrencias WHERE job_do_erro=? AND estado!=? ORDER BY criada_em, id`, job, EstadoApagada)
 	if err != nil {
@@ -388,7 +406,7 @@ func (s *Store) findSameOrigin(ctx context.Context, tx *sql.Tx, job string, o Or
 		if err := rows.Scan(&i, &og, &es, &c, &u, &ip); err != nil {
 			return false, err
 		}
-		if sameOccOrigin(c, u, ip, o) {
+		if anyOrigin || sameOccOrigin(c, u, ip, o) {
 			*id, *origem, *estado = i, og, es
 			return true, nil
 		}

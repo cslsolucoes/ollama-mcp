@@ -585,12 +585,9 @@ func TestQuotaTableExistsAndNothingTouchesIt(t *testing.T) { // C-4.11b
 			t.Fatal(err)
 		}
 	}
-	before := dumpTable(t, s, "cota_grupos")
 	// unconfirm, discard and delete occurrences that sit in a test group
 	a, b, c := occIn(t, s, EstadoConfirmada), occIn(t, s, EstadoConfirmada), occIn(t, s, EstadoConfirmada)
-	for _, id := range []string{a, b, c} {
-		s.db.Exec(`UPDATE ocorrencias SET particao='teste', grupo_id='g1' WHERE id=?`, id)
-	}
+	before := dumpTable(t, s, "cota_grupos") // the confirmations themselves took their places in the quota
 	nv := "mudou"
 	if _, err := s.Update(ctx, a, Edit{RespostaCorreta: &nv}, admin); err != nil {
 		t.Fatal(err)

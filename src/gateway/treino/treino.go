@@ -119,6 +119,11 @@ CREATE TABLE IF NOT EXISTS retrato_itens(
 CREATE INDEX IF NOT EXISTS idx_retitens_oc ON retrato_itens(ocorrencia_id);
 CREATE TABLE IF NOT EXISTS embeddings(
   ocorrencia_id TEXT PRIMARY KEY, vetor BLOB, modelo TEXT);
+-- covering indexes of the recompute and of the summary (review of 12.6, I-2): they answer from
+-- the index alone, without reading the rows that carry the blobs of the samples
+CREATE INDEX IF NOT EXISTS idx_amostras_grupo ON amostras(job_id, key_id, doc_hash, conteudo_hmac);
+CREATE INDEX IF NOT EXISTS idx_amostras_pred ON amostras(job_id, endpoint, status, http_status, prompt_truncado, prompt_json_truncado, tem_imagem, resp_final, resp_truncada, (COALESCE(length(prompt_json),0) > 0));
+CREATE INDEX IF NOT EXISTS idx_oc_estado_part ON ocorrencias(estado, particao, categoria);
 CREATE TABLE IF NOT EXISTS cota_grupos(
   grupo_id TEXT PRIMARY KEY, categoria TEXT NOT NULL,
   particao TEXT NOT NULL CHECK(particao IN ('treino','teste')), atribuida_em INTEGER NOT NULL);

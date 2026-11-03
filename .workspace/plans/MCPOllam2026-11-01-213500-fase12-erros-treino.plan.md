@@ -1,6 +1,6 @@
 # Plano — Fase 12: o MCP organiza os erros do modelo local e gera o histórico para treinar o servidor de IA
 
-> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.5 concluída; próxima: 12.6). Contrato de dados **1.1.4 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
+> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.6 concluída; próxima: 12.7). Contrato de dados **1.1.4 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
 > achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). O código começa na 12.2.
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
@@ -602,7 +602,7 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 | 12.3 | gateway: `prompt_json` no `content.db` na **entrada** (D12-13; C-2.1 a C-2.8, C-2.10 a C-2.12), a partir do corpo depois de `applyPolicy`; `requests.doc_hash` como HMAC com `key_id` e flag `--doc-key-file` (C-4.2, C-4.3, C-4.3a) | sonnet | teste, um por regra: o `prompt_json` é igual, byte a byte, ao corpo que o Ollama falso recebeu, exceto pelas imagens, inclusive todo o histórico de `chat` (C-2.10); migração idempotente de banco antigo sem perder dados (C-2.7); teto de 16 MiB **por campo** com marca própria (`prompt_truncated`, `prompt_json_truncated`), `resp_final`/`resp_truncated` (C-2.3, C-2.4), e o predicado recusa `prompt_json_truncated=1` mesmo depois de o `content.db` expirar; imagem vira `{"imagem_hmac":"<hex>"}` + `tem_imagem=1` e fica não exportável (C-2.5, C-2.6); teto total de 4 GiB apagando os mais antigos (C-2.8); `prompt_hmac` e `conteudo_hmac` calculados como na C-2.12 e nunca como sha256 puro; `requests.doc_hash` gravado só como HMAC com `key_id`, o sha256 puro ausente de todo banco e log (C-4.2), e o cabeçalho `X-Mcpollama-Doc` removido antes do Ollama e ausente do `prompt_json` (C-2.11); sem `--doc-key-file` o gateway não aceita relatos (C-4.3a, verificado na 12.4) | ✅ **concluída** (2026-11-02 22:35, sem commit ainda): Sonnet implementou; revisão Opus (1 bloqueador, 2 importantes, 6 menores) corrigida; gate refeito pelo coordenador |
 | 12.4 | gateway: `treino.db` (ocorrências, jobs, amostras, histórico) + `POST /api/feedback` em rota própria (D12-4, 5, 10, 16); flag `--role` (C-1.21) | sonnet | testes, um por regra do contrato nesta etapa (C-0.4): validação dos enums e limites (C-1.16, C-1.17: corpo 256 KB, `descricao` 4 KB, `resposta_correta` 128 KB, 64 jobs); `job_do_erro` inexistente → 404 sem gravar nada (C-1.4) e obrigatório em `translate`/listas sem `final` (C-1.3); transação única com as amostras de todos os jobs (C-1.5); `sem_pedido` só pelo `job_do_erro` expirado ou sem `prompt_json`, e `nova` quando expiram só os outros (C-1.9, C-1.9a); `distribuida` sem amostras com `jobs_externos` (C-1.10) e `fallback` com `--role fallback` sem amostras (C-1.21), com a precedência da C-1.9; transições da C-1.12 e confirmar sem `resposta_correta` recusado (C-1.12a); candidato automático substituído por relato humano com `alterou`/`campo=origem` (C-1.19); 503 sem `--doc-key-file` (C-4.3a); 507 no teto de 2 GiB sem apagar nada (C-6.2); apagar deixa só a linha mínima e respeita a contagem de referências (C-6.3, C-6.4); alterar a correção desfaz a confirmação e apaga o embedding (C-6.5); histórico sem texto, só hash e tamanho, e sem expirar (C-7.4, C-7.6, C-7.9); consultas com `context.Background()` (C-6.10); ataques 9.5/10.L/10.5 ok | ✅ **concluída** (2026-11-03 00:43, sem commit ainda): Sonnet implementou; revisão Opus (6 importantes, 6 menores) corrigida com o contrato 1.1.2; gate refeito pelo coordenador |
 | 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8; C-1.3, C-1.19, C-1.20); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis (até 64, C-1.17) e o backend de cada um; `job_do_erro` padrão `final`/`unico` e obrigatório em `translate` e em listas sem `final` (C-1.3); enums e limites (C-1.16, C-1.17); relato ao gateway do `job_do_erro` (C-1.11); os automáticos são só as três regras da C-1.20 (inclui `num_predict` ausente), nascem `nova` sem `resposta_correta` (C-1.19); o automático não atrasa nem quebra a tool; deduplicação (relato humano substitui o automático) | ✅ **concluída** (2026-11-03 10:40, sem commit ainda): Sonnet implementou; revisão Opus (pode publicar) com ajustes; decisões do owner no contrato 1.1.4; gate refeito pelo coordenador |
-| 12.6 | monitor: aba "Erros (treino)", "Marcar erro", confirmar/completar/descartar/apagar/exemplo público/**liberar quarentena** (rota `POST /monitor/api/treino/{id}/liberar-quarentena`), exportação com predicado e partição (D12-6, 7, 7a; C-1.13, C-3.x, C-4.x) | sonnet | Firefox headless 570–1400 px; ações só do admin com sessão, CSRF e same-site, cada uma no histórico (C-1.13); o predicado exclui cada caso proibido, inclusive imagem, `distribuida`, `fallback`, `quarentena` e `translate` montado, **um teste por condição, com um caso que falha só nela** (C-3.16); exportação por `parte=treino\|teste` só da partição pedida, em streaming, sem guardar no servidor, com `meta` sem texto livre e uma linha `exportou` **por ocorrência** (C-3.11 a C-3.15, C-7.7); grupos por `doc_hash`, por `conteudo_hmac` ou por job em comum, com todas as não apagadas, inclusive `nova` e `descartada` (C-4.5, C-4.15); cota de 30 grupos **com amostra exportável** por categoria, na ordem em que cada grupo ganha a primeira amostra exportável, com a categoria dessa amostra e partição **pendente** antes disso (contrato 1.1.0: C-4.6, C-4.7, C-1.8); partição estável e fusão de grupos do mesmo lado pelo menor `grupo_id` sem reavaliar (C-4.8); **união de grupos já atribuídos a lados opostos vai para quarentena** e invalida os retratos e o índice de exemplos; um lado só é herdado; nenhum lado fica pendente (C-4.9 1.1.0, C-4.10, teste dedicado para cada caso); `liberar-quarentena` grava `alterou`/`campo=particao` (C-4.11); desconfirmar/descartar (C-1.12b)/apagar ocorrência de teste não libera a vaga e invalida os retratos que a listam (C-4.11a); nenhum `job_id`, `doc_hash` ou `grupo_id` em treino e teste ao mesmo tempo (C-4.12); `doc_hash` guardado como HMAC com `key_id`, nunca o sha256 puro (C-4.2); ocorrência distribuída e `fallback` sem amostras; descartar vale também para `sem_pedido`/`distribuida`/`fallback` (C-1.12); histórico sem texto sensível (C-7.6); alterar `resposta_correta`, `descricao` ou `correcao_aplicada` confirmada desfaz a confirmação (C-6.5); embedding só ao marcar `exemplo_publico` (C-6.6); consultas com `context.Background()` e cache em segundo plano (C-6.10) | pendente |
+| 12.6 | monitor: aba "Erros (treino)", "Marcar erro", confirmar/completar/descartar/apagar/exemplo público/**liberar quarentena** (rota `POST /monitor/api/treino/{id}/liberar-quarentena`), exportação com predicado e partição (D12-6, 7, 7a; C-1.13, C-3.x, C-4.x) | sonnet | Firefox headless 570–1400 px; ações só do admin com sessão, CSRF e same-site, cada uma no histórico (C-1.13); o predicado exclui cada caso proibido, inclusive imagem, `distribuida`, `fallback`, `quarentena` e `translate` montado, **um teste por condição, com um caso que falha só nela** (C-3.16); exportação por `parte=treino\|teste` só da partição pedida, em streaming, sem guardar no servidor, com `meta` sem texto livre e uma linha `exportou` **por ocorrência** (C-3.11 a C-3.15, C-7.7); grupos por `doc_hash`, por `conteudo_hmac` ou por job em comum, com todas as não apagadas, inclusive `nova` e `descartada` (C-4.5, C-4.15); cota de 30 grupos **com amostra exportável** por categoria, na ordem em que cada grupo ganha a primeira amostra exportável, com a categoria dessa amostra e partição **pendente** antes disso (contrato 1.1.0: C-4.6, C-4.7, C-1.8); partição estável e fusão de grupos do mesmo lado pelo menor `grupo_id` sem reavaliar (C-4.8); **união de grupos já atribuídos a lados opostos vai para quarentena** e invalida os retratos e o índice de exemplos; um lado só é herdado; nenhum lado fica pendente (C-4.9 1.1.0, C-4.10, teste dedicado para cada caso); `liberar-quarentena` grava `alterou`/`campo=particao` (C-4.11); desconfirmar/descartar (C-1.12b)/apagar ocorrência de teste não libera a vaga e invalida os retratos que a listam (C-4.11a); nenhum `job_id`, `doc_hash` ou `grupo_id` em treino e teste ao mesmo tempo (C-4.12); `doc_hash` guardado como HMAC com `key_id`, nunca o sha256 puro (C-4.2); ocorrência distribuída e `fallback` sem amostras; descartar vale também para `sem_pedido`/`distribuida`/`fallback` (C-1.12); histórico sem texto sensível (C-7.6); alterar `resposta_correta`, `descricao` ou `correcao_aplicada` confirmada desfaz a confirmação (C-6.5); embedding só ao marcar `exemplo_publico` (C-6.6); consultas com `context.Background()` e cache em segundo plano (C-6.10) | ✅ **concluída** (2026-11-03 13:30, sem commit ainda): Sonnet implementou; revisão Opus corrigida; desvio: telas com login conferidas no Chromium (Playwright), o visitante no Firefox headless |
 | 12.7 | banco de provas: `bakeoff -suites erros` com o protocolo da §8.5 + **retrato** do teste + **linha de base** do `qwen3-ia` atual | sonnet | relatório com o ID do retrato, N, acerto e intervalo de Wilson 95% por categoria (C-5.9); um retrato por avaliação, com os campos da C-4.13; replay com o `prompt_json` igual exceto `options.seed` e `X-Mcpollama-Tool: bakeoff-erros` (C-5.1); **3 rodadas pareadas** (seed 1/2/3), acerto com 2 de 3, modelo atual e candidato intercalados, e o relatório traz os casos que mudaram entre rodadas (C-5.15); a **linha de base** registrada e o modelo atual **medido de novo** a cada comparação, com aviso se divergirem mais de 3 pontos numa categoria (C-5.14, C-5.16); pontuação da C-5.2 (100% de precisão e cobertura), `formato_invalido` compara valores (C-5.3), C-5.4 (`contagem`/`calculo`/`truncado`); humana às cegas em `blind` com 1 rodada, conteúdo de cliente só pelo owner (C-5.5, C-5.6); `outro`/`idioma_errado` fora (C-5.7); reporta com ≥ 20 e decide com ≥ 30 (C-5.8); o gate falha com 0 casos, sem categoria com 30 casos ou com retrato `valido=0`, dizendo "dados insuficientes" (C-5.13) | pendente |
 | 12.8 | **melhora sem treino** (D12-15): (a) instruções por tool; (b) exemplos recuperados por embedding, com a regra de privacidade | sonnet | **medido pela 12.7** com os limiares da §8.5 (C-5.10 a C-5.12); só fica ligado o que passar, por tool e por flag, com padrão desligado (C-8.8); exemplos só de ocorrências `confirmadas` com `exemplo_publico=1`, com embedding só para elas (C-8.1, C-6.6); busca só na partição `treino`, excluindo a ocorrência, o grupo, o documento em avaliação e todo caso em `quarentena` (C-8.3, C-8.4); nenhuma ocorrência desconfirmada, descartada, apagada, `sem_pedido`, `distribuida` ou `fallback` como exemplo (C-8.9); índice congelado com o retrato e hash registrado (C-8.5); análise das instruções só no treino, versão com ID e hash congelada antes da avaliação (C-8.6, C-8.7); k e limiar de similaridade fixados aqui, medidos pela 12.7 e registrados no retrato (C-8.10) | pendente |
 | 12.9 | revisão adversarial: relato forjado, flood, corpo gigante, injeção no JSONL exportado, **vazamento entre clientes pelos exemplos (D12-15b)**, **resposta do teste vazando pelos exemplos (B1)**, apagamento incompleto (histórico, amostras compartilhadas), vazamento na aba, CSRF, rota `/api/feedback`; ainda: chave HMAC (`--doc-key-file`) ausente ou diferente entre gateways (503, `key_id`, C-4.3a), gateway `--role fallback` guardando amostra (C-1.21), `liberar-quarentena` e cota manipuláveis (C-4.9 a C-4.11a), teto 507 contornável (C-6.2), apagar que deixe conteúdo além da linha mínima (C-6.3), linha de `historico` com texto (C-7.4, C-7.6) | **opus** | achados corrigidos; testes de ataque guardados em `.workspace/reports/...testes/` | pendente |
@@ -1086,3 +1086,92 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   - **Pendências:**
     1. M-6: implantar o gateway 0.13.0 **antes** do mcpollama 0.10.0 (12.10).
     2. M-7: no modo compact, a tool fica sem instruções; aceito, porque o `RELATAR-ERROS-IA.md` é a fonte.
+- 2026-11-03 10:44: **publicados** `37706bb` (fix gateway: origem estação+IP, teto na vez), `9f67fee` (12.5) e `d27a4ca` (contrato 1.1.3/1.1.4 e plano); segredos 0. **Início da 12.6** (Sonnet da 12.4).
+  - **Escopo:** rotas admin; "Marcar erro" sem a restrição de origem; partição, grupos, cota, quarentena e retratos (cap. 4 1.1.x); exportação JSONL em streaming com o predicado único e `exportou` por ocorrência; marca de exemplo público; aba "Erros (treino)".
+  - **Decisão de divisão:** o **cálculo do embedding** (C-6.6) fica para a **12.8**. A 12.6 só registra a marca, que fica pendente de embedding.
+- 2026-11-03 12:10: **incidente.** Um comando antigo, em segundo plano, do Sonnet da 12.2 (um script de mutação que tinha travado esperando stdin e nunca foi encerrado) terminou por volta das 12:00 e **restaurou backups velhos** por cima de `ollama/api.go`, `tools/generate.go`, `tools/chat.go` e `tools/filetools.go`. Isso desfez trabalho da 12.5 só na árvore de trabalho: o commit `9f67fee` não foi afetado. O Sonnet refez os arquivos a partir dos backups da 12.5 e à mão.
+  - **Verificação do coordenador:**
+    - `git diff --stat HEAD -- src/ollama src/tools src/mcpollama-mcp TOOLS.md` → **vazio**: os 4 arquivos estão idênticos ao commit;
+    - sem dano no que foi publicado;
+    - nenhum processo velho rodando (só o `mut4.py` da 12.6, iniciado às 12:06).
+  - **O coordenador repetiu o erro** ao registrar o incidente: um `cat >> arquivo` sem entrada travou esperando stdin. O comando foi **encerrado** (TaskStop) e o arquivo vazio que ele criou foi apagado.
+  - **Lição (para todos os agentes):** nunca usar `cat`/`python -` sem entrada definida. Comando em segundo plano que trava tem de ser encerrado e conferido antes de seguir, e nenhum `restore` pode ficar pendente.
+- 2026-11-03 12:48: **12.6 implementada** pelo Sonnet (105 mutações: 94 FAIL de primeira, 8 depois de ajustes, 3 equivalentes, que são camadas redundantes do predicado).
+  - **Arquivos novos:**
+    - `treino/partition.go`: grupos, cota, quarentena, `Eligible`, `ReleaseQuarantine`, `SetExemploPublico`;
+    - `treino/export.go`: JSONL em streaming;
+    - `treino/query.go`: `Summary`/`List`/`Detail`;
+    - `monitor/treino.go`: rotas.
+  - **Arquivos alterados:**
+    - `ingest.go`/`state.go`: `IngestWith{Admin}` e `recompute` na mesma transação;
+    - `monitor.go`: `Config` e o resumo no `/state` via `swr`;
+    - `index.html`: aba "Erros (treino)", detalhe, formulários e "Marcar erro"; continua em LF (0 CR, conferido), com a CSP recalculada pelo código;
+    - `main.go`: fiação.
+  - **Gate (coordenador, 12:47):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` 22 ok;
+    - `-race -count=1 ./...` 22 ok, 0 FAIL;
+    - `treino`/`monitor`/`cmd` com `-race -count=3`: ok;
+    - `proxy`, `ollama`, `tools` e `mcpollama-mcp` idênticos ao HEAD (conferido);
+    - nenhum processo python/go velho.
+  - **Ataques (Sonnet, só `cmd`/`gateway`):** 612 PASS, 0 FAIL, 10 SKIP; 0 vetores com falha.
+    - O vetor **A3 da 10.L** compara a lista exata de rotas POST do `monitor.go` e teve de ser atualizado na cópia temporária, com as 7 rotas novas.
+    - **Pendência:** atualizar o arquivo guardado em `.workspace/reports/...10L.testes/gateway/monitor/fase10l_adv_test.go`.
+  - **UI:**
+    - Firefox headless em 570/900/1400 px só para o visitante, porque o `--screenshot` não faz login;
+    - **as telas com login foram feitas no Chromium (Playwright)**, porque não houve login no Firefox. O aceite pedia Firefox; isso fica registrado como **desvio**;
+    - sem rolagem horizontal;
+    - console: só o `favicon.ico` 404, que já existia.
+  - **Incidentes do Sonnet:**
+    - um comando antigo da 12.4 (heredoc de Python preso) terminou e acrescentou um bloco duplicado ao `proxy.go`. Foi removido, e o arquivo está igual ao HEAD;
+    - um script de mutação morto no meio deixou o `partition.go` mutado. Restaurado do snapshot, com a rodada refeita limpa.
+  - **Decisões de implementação:**
+    1. `grupo_id` = menor id entre os membros; numa divisão, cada parte fica com um id próprio.
+    2. O sha256 entra no cálculo como número de 256 bits.
+    3. A quarentena é persistente para o componente; liberar não consome vaga.
+    4. "Pendente de embedding" = linha em `embeddings` com `vetor`/`modelo` NULL.
+    5. O índice de exemplos congelado ainda não é uma tabela: é invalidado pelos retratos (`indice_hash`). A 12.8 decide.
+    6. Mudanças de partição feitas pelo sistema gravam `alterou`/`particao` com `quem=sistema`.
+    7. O estado é checado só no `Eligible`.
+    8. A ação do admin vai só ao `historico`, não à auditoria do monitor.
+    9. `exportou` em lotes de 20, depois de escrever na resposta.
+  - **Revisão independente em Opus:** em andamento.
+- 2026-11-03 12:56: **revisão independente da 12.6** (Opus, só leitura): **corrigir antes de publicar**.
+  - **Sem falha encontrada em:** vazamento ao visitante, XSS, CSRF/same-site, predicado de exportação (completo), formato e `meta` do JSONL, C-4.12 (por construção; a divisão de grupo não muda o lado).
+  - **I-1:** `exportou` pode faltar para até 19 linhas já entregues (retornos de erro sem `record()`) → gravar o lote antes de escrever.
+  - **I-2:** o `recompute` refaz tudo sob a vez de escrever (O(N²) no total) → índices de cobertura e teste de escala com meta (< 200 ms com 10 mil ocorrências), ou recompute incremental.
+  - **I-3:** as leituras usavam `WithTimeout` → `context.Background()`, como pede a lição da 0.12.6.
+  - **Menores:**
+    - M-1: avisar ao liberar uma quarentena com membro já exportado na outra parte;
+    - M-2: detalhe sem corte (pior caso: 2 GB);
+    - M-3/M-4: documentar.
+  - **Lacunas de teste:** C-4.12 intercalado, divisão de grupo, `exportou` em erro, `innerHTML` estático, `/v1`.
+  - Correções delegadas ao Sonnet da 12.6, incluindo a atualização do vetor A3 guardado em `.workspace/reports`.
+- 2026-11-03 13:30: **correções da revisão da 12.6 concluídas** (Sonnet; 40 mutações, todas provadas ou explicadas). Gate refeito pelo coordenador.
+  - **I-1:** `exportou` passou a ser **write-ahead**. Cada lote (20 linhas ou 8 MiB) é gravado antes de ser enviado, com contexto e transação próprios; se gravar falha, o lote não é enviado. Testes: writer falhando, erro de banco no meio (trigger), contexto expirado no meio.
+  - **I-2:** índices de cobertura em `amostras`/`ocorrencias` com `INDEXED BY`; o índice do predicado usa `COALESCE(length(prompt_json),0)>0`, para não ler os blobs.
+    - Escala com 10 mil ocorrências, ~30 mil jobs e 242 MiB: **recompute 342 → 94 ms** e **Summary 98 → 59 ms**, medidos também pelo coordenador às 13:28. O incremental não foi preciso.
+    - O teste é pulado sob `-race` (`race_on/off_test.go`).
+    - Só a mutação do índice do join prova o tempo; as dos índices do resumo e do predicado sobreviveram, porque o planner escolhe o índice sozinho.
+  - **I-3:** leituras do monitor com `context.Background()`; o prazo do export virou `ExportUntil`, verificado entre linhas; LIMIT na lista. `TestReadPathsUseNoContextWithDone` (go/ast).
+  - **M-1:** `ReleaseQuarantineInfo` avisa quando há membros já exportados para a outra parte.
+  - **M-2:** o detalhe corta cada campo em 256 KiB no SQL (`substr`), em fronteira de caractere, com a marca `[cortado (N bytes)]`.
+  - **M-3/M-4:** documentados no código.
+  - **Testes novos:**
+    - C-4.12 com 900 operações intercaladas (60 quarentenas e 105 heranças exercidas);
+    - divisão de grupo;
+    - teste estático do `index.html` (sem `innerHTML`/`on*=`/`style=`…);
+    - exportação das rotas `/v1`.
+  - **Bug real encontrado:** ao apagar a ponte de um grupo, as duas partes podiam receber o **mesmo `grupo_id`**. Corrigido com um id derivado de forma determinística quando todos os ids possíveis já estão tomados. O teste falha sem a correção.
+  - **Vetor A3 guardado** (`.workspace/reports/...10L.testes/gateway/monitor/fase10l_adv_test.go`): a lista agora tem as 7 rotas POST novas e continua exigindo a lista exata; passa copiado.
+  - **Gate (coordenador, 13:28):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` 22 ok;
+    - `-race -count=1 ./...` 22 ok, 0 FAIL;
+    - `treino`/`monitor` com `-race -count=2`: ok;
+    - `index.html` 0 CR;
+    - `proxy`/`ollama`/`tools`/`mcpollama-mcp` iguais ao HEAD;
+    - nenhum processo python/go velho.
+  - **Ataques (Sonnet):** 2ª rodada com 627 PASS, 0 FAIL, 10 SKIP.
+    - Na 1ª rodada, 1 FAIL esporádico em `TestAdvCSRF` (Fase 9): o vetor troca o último caractere do token por `A` e, em 1 de cada 64 casos, o token "errado" é igual ao certo e a resposta sai 409.
+    - **Pendência:** endurecer o vetor guardado (trocar o caractere por outro sempre diferente).

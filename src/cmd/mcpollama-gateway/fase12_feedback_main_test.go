@@ -11,7 +11,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -19,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
+	"github.com/cslsoftwares/mcpollama/gateway/monitor"
 )
 
 type gw struct {
@@ -286,5 +289,106 @@ func TestRunFeedbackFallbackRole(t *testing.T) {
 	code, res := g.feedback(t, "POST", body)
 	if code != 200 || res["estado"] != "fallback" || res["amostras_copiadas"].(float64) != 0 {
 		t.Errorf("%d %v", code, res)
+	}
+}
+
+// Fase 12.6 through run(): the admin routes are wired, the HMAC key given to the store
+// reaches the history of an admin action (pending of 12.4), and the export route
+// streams the line of a confirmed occurrence.
+func TestRunAdminRoutesEndToEnd(t *testing.T) {
+	keyPath := writeDocKey(t, docKeyHex+"\n")
+	line, err := monitor.HashPassword("uma-senha-longa-de-teste", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminPath := filepath.Join(t.TempDir(), "admin")
+	if err := os.WriteFile(adminPath, []byte("admin:"+line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	treinoPath := filepath.Join(t.TempDir(), "treino.db")
+	g := startGW(t, "--doc-key-file", keyPath, "--treino-db", treinoPath, "--admin-file", adminPath)
+	id := g.generate(t, "conte os itens")
+	g.waitJobDone(t, id)
+	code, res := g.feedback(t, "POST", fbBody(id))
+	if code != 200 {
+		t.Fatalf("report: %d %v", code, res)
+	}
+	occ := res["ocorrencia_id"].(string)
+
+	jar, _ := cookiejar.New(nil)
+	cli := &http.Client{Jar: jar}
+	resp, err := cli.Post(g.base+"/monitor/api/login", "application/json", strings.NewReader(`{"user":"admin","password":"uma-senha-longa-de-teste"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lg struct{ CSRF string }
+	json.NewDecoder(resp.Body).Decode(&lg)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || lg.CSRF == "" {
+		t.Fatalf("login: %d", resp.StatusCode)
+	}
+	postA := func(path, body string) int {
+		req, _ := http.NewRequest("POST", g.base+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-CSRF-Token", lg.CSRF)
+		r, err := cli.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		return r.StatusCode
+	}
+	if c := postA("/monitor/api/treino/"+occ+"/completar", `{"resposta_correta":"1, 2, 3, 4"}`); c != 200 {
+		t.Fatalf("completar: %d", c)
+	}
+	if c := postA("/monitor/api/treino/"+occ+"/confirmar", `{}`); c != 200 {
+		t.Fatalf("confirmar: %d", c)
+	}
+	// "Marcar erro": the wiring of the key and of the source reaches the admin report
+	if c := postA("/monitor/api/jobs/"+id+"/marcar-erro", `{"categoria":"omitiu","severidade":"baixa","descricao":"marcado pelo admin","resposta_correta":"certa"}`); c != 200 {
+		t.Fatalf("marcar-erro: %d", c)
+	}
+	r2, err := cli.Get(g.base + "/monitor/api/treino/export?parte=teste")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(r2.Body)
+	r2.Body.Close()
+	if r2.StatusCode != 200 || !strings.Contains(string(b), `"ocorrencia_id":"`+occ+`"`) || !strings.Contains(string(b), "1, 2, 3, 4") || !strings.Contains(string(b), "conte os itens") {
+		t.Errorf("export: %d %s", r2.StatusCode, b)
+	}
+	// a visitor (no cookie) gets counts only and cannot export
+	vr, _ := http.Get(g.base + "/monitor/api/treino")
+	vb, _ := io.ReadAll(vr.Body)
+	vr.Body.Close()
+	if strings.Contains(string(vb), "conte os itens") || strings.Contains(string(vb), "esqueceu o item 3") || !strings.Contains(string(vb), `"por_estado"`) {
+		t.Errorf("visitor view: %s", vb)
+	}
+	if vr, _ := http.Get(g.base + "/monitor/api/treino/export?parte=teste"); vr.StatusCode != 401 {
+		t.Errorf("visitor export: %d", vr.StatusCode)
+	}
+	if c, msg := g.stop(); c != 0 {
+		t.Fatalf("exit %d: %s", c, msg)
+	}
+	tdb, err := sql.Open("sqlite", treinoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tdb.Close()
+	k, _ := hmackey.Load(keyPath)
+	var depois string
+	tdb.QueryRow(`SELECT depois FROM historico WHERE ocorrencia_id=? AND acao='alterou' AND campo='resposta_correta'`, occ).Scan(&depois)
+	if want := "hmac=" + k.MACString("1, 2, 3, 4") + " key_id=" + k.ID() + " bytes=10"; depois != want {
+		t.Errorf("the admin edit is in the history as %q, want %q (the store got no key?)", depois, want)
+	}
+	var marked int
+	tdb.QueryRow(`SELECT COUNT(*) FROM ocorrencias WHERE origem='usuario' AND job_do_erro=?`, id).Scan(&marked)
+	if marked != 1 {
+		t.Errorf("occurrences marked by the admin: %d", marked)
+	}
+	var n int
+	tdb.QueryRow(`SELECT COUNT(*) FROM historico WHERE ocorrencia_id=? AND acao IN ('confirmou','exportou') AND quem='admin'`, occ).Scan(&n)
+	if n != 2 {
+		t.Errorf("confirmou/exportou rows by admin: %d", n)
 	}
 }

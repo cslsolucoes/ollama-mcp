@@ -60,6 +60,7 @@ td .row{flex-wrap:nowrap;gap:4px}
 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc);font-weight:600}
 .tabs button:hover{color:var(--fg)}
+textarea{font:inherit;width:100%;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:4px 6px;resize:vertical}
 select{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;padding:3px 6px}
 .det{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0 0 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-width:0}
 .det[hidden]{display:none}
@@ -106,6 +107,7 @@ main{padding:8px;gap:8px}
       <button type="button" role="tab" id="tabbtn-recent" data-tab="recent" aria-controls="tab-recent" aria-selected="true">Concluídos recentes</button>
       <button type="button" role="tab" id="tabbtn-events" data-tab="events" aria-controls="tab-events" aria-selected="false">Eventos</button>
       <button type="button" role="tab" id="tabbtn-joblog" data-tab="joblog" aria-controls="tab-joblog" aria-selected="false">Log em tempo real</button>
+      <button type="button" role="tab" id="tabbtn-erros" data-tab="erros" aria-controls="tab-erros" aria-selected="false">Erros (treino)</button>
     </div>
     <div role="tabpanel" id="tab-recent" aria-labelledby="tabbtn-recent"><div class="wrap"><table id="recent"></table></div></div>
     <div role="tabpanel" id="tab-events" aria-labelledby="tabbtn-events" hidden><div class="wrap"><table id="events"></table></div></div>
@@ -119,6 +121,23 @@ main{padding:8px;gap:8px}
       </div>
       <div class="det" id="jobdetail" hidden></div>
       <div class="wrap"><table id="joblog"></table></div>
+    </div>
+    <div role="tabpanel" id="tab-erros" aria-labelledby="tabbtn-erros" hidden>
+      <div class="cards mb8" id="trcards"></div>
+      <div class="pbar" id="trbar" hidden><span id="trbarfill"></span></div>
+      <div id="trmeta" class="empty"></div>
+      <div class="row mb8" id="trbar2" hidden>
+        <select id="trcat" aria-label="Categoria"></select>
+        <select id="trest" aria-label="Estado"></select>
+        <select id="trpart" aria-label="Partição"></select>
+        <select id="trtool" aria-label="Tool"></select>
+        <input id="trestacao" placeholder="estação (máquina ou usuário)" size="22" maxlength="64" aria-label="Estação">
+        <button type="button" id="trapply">Filtrar</button>
+        <button type="button" id="trexptreino" title="Baixa o JSONL da parte de treino (só o que passa na regra de exportação)">Exportar treino</button>
+        <button type="button" id="trexpteste" title="Baixa o JSONL da parte de teste">Exportar teste</button>
+      </div>
+      <div class="det" id="trdetail" hidden></div>
+      <div class="wrap"><table id="trlist"></table></div>
     </div>
   </section>
   <section><h2>Auditoria (ações do administrador)</h2><div class="wrap"><table id="audit"></table></div></section>
@@ -573,6 +592,10 @@ function renderDetail(d, c, cstate) {
   head.appendChild(el("b", "Job " + j.id));
   head.appendChild(el("span", statusText(j.status), "pill " + j.status));
   var cl = el("button", "Fechar"); cl.type = "button"; cl.addEventListener("click", closeJob); head.appendChild(cl);
+  if (loggedIn && isFinal(j.status) && lastState && lastState.treino) {
+    var mk = el("button", "Marcar erro"); mk.type = "button"; mk.title = "Registra este job como erro do modelo local (registro de erros para treino)";
+    mk.addEventListener("click", function () { markForm(j, box); }); head.appendChild(mk);
+  }
   box.appendChild(head);
   var kv = el("div", null, "kv");
   [["Entrada", j.enqueued_at ? new Date(j.enqueued_at).toLocaleString("pt-BR") : ""], ["Início", j.started_at ? new Date(j.started_at).toLocaleString("pt-BR") : "-"],
@@ -660,17 +683,223 @@ $("jlexport").addEventListener("click", function () {
 
 // Tabs for "Concluídos recentes" / "Eventos" / "Log em tempo real"; the chosen tab is remembered per browser.
 function showTab(name) {
-  ["recent", "events", "joblog"].forEach(function (n) {
+  ["recent", "events", "joblog", "erros"].forEach(function (n) {
     var on = n === name;
     $("tabbtn-" + n).setAttribute("aria-selected", on ? "true" : "false");
     $("tab-" + n).hidden = !on;
   });
+  if (name === "erros") loadTreino();
   try { localStorage.setItem("monitor.tab", name); } catch (x) {}
 }
 Array.prototype.forEach.call(document.querySelectorAll(".tabs button[data-tab]"), function (b) {
   b.addEventListener("click", function () { showTab(b.getAttribute("data-tab")); });
 });
-(function () { var t = "recent"; try { t = localStorage.getItem("monitor.tab") || "recent"; } catch (x) {} showTab(t === "events" || t === "joblog" ? t : "recent"); })();
+(function () { var t = "recent"; try { t = localStorage.getItem("monitor.tab") || "recent"; } catch (x) {} showTab(t === "events" || t === "joblog" || t === "erros" ? t : "recent"); })();
+
+// ---- Erros (treino): the board of Fase 12.6. Visitors see counts only; the list, the detail, the actions and the
+// export are for the administrator (the server decides: the page only hides what it could not use).
+var trSel = null;
+var TR_CATS = ["numeracao_errada", "contagem_errada", "calculo_errado", "inventou", "omitiu", "formato_invalido", "resumo_infiel", "traducao_errada", "idioma_errado", "truncado", "ignorou_instrucao", "outro"];
+var TR_ESTADOS = ["nova", "confirmada", "descartada", "sem_pedido", "distribuida", "fallback"];
+var TR_PARTES = ["treino", "teste", "quarentena", "pendente"];
+var TR_TOOLS = ["generate", "chat", "summarize_file", "extract", "translate"];
+function fmtBytes(n) {
+  if (n >= 1073741824) return num1(n / 1073741824) + " GiB";
+  if (n >= 1048576) return num1(n / 1048576) + " MiB";
+  return num1(n / 1024) + " KiB";
+}
+function fmtDate(ms) { return ms ? new Date(ms).toLocaleString("pt-BR") : "-"; }
+function fillSelect(id, label, list) {
+  var s = $(id);
+  if (s.options.length) return;
+  s.appendChild(new Option(label, ""));
+  list.forEach(function (v) { s.appendChild(new Option(v, v)); });
+}
+fillSelect("trcat", "todas as categorias", TR_CATS);
+fillSelect("trest", "todos os estados", TR_ESTADOS);
+fillSelect("trpart", "todas as partições", TR_PARTES);
+fillSelect("trtool", "todas as tools", TR_TOOLS);
+
+function trCards(sm) {
+  var box = $("trcards");
+  if (sameSig(box, sm)) return;
+  box.textContent = "";
+  if (!sm) return;
+  var e = sm.por_estado || {}, p = sm.por_particao || {};
+  var stat = (e.sem_pedido || 0) + (e.distribuida || 0) + (e.fallback || 0);
+  var pct = sm.max_bytes > 0 ? Math.min(100, sm.size_bytes / sm.max_bytes * 100) : 0;
+  [["Ocorrências", sm.total], ["Novas", e.nova || 0], ["Confirmadas", e.confirmada || 0], ["Descartadas", e.descartada || 0], ["Só estatística", stat],
+   ["Exportáveis (treino)", sm.exportaveis_treino], ["Exportáveis (teste)", sm.exportaveis_teste], ["Em quarentena", sm.quarentena],
+   ["Partição pendente", p.pendente || 0], ["Embeddings pendentes", sm.embeddings_pendentes], ["treino.db usado", fmtBytes(sm.size_bytes) + " de " + fmtBytes(sm.max_bytes) + " (" + num1(pct) + "%)"]]
+    .forEach(function (x) { var d = el("div", null, "card"); d.appendChild(el("div", x[1], "v")); d.appendChild(el("div", x[0], "l")); box.appendChild(d); });
+  var bar = $("trbar"); bar.hidden = false; bar.className = pct >= 80 ? "pbar hot" : "pbar";
+  $("trbarfill").style.width = pct.toFixed(0) + "%"; // JS assignment: allowed by the CSP
+}
+
+function trQuery() {
+  var q = ["limite=100"];
+  [["categoria", "trcat"], ["estado", "trest"], ["particao", "trpart"], ["tool", "trtool"], ["estacao", "trestacao"]].forEach(function (p) {
+    var v = $(p[1]).value.trim(); if (v) q.push(p[0] + "=" + encodeURIComponent(v));
+  });
+  return q.join("&");
+}
+function loadTreino() {
+  fetch("/monitor/api/treino?" + trQuery(), { credentials: "same-origin" }).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); }).then(function (x) {
+    if (x.s !== 200) { trCards(null); $("trbar").hidden = true; $("trbar2").hidden = true; table("trlist", [], [], ""); $("trmeta").textContent = x.j.error || ("Erro " + x.s); return; }
+    renderTreino(x.j);
+  }).catch(function () {});
+}
+function renderTreino(j) {
+  trCards(j.summary);
+  var admin = !!j.admin && loggedIn;
+  $("trbar2").hidden = !admin;
+  if (!admin) {
+    $("trmeta").textContent = "Só as contagens são públicas. Entre como admin para ver a lista, o detalhe e exportar.";
+    $("trdetail").hidden = true; table("trlist", [], [], ""); return;
+  }
+  $("trmeta").textContent = "";
+  var rows = (j.rows || []).map(function (r) {
+    var b = el("button", "Detalhes"); b.type = "button"; b.dataset.k = "trdet:" + r.id; b.title = "Abre a ocorrência " + r.id;
+    b.addEventListener("click", function () { openTreino(r.id); });
+    return [fmtDate(r.criada_em), { text: r.estado, cls: r.estado === "confirmada" ? "ok" : r.estado === "descartada" ? "dim" : "" }, r.categoria, { text: r.severidade, cls: r.severidade },
+      r.origem, r.tool || "-", { text: r.estacao || "-", title: r.estacao }, r.particao || "pendente", r.grupo || "-", r.exemplo_publico ? (r.embedding_pendente ? "sim (emb. pendente)" : "sim") : "-",
+      { text: r.descricao, title: r.descricao }, b];
+  });
+  table("trlist", ["Criada", "Estado", "Categoria", "Sev.", "Origem", "Tool", "Estação", "Partição", "Grupo", "Exemplo", "Descrição", ""], rows, "Nenhuma ocorrência com esses filtros.");
+}
+function trPost(id, kind, body, done) {
+  post("/monitor/api/treino/" + id + "/" + kind, body).then(function (r) {
+    if (r.status === 200) msg((r.body && r.body.aviso) || ""); else msg((r.body && r.body.error) || ("Erro " + r.status));
+    if (r.status === 401) { loggedIn = false; renderAuth(); }
+    if (done) done(r);
+    loadTreino(); if (trSel === id) loadTreinoDetail();
+  });
+}
+function trButton(label, title, fn, cls) {
+  var b = el("button", label, cls); b.type = "button"; b.title = title; b.addEventListener("click", fn); return b;
+}
+function openTreino(id) { trSel = id; $("trdetail").hidden = false; loadTreinoDetail(); $("trdetail").scrollIntoView({ block: "start" }); }
+function closeTreino() { trSel = null; $("trdetail").hidden = true; $("trdetail").textContent = ""; }
+function loadTreinoDetail() {
+  if (!trSel) return;
+  var id = trSel;
+  fetch("/monitor/api/treino/" + id, { credentials: "same-origin" }).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); }).then(function (x) {
+    if (id !== trSel) return;
+    if (x.s === 401) { loggedIn = false; renderAuth(); closeTreino(); return; }
+    if (x.s !== 200) { msg(x.j.error || ("Erro " + x.s)); closeTreino(); return; }
+    renderTreinoDetail(x.j);
+  }).catch(function () {});
+}
+function renderTreinoDetail(d) {
+  var box = $("trdetail"); box.textContent = "";
+  var head = el("div", null, "row");
+  head.appendChild(el("b", "Ocorrência " + d.id));
+  head.appendChild(el("span", d.estado, "pill"));
+  head.appendChild(trButton("Fechar", "Fecha o detalhe", closeTreino));
+  box.appendChild(head);
+  var kv = el("div", null, "kv");
+  [["Criada", fmtDate(d.criada_em)], ["Categoria", d.categoria], ["Severidade", d.severidade], ["Origem", d.origem], ["Projeto", d.projeto || "-"], ["Tool", d.tool || "-"],
+   ["Estação", (d.estacao_computer || "-") + " / " + (d.estacao_user || "-") + " / " + (d.estacao_domain || "-")], ["IP", d.client_ip || "-"], ["Job do erro", d.job_do_erro || "-"],
+   ["Partição", d.particao || "pendente"], ["Grupo", d.grupo || "-"], ["Exemplo público", d.exemplo_publico ? (d.embedding_pendente ? "sim (embedding pendente)" : "sim") : "não"],
+   ["Revisada por", d.revisada_por ? d.revisada_por + " em " + fmtDate(d.revisada_em) : "-"], ["Exportável", d.exportavel ? "sim" : "não (" + (d.motivo_nao_exportavel || "-") + ")"]].forEach(function (p) {
+    var row = el("div"); row.appendChild(el("span", p[0] + ": ")); row.appendChild(document.createTextNode(String(p[1] === null || p[1] === undefined ? "" : p[1]))); kv.appendChild(row);
+  });
+  box.appendChild(kv);
+  [["Descrição do erro", d.descricao], ["Resposta correta", d.resposta_correta], ["Correção aplicada", d.correcao_aplicada]].forEach(function (p) {
+    var c = el("div"); c.appendChild(el("div", p[0], "l")); c.appendChild(el("pre", p[1] || "(vazio)")); box.appendChild(c);
+  });
+  // the actions, only the ones the state allows (the server checks them again)
+  var acts = el("div", null, "row mb8"), st = d.estado;
+  if (st === "nova") acts.appendChild(trButton("Confirmar", "Confirma: a correção passa a valer (exige a resposta correta)", function () {
+    if (confirm("Confirmar esta ocorrência? Ela passa a ser elegível para treino e teste.")) trPost(d.id, "confirmar", {});
+  }));
+  if (st === "nova" || st === "confirmada") acts.appendChild(trButton("Completar a correção", "Edita a descrição, a resposta correta e a correção aplicada (editar uma confirmada desfaz a confirmação)", function () { trEditForm(d, box); }));
+  if (st === "nova" || st === "confirmada" || st === "sem_pedido" || st === "distribuida" || st === "fallback") acts.appendChild(trButton("Descartar", "Não foi erro do modelo: sai da estatística", function () {
+    if (confirm("Descartar? Não foi erro do modelo; o caso sai da estatística e não volta.")) trPost(d.id, "descartar", {});
+  }, "danger"));
+  if (st === "confirmada") acts.appendChild(trButton(d.exemplo_publico ? "Desmarcar exemplo público" : "Marcar exemplo público", "Exemplo público: só sintético ou anonimizado; o embedding é calculado depois", function () {
+    if (d.exemplo_publico || confirm("Marcar como exemplo público? Só marque se o conteúdo for sintético ou anonimizado.")) trPost(d.id, "exemplo-publico", { marcar: !d.exemplo_publico });
+  }));
+  if (d.particao === "quarentena") {
+    var sel = el("select"); sel.appendChild(new Option("treino", "treino")); sel.appendChild(new Option("teste", "teste"));
+    acts.appendChild(el("span", "Liberar a quarentena para:")); acts.appendChild(sel);
+    acts.appendChild(trButton("Liberar", "Escolhe o lado do componente inteiro", function () {
+      if (confirm("Liberar o componente inteiro para " + sel.value + "?")) trPost(d.id, "liberar-quarentena", { lado: sel.value });
+    }));
+  }
+  acts.appendChild(trButton("Apagar", "Remove o conteúdo; fica só a linha mínima e o histórico", function () {
+    if (confirm("Apagar? O conteúdo é removido; ficam só a linha mínima e o histórico.")) trPost(d.id, "apagar", {}, function (r) { if (r.status === 200) closeTreino(); });
+  }, "danger"));
+  box.appendChild(acts);
+  box.appendChild(el("div", "Jobs", "l"));
+  box.appendChild(mkTable(["Papel", "Job", "Backend"], (d.jobs || []).map(function (j) { return [j.papel, j.id, j.backend]; })));
+  (d.amostras || []).forEach(function (a) {
+    var c = el("div");
+    c.appendChild(el("div", "Amostra do job " + a.job_id + " · " + a.endpoint + " · " + a.modelo + " · " + a.status + " " + a.http_status +
+      (a.prompt_truncado || a.prompt_json_truncado ? " · PEDIDO TRUNCADO" : "") + (a.resp_final ? "" : " · RESPOSTA PARCIAL") + (a.resp_truncada ? " · RESPOSTA TRUNCADA" : "") + (a.tem_imagem ? " · TEM IMAGEM" : ""), "l"));
+    c.appendChild(el("div", "Pedido (" + a.prompt_bytes + " bytes)", "l")); c.appendChild(el("pre", a.prompt));
+    c.appendChild(el("div", "Resposta errada do modelo (" + a.resp_bytes + " bytes)", "l")); c.appendChild(el("pre", a.resposta));
+    box.appendChild(c);
+  });
+  if (!(d.amostras || []).length) box.appendChild(el("div", "Sem amostra copiada (só a referência dos jobs).", "empty"));
+  box.appendChild(el("div", "Histórico (só hash e tamanho dos textos)", "l"));
+  var sc = el("div", null, "sc");
+  sc.appendChild(mkTable(["Quando", "Ação", "Campo", "Antes", "Depois", "Quem", "IP"], (d.historico || []).map(function (h) { return [fmtDate(h.quando), h.acao, h.campo, h.antes, h.depois, h.quem, h.ip]; })));
+  box.appendChild(sc);
+}
+function trTextArea(label, value, max) {
+  var w = el("div"); w.appendChild(el("div", label + " (máx. " + max + " bytes)", "l"));
+  var t = document.createElement("textarea"); t.value = value || ""; t.rows = 5; w.appendChild(t); w._t = t; return w;
+}
+function trEditForm(d, box) {
+  var old = box.querySelector(".editform"); if (old) { old.remove(); return; }
+  var f = el("div", null, "editform det");
+  var a = trTextArea("Descrição do erro", d.descricao, 4096), b = trTextArea("Resposta correta", d.resposta_correta, 131072), c = trTextArea("Correção aplicada", d.correcao_aplicada, 4096);
+  [a, b, c].forEach(function (x) { f.appendChild(x); });
+  if (d.estado === "confirmada") f.appendChild(el("div", "Atenção: editar uma ocorrência confirmada desfaz a confirmação (ela volta a nova).", "empty"));
+  var save = trButton("Salvar", "Grava só os campos que mudaram", function () {
+    var body = {};
+    if (a._t.value !== (d.descricao || "")) body.descricao = a._t.value;
+    if (b._t.value !== (d.resposta_correta || "")) body.resposta_correta = b._t.value;
+    if (c._t.value !== (d.correcao_aplicada || "")) body.correcao_aplicada = c._t.value;
+    if (!Object.keys(body).length) { msg("Nada mudou."); return; }
+    trPost(d.id, "completar", body);
+  });
+  f.appendChild(save);
+  box.insertBefore(f, box.querySelector(".mb8").nextSibling);
+}
+$("trapply").addEventListener("click", loadTreino);
+$("trestacao").addEventListener("keydown", function (e) { if (e.key === "Enter") loadTreino(); });
+function trExport(parte) { window.location.href = "/monitor/api/treino/export?parte=" + parte; }
+$("trexptreino").addEventListener("click", function () { trExport("treino"); });
+$("trexpteste").addEventListener("click", function () { trExport("teste"); });
+setInterval(function () { if (!$("tab-erros").hidden) loadTreino(); }, 5000);
+
+// "Marcar erro" in the job detail (administrator): reports the job as an error of the model.
+function markForm(j, box) {
+  var old = box.querySelector(".markform"); if (old) { old.remove(); return; }
+  var f = el("div", null, "markform det");
+  f.appendChild(el("b", "Marcar erro do modelo neste job (origem: usuário)"));
+  var cat = el("select"), sev = el("select"), proj = el("input");
+  TR_CATS.forEach(function (v) { cat.appendChild(new Option(v, v)); });
+  ["baixa", "media", "alta"].forEach(function (v) { sev.appendChild(new Option(v, v)); });
+  sev.value = "media"; proj.placeholder = "projeto (opcional)"; proj.maxLength = 128;
+  var row = el("div", null, "row"); row.appendChild(cat); row.appendChild(sev); row.appendChild(proj); f.appendChild(row);
+  var d = trTextArea("O que estava errado", "", 4096), r = trTextArea("Resposta correta (se souber; é o que ensina o modelo)", "", 131072), c = trTextArea("Correção aplicada", "", 4096);
+  [d, r, c].forEach(function (x) { f.appendChild(x); });
+  var out = el("div", null, "empty");
+  var send = trButton("Enviar", "Cria a ocorrência no registro de erros", function () {
+    post("/monitor/api/jobs/" + j.id + "/marcar-erro", { categoria: cat.value, severidade: sev.value, descricao: d._t.value, resposta_correta: r._t.value, correcao_aplicada: c._t.value, projeto: proj.value }).then(function (x) {
+      if (x.status === 200) {
+        out.textContent = "Registrado: ocorrência " + x.body.ocorrencia_id + " (" + x.body.estado + ", " + x.body.amostras_copiadas + " amostra(s)). ";
+        var go = trButton("Abrir no registro", "Abre a ocorrência na aba Erros (treino)", function () { showTab("erros"); openTreino(x.body.ocorrencia_id); }); out.appendChild(go);
+        loadTreino();
+      } else out.textContent = (x.body && x.body.error) || ("Erro " + x.status);
+    });
+  });
+  f.appendChild(send); f.appendChild(out);
+  box.appendChild(f);
+}
 
 fetch("/monitor/api/session", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (j) {
   adminEnabled = !!j.admin_enabled; loggedIn = !!j.logged_in; csrf = j.csrf || ""; renderAuth();

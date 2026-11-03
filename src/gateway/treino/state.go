@@ -64,7 +64,10 @@ func (s *Store) Confirm(ctx context.Context, id string, a Actor) error {
 			EstadoConfirmada, now.UnixMilli(), a.Who, now.UnixMilli(), id); err != nil {
 			return err
 		}
-		return hist(ctx, tx, now, id, AcaoConfirmou, "estado", EstadoNova, EstadoConfirmada, a)
+		if err := hist(ctx, tx, now, id, AcaoConfirmou, "estado", EstadoNova, EstadoConfirmada, a); err != nil {
+			return err
+		}
+		return s.recompute(ctx, tx, now) // the group may now have its first exportable sample (C-4.6)
 	})
 }
 
@@ -92,7 +95,10 @@ func (s *Store) Discard(ctx context.Context, id string, a Actor) error {
 			EstadoDescartada, now.UnixMilli(), a.Who, now.UnixMilli(), id); err != nil {
 			return err
 		}
-		return hist(ctx, tx, now, id, AcaoDescartou, "estado", r.estado, EstadoDescartada, a)
+		if err := hist(ctx, tx, now, id, AcaoDescartou, "estado", r.estado, EstadoDescartada, a); err != nil {
+			return err
+		}
+		return s.recompute(ctx, tx, now)
 	})
 	if err == nil {
 		s.vacuum(ctx)
@@ -161,6 +167,9 @@ func (s *Store) Update(ctx context.Context, id string, e Edit, a Actor) (desconf
 			}
 			desconfirmou = true
 		}
+		if changed {
+			return s.recompute(ctx, tx, now)
+		}
 		return nil
 	})
 	if err != nil {
@@ -208,7 +217,10 @@ func (s *Store) Delete(ctx context.Context, id string, a Actor) error {
 			return err
 		}
 		antes := "estado=" + r.estado + " descricao=[" + hashSize(s.opts.Key, r.desc) + "] resposta_correta=[" + hashSize(s.opts.Key, r.resp) + "] correcao_aplicada=[" + hashSize(s.opts.Key, r.corr) + "]"
-		return hist(ctx, tx, now, id, AcaoApagou, "conteudo", antes, "estado="+EstadoApagada, a)
+		if err := hist(ctx, tx, now, id, AcaoApagou, "conteudo", antes, "estado="+EstadoApagada, a); err != nil {
+			return err
+		}
+		return s.recompute(ctx, tx, now) // an erased occurrence leaves the groups; the quota rows stay (C-4.11b)
 	})
 	if err == nil {
 		s.vacuum(ctx) // the space comes back to the budget (C-6.2a)

@@ -279,7 +279,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		}
 	}
 
-	mon, err = monitor.New(monitor.Config{Pool: pl, Models: mcol, Queue: q, Store: st, Content: cs, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
+	mon, err = monitor.New(monitor.Config{Pool: pl, Models: mcol, Queue: q, Store: st, Content: cs, Treino: tr, TreinoSource: treino.NewSource(st, cs), TreinoKey: docKey, Role: cfg.Role, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
 		return 1

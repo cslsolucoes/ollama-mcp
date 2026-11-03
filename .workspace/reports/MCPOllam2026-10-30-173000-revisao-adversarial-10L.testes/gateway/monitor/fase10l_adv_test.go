@@ -334,10 +334,13 @@ func TestAdvLIDsAndNoNewPOST(t *testing.T) {
 	for _, p := range posts {
 		list = append(list, p[1])
 	}
+	// Fase 12.6: as 7 rotas novas (acoes do admin sobre o registro de erros e "Marcar erro") foram revisadas:
+	// todas passam por authorize (sessao + CSRF + mesma origem), com teste proprio no pacote monitor
+	// (TestTreinoRoutesNeedTheAdminSessionCSRFAndSameSite). O vetor continua exigindo a lista exata.
 	// Fase 10.5: a 10.4 acrescentou drain/undrain (sessao + CSRF + mesma origem,
 	// TestDrainNeedsAdminCSRFAndSameSite e o vetor M1 da 10.5). A lista exata
 	// continua sendo a protecao: qualquer POST novo sem revisao faz este vetor falhar.
-	want := "/monitor/api/login /monitor/api/logout /monitor/api/queue/{id}/promote /monitor/api/queue/{id}/demote /monitor/api/queue/{id}/remove /monitor/api/running/{id}/cancel /monitor/api/backends/{id}/drain /monitor/api/backends/{id}/undrain"
+	want := "/monitor/api/treino/{id}/confirmar /monitor/api/treino/{id}/descartar /monitor/api/treino/{id}/completar /monitor/api/treino/{id}/apagar /monitor/api/treino/{id}/exemplo-publico /monitor/api/treino/{id}/liberar-quarentena /monitor/api/jobs/{id}/marcar-erro /monitor/api/login /monitor/api/logout /monitor/api/queue/{id}/promote /monitor/api/queue/{id}/demote /monitor/api/queue/{id}/remove /monitor/api/running/{id}/cancel /monitor/api/backends/{id}/drain /monitor/api/backends/{id}/undrain"
 	f := newJobFixture(t, time.Minute, true)
 	ck, _ := f.login(t)
 	var csrf []string

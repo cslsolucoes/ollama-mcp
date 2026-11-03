@@ -31,11 +31,13 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/content"
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 	"github.com/cslsoftwares/mcpollama/gateway/store"
+	"github.com/cslsoftwares/mcpollama/gateway/treino"
 )
 
 //go:embed index.html
@@ -97,9 +99,15 @@ type Config struct {
 	Pool    *pool.Pool     // may be nil: no drain action (the board still shows the queue's own pool)
 	Content *content.Store // may be nil: the text of the jobs is not recorded (Fase 10.L)
 	Admin   *Credentials   // nil disables the actions
-	Version string
-	BootID  string
-	MaxSSE  int // concurrent event streams, default 32
+	// Fase 12.6: the training database and what "Marcar erro" needs. Treino nil
+	// turns the board off (503 on its routes).
+	Treino       *treino.Store
+	TreinoSource treino.Source
+	TreinoKey    *hmackey.Key
+	Role         string // --role of this gateway
+	Version      string
+	BootID       string
+	MaxSSE       int // concurrent event streams, default 32
 	// MaxSSEPerIP bounds the streams of one client IP (Fase 9.5, M3), so one
 	// machine cannot take every stream; default 4.
 	MaxSSEPerIP int
@@ -142,10 +150,11 @@ type Handler struct {
 	// cfg.Store in production (an interface only so a test can make it hang).
 	src readSource
 
-	extras   swrCache[extras]
-	series   seriesRing
-	bucketMu sync.Mutex
-	bucket   bucketAcc
+	extras    swrCache[extras]
+	treinoSum swrCache[treinoSum]
+	series    seriesRing
+	bucketMu  sync.Mutex
+	bucket    bucketAcc
 }
 
 // New builds the Handler.
@@ -226,6 +235,18 @@ func (h *Handler) routes() {
 	m.HandleFunc("GET /monitor/api/jobs/export", h.apiJobsExport)
 	m.HandleFunc("GET /monitor/api/jobs/{id}", h.apiJob)
 	m.HandleFunc("GET /monitor/api/jobs/{id}/content", h.apiJobContent)
+	m.HandleFunc("GET /monitor/api/treino", h.apiTreino)
+	m.HandleFunc("GET /monitor/api/treino/export", h.apiTreinoExport)
+	m.HandleFunc("GET /monitor/api/treino/{id}", h.apiTreinoDetail)
+	// The administrator actions of Fase 12.6, one explicit line each: the list of POST routes is
+	// reviewed as a whole (vector A3 of the 10.L attacks compares it with an exact list).
+	m.HandleFunc("POST /monitor/api/treino/{id}/confirmar", h.treinoAction("confirmar"))
+	m.HandleFunc("POST /monitor/api/treino/{id}/descartar", h.treinoAction("descartar"))
+	m.HandleFunc("POST /monitor/api/treino/{id}/completar", h.treinoAction("completar"))
+	m.HandleFunc("POST /monitor/api/treino/{id}/apagar", h.treinoAction("apagar"))
+	m.HandleFunc("POST /monitor/api/treino/{id}/exemplo-publico", h.treinoAction("exemplo-publico"))
+	m.HandleFunc("POST /monitor/api/treino/{id}/liberar-quarentena", h.treinoAction("liberar-quarentena"))
+	m.HandleFunc("POST /monitor/api/jobs/{id}/marcar-erro", h.apiMarkError)
 	m.HandleFunc("GET /monitor/api/session", h.apiSession)
 	m.HandleFunc("POST /monitor/api/login", h.apiLogin)
 	m.HandleFunc("POST /monitor/api/logout", h.apiLogout)
@@ -315,6 +336,9 @@ type State struct {
 	ContentOn    bool           `json:"content_enabled"`
 	Dropped      int64          `json:"dropped"`
 	AdminEnabled bool           `json:"admin_enabled"`
+	// Treino is the open summary of the error board (Fase 12.6): counts and the
+	// use of the ceiling, never a text. Absent when the feature is off.
+	Treino *treino.Summary `json:"treino,omitempty"`
 }
 
 const extrasTTL = 2 * time.Second
@@ -406,6 +430,7 @@ func (h *Handler) state() State {
 	if h.cfg.Store != nil {
 		st.Dropped = h.cfg.Store.Dropped()
 	}
+	st.Treino = h.treinoSummary()
 	return st
 }
 
