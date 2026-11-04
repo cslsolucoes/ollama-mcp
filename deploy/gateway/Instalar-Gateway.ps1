@@ -8,7 +8,9 @@
                /root/deploy96 (root 0700), roda a etapa 1, pede a senha do admin do /monitor se ela
                ainda nao existir (voce digita no seu terminal, sem eco) e roda a etapa 2 (ativacao).
     Preparar   so a etapa 1 (usuario, pastas, binario); nao mexe no trafego.
-    Atualizar  troca so o binario de um gateway ja instalado: etapa 1 + restart + conferencia.
+    Atualizar  troca o binario de um gateway ja instalado e, se mudou, a unit (Fase 12: variaveis MCPGW_*): etapa 1 (que gera
+               a chave doc.key se nao existir) + stage-atualizar.sh (daemon-reload, restart, conferencia; volta sozinho se falhar).
+               Nao mexe no nginx nem no Ollama.
     Senha      so (re)define a senha do admin do /monitor.
     Reverter   roda o rollback de uma ativacao: -Backup /root/srv-backup-20261028/fase96-ativacao-AAAAMMDD-HHMMSS
 
@@ -27,7 +29,7 @@ param(
     [ValidateSet('Completo', 'Preparar', 'Atualizar', 'Senha', 'Reverter')]
     [string]$Modo = 'Completo',
     [string]$Servidor = 'lx-ai01-root',      # alias do ~/.ssh/config (root@10.100.2.2)
-    [string]$Versao = '',                    # padrao: 0.9.0-<commit>
+    [string]$Versao = '',                    # padrao: 0.13.0-<commit> (Fase 12)
     [switch]$SemBuild,                       # usa o D:\MCP\mcpollama-gateway existente
     [string]$Backup = ''                     # para -Modo Reverter
 )
@@ -36,7 +38,7 @@ $Aqui = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Repo = (Resolve-Path (Join-Path $Aqui '..\..')).Path
 $Bin = 'D:\MCP\mcpollama-gateway'
 $Remoto = '/root/deploy96'
-$Arquivos = 'mcpollama-gateway.service', 'ollama.conf', 'stage1.sh', 'stage2.sh', 'rollback.sh', 'mcpgw-definir-senha.sh'
+$Arquivos = 'mcpollama-gateway.service', 'ollama.conf', 'stage1.sh', 'stage2.sh', 'rollback.sh', 'mcpgw-definir-senha.sh', 'stage-atualizar.sh'
 
 function Passo($t) { Write-Host "`n== $t" -ForegroundColor Cyan }
 function Invoke-Remoto([string]$cmd) {
@@ -58,7 +60,7 @@ if ($Modo -eq 'Senha') {
 
 # 1) binario
 if (-not $SemBuild) {
-    if (-not $Versao) { $Versao = '0.9.0-' + (& git -C $Repo rev-parse --short HEAD).Trim() }
+    if (-not $Versao) { $Versao = '0.13.0-' + (& git -C $Repo rev-parse --short HEAD).Trim() }
     Passo "Gerando o binario Linux $Versao em $Bin"
     Push-Location (Join-Path $Repo 'src')
     try {
@@ -101,9 +103,8 @@ Invoke-Remoto "bash $Remoto/stage1.sh $SumsHash"
 if ($Modo -eq 'Preparar') { Write-Host "`nPronto (so preparo)." -ForegroundColor Green; return }
 
 if ($Modo -eq 'Atualizar') {
-    Passo 'Reiniciando o gateway com o binario novo'
-    # sem aspas duplas no comando remoto: o PowerShell 5.1 as remove ao chamar o ssh.exe
-    Invoke-Remoto 'systemctl restart mcpollama-gateway && sleep 2 && systemctl is-active mcpollama-gateway && /usr/local/bin/mcpollama-gateway --version && echo gateway_api_version=$(curl -s -m 5 -o /dev/null -w %{http_code} http://127.0.0.1:11500/api/version) && echo gateway_monitor=$(curl -s -m 5 -o /dev/null -w %{http_code} http://127.0.0.1:11500/monitor)'
+    Passo 'Atualizando a unit (se mudou) e reiniciando o gateway com o binario novo (volta sozinho se nao subir)'
+    Invoke-Remoto "bash $Remoto/stage-atualizar.sh $SumsHash"
     Write-Host "`nBinario atualizado." -ForegroundColor Green
     return
 }

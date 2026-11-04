@@ -602,6 +602,23 @@ Como conferir (no servidor): `systemctl is-active mcpollama-gateway` (`active`),
 `ss -tlnH | grep -E '11434|11500'` (ambos em 127.0.0.1). Na LAN: `https://ia.cslsolucoes.com.br:8443/monitor` abre o painel.
 Tabela de diagnóstico completa: seção 10 do [MANUAL](MANUAL-GATEWAY.md#10-diagnóstico).
 
+### C.1 Fase 12 (gateway 0.13.0): chave HMAC e variáveis (a implantar)
+
+A Fase 12 (erros do modelo → base de treino; detalhes na seção 17 do [MANUAL](MANUAL-GATEWAY.md#17-erros-do-modelo-e-base-de-treino-fase-12-a-implantar)) acrescenta dois passos
+a esta parte, **sem comando extra**: o instalador já faz os dois.
+
+1. **Chave HMAC.** A etapa 1 (`stage1.sh`) cria `/etc/mcpollama-gateway/doc.key` **se não existir**: 32 bytes aleatórios em hex (64 caracteres),
+   dono `mcpgw:mcpgw`, modo **0600** (o gateway recusa qualquer permissão de grupo ou outros e roda como `mcpgw`). **Nunca sobrescreve** uma chave
+   existente e **nunca a imprime**: mostra só o `key_id` (16 hex do sha256 da chave). Anote o `key_id`. Num segundo gateway (fallback), copie a **mesma** chave
+   por canal protegido e confira o `key_id` igual. A chave **não entra no backup comum**.
+2. **Variáveis da unit.** A unit `mcpollama-gateway.service` traz `Environment=MCPGW_TREINO_DB=/var/lib/mcpollama-gateway/treino.db`,
+   `MCPGW_DOC_KEY_FILE=/etc/mcpollama-gateway/doc.key` e `MCPGW_ROLE=primario` (num gateway de fallback, `fallback`). São **variáveis, não flags**, para um rollback
+   só do binário (para o 0.12.6, que recusa flag desconhecida mas ignora variável) continuar subindo. A melhora sem treino fica **desligada** (nenhuma `MCPGW_MELHORA_*`).
+
+**Ordem:** gateway 0.13.0 **antes** do mcpollama 0.10.0. Para um servidor já instalado, `Instalar-Gateway.ps1 -Modo Atualizar` troca binário **e unit** e volta sozinho se o gateway
+não subir (o nginx e o Ollama não são tocados). Conferência: `ls -l /etc/mcpollama-gateway/doc.key` (`mcpgw mcpgw -rw-------`), `systemctl show mcpollama-gateway -p Environment`
+(as três variáveis) e a aba **Erros (treino)** no `/monitor`.
+
 Nota: o limite de conexões simultâneas por IP é **80** (`limit_conn ollama_conn 80` no `ollama.conf`, desde 2026-10-30 22:35; antes 30, com `burst=60`, e a fila do gateway por IP subiu de 16 para 64); o MANUAL do gateway está alinhado com esse valor.
 
 ---
@@ -843,12 +860,14 @@ go test -count=1 ./...
 go build -ldflags "-X main.Version=<versao>" -o D:\MCP\mcpollama-mcp.exe ./mcpollama-mcp
 ```
 
+**mcpollama 0.10.0 (Fase 12):** só depois do gateway 0.13.0 já estar no servidor (C.1). A tool `reportar_erro` aparece sem configuração; `--auto-report` (relatos automáticos) vem **desligado** e só se acrescenta ao `.mcp.json` por decisão do owner.
+
 Reinicie o cliente (Claude Code, Cursor, VS Code); o binário em uso é renomeado para `.exe~` (apague-o depois). Confira com `--version` e `list_models`.
 Mudanças em `src/files/`, `src/doctext/`, `src/ocr/` ou `src/gateway/` exigem rodar de novo os testes de ataque descritos no [CLAUDE.md](../CLAUDE.md).
 
 ### G.2 Trocar o binário do gateway
 
-`Instalar-Gateway.ps1 -Modo Atualizar` (parte C). Olhe o `/monitor` antes: o restart corta quem está em execução. O banco migra sozinho. Para voltar ao binário antigo, a etapa 1 guardou uma cópia em
+`Instalar-Gateway.ps1 -Modo Atualizar` (parte C). Olhe o `/monitor` antes: o restart corta quem está em execução. O banco migra sozinho. Desde a Fase 12 o modo `Atualizar` também troca a unit (se mudou) e volta sozinho se o gateway não subir (C.1). Para voltar ao binário antigo, a etapa 1 guardou uma cópia em
 `/root/srv-backup-20261028/fase96-AAAAMMDD-HHMMSS/mcpollama-gateway`.
 
 ### G.3 Trocar o modelo (alias)
@@ -923,6 +942,8 @@ O que guardar (fora do git; cofre e backup cifrados):
 | Token do túnel | `/etc/cloudflared/token` | segredo (regerável no painel) |
 | Senha do admin do monitor | `/etc/mcpollama-gateway/admin` | só o hash |
 | Banco do gateway | `/var/lib/mcpollama-gateway/gateway.db` | cópia consistente: `sqlite3 ... ".backup '<destino>'"` com o gateway rodando |
+| Chave HMAC dos dados de treino (Fase 12) | `/etc/mcpollama-gateway/doc.key` | segredo; **fora do backup comum**; só por canal protegido; a mesma chave no gateway de fallback |
+| `treino.db*` (Fase 12) | `/var/lib/mcpollama-gateway/treino.db` | conteúdo de clientes, sem expiração; **fora do backup comum**, ou só cifrado |
 | Configurações | `/etc/systemd/system/{ollama.service.d,nvidia-powercap.service,...}`, `/etc/nginx/`, `/etc/systemd/journald.conf.d/` | também estão em `deploy/servidor-ia/` |
 
 > **Atenção: excluir ou cifrar o `content.db*`.** `/var/lib/mcpollama-gateway/content.db` (e os `-wal`/`-shm`) guarda **prompt e resposta completos** dos últimos 7 dias, incluindo

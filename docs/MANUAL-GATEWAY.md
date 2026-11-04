@@ -27,6 +27,7 @@ e da revisão adversarial da Fase 9. Onde o plano e o código divergem, vale o c
 14. [Referências](#14-referências)
 15. [Notas de conferência](#15-notas-de-conferência)
 16. [Pool de backends e secundário (Fase 10.4)](#16-pool-de-backends-e-secundário-fase-104)
+17. [Erros do modelo e base de treino (Fase 12, a implantar)](#17-erros-do-modelo-e-base-de-treino-fase-12-a-implantar)
 
 ---
 
@@ -215,7 +216,10 @@ Ele gera o binário, envia o pacote conferido, roda a etapa 1 (que **guarda uma 
 
 Cuidados:
 - **O restart corta** quem está em execução e quem espera na fila (o gateway dá até 30 s de tolerância para terminar o que está em curso). Olhe o `/monitor` antes: o ideal é fila e execução vazias. Os clientes recebem erro de conexão; o mcpollama não repete esse caso.
-- O modo `Atualizar` **não mexe** na unit nem no nginx. Se a mudança precisa de flag nova ou de unit nova, use `Completo` (`-SemBuild` se o binário já está pronto) ou a seção 9.
+- Desde a Fase 12, o modo `Atualizar` roda também o `stage-atualizar.sh`: instala a **unit** nova se ela mudou (guarda a antiga em
+  `/root/srv-backup-20261028/fase96-unit-*`), faz `daemon-reload` e o restart, confere (`active`, `/api/version` 200, `/monitor/api/treino`) e, se o
+  gateway não subir, **devolve a unit e o binário anteriores** sozinho. Ele **não mexe** no nginx nem no Ollama. Mudança no nginx
+  ou no Ollama ainda exige `Completo` (`-SemBuild` se o binário já está pronto) ou a seção 9.
 - O banco migra sozinho no start (`ALTER TABLE ... ADD COLUMN` só se faltar).
 
 **À mão** (binário já enviado e conferido pela etapa 1, ou copiado por você):
@@ -240,7 +244,9 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 `2160h`. Fonte: `src/cmd/mcpollama-gateway/config.go` (38 flags). **A unit de produção** é `mcpollama-gateway.service`.
 
 > Na unit, as flags vão em `ExecStart`. Como a flag vence a variável de ambiente, definir `Environment=MCPGW_X=...`
-> **não** muda uma flag que já está no `ExecStart`.
+> **não** muda uma flag que já está no `ExecStart`. **Exceção deliberada (Fase 12):** `MCPGW_TREINO_DB`, `MCPGW_DOC_KEY_FILE` e
+> `MCPGW_ROLE` ficam como `Environment=` na unit, e não como flags, para o rollback ao 0.12.6 continuar subindo (seção 17.9). As flags
+> da Fase 12 (`--doc-key-file`, `--treino-db`, `--role`, `--melhora-*`, `--content-max-bytes` 4 GiB) estão na seção 17.
 
 | Flag | Env | Padrão | O que faz | Unit de produção |
 | --- | --- | --- | --- | --- |
@@ -921,7 +927,7 @@ Divergências entre fontes, resolvidas a favor do **código** (e dos scripts com
 | **N1** | **Permissão do arquivo da senha.** `admin.go:90` (`LoadAdminFile`) recusa a partida se `perm & 0o077 != 0`, e o `--help` diz "mode 0600". Mas `stage2.sh` e `mcpgw-definir-senha.sh` gravam `root:mcpgw` **`0640`** (o grupo precisa ler porque o serviço roda como `mcpgw`). Por leitura do código: o gateway sai com código 2 (`--admin-file ... tem permissão -rw-r-----: use 0600`) e o systemd reinicia em laço; a etapa 2 para em `systemctl is-active` (antes do `trap`) com o nginx **ainda no Ollama**, e ela mesma refaz o `chmod 0640` se rodada de novo. **Não executado em Linux nesta conferência.** | **Resolvida em 2026-10-30 10:50 (opção A, sem mexer no código):** `stage2.sh` e `mcpgw-definir-senha.sh` gravam `mcpgw:mcpgw` modo `0600`. A pasta `/etc/mcpollama-gateway` é `root:mcpgw 0750`, então o `mcpgw` lê o próprio arquivo. Prova no servidor com o binário `0.9.0-2cb599d` rodando como `mcpgw` na porta de teste 11599: `0640` → código 2 ("use 0600"); `0600` → `/monitor` 200. A etapa 2 também corrige o modo de uma senha gravada pelo script antigo. |
 | N2 | O `README.md`/stage1 antigos usavam `/tmp/deploy96` e o hash do **binário**. | Hoje: `/root/deploy96` (root `0700`) e o hash do **`SHA256SUMS`**, em `stage1.sh`, `stage2.sh` e `Instalar-Gateway.ps1` (conferidos). O manual segue o estado atual. |
 | N3 | Os scripts apontam `bash /root/mcpgw-definir-senha.sh`; o arquivo só existe em `/root/` depois que o **instalador** o copia (ou o passo b da seção 2.2). | Documentado nos dois caminhos. O modo `Senha` só funciona depois de uma rodada de `Preparar`/`Completo`/`Atualizar`. |
-| N4 | `Instalar-Gateway.ps1 -Modo Atualizar` **não** instala a unit nem o nginx (só a etapa 1 e o restart). | Mudança de flag/unit exige `Completo -SemBuild` ou a edição manual da seção 9. |
+| N4 | `Instalar-Gateway.ps1 -Modo Atualizar` **não** instalava a unit nem o nginx (só a etapa 1 e o restart). | **Mudou na Fase 12:** passa a trocar a unit (via `stage-atualizar.sh`); o nginx continua de fora (`Completo -SemBuild` ou a seção 9). |
 | N5 | Troca de senha pelo modo `Senha` **não reinicia** o gateway, e o arquivo é lido só na partida. | Documentado: `systemctl restart mcpollama-gateway` depois. |
 | N6 | Plano §9.4: "5 falhas por IP **e 30 no total**" no login. | Substituído na 9.5: não há teto global; 5 por IP com backoff exponencial (15 min até 24 h). Vale o código. |
 | N7 | Plano §3: "`alta` só vem do administrador"; §4.3: "pedido em execução não é interrompido na v1". | Valem a decisão **D9-8** e o código: `alta` por IPs autorizados (`--priority-ips`); **cancelar em execução existe**. |
@@ -1120,3 +1126,173 @@ Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primári
 - O gateway roda **no servidor primário**: se ele cair, não repassa. Para isso existe o fallback do cliente.
 - **Revisão adversarial do pool (10.5) feita** em 2026-10-30 (report `MCPOllam2026-10-30-190200-revisao-adversarial-10-5-pool`).
   O aceite numa instância de teste (10.7) foi feito, com todos os cenários PASS; o plano da Fase 10 está congelado (2026-10-30) e lista as pendências sem data.
+
+---
+
+## 17. Erros do modelo e base de treino (Fase 12, a implantar)
+
+> **Estado:** código pronto e revisado (gateway **0.13.0**, mcpollama **0.10.0**); **ainda não instalado** (aguarda a ordem do owner).
+> Contrato de dados (regras `C-x.y`, testáveis): [`CONTRATO-DADOS-TREINO.md`](CONTRATO-DADOS-TREINO.md) (1.1.6). Instruções para o Claude
+> relatar erros: [`RELATAR-ERROS-IA.md`](RELATAR-ERROS-IA.md). Plano: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`.
+
+**Em uma frase.** Quando o modelo local erra, o Claude (tool `reportar_erro`) ou o admin (botão "Marcar erro" no log) registra o caso
+no `treino.db`; o admin confirma e corrige na aba **Erros (treino)**; os confirmados viram exemplos de **treino** ou de **teste**
+(por documento, nunca misturados) e podem ser exportados em JSONL ou medidos pelo `bakeoff -suites erros`.
+
+### 17.1 Arquivos, dono e permissão
+
+| Arquivo | Dono e modo | O que é | Backup |
+| --- | --- | --- | --- |
+| `/etc/mcpollama-gateway/doc.key` | `mcpgw:mcpgw` **0600** | chave HMAC (64 hex) | **fora do backup comum** (C-6.8); só por canal protegido |
+| `/var/lib/mcpollama-gateway/treino.db` (+ `-wal`, `-shm`) | `mcpgw`, **0600**, criado pelo gateway | ocorrências, jobs, amostras, histórico, retratos, índices | **fora do backup comum**, ou só cifrado (C-6.8) |
+| `/var/lib/mcpollama-gateway/content.db*` | `mcpgw`, 0600 | texto dos jobs, agora com o `prompt_json` (teto 4 GiB) | idem |
+
+O `hmackey.Load` **recusa** a chave com qualquer permissão de grupo ou outros; por isso o dono é o `mcpgw` e o modo é 0600
+(não `root:mcpgw 0640`).
+
+### 17.2 Chave HMAC (`doc.key`, `key_id`)
+
+- **Para que serve (C-4.2, C-2.12):** o gateway nunca grava um sha256 puro de documento, imagem ou pedido; grava o HMAC dele sob esta chave
+  (`requests.doc_hash`, `prompt_hmac`, `conteudo_hmac`, histórico). Quem vazar um banco não consegue testar um palpite contra os hashes.
+- **Geração:** a etapa 1 (`stage1.sh`) a cria **se não existir**: 32 bytes de `/dev/urandom` em hex (64 caracteres), gravada por `ln` (que
+  falha se o destino existe, então **nunca sobrescreve**, nem numa corrida), `mcpgw:mcpgw` 0600. **Nunca imprime a chave**: imprime só o
+  `key_id` (16 primeiros hex do sha256 dos 32 bytes, o mesmo `Key.ID()` do código). Se o arquivo existe, só confere dono e modo.
+- **Conferir o `key_id` depois:** rodar de novo a etapa 1 (`bash /root/deploy96/stage1.sh <HASH>`) imprime `doc.key key_id=...`; ou, no servidor,
+  `python3 -c 'import sys,hashlib,binascii; print(hashlib.sha256(binascii.unhexlify(sys.stdin.read().strip())).hexdigest()[:16])' < /etc/mcpollama-gateway/doc.key`
+  (a chave vai por stdin e nada dela aparece).
+- **A mesma chave em todo gateway** que atende as mesmas estações, inclusive o de **fallback** (`MCPGW_ROLE=fallback`), com o `key_id` conferido
+  (C-4.3a). Copie por canal protegido (nunca por e-mail, chat ou repositório) e rode a conferência acima nos dois. Os servidores Ollama do
+  pool, atrás de um gateway, não recebem a chave.
+- **Trocar a chave só com o owner (C-4.4):** os hashes antigos continuam com o `key_id` antigo e **deixam de ligar** documentos e pedidos
+  novos aos antigos, o que quebra os grupos (a partição treino/teste deixa de ser garantida entre o antigo e o novo). Não rotacione por rotina.
+- **Sem a chave** o gateway sobe normalmente, mas o `doc_hash` fica vazio e o `POST /api/feedback` responde **503**.
+
+### 17.3 `treino.db`
+
+- **Onde:** `MCPGW_TREINO_DB=/var/lib/mcpollama-gateway/treino.db` (na unit; absoluto e diferente dos outros bancos). O gateway o cria em 0600 e o
+  migra sozinho (**esquema v4**, `PRAGMA user_version`; um arquivo de versão maior que a do binário é recusado, ver 17.9).
+- **Teto de 2 GiB de dados vivos** (páginas usadas, sem as livres), medido na hora de gravar. Acima dele os **relatos novos recebem
+  HTTP 507** com corpo de erro (`teto_bytes` e `tamanho_bytes`), o gateway grava um evento e o monitor mostra aviso.
+  **Nada é apagado sozinho** (são dados curados). Para voltar a aceitar: o admin **apaga** ocorrências na aba Erros (o `auto_vacuum`
+  incremental devolve o espaço).
+- **Apagar** remove o conteúdo da ocorrência, seus jobs e as amostras que ninguém mais usa, **inclusive dos bytes em disco**
+  (`secure_delete` e checkpoint TRUNCATE do `-wal`); deixa só uma linha mínima (`id`, `estado=apagada`, datas) e o histórico (só hash e tamanho).
+- **Sem expiração automática** (C-6.1), ao contrário do `content.db` (7 dias). O histórico também não expira e conta no teto.
+- **Fora do backup comum.** Se precisar de cópia, cifrada: `sqlite3 /var/lib/mcpollama-gateway/treino.db ".backup '<destino>'"` com o gateway rodando
+  (cópia consistente) e **depois cifre** o destino. Nunca copie só o `.db` com o gateway ativo (o `-wal` fica de fora).
+
+### 17.4 `POST /api/feedback`
+
+Recebe os relatos do `reportar_erro` (e dos automáticos, se `--auto-report` estiver ligado no mcpollama). A origem do relato exige **estação e IP**.
+Respostas: `200` gravado; `400` JSON inválido ou campo desconhecido; `413` corpo maior que 256 KB; `404` o `job_do_erro` não existe **neste**
+gateway (o relato vai ao gateway que criou o job); `409` o job ainda está na fila ou rodando (o mcpollama tenta de novo uma vez); `503` sem
+`--treino-db`, sem `--doc-key-file` ou banco ocupado; `507` teto (17.3). Num gateway com `MCPGW_ROLE=fallback`, todo relato vira estado `fallback`,
+sem copiar amostra (a ocorrência fica só como rastro).
+
+### 17.5 Aba "Erros (treino)" do `/monitor`
+
+Contagens para qualquer visitante da LAN; lista, detalhe (com texto), ações e exportação **só para o admin** (sessão, same-site).
+
+| Ação | O que faz |
+| --- | --- |
+| confirmar | marca a ocorrência como `confirmada` (exige a `resposta_correta`); só confirmada entra no treino/teste |
+| completar | preenche a `resposta_correta`, a descrição e a correção aplicada. **Alterar** esses campos numa confirmada **desfaz a confirmação** e o embedding (C-6.5) |
+| descartar | tira a ocorrência da base sem apagar (não libera a vaga da cota de teste) |
+| apagar | remove o conteúdo (17.3) e grava `apagou` no histórico |
+| exemplo público | marca (ou desmarca) a confirmada como **exemplo público** (sintética ou anonimizada); só estas podem virar exemplo na melhora e ter embedding |
+| liberar quarentena | escolhe o lado (treino ou teste) para um componente em quarentena; **recusado** se algum membro já foi exportado no outro lado (C-4.11c) |
+| Marcar erro | no log de jobs, abre uma ocorrência a partir de um job (`POST /monitor/api/jobs/{id}/marcar-erro`) |
+
+- **Partição (C-4.5 a C-4.12):** o grupo (documentos ligados pelo mesmo `doc_hash`, mesmo `conteudo_hmac` ou um job em comum) cai **inteiro** de um
+  lado. Os 30 primeiros grupos exportáveis de cada categoria vão para o **teste**; depois, `sha256(grupo) mod 100 < 15`. Grupos unidos com lados
+  opostos já atribuídos vão para **quarentena**: nunca saem na exportação até o admin liberar.
+- **Exportação:** `GET /monitor/api/treino/export?parte=treino|teste`, JSONL em streaming gerado na hora (nada fica guardado no servidor), uma linha
+  `{"messages":[system,user,assistant],"meta":{...}}` por amostra que passa em **todas** as condições do capítulo 3 do contrato (confirmada, sem
+  imagem, sem truncamento, tool de geração, não distribuída nem de fallback, partição pedida e fora da quarentena). Cada ocorrência exportada grava
+  `exportou` no histórico, com a parte e quem baixou. **O arquivo baixado é responsabilidade de quem baixou.**
+- **Treinar fora da rede** exige dados anonimizados (C-6.9).
+- **Exemplo público:** só uma confirmada marcada assim pode ser usada como exemplo no pedido de outro (C-8.1) e ter embedding; não use para dado de cliente.
+
+### 17.6 Melhora sem treino (DESLIGADA)
+
+Instruções por tool e até k exemplos "erro → certo" acrescentados ao texto **system** do pedido (nunca ao texto do usuário nem aos marcadores de
+arquivo). **Desligada por padrão** e **sem nenhuma variável `MCPGW_MELHORA_*` na unit**: só liga depois que o `bakeoff -suites erros` mostrar ganho
+na categoria-alvo (≥ 10 pontos, com o limite inferior de Wilson acima do ponto do modelo atual) sem queda nas outras (C-5.10 a C-5.12).
+
+Para ligar **depois** (decisão do owner, com a medição na mão): congele o índice (17.7, modo `indice`), grave o arquivo de instruções
+(`{"tools":{"extract":"..."}}`) e acrescente à unit, **num restart combinado**: `Environment=MCPGW_MELHORA_TOOLS=extract` (as tools a melhorar),
+`MCPGW_MELHORA_INSTRUCOES=<arquivo absoluto>`, `MCPGW_MELHORA_INDICE=<id do índice>` e, para calcular os embeddings dos exemplos públicos em segundo
+plano, `MCPGW_MELHORA_EMBEDDINGS=true` (também desligado por padrão; sem ele os embeddings ficam pendentes e nada vai ao modelo de embedding).
+`MCPGW_MELHORA_EMBED_TIMEOUT` (2 s): estourou, o pedido segue **sem** exemplos. O log de jobs guarda o pedido como o cliente mandou **e** o
+melhorado, com o rastro (`melhora_*`); esses jobs **não** entram na exportação nem no retrato (C-3.10a). Um membro do índice que deixa de ser
+exemplo **invalida o índice** (C-4.10): reinicie com outro. Atenção: essas variáveis seriam ignoradas pelo 0.12.6, mas a melhora só existe no 0.13.0.
+
+### 17.7 Bakeoff dos erros (`-suites erros`)
+
+**Onde roda:** **no servidor**, ao lado do `treino.db`, **com o mesmo usuário do gateway** (`mcpgw`: o `treino.db` e a `doc.key` são 0600 dele), porque o
+conteúdo dos casos é de cliente e não sai da rede (C-5.6). O programa lê o `treino.db` e reenvia os pedidos ao gateway local (`127.0.0.1:11500`) com
+`X-Mcpollama-Tool: bakeoff-erros`; o que ele escreve (relatório, linha de base) só tem ids, categorias e números. O único arquivo com texto é o da
+revisão às cegas (0600, para o owner).
+
+Binário (neste PC, em pasta temporária; **nunca** em `D:\MCP`): `cd src; $env:GOOS='linux'; $env:CGO_ENABLED='0'; go build -ldflags "-X main.Version=<versão>" -o <pasta>\bakeoff ./cmd/bakeoff`;
+envio por `scp` e `install -m 0755 -o root -g root bakeoff /usr/local/bin/mcpollama-bakeoff`. Rodar:
+
+```bash
+runuser -u mcpgw -- /usr/local/bin/mcpollama-bakeoff -suites erros -erros-modo retrato \
+  -treino-db /var/lib/mcpollama-gateway/treino.db -doc-key-file /etc/mcpollama-gateway/doc.key -out /var/lib/mcpollama-gateway/bakeoff
+```
+
+| `-erros-modo` | Faz |
+| --- | --- |
+| `retrato` | congela o teste: lista (ocorrência, job, `prompt_hmac`, categoria) das amostras da partição teste; imprime o ID do retrato |
+| `base` | linha de base do `qwen3-ia` atual no retrato (`-retrato ID`), 3 rodadas pareadas (`options.seed` 1, 2 e 3); acerto com 2 de 3 (C-5.15) |
+| `comparar` | candidato x atual no mesmo retrato (`-retrato ID -candidato M -alvo CAT`); o atual é medido de novo a cada comparação (C-5.16) |
+| `apurar` | aplica as respostas do owner à revisão às cegas (`-resultado resultado-*.json -blind-respostas arquivo`, linhas `rótulo<TAB>certa ou errada<TAB>certa ou errada`) |
+| `indice` | congela os exemplos públicos num índice (`-exemplos-k`, `-exemplos-limiar`; padrões provisórios 3 e 0,80) |
+| `indices-limpar` | apaga os índices já invalidados |
+
+Códigos de saída: `0` ok; `1` o gate **falha** por dados insuficientes (menos de 30 casos de teste confirmados na categoria; o relatório diz "dados
+insuficientes", nunca "sem regressão"); `2` uso; `3` avaliação válida, mas a mudança não cumpre C-5.10 a C-5.12; `4` aguardando a revisão às cegas do
+owner. Uma categoria só é **reportada** com ≥ 20 casos e só **decide** com ≥ 30. A linha de base e a medição só têm sentido com dados reais, **depois** da
+implantação. **Pendência do aceite:** um segundo processo abrindo o `treino.db` **vivo** (com o gateway rodando) ainda não foi exercitado ao vivo; confira
+no aceite da implantação.
+
+### 17.8 Implantação (a ordem importa)
+
+1. **Gateway 0.13.0 primeiro**, mcpollama 0.10.0 depois (C-2.11): o 0.12.6 repassa o `X-Mcpollama-Doc` ao Ollama.
+2. Fila e execução **vazias** (o restart corta quem está em andamento).
+3. `Instalar-Gateway.ps1 -Modo Atualizar`: etapa 1 (gera a `doc.key` se não existir e imprime o `key_id`) + `stage-atualizar.sh` (troca a unit, restart,
+   confere `active`, `/api/version` 200, `/monitor/api/treino` 200). Anote o `key_id`.
+4. Conferir: `ls -l /etc/mcpollama-gateway/doc.key /var/lib/mcpollama-gateway/treino.db` (ambos `mcpgw`, `-rw-------`);
+   `journalctl -u mcpollama-gateway -n 30`; a aba Erros abre no `/monitor`; um `POST /api/feedback` com corpo inválido responde 400 (não 503).
+5. Se houver gateway de fallback: copiar a `doc.key` por canal protegido, `MCPGW_ROLE=fallback` na unit dele, e conferir o `key_id` igual.
+6. **Depois**, o mcpollama 0.10.0 em `D:\MCP` (ver `INSTALACAO.md` G.1) e reiniciar as sessões do Claude Code.
+7. Aceite ao vivo com o owner: um relato real pela `reportar_erro`, confirmação na aba Erros e exportação de teste.
+8. Só então o `docs/RELATAR-ERROS-IA.md` deixa de ser "instrução futura" e a seção do `~\.claude\CLAUDE.md` global (12.11) entra.
+
+### 17.9 Voltar atrás (rollback) da Fase 12
+
+- **Só o binário, para o 0.12.6:** `systemctl stop mcpollama-gateway; install -m 0755 <cópia guardada pela etapa 1> /usr/local/bin/mcpollama-gateway;
+  systemctl start mcpollama-gateway` (a cópia está em `/root/srv-backup-20261028/fase96-AAAAMMDD-HHMMSS/mcpollama-gateway`, a mais recente antes da troca).
+  **A unit pode ficar como está:** a Fase 12 usa `Environment=`, e o 0.12.6 **ignora variável desconhecida** (uma flag desconhecida o faria sair com erro
+  e entrar em laço de reinício). O `treino.db` e a `doc.key` deixam de ser usados e **ficam em disco** (continuam 0600; apague só com decisão do owner).
+- **O `content.db` com colunas novas** é lido pelo 0.12.6 (ele ignora as colunas que não conhece). Cuidado: o **teto antigo de 2 GiB do 0.12.6 não conta o
+  `prompt_json`**; com o binário antigo o arquivo pode passar de 2 GiB sem o teto agir. A retenção de 7 dias continua apagando os jobs velhos.
+- **O inverso não vale:** um gateway que encontra um `treino.db` de versão **maior** que a que conhece (v4) **recusa abrir** e não sobe; use o binário certo.
+- **mcpollama 0.9.2 de volta:** reinstale o binário antigo na estação; o gateway 0.13.0 segue servindo (a `reportar_erro` some e o `X-Mcpollama-Doc` deixa de ser enviado).
+- **O `rollback.sh` (9.6)** continua sendo o da ativação do gateway (nginx e Ollama); ele **não** troca binário nem unit e não é o caminho para sair da Fase 12.
+  O `stage-atualizar.sh` já devolve sozinho a unit e o binário se o gateway novo não subir.
+
+### 17.10 Diagnóstico
+
+| Sintoma | Causa provável | O que fazer |
+| --- | --- | --- |
+| gateway não sobe, "--doc-key-file ... use 0600" | `doc.key` com modo ou dono errado | `chown mcpgw:mcpgw` e `chmod 0600` (o `stage1.sh` conserta); nunca recriar a chave |
+| gateway não sobe, "curta demais" ou "hexadecimal" | `doc.key` corrompida ou vazia | **não** gere outra por cima sem o owner (quebra os grupos); restaure da cópia protegida |
+| gateway não sobe, "treino.db is version N, this gateway knows 4" | binário mais antigo que o banco | instalar o binário certo |
+| `/api/feedback` 503 "falta --doc-key-file" ou "--treino-db" | variável ausente na unit, ou unit não recarregada | `systemctl show mcpollama-gateway -p Environment`, `daemon-reload` e restart |
+| `/api/feedback` 507 | `treino.db` no teto de 2 GiB | o admin apaga ocorrências (17.3); nada é apagado sozinho |
+| `/api/feedback` 404 | o job é de outro gateway | enviar ao gateway que criou o job |
+| `/monitor/api/treino` 503 | `MCPGW_TREINO_DB` não chegou ao processo | idem 503 acima |
+| aba Erros vazia para o visitante | só o admin vê a lista | entrar como `admin` |
+| `bakeoff` sai com 1 | dados insuficientes (< 30 casos de teste na categoria) | juntar e confirmar mais casos; não é "sem regressão" |

@@ -13,11 +13,38 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
 feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
-Em planejamento: **Fase 12** (registro dos erros do modelo local → base de treino), aguardando ajustes do owner:
-`.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; instruções para o Claude em `docs/RELATAR-ERROS-IA.md`.
+**Fase 12** (registro dos erros do modelo local → base de treino): **código pronto e revisado, a implantar** (aguarda a ordem
+do owner; nada foi instalado no servidor nem em `D:\MCP`). Entra como **gateway 0.13.0** e **mcpollama 0.10.0**, descritos
+abaixo. **Ordem obrigatória: gateway 0.13.0 ANTES do mcpollama 0.10.0** (ver as entradas). Plano:
+`.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; contrato de dados (1.1.6):
+`docs/CONTRATO-DADOS-TREINO.md`; instruções para o Claude em `docs/RELATAR-ERROS-IA.md` (valem só depois da implantação).
 
 
 ## mcpollama
+
+### [0.10.0] - a implantar (Fase 12; ainda sem tag)
+
+Binário `0.10.0-<hash>` ainda **não** instalado em `D:\MCP`. **Só instale depois do gateway 0.13.0** (ver abaixo): o gateway
+0.12.6, em produção, repassa o cabeçalho novo `X-Mcpollama-Doc` ao Ollama (que o ignora), mas a remoção dele e a partição por
+documento só passam a valer com o 0.13.0 (C-2.11). Commits da Fase 12 nesta parte: `1bb42fc` (12.2) e `9f67fee` (12.5), mais o contrato.
+
+#### Adicionado
+- **ID e papel de cada job** (12.2): o mcpollama lê o `X-Request-Id` (32 hex minúsculos) da resposta usada, inclusive a do
+  fallback, e a linha `[uso]` ganha `job=<id>` (uma chamada) ou `jobs=<papel>:<id>,...` (várias; papéis `unico`, `mapN`,
+  `reduceN`, `final`; `@fallback` quando o job rodou no segundo servidor). O mesmo vai em `jobs` no `_meta` `mcpollama/usage`.
+- **Cabeçalho `X-Mcpollama-Doc`** (12.2, C-4.1): nas tools de arquivo, o sha256 do texto extraído do documento inteiro, enviado em
+  **cada** chamada do pedido (map, reduce e partes). O gateway só grava o HMAC dele, nunca o sha256 puro.
+- **Tool `reportar_erro`** (12.5): o Claude relata um erro do modelo local ao gateway (`POST /api/feedback`), com os jobs
+  envolvidos (até 64), a resposta correta e a categoria. Aparece sem configuração nenhuma. Só retenta no 409 (uma vez) e nunca
+  cai para o outro servidor. Instruções: `docs/RELATAR-ERROS-IA.md`.
+- **Flag `--auto-report` / `MCPOLLAMA_AUTO_REPORT`** (12.5): liga os relatos **automáticos** de candidatos a erro (resposta vazia
+  ou cortada pelo limite de tokens; a regra de JSON inválido está reservada e não dispara, porque nenhuma tool expõe o `format`
+  do Ollama). **Desligada por padrão** (`false`): cada automático copia pedido e resposta, inclusive de documentos sensíveis, para
+  a base de treino do servidor, sem expiração. Quando ligada: fila de 16, 1 goroutine, 30 s por envio, nunca atrasa nem falha uma tool.
+
+#### Alterado
+- `TOOLS.md` regenerado (tool nova); o orçamento de tamanho do `tools/list` subiu (4.620 para 6.650 bytes no modo compacto e
+  8.330 para 10.360 no completo), porque o esquema da `reportar_erro` tem 3 enums.
 
 ### [0.9.2] - 2026-10-31 (tag `mcpollama-v0.9.2`)
 
@@ -129,6 +156,55 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
+
+### [0.13.0] - a implantar (Fase 12; ainda sem tag)
+
+Binário `0.13.0-<hash>` (Linux amd64) ainda **não** instalado no servidor. Commits da Fase 12: `8fc5558` (contrato 1.0.0), `1fd5b27`,
+`3531beb` (12.3), `a1a4f9f`, `a820b70` (12.4), `37706bb`, `d27a4ca`, `0493f7f` (12.6), `3fc8fa9` (12.7), `9e3c111` (12.8) e `481aee0`
+(correções da revisão adversarial 12.9 e contrato 1.1.6); `c11aff9` é só o pack do Codex no git, sem código.
+
+**Ordem de implantação obrigatória: gateway 0.13.0 ANTES do mcpollama 0.10.0** (C-2.11). O 0.12.6 repassa o `X-Mcpollama-Doc` ao
+Ollama; o 0.13.0 o remove e grava só o HMAC. Gateway novo com mcpollama antigo não quebra nada (o `/api/feedback` só não é
+chamado); o inverso é o que se evita.
+
+#### Adicionado
+- **Pedido canônico** (12.3): o `content.db` guarda também o `prompt_json` de cada job (o pedido, com cada imagem trocada por
+  `{"imagem_hmac":"<hex>"}`), com tetos próprios e marcas de truncamento; funções `prompt_hmac` e `conteudo_hmac` (C-2.12).
+- **Chave HMAC** `--doc-key-file` / `MCPGW_DOC_KEY_FILE` (12.3): 64 hex, modo 0600. Com ela, `requests.doc_hash` guarda o HMAC do
+  `X-Mcpollama-Doc` com o `key_id` (16 hex do sha256 da chave). Sem ela, o hash fica vazio e o `/api/feedback` responde 503.
+- **`treino.db` e `POST /api/feedback`** (12.4): `--treino-db` / `MCPGW_TREINO_DB` (absoluto, 0600, teto de **2 GiB** de dados vivos;
+  acima, **HTTP 507** sem apagar nada). Ocorrências, jobs, amostras, histórico (só hash e tamanho nos campos de conteúdo),
+  retratos e embeddings. **Esquema v4** (`PRAGMA user_version`); o gateway recusa abrir um arquivo de versão maior.
+  `--role primario|fallback` / `MCPGW_ROLE`: num gateway de fallback, todo relato vira estado `fallback`, sem copiar amostra.
+- **Aba "Erros (treino)" no `/monitor`** (12.6): lista e filtros; detalhe só para o admin; ações do admin (confirmar, descartar,
+  completar, apagar, marcar exemplo público, liberar quarentena e "Marcar erro" num job do log); **exportação JSONL** em streaming
+  (`parte=treino|teste`, regra única do capítulo 3 do contrato, `exportou` por ocorrência no histórico); partição treino/teste por
+  grupo com cota e quarentena. Rotas `GET /monitor/api/treino[/export|/{id}]` e `POST /monitor/api/treino/{id}/{ação}`.
+- **Bakeoff `-suites erros`** (12.7): retrato congelado do teste, linha de base do `qwen3-ia`, comparação candidato x atual em 3
+  rodadas pareadas, revisão às cegas e apuração (`-erros-modo retrato|base|comparar|apurar|indice|indices-limpar`). Roda **no
+  servidor**, com o mesmo usuário do gateway (o conteúdo dos casos não sai da rede). Binário próprio (`cmd/bakeoff`, Linux).
+- **Melhora sem treino, DESLIGADA por padrão** (12.8, D12-15): `--melhora-tools`, `--melhora-instrucoes`, `--melhora-indice`,
+  `--melhora-embed-model`, `--melhora-embed-timeout` e `--melhora-embeddings` (env `MCPGW_MELHORA_*`). Só liga depois que o bakeoff
+  mostrar ganho (C-5.10 a C-5.12). Com ela desligada, o caminho quente fica idêntico ao do 0.12.6.
+
+#### Alterado (padrões novos)
+- `--content-max-bytes`: padrão de **2 GiB para 4 GiB**; o `prompt_json` conta nesse teto.
+- `--content-max-job-bytes` (16 MiB) vale para cada um: prompt plano, `prompt_json` e resposta.
+- `--melhora-*` vem **desligado**; no mcpollama 0.10.0, `--auto-report` vem **desligado** (`false`).
+- Remoção do `X-Mcpollama-Doc` antes do Ollama (C-2.11).
+- Migração do `content.db` no start, por `ALTER TABLE ... ADD COLUMN` (`prompt_json`, `prompt_json_truncated`, `tem_imagem`,
+  `prompt_json_original*`, `melhora_*`), e do `gateway.db` (`requests.doc_hash`). **O 0.12.6 lê esse `content.db`** (ignora as colunas novas).
+
+#### Implantação
+- A unit versionada (`deploy/gateway/mcpollama-gateway.service`) configura a Fase 12 por **variáveis de ambiente** (`MCPGW_TREINO_DB`,
+  `MCPGW_DOC_KEY_FILE`, `MCPGW_ROLE`), **não** por flags no `ExecStart`: o 0.12.6 recusa flag desconhecida (laço de reinício), mas
+  ignora variável desconhecida, então o rollback só do binário continua subindo com a mesma unit.
+- A etapa 1 (`stage1.sh`) gera `/etc/mcpollama-gateway/doc.key` se não existir (32 bytes aleatórios em hex, `mcpgw:mcpgw` 0600),
+  nunca a sobrescreve nem a imprime (só o `key_id`). Novo `stage-atualizar.sh`: o `-Modo Atualizar` agora também troca a unit se
+  mudou, reinicia e confere, e volta sozinho (unit e binário) se o gateway não subir; não mexe no nginx nem no Ollama.
+- `treino.db`, `content.db` e `doc.key` ficam **fora do backup comum** (C-6.8); a mesma chave vai para o gateway de fallback, por
+  canal protegido (C-4.3a).
+- Procedimento e rollback: `docs/MANUAL-GATEWAY.md` seção 17 e `docs/INSTALACAO.md` (C.1).
 
 ### [0.12.6] - 2026-11-01 (tag `gateway-v0.12.6`)
 

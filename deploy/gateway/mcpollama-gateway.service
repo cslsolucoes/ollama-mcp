@@ -28,6 +28,20 @@ ExecStart=/usr/local/bin/mcpollama-gateway \
   --allowed-models "qwen3-ia;nomic-embed-text" \
   --admin-file /etc/mcpollama-gateway/admin \
   --start-stagger 300ms
+# Fase 12 (gateway 0.13.0): erros do modelo -> base de treino. Configurada por VARIAVEL DE AMBIENTE, nao por flag no
+# ExecStart, de proposito: o binario 0.12.6 recusa flag desconhecida (sairia com erro e entraria em laco de reinicio),
+# mas ignora variavel desconhecida. Assim um rollback so do binario para a 0.12.6 continua subindo com ESTA unit.
+# Todas as flags do gateway tem o fallback MCPGW_* (src/cmd/mcpollama-gateway/config.go); a flag, se existisse, venceria.
+#   MCPGW_TREINO_DB     treino.db (0600, criado pelo gateway; teto de 2 GiB de dados vivos, 507 acima; FORA do backup comum).
+#                       Liga o POST /api/feedback e a aba Erros do monitor. Fica em /var/lib/mcpollama-gateway (ReadWritePaths).
+#   MCPGW_DOC_KEY_FILE  chave HMAC (64 hex, mode 0600, dono mcpgw), gerada pelo stage1.sh se nao existir. Sem ela o
+#                       /api/feedback responde 503 e nenhum hash e gravado. A MESMA chave vai para o gateway de fallback.
+#   MCPGW_ROLE          primario (padrao). Num gateway de fallback, fallback.
+# A melhora sem treino (--melhora-* / MCPGW_MELHORA_*) fica DESLIGADA de proposito: so liga depois da medicao do bakeoff
+# (C-8.8). Nao acrescente as variaveis MCPGW_MELHORA_* aqui antes disso.
+Environment=MCPGW_TREINO_DB=/var/lib/mcpollama-gateway/treino.db
+Environment=MCPGW_DOC_KEY_FILE=/etc/mcpollama-gateway/doc.key
+Environment=MCPGW_ROLE=primario
 Restart=always
 RestartSec=3
 NoNewPrivileges=yes

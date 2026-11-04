@@ -18,6 +18,9 @@ echo "boot: $(uptime -s)"
 test -s /etc/mcpollama-gateway/admin || { echo "FALTA /etc/mcpollama-gateway/admin (bash /root/mcpgw-definir-senha.sh)"; exit 1; }
 # o gateway (usuario mcpgw) le o arquivo e recusa qualquer permissao de grupo/outros (admin.go: 0600)
 chown mcpgw:mcpgw /etc/mcpollama-gateway/admin; chmod 0600 /etc/mcpollama-gateway/admin
+# Fase 12: a unit aponta MCPGW_DOC_KEY_FILE para este arquivo (criado pela etapa 1; nunca sobrescrito)
+test -s /etc/mcpollama-gateway/doc.key || { echo "FALTA /etc/mcpollama-gateway/doc.key (rode a etapa 1: stage1.sh a cria)"; exit 1; }
+[ "$(stat -c '%U:%G %a' /etc/mcpollama-gateway/doc.key)" = "mcpgw:mcpgw 600" ] || { echo "doc.key precisa ser mcpgw:mcpgw 0600"; exit 1; }
 cp -p "$NG" "$B/ollama.conf"; cp -p "$PERF" "$B/10-performance.conf"; cp -p "$D/rollback.sh" "$B/rollback.sh"; sync
 test -s "$B/ollama.conf"; test -s "$B/10-performance.conf"; test -s "$B/rollback.sh"
 echo "backups em $B"
@@ -31,6 +34,7 @@ sleep 2
 systemctl is-active mcpollama-gateway
 echo "gateway /api/version: $(curl -s -m 5 -o /dev/null -w '%{http_code}' $G/api/version)"
 echo "gateway /monitor:     $(curl -s -m 5 -o /dev/null -w '%{http_code}' $G/monitor)"
+echo "gateway /monitor/api/treino: $(curl -s -m 5 -o /dev/null -w '%{http_code}' $G/monitor/api/treino)  (Fase 12; 200 = treino.db aberto)"
 
 rollback() { echo "!! FALHA - rollback"; bash "$B/rollback.sh" "$B" || true; exit 1; }
 trap rollback ERR

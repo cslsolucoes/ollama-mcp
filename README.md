@@ -88,6 +88,7 @@ Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`
 | 9 | Gateway: fila, políticas, `/monitor`, SQLite, instalador | concluída (2026-10-30) |
 | 10 | Log de jobs, pool de backends e fallback (faixa CPU descartada) | **10.1 a 10.8 concluídas; plano congelado em 2026-10-30**; 10.S (secundário) pendente, sem data |
 | 11 | Túnel WebSocket e jobs assíncronos ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md)) | **congelada em 2026-10-30 23:50** (decisão do owner); só o spike 11.1 foi feito ([relatório](.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md)); nenhum código |
+| 12 | Erros do modelo local, base de treino, melhora sem treino ([plano](.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md), [contrato](docs/CONTRATO-DADOS-TREINO.md)) | **código pronto e revisado (12.1 a 12.9); PRONTA PARA IMPLANTAR** (gateway 0.13.0 antes do mcpollama 0.10.0; aguarda a ordem do owner; ver [MANUAL, seção 17](docs/MANUAL-GATEWAY.md#17-erros-do-modelo-e-base-de-treino-fase-12-a-implantar)) |
 
 **Fase 10** ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md), congelado):
 

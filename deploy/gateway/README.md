@@ -28,12 +28,13 @@ Se a ativação falhar, a volta atrás é automática.
 | Arquivo | O que é |
 | --- | --- |
 | `Instalar-Gateway.ps1` | instalador, executado neste PC |
-| `mcpollama-gateway.service` | unit do systemd: usuário `mcpgw`, 127.0.0.1:11500, 1 slot de geração, prioridade alta da LAN |
+| `mcpollama-gateway.service` | unit do systemd: usuário `mcpgw`, 127.0.0.1:11500, 3 slots de geração, prioridade alta da LAN; Fase 12 por variáveis `Environment=MCPGW_*` (não flags, para o rollback ao 0.12.6 continuar subindo) |
 | `ollama.conf` | `/etc/nginx/conf.d/ollama.conf`: nginx → gateway; `/monitor` só na LAN; IP real do cliente, sem confiar no `CF-Connecting-IP` vindo da LAN |
-| `stage1.sh` | **etapa 1, preparo:** usuário, pastas e binário. Não mexe no tráfego |
+| `stage1.sh` | **etapa 1, preparo:** usuário, pastas, **chave HMAC `doc.key` (Fase 12; gerada só se não existir, `mcpgw:mcpgw` 0600, nunca impressa; mostra o `key_id`)** e binário. Não mexe no tráfego |
 | `mcpgw-definir-senha.sh` | senha do administrador do `/monitor` (usuário `admin`), digitada sem eco; grava só o hash |
 | `stage2.sh` | **etapa 2, ativação:** gateway, Ollama só no loopback, nginx → gateway (`nginx -t`); confere pelo caminho real; volta atrás sozinho se falhar |
 | `rollback.sh` | volta o nginx direto ao Ollama e o Ollama para a LAN, e para o gateway. A etapa 2 guarda uma cópia na pasta de backup |
+| `stage-atualizar.sh` | **Fase 12, modo `Atualizar`:** troca a unit se mudou, `daemon-reload`, restart e conferência; volta sozinho (unit e binário) se o gateway não subir. Não mexe no nginx nem no Ollama |
 
 **Binário (não versionado):** `D:\MCP\mcpollama-gateway` (Linux amd64), gerado pelo instalador a partir de `src/`.
 
