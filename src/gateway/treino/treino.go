@@ -122,15 +122,23 @@ CREATE TABLE IF NOT EXISTS embeddings(
 -- covering indexes of the recompute and of the summary (review of 12.6, I-2): they answer from
 -- the index alone, without reading the rows that carry the blobs of the samples
 CREATE INDEX IF NOT EXISTS idx_amostras_grupo ON amostras(job_id, key_id, doc_hash, conteudo_hmac);
-CREATE INDEX IF NOT EXISTS idx_amostras_pred ON amostras(job_id, endpoint, status, http_status, prompt_truncado, prompt_json_truncado, tem_imagem, resp_final, resp_truncada, (COALESCE(length(prompt_json),0) > 0));
 CREATE INDEX IF NOT EXISTS idx_oc_estado_part ON ocorrencias(estado, particao, categoria);
 CREATE TABLE IF NOT EXISTS cota_grupos(
   grupo_id TEXT PRIMARY KEY, categoria TEXT NOT NULL,
   particao TEXT NOT NULL CHECK(particao IN ('treino','teste')), atribuida_em INTEGER NOT NULL);
+-- frozen index of examples (stage 12.8; C-8.5): the header and the members with their vectors, no text
+CREATE TABLE IF NOT EXISTS indices(
+  id TEXT PRIMARY KEY, criado_em INTEGER NOT NULL, hash TEXT NOT NULL, modelo TEXT NOT NULL,
+  k INTEGER NOT NULL, limiar REAL NOT NULL, valido INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS indice_itens(
+  indice_id TEXT NOT NULL, ocorrencia_id TEXT NOT NULL, tool TEXT NOT NULL, grupo_id TEXT, doc_hash TEXT, doc_key_id TEXT,
+  vetor BLOB NOT NULL, PRIMARY KEY(indice_id, ocorrencia_id));
+CREATE INDEX IF NOT EXISTS idx_indice_itens_oc ON indice_itens(ocorrencia_id);
 `
 
-// schemaVersion is PRAGMA user_version after migrate.
-const schemaVersion = 1
+// schemaVersion is PRAGMA user_version after migrate. Version 2 (stage 12.8): the
+// retrato records k and the similarity floor of the index it used (C-8.10).
+const schemaVersion = 3
 
 // Options configures Open. Zero values take the defaults.
 type Options struct {
@@ -146,6 +154,10 @@ type Options struct {
 	Now     func() time.Time // tests
 	// TxLockImmediate: see dsn. Default false: the gateway behaves as before.
 	TxLockImmediate bool
+	// OnIndexInvalidated is told, after the commit, that a frozen index of examples
+	// went invalid (C-4.10, C-8.9): the process that serves examples drops it at once.
+	// Runs in the writers' turn; it must not call the Store.
+	OnIndexInvalidated func(id string)
 }
 
 // dsn is the connection string. TxLockImmediate (off for the gateway, which has
@@ -171,6 +183,8 @@ type Store struct {
 	evMu   sync.Mutex
 	evAt   map[string]time.Time
 	closed bool
+	// invalidated collects, during a write transaction, the indexes that went invalid; flushed after the commit.
+	invalidated []string
 }
 
 // Open creates (0600) or opens treino.db, applies the schema and migrates it.
@@ -236,12 +250,66 @@ func migrate(db *sql.DB) error {
 	if v > schemaVersion {
 		return fmt.Errorf("treino.db is version %d, this gateway knows %d", v, schemaVersion)
 	}
+	// Version 2: the retrato columns for k and the floor (C-8.10). Guarded by the
+	// table itself, not only by user_version, so a file half-migrated by a crash, or
+	// opened by two processes at once, ends the same way.
+	// Version 3 (stage 12.8, review): the trace of the improvement in the sample (C-2.10a, C-3.10a) and the
+	// version of the format of the examples in the index (C-8.10a).
+	for _, col := range []struct{ table, name, typ string }{
+		{"retratos", "exemplos_k", "INTEGER"}, {"retratos", "exemplos_limiar", "REAL"},
+		{"amostras", "prompt_json_original", "BLOB"}, {"amostras", "prompt_json_original_truncado", "INTEGER NOT NULL DEFAULT 0"},
+		{"amostras", "melhora", "INTEGER NOT NULL DEFAULT 0"}, {"amostras", "melhora_instrucoes_id", "TEXT"},
+		{"amostras", "melhora_indice_id", "TEXT"}, {"amostras", "melhora_exemplos", "TEXT"},
+		{"indices", "formato", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		has, err := hasColumn(db, col.table, col.name)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE ` + col.table + ` ADD COLUMN ` + col.name + ` ` + col.typ); err != nil {
+			if again, e2 := hasColumn(db, col.table, col.name); e2 != nil || !again { // lost a race with another opener: fine
+				return err
+			}
+		}
+	}
+	// the covering index of the export predicate, with the column of the improvement (C-3.10a)
+	for _, q := range []string{
+		`DROP INDEX IF EXISTS idx_amostras_pred`,
+		`CREATE INDEX IF NOT EXISTS idx_amostras_pred2 ON amostras(job_id, endpoint, status, http_status, prompt_truncado, prompt_json_truncado, tem_imagem, resp_final, resp_truncada, melhora, (COALESCE(length(prompt_json),0) > 0))`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			return err
+		}
+	}
 	if v < schemaVersion {
 		if _, err := db.Exec(`PRAGMA user_version=` + strconv.Itoa(schemaVersion)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func hasColumn(db *sql.DB, table, col string) (bool, error) {
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`) // table is a constant of this package
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return false, err
+		}
+		if name == col {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // Close closes the database.
@@ -374,11 +442,25 @@ func (s *Store) withTxSized(ctx context.Context, f func(tx *sql.Tx, size int64) 
 	if err != nil {
 		return err
 	}
+	s.invalidated = nil
 	if err := f(tx, size); err != nil {
 		_ = tx.Rollback()
+		s.invalidated = nil
 		return err
 	}
-	return tx.Commit()
+	// Every write checks the frozen indexes of examples (C-4.10, C-8.9): one that lists
+	// something that stopped being an example goes invalid in the same transaction.
+	if err := s.sweepIndexes(ctx, tx); err != nil {
+		_ = tx.Rollback()
+		s.invalidated = nil
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		s.invalidated = nil
+		return err
+	}
+	s.flushInvalidated()
+	return nil
 }
 
 // vacuum returns the free pages to the file system (C-6.2a); a failure only

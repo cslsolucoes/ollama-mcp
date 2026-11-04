@@ -1,6 +1,6 @@
 # Contrato de dados da Fase 12 (erros do modelo local → base de treino)
 
-> **Versão:** 1.1.4 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21) (etapa 12.1) · **Data:** 2026-11-02
+> **Versão:** 1.1.5 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21; 1.1.5 em 2026-11-04 00:57) (etapa 12.1) · **Data:** 2026-11-02
 > **Fonte única:** `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (decisões D12-1 a D12-17, §5, §8, §10, §13, §14, §15).
 > Este documento só fixa regras; o raciocínio e o histórico estão no plano.
 
@@ -73,6 +73,7 @@
 - **C-2.8** O teto total do `content.db` é 4 GiB, com retenção de 7 dias; acima do teto apaga os mais antigos.
 - **C-2.9** Ao relatar, as marcas `prompt_truncated`, `prompt_json_truncated`, `tem_imagem`, `resp_final`, `resp_truncated`, `status` e `http_status` são copiadas para a amostra, e a exportação lê só a amostra, nunca o `content.db`.
 - **C-2.10** O `prompt_json` gravado para um job é igual, byte a byte, ao corpo que chegou ao Ollama, exceto pelas imagens trocadas pelo marcador (C-2.5) (teste com Ollama falso, inclusive `chat` com histórico).
+- **C-2.10a** (1.1.5) Quando a melhora sem treino (cap. 8) altera o pedido, o `prompt_json` continua sendo o corpo que chegou ao Ollama (C-2.10). O pedido **antes** da melhora vai na coluna própria `prompt_json_original`, com o mesmo teto e marca de truncado. O job também registra `melhora_instrucoes_id`, `melhora_indice_id` e os ids dos exemplos injetados. Sem melhora, essas colunas ficam vazias.
 - **C-2.11** O cabeçalho `X-Mcpollama-Doc` é removido antes de o pedido chegar ao Ollama e não aparece no `prompt_json`.
 - **C-2.12** `prompt_hmac` (na amostra e no retrato) = HMAC-SHA256(chave, sha256 do `prompt_json` gravado). `conteudo_hmac` = HMAC-SHA256(chave, sha256 do JSON canônico de `system`, `prompt` e `messages`, sem `model`, `options`, `format` e `think`; chaves ordenadas, sem espaços). Nenhum dos dois é guardado como sha256 puro.
 
@@ -88,6 +89,7 @@
 - **C-3.8** (item 7) `tem_imagem=0`.
 - **C-3.9** (item 8) A ocorrência não é `distribuida` nem `fallback`, e a partição não é `quarentena`.
 - **C-3.10** (item 9) No `translate`, a ocorrência só entra se o `job_do_erro` for uma parte (`mapN`) ou a chamada única (`unico`, arquivo de uma parte, sem texto montado; 1.1.1) e a `resposta_correta` for a tradução certa **daquela chamada**; erro no texto montado do `translate` não entra.
+- **C-3.10a** (1.1.5, item 10) Um job cujo pedido foi alterado pela melhora (com `melhora_*` preenchido) **não entra** na exportação de treino nem no retrato. A resposta foi gerada com exemplos ou instruções, e misturá-la com o pedido sem eles contaminaria a amostra. Esses jobs contam só na estatística até uma decisão futura.
 - **C-3.11** A exportação aceita `parte=treino` ou `parte=teste`, exporta só amostras da partição pedida, e nenhuma amostra de `quarentena`.
 - **C-3.12** A exportação é restrita ao admin (sessão + same-site), gerada na hora em streaming, não fica guardada no servidor, e grava `exportou` no histórico.
 - **C-3.13** Cada linha do JSONL é `{"messages":[system, user, assistant],"meta":{...}}`; o `assistant` é a `resposta_correta`, e `system`/`user` vêm do `prompt_json`.
@@ -143,7 +145,7 @@
 - **C-6.3** Apagar é ação do admin, com histórico. Remove todo o conteúdo da ocorrência, os jobs dela e as amostras que ninguém mais usa, e deixa só uma linha mínima (`id`, `estado=apagada`, datas), sem nenhum campo de conteúdo.
 - **C-6.4** Uma amostra (e o embedding) só é removida quando nenhuma ocorrência a referencia mais (contagem de referências).
 - **C-6.5** Alterar `resposta_correta`, `descricao` ou `correcao_aplicada` de uma ocorrência `confirmada` desfaz a confirmação (volta a `nova`), apaga o embedding anterior e grava `desconfirmou` no histórico.
-- **C-6.6** O embedding (`nomic-embed-text`, 768 floats) é calculado só quando o admin marca `exemplo_publico=1` numa ocorrência confirmada, e é apagado quando a marca sai ou a confirmação é desfeita.
+- **C-6.6** O embedding (`nomic-embed-text`, 768 floats) só existe para ocorrência confirmada com `exemplo_publico=1`. Ele é calculado em segundo plano, **só quando o gateway roda com `--melhora-embeddings`** (padrão desligado, 1.1.5); antes disso fica pendente. É apagado, inclusive as cópias nos índices congelados, quando a marca sai ou a confirmação é desfeita.
 - **C-6.7** A exportação é gerada na hora e não é guardada no servidor; o arquivo baixado é responsabilidade de quem baixou, e isso fica no histórico.
 - **C-6.8** O `treino.db` e o `content.db` ficam fora do backup comum, ou só entram cifrados.
 - **C-6.9** Treinar fora da rede exige dados anonimizados.
@@ -173,6 +175,8 @@
 - **C-8.8** Os exemplos (até k pares "erro → certo") e as instruções novas ficam ligáveis por tool e por flag, com padrão **desligado**, e só ficam ligados quando a avaliação cumprir C-5.10 a C-5.12.
 - **C-8.9** Uma ocorrência desconfirmada, descartada, apagada, `sem_pedido`, `distribuida` ou `fallback` não é usada como exemplo.
 - **C-8.10** O valor de k e o limiar de similaridade são fixados na etapa 12.8, medidos pela 12.7, e registrados no retrato junto com o índice.
+- **C-8.10a** (1.1.5) k e o limiar ficam **congelados no índice** (entram no hash dele) e são registrados no retrato. Produção e medição usam os mesmos valores. O hash do índice também cobre a versão do formato dos exemplos.
+- **C-8.11** (1.1.5) O bloco de exemplos no pedido é delimitado por um marcador com nonce próprio, novo a cada pedido, e declarado como dado, não como instrução. O texto de cada exemplo não pode conter um marcador de arquivo aberto nem unificar nonces distintos.
 
 ## Rastreabilidade (regra → decisão do plano)
 
@@ -245,3 +249,12 @@ Achados da revisão automática de segurança do commit da 12.4. A **C-1.11a** p
 ## Versão 1.1.4 (owner, 2026-11-03 10:21)
 
 Revisão da 12.5: a regra automática do JSON inválido fica reservada até alguma tool expor o `format`, e os automáticos passam a vir desligados por padrão (C-1.20a). O plano dizia "ligados" (D12-8, §14 item 1); prevalece esta versão.
+
+## Versão 1.1.5 (owner, 2026-11-04 00:57)
+
+Revisão da 12.8:
+- **C-2.10a:** com a melhora ligada, o gateway grava os dois pedidos (o que chegou ao Ollama e o original) e o rastro da melhora.
+- **C-3.10a:** jobs alterados pela melhora ficam fora da exportação de treino e do retrato.
+- **C-6.6:** os embeddings em segundo plano vêm desligados por padrão.
+- **C-8.10a:** k e o limiar ficam congelados no índice.
+- **C-8.11:** os exemplos são delimitados com nonce próprio.

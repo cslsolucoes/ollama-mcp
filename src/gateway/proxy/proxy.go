@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
+	"github.com/cslsoftwares/mcpollama/gateway/melhora"
 	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 )
@@ -100,6 +101,13 @@ type Config struct {
 	// markers. nil: doc_hash stays empty and the image markers carry no hash
 	// (Fase 12, C-2.5, C-4.2). The key is never logged or returned.
 	DocKey *hmackey.Key
+	// Melhora, when set, adds the instructions of the tool and the examples of the
+	// frozen index to the SYSTEM text of a generation request, for the tools it is on
+	// for (Fase 12.8, D12-15; off by default). The search of the examples is made
+	// before the request takes its place in the queue. When it changes the request, the
+	// job log keeps the body the Ollama received as prompt_json (C-2.10), the request before the
+	// improvement as prompt_json_original and the ids of what was added (C-2.10a).
+	Melhora *melhora.Transformer
 
 	Logf func(format string, args ...any)
 }
@@ -470,6 +478,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	body = pol.body
 
+	// Improvement without training (Fase 12.8): fwd is what the model receives, body
+	// stays what the job log keeps. The search of the examples (an embedding through the
+	// queue's embed lane, bounded by a short timeout) is done here, BEFORE Acquire, so a
+	// request never holds a slot of generation while it waits for its examples.
+	fwd := body
+	var mo melhora.Outcome
+	if h.cfg.Melhora != nil && rt.lane == queue.LaneGen {
+		fwd, mo = h.cfg.Melhora.Transform(r.Context(), cleanTool(r.Header.Get(HeaderTool)), path, body, melhora.Exclusion{})
+	}
+	changed := mo.Instrucao || mo.Exemplos > 0
+
 	ip := clientIP(r)
 	pin, pfinal := h.priorityFor(ip, r.Header.Get(HeaderPriority))
 	qreq := queue.Request{
@@ -496,7 +515,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	jr := h.cfg.Journal
 	if jr != nil {
-		// body is the policy's output: exactly what the Ollama will receive. The
+		// fwd is what the Ollama will receive: the policy's output (body), plus the improvement when
+		// there is one (C-2.10, C-2.10a). The
 		// text and the JSON are built once the line accepted the request (a
 		// rejected one never pays for the scan), and not at all when the journal
 		// does not record content.
@@ -504,13 +524,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if jj, ok := jr.(JSONJournal); ok {
 			if jj.WantsPromptJSON() {
 				qreq.OnAccepted = func(rec queue.Record) {
-					jj.EnqueuedJSON(rec, extractPrompt(kind, body, key), buildPromptJSON(body, key))
+					pj := buildPromptJSON(fwd, key)
+					if changed {
+						pj.Melhora, pj.InstrucoesID, pj.IndiceID, pj.Exemplos = true, mo.InstrucoesID, mo.IndiceID, mo.ExemploIDs
+						if orig := buildPromptJSON(body, key); !orig.Failed {
+							pj.Original = orig.JSON
+						}
+					}
+					jj.EnqueuedJSON(rec, extractPrompt(kind, fwd, key), pj)
 				}
 			} else {
 				qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, "") }
 			}
 		} else {
-			qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, extractPrompt(kind, body, key)) }
+			qreq.OnAccepted = func(rec queue.Record) { jr.Enqueued(rec, extractPrompt(kind, fwd, key)) }
 		}
 	}
 	tk, err := h.cfg.Queue.Acquire(r.Context(), qreq)
@@ -542,8 +569,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := context.WithValue(runCtx, ctxKey{}, ex)
 	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { ex.connected.Store(true) }})
 	out := r.WithContext(ctx)
-	out.Body = io.NopCloser(bytes.NewReader(body))
-	out.ContentLength = int64(len(body))
+	out.Body = io.NopCloser(bytes.NewReader(fwd))
+	out.ContentLength = int64(len(fwd))
 	out.TransferEncoding = nil
 	h.proxy.ServeHTTP(w, out)
 }

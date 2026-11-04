@@ -226,6 +226,9 @@ func renderReport(in reportInput, o outcome) string {
 	w("- Gerado em: %s", in.Now.Format("2006-01-02 15:04:05"))
 	w("- **Retrato:** `%s` (válido: %s; criado em %s)", in.RetratoID, yesNo(in.Retrato.Valido), time.UnixMilli(in.Retrato.CriadoEm).Format("2006-01-02 15:04:05"))
 	w("- Índice de exemplos: `%s` · Instruções: `%s` / `%s`", orNone(in.Retrato.IndiceHash), orNone(in.Retrato.InstrucoesID), orNone(in.Retrato.InstrucoesHash))
+	if in.Retrato.ExemplosK > 0 {
+		w("- Exemplos: k=%d · limiar de similaridade=%.4f (C-8.10)", in.Retrato.ExemplosK, in.Retrato.ExemplosLimiar)
+	}
 	w("- Modelo atual (medido de novo nesta sessão, C-5.16): `%s`", in.Atual)
 	if in.Mode == "comparar" {
 		w("- Candidato: `%s` · Categoria-alvo: `%s`", in.Candidato, orNone(in.Alvo))

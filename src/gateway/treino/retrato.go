@@ -52,6 +52,9 @@ type Retrato struct {
 	IndiceHash     string
 	InstrucoesID   string
 	InstrucoesHash string
+	// ExemplosK and ExemplosLimiar: see RetratoOptions (read back from the table).
+	ExemplosK      int
+	ExemplosLimiar float64
 	Valido         bool
 	Itens          []RetratoItem
 }
@@ -62,6 +65,10 @@ type RetratoOptions struct {
 	IndiceHash     string
 	InstrucoesID   string
 	InstrucoesHash string
+	// ExemplosK and ExemplosLimiar are k and the similarity floor of the index the
+	// evaluation uses (C-8.10); zero when there is no index.
+	ExemplosK      int
+	ExemplosLimiar float64
 }
 
 // RetratoCase is a case with its content, for the replay. It lives in memory only.
@@ -98,6 +105,9 @@ func (s *Store) CreateRetrato(ctx context.Context, o RetratoOptions) (Retrato, e
 	}
 	rt := Retrato{ID: hex.EncodeToString(id[:]), CriadoEm: s.opts.Now().UnixMilli(),
 		IndiceHash: nz(o.IndiceHash), InstrucoesID: nz(o.InstrucoesID), InstrucoesHash: nz(o.InstrucoesHash), Valido: true}
+	if o.IndiceHash != "" { // k and the floor go with the index, never alone (C-8.10)
+		rt.ExemplosK, rt.ExemplosLimiar = o.ExemplosK, o.ExemplosLimiar
+	}
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, elSelect+`WHERE o.estado=? AND o.particao=? ORDER BY o.id`, EstadoConfirmada, ParteTeste)
 		if err != nil {
@@ -132,8 +142,12 @@ func (s *Store) CreateRetrato(ctx context.Context, o RetratoOptions) (Retrato, e
 		if len(rt.Itens) == 0 {
 			return ErrNoCases
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO retratos(id,criado_em,indice_hash,instrucoes_id,instrucoes_hash,valido) VALUES(?,?,?,?,?,1)`,
-			rt.ID, rt.CriadoEm, rt.IndiceHash, rt.InstrucoesID, rt.InstrucoesHash); err != nil {
+		var ek, el any // NULL without an index
+		if rt.ExemplosK > 0 {
+			ek, el = rt.ExemplosK, rt.ExemplosLimiar
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO retratos(id,criado_em,indice_hash,instrucoes_id,instrucoes_hash,exemplos_k,exemplos_limiar,valido) VALUES(?,?,?,?,?,?,?,1)`,
+			rt.ID, rt.CriadoEm, rt.IndiceHash, rt.InstrucoesID, rt.InstrucoesHash, ek, el); err != nil {
 			return err
 		}
 		for _, it := range rt.Itens {
@@ -154,8 +168,8 @@ func (s *Store) CreateRetrato(ctx context.Context, o RetratoOptions) (Retrato, e
 func (s *Store) GetRetrato(ctx context.Context, id string) (Retrato, error) {
 	var rt Retrato
 	var v int
-	err := s.db.QueryRowContext(ctx, `SELECT id,criado_em,COALESCE(indice_hash,''),COALESCE(instrucoes_id,''),COALESCE(instrucoes_hash,''),valido FROM retratos WHERE id=?`, id).
-		Scan(&rt.ID, &rt.CriadoEm, &rt.IndiceHash, &rt.InstrucoesID, &rt.InstrucoesHash, &v)
+	err := s.db.QueryRowContext(ctx, `SELECT id,criado_em,COALESCE(indice_hash,''),COALESCE(instrucoes_id,''),COALESCE(instrucoes_hash,''),COALESCE(exemplos_k,0),COALESCE(exemplos_limiar,0),valido FROM retratos WHERE id=?`, id).
+		Scan(&rt.ID, &rt.CriadoEm, &rt.IndiceHash, &rt.InstrucoesID, &rt.InstrucoesHash, &rt.ExemplosK, &rt.ExemplosLimiar, &v)
 	if err == sql.ErrNoRows {
 		return rt, ErrRetratoNotFound
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
+	"github.com/cslsoftwares/mcpollama/gateway/melhora"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
 )
 
@@ -73,6 +74,21 @@ environment variable; the flag wins.
                           (503 without it). Without this flag the feature is off and the route answers 503  (MCPGW_TREINO_DB)
   --role primario|fallback  role of this gateway for the reports (default primario). On a "fallback" gateway every report whose
                           jobs run on one backend is recorded as estado fallback, with no sample copied  (MCPGW_ROLE)
+  --melhora-tools LIST    tools (generate, chat, summarize_file, extract, translate; separated by , or ;) whose requests get the
+                          instructions and the examples of the improvement without training (Fase 12.8, D12-15) appended to their
+                          SYSTEM text; the user text and the file markers are never touched. Default none: OFF (C-8.8). The job log
+                          keeps the request as the client sent it, not the improved one  (MCPGW_MELHORA_TOOLS)
+  --melhora-instrucoes FILE  absolute path of the JSON file {"tools":{"extract":"..."}} with the instruction of each tool; its ID and
+                          hash come from the content (C-8.7); an empty file is the version v0 and changes nothing (MCPGW_MELHORA_INSTRUCOES)
+  --melhora-indice ID     id of a frozen index of examples in --treino-db (made by bakeoff -erros-modo indice); k and the similarity
+                          floor are those frozen with it. It is invalidated for good when a member stops being an example (C-4.10);
+                          changing it takes a restart. Without it no example is added   (MCPGW_MELHORA_INDICE)
+  --melhora-embed-model M  embedding model of the examples      (MCPGW_MELHORA_EMBED_MODEL, default nomic-embed-text)
+  --melhora-embed-timeout D  longest wait of a request for the embedding of its query; past it the request goes on WITHOUT examples
+                          (a counter of the monitor records it)  (MCPGW_MELHORA_EMBED_TIMEOUT, default 2s)
+  --melhora-embeddings BOOL  compute in the background the embedding of the occurrences the admin marked as public examples (C-6.6),
+                          through the embed lane of the queue; needs --treino-db. Default OFF: without it the embeddings stay
+                          pending and nothing is sent to the embedding model   (MCPGW_MELHORA_EMBEDDINGS, default false)
   --gpu-interval D        nvidia-smi and CPU/RAM sampling period (MCPGW_GPU_INTERVAL, default 1s; 0 disables both)
   --nvidia-smi PATH       nvidia-smi binary                  (MCPGW_NVIDIA_SMI, default nvidia-smi)
   --aer-path FILE         correctable AER counter of the bridge 00:1b.4; "-" disables
@@ -149,6 +165,12 @@ type Config struct {
 	DocKeyFile     string
 	TreinoDB       string
 	Role           string
+	MelhoraTools   []string
+	MelhoraInstr   string
+	MelhoraIndice  string
+	MelhoraModel   string
+	MelhoraTimeout time.Duration
+	MelhoraBg      bool
 	GPUInterval    time.Duration
 	NvidiaSMI      string
 	AERPath        string
@@ -181,57 +203,63 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 	fs.SetOutput(errw)
 	fs.Usage = func() { fmt.Fprint(errw, usageText) }
 	var (
-		fListen  = fs.String("listen", "", "")
-		fOllama  = fs.String("ollama", "", "")
-		fDB      = fs.String("db", "", "")
-		fGen     = fs.Int("gen-slots", 0, "")
-		fEmbed   = fs.Int("embed-slots", 0, "")
-		fQMax    = fs.Int("queue-max", 0, "")
-		fPerCl   = fs.Int("queue-per-client", 0, "")
-		fPerIP   = fs.Int("queue-per-ip", 0, "")
-		fLabels  = fs.Int("labels-per-ip", 0, "")
-		fMaxWait = fs.Duration("max-wait", 0, "")
-		fRunTO   = fs.Duration("run-timeout", 0, "")
-		fMaxRows = fs.Int("max-request-rows", 0, "")
-		fAge     = fs.Duration("age-after", 0, "")
-		fStagger = fs.Duration("start-stagger", 0, "")
-		fPrio    = fs.String("priority-ips", "", "")
-		fModels  = fs.String("allowed-models", "", "")
-		fThink   = fs.Bool("default-think", false, "")
-		fSuffix  = fs.String("think-suffix", "", "")
-		fKeepAl  = fs.Bool("allow-client-keepalive", false, "")
-		fNumCtx  = fs.Bool("allow-client-num-ctx", false, "")
-		fStrip   = fs.String("strip-options", "", "")
-		fBody    = fs.Int64("max-body-bytes", 0, "")
-		fAdmin   = fs.String("admin-file", "", "")
-		fDocKey  = fs.String("doc-key-file", "", "")
-		fTreino  = fs.String("treino-db", "", "")
-		fRole    = fs.String("role", "", "")
-		fGPUInt  = fs.Duration("gpu-interval", 0, "")
-		fSMI     = fs.String("nvidia-smi", "", "")
-		fAER     = fs.String("aer-path", "", "")
-		fSStore  = fs.Duration("sample-store-interval", 0, "")
-		fProc    = fs.String("proc-root", "", "")
-		fSys     = fs.String("sys-root", "", "")
-		fRetReq  = fs.Duration("retention-requests", 0, "")
-		fRetGPU  = fs.Duration("retention-gpu", 0, "")
-		fKeepDn  = fs.Duration("monitor-keep-done", 0, "")
-		fLogCont = fs.Bool("log-content", true, "")
-		fContDB  = fs.String("content-db", "", "")
-		fContMax = fs.Int64("content-max-bytes", 0, "")
-		fContJob = fs.Int64("content-max-job-bytes", 0, "")
-		fRetCont = fs.Duration("retention-content", 0, "")
-		fRetJob  = fs.Duration("retention-job-gpu", 0, "")
-		fNonLoop = fs.Bool("non-loopback-listen", false, "")
-		fBackend = fs.String("backends", "", "")
-		fOvWait  = fs.Duration("overload-wait", 0, "")
-		fOvQueue = fs.Int("overload-queue", 0, "")
-		fOvHold  = fs.Duration("overload-hold", 0, "")
-		fHealth  = fs.Duration("health-interval", 0, "")
-		fBrFails = fs.Int("breaker-failures", 0, "")
-		fBrOpen  = fs.Duration("breaker-open", 0, "")
-		fDebug   = fs.Bool("debug", false, "")
-		fVersion = fs.Bool("version", false, "")
+		fListen   = fs.String("listen", "", "")
+		fOllama   = fs.String("ollama", "", "")
+		fDB       = fs.String("db", "", "")
+		fGen      = fs.Int("gen-slots", 0, "")
+		fEmbed    = fs.Int("embed-slots", 0, "")
+		fQMax     = fs.Int("queue-max", 0, "")
+		fPerCl    = fs.Int("queue-per-client", 0, "")
+		fPerIP    = fs.Int("queue-per-ip", 0, "")
+		fLabels   = fs.Int("labels-per-ip", 0, "")
+		fMaxWait  = fs.Duration("max-wait", 0, "")
+		fRunTO    = fs.Duration("run-timeout", 0, "")
+		fMaxRows  = fs.Int("max-request-rows", 0, "")
+		fAge      = fs.Duration("age-after", 0, "")
+		fStagger  = fs.Duration("start-stagger", 0, "")
+		fPrio     = fs.String("priority-ips", "", "")
+		fModels   = fs.String("allowed-models", "", "")
+		fThink    = fs.Bool("default-think", false, "")
+		fSuffix   = fs.String("think-suffix", "", "")
+		fKeepAl   = fs.Bool("allow-client-keepalive", false, "")
+		fNumCtx   = fs.Bool("allow-client-num-ctx", false, "")
+		fStrip    = fs.String("strip-options", "", "")
+		fBody     = fs.Int64("max-body-bytes", 0, "")
+		fAdmin    = fs.String("admin-file", "", "")
+		fDocKey   = fs.String("doc-key-file", "", "")
+		fTreino   = fs.String("treino-db", "", "")
+		fRole     = fs.String("role", "", "")
+		fMelTools = fs.String("melhora-tools", "", "")
+		fMelInstr = fs.String("melhora-instrucoes", "", "")
+		fMelIdx   = fs.String("melhora-indice", "", "")
+		fMelModel = fs.String("melhora-embed-model", "", "")
+		fMelTO    = fs.Duration("melhora-embed-timeout", 0, "")
+		fMelBg    = fs.Bool("melhora-embeddings", false, "")
+		fGPUInt   = fs.Duration("gpu-interval", 0, "")
+		fSMI      = fs.String("nvidia-smi", "", "")
+		fAER      = fs.String("aer-path", "", "")
+		fSStore   = fs.Duration("sample-store-interval", 0, "")
+		fProc     = fs.String("proc-root", "", "")
+		fSys      = fs.String("sys-root", "", "")
+		fRetReq   = fs.Duration("retention-requests", 0, "")
+		fRetGPU   = fs.Duration("retention-gpu", 0, "")
+		fKeepDn   = fs.Duration("monitor-keep-done", 0, "")
+		fLogCont  = fs.Bool("log-content", true, "")
+		fContDB   = fs.String("content-db", "", "")
+		fContMax  = fs.Int64("content-max-bytes", 0, "")
+		fContJob  = fs.Int64("content-max-job-bytes", 0, "")
+		fRetCont  = fs.Duration("retention-content", 0, "")
+		fRetJob   = fs.Duration("retention-job-gpu", 0, "")
+		fNonLoop  = fs.Bool("non-loopback-listen", false, "")
+		fBackend  = fs.String("backends", "", "")
+		fOvWait   = fs.Duration("overload-wait", 0, "")
+		fOvQueue  = fs.Int("overload-queue", 0, "")
+		fOvHold   = fs.Duration("overload-hold", 0, "")
+		fHealth   = fs.Duration("health-interval", 0, "")
+		fBrFails  = fs.Int("breaker-failures", 0, "")
+		fBrOpen   = fs.Duration("breaker-open", 0, "")
+		fDebug    = fs.Bool("debug", false, "")
+		fVersion  = fs.Bool("version", false, "")
 	)
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
@@ -332,6 +360,12 @@ func parseConfig(args []string, getenv func(string) string, errw io.Writer) (Con
 		DocKeyFile:     str("doc-key-file", "MCPGW_DOC_KEY_FILE", "", fDocKey),
 		TreinoDB:       str("treino-db", "MCPGW_TREINO_DB", "", fTreino),
 		Role:           strings.ToLower(strings.TrimSpace(str("role", "MCPGW_ROLE", "primario", fRole))),
+		MelhoraTools:   splitList(str("melhora-tools", "MCPGW_MELHORA_TOOLS", "", fMelTools)),
+		MelhoraInstr:   str("melhora-instrucoes", "MCPGW_MELHORA_INSTRUCOES", "", fMelInstr),
+		MelhoraIndice:  str("melhora-indice", "MCPGW_MELHORA_INDICE", "", fMelIdx),
+		MelhoraModel:   str("melhora-embed-model", "MCPGW_MELHORA_EMBED_MODEL", melhora.DefaultEmbedModel, fMelModel),
+		MelhoraTimeout: dur("melhora-embed-timeout", "MCPGW_MELHORA_EMBED_TIMEOUT", melhora.DefaultEmbedTimeout, fMelTO),
+		MelhoraBg:      boolean("melhora-embeddings", "MCPGW_MELHORA_EMBEDDINGS", fMelBg),
 		GPUInterval:    dur("gpu-interval", "MCPGW_GPU_INTERVAL", time.Second, fGPUInt),
 		SampleStore:    dur("sample-store-interval", "MCPGW_SAMPLE_STORE_INTERVAL", 5*time.Second, fSStore),
 		NvidiaSMI:      str("nvidia-smi", "MCPGW_NVIDIA_SMI", "nvidia-smi", fSMI),
@@ -512,6 +546,20 @@ func (c Config) validate() error {
 	}
 	if c.Role != "primario" && c.Role != "fallback" {
 		return errors.New("--role must be primario or fallback")
+	}
+	for _, t := range c.MelhoraTools {
+		if !melhora.IsTool(t) {
+			return fmt.Errorf("--melhora-tools: %q is not one of %s", t, strings.Join(melhora.Tools, ", "))
+		}
+	}
+	if c.MelhoraInstr != "" && !filepath.IsAbs(c.MelhoraInstr) && !strings.HasPrefix(c.MelhoraInstr, "/") {
+		return errors.New("--melhora-instrucoes must be an absolute path")
+	}
+	if c.MelhoraIndice != "" && c.TreinoDB == "" {
+		return errors.New("--melhora-indice needs --treino-db (the frozen index lives there)")
+	}
+	if c.MelhoraTimeout <= 0 || c.MelhoraModel == "" {
+		return errors.New("--melhora-embed-timeout must be positive and --melhora-embed-model not empty")
 	}
 	if c.DB == "" {
 		return errors.New("--db is required")

@@ -46,7 +46,9 @@ type options struct {
 	bigDocs, step, expectBoot, monFile, from, to string
 	// Fase 12.7: suite erros (runs on the server, next to treino.db)
 	errMode, treinoDB, keyFile, gwURL, retratoID, atual, candidato, alvo string
-	indiceHash, instrID, instrHash                                       string
+	indiceID, instrFile, embedModel                                      string
+	exemplosK                                                            int
+	exemplosLimiar                                                       float64
 	gwRemote, outSet                                                     bool
 	resultado, blindResp                                                 string
 }
@@ -99,7 +101,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.monFile, "mon-file", "", "monpeak: monitor output file")
 	fs.StringVar(&o.from, "from", "", "monpeak: window start HH:MM:SS")
 	fs.StringVar(&o.to, "to", "", "monpeak: window end HH:MM:SS")
-	fs.StringVar(&o.errMode, "erros-modo", "comparar", "erros: retrato (congela o teste) | base (linha de base do modelo atual) | comparar (candidato x atual) | apurar (aplica as respostas do owner ao blind)")
+	fs.StringVar(&o.errMode, "erros-modo", "comparar", "erros: indices-limpar (apaga os índices inválidos) | indice (congela os exemplos públicos, 12.8) | retrato (congela o teste) | base (linha de base do modelo atual) | comparar (candidato x atual) | apurar (aplica as respostas do owner ao blind)")
 	fs.StringVar(&o.treinoDB, "treino-db", "", "erros: caminho do treino.db (o replay roda no servidor; o conteúdo dos casos não sai da rede, C-5.6)")
 	fs.StringVar(&o.keyFile, "doc-key-file", "", "erros: arquivo da chave HMAC (0600); com ele o retrato confere o prompt_hmac recalculado")
 	fs.StringVar(&o.gwURL, "gateway-url", "http://127.0.0.1:11500", "erros: gateway do replay (loopback)")
@@ -108,9 +110,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.atual, "atual", "qwen3-ia", "erros: nome do modelo atual (rótulo; pasta do score.json do S2/S3)")
 	fs.StringVar(&o.candidato, "candidato", "", "erros: modelo candidato (modo comparar)")
 	fs.StringVar(&o.alvo, "alvo", "", "erros: categoria-alvo da mudança (C-5.10)")
-	fs.StringVar(&o.indiceHash, "indice-hash", "", "erros/retrato: hash do índice de exemplos congelado (12.8; vazio = nenhum)")
-	fs.StringVar(&o.instrID, "instrucoes-id", "", "erros/retrato: id da versão das instruções (12.8; vazio = nenhum)")
-	fs.StringVar(&o.instrHash, "instrucoes-hash", "", "erros/retrato: hash da versão das instruções (12.8; vazio = nenhum)")
+	fs.StringVar(&o.indiceID, "indice", "", "erros/retrato e comparar: id do índice de exemplos congelado em treino.db (12.8; vazio = nenhum)")
+	fs.StringVar(&o.instrFile, "instrucoes", "", "erros/retrato e comparar: arquivo JSON da versão das instruções (12.8; vazio = nenhuma)")
+	fs.IntVar(&o.exemplosK, "exemplos-k", 0, "erros/indice: k, quantos pares erro->certo no máximo (12.8, C-8.10; 0 = 3, provisório até haver dados medidos)")
+	fs.Float64Var(&o.exemplosLimiar, "exemplos-limiar", 0, "erros/indice: limiar de similaridade (cosseno) dos exemplos (12.8, C-8.10; 0 = 0.80, provisório)")
+	fs.StringVar(&o.embedModel, "embed-modelo", "", "erros/indice: modelo de embedding dos vetores do índice (padrão nomic-embed-text)")
 	fs.StringVar(&o.resultado, "resultado", "", "erros/apurar: resultado-*.json escrito pelo modo comparar")
 	fs.StringVar(&o.blindResp, "blind-respostas", "", "erros/apurar: arquivo de respostas do owner (rotulo<TAB>certa|errada<TAB>certa|errada)")
 	if err := fs.Parse(args); err != nil {

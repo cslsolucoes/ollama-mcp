@@ -141,6 +141,8 @@ type gwReq struct {
 	Body       map[string]json.RawMessage
 }
 
+type embedReq struct{ Model, Tool, Text string }
+
 type fakeGW struct {
 	srv    *httptest.Server
 	mu     sync.Mutex
@@ -152,6 +154,9 @@ type fakeGW struct {
 	onReq func(n int)
 	// cut makes an answer end badly: "nodone" (the stream stops without done), "abort" (the connection breaks)
 	cut func(model string, seed int, c synthCase) string
+	// stage 12.8: the embeddings asked for the examples of the candidate
+	embeds      []embedReq
+	embedStatus int
 }
 
 var caseKeyRe = regexp.MustCompile(`PEDIDO-([0-9a-f]{32})`)
@@ -163,6 +168,20 @@ func newGW(t *testing.T, cs []synthCase, policy func(model string, seed int, c s
 	}
 	g.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
+		if r.URL.Path == "/api/embed" { // stage 12.8: the search of the examples
+			var eb struct{ Model, Input string }
+			_ = json.Unmarshal(raw, &eb)
+			g.mu.Lock()
+			g.embeds = append(g.embeds, embedReq{Model: eb.Model, Tool: r.Header.Get("X-Mcpollama-Tool"), Text: eb.Input})
+			st := g.embedStatus
+			g.mu.Unlock()
+			if st != 0 {
+				w.WriteHeader(st)
+				return
+			}
+			fmt.Fprint(w, `{"embeddings":[[1,0,0]]}`)
+			return
+		}
 		var body map[string]json.RawMessage
 		_ = json.Unmarshal(raw, &body)
 		var model string

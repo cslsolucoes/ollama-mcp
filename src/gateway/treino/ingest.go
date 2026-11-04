@@ -59,6 +59,18 @@ type Content struct {
 	HasImage            bool
 	RespFinal           bool
 	RespTruncated       bool
+	// The trace of the improvement without training (C-2.10a), copied to the sample (C-2.9). All empty for
+	// a job it did not change.
+	PromptJSONOriginal          []byte
+	PromptJSONOriginalTruncated bool
+	MelhoraInstrucoesID         string
+	MelhoraIndiceID             string
+	MelhoraExemplos             string
+}
+
+// Melhora says whether the request of the job was changed by the improvement (C-3.10a).
+func (c Content) Melhora() bool {
+	return c.MelhoraInstrucoesID != "" || c.MelhoraIndiceID != "" || c.MelhoraExemplos != "" || c.PromptJSONOriginal != nil
 }
 
 // Probe says what a job holds in the content database without loading it (M-1).
@@ -121,7 +133,9 @@ func (r realSource) Content(ctx context.Context, id string) (Content, bool, erro
 		return Content{}, false, err
 	}
 	return Content{Prompt: c.Prompt, Response: c.Response, PromptJSON: pj.JSON, PromptTruncated: c.PromptTruncated,
-		PromptJSONTruncated: pj.Truncated, HasImage: pj.HasImage, RespFinal: c.RespFinal, RespTruncated: c.RespTruncated}, true, nil
+		PromptJSONTruncated: pj.Truncated, HasImage: pj.HasImage, RespFinal: c.RespFinal, RespTruncated: c.RespTruncated,
+		PromptJSONOriginal: pj.Original, PromptJSONOriginalTruncated: pj.OriginalTruncated,
+		MelhoraInstrucoesID: pj.InstrucoesID, MelhoraIndiceID: pj.IndiceID, MelhoraExemplos: pj.Exemplos}, true, nil
 }
 
 // Origin is what the gateway knows about who reports: the declared station
@@ -453,11 +467,13 @@ func (s *Store) insertSample(ctx context.Context, tx *sql.Tx, now time.Time, job
 		dh = j.DocHash
 	}
 	r, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO amostras(job_id,copiada_em,endpoint,modelo,think,prompt_json,prompt_texto,resposta,
-		prompt_hmac,conteudo_hmac,key_id,prompt_truncado,prompt_json_truncado,tem_imagem,doc_hash,resp_final,resp_truncada,status,http_status)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		prompt_hmac,conteudo_hmac,key_id,prompt_truncado,prompt_json_truncado,tem_imagem,doc_hash,resp_final,resp_truncada,status,http_status,
+		prompt_json_original,prompt_json_original_truncado,melhora,melhora_instrucoes_id,melhora_indice_id,melhora_exemplos)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		jobID, now.UnixMilli(), j.Endpoint, j.Model, j.Think, c.PromptJSON, []byte(c.Prompt), []byte(c.Response),
 		ph, ch, key.ID(), b2i(c.PromptTruncated), b2i(c.PromptJSONTruncated), b2i(c.HasImage), dh, b2i(c.RespFinal), b2i(c.RespTruncated),
-		j.Status, j.HTTPStatus)
+		j.Status, j.HTTPStatus,
+		c.PromptJSONOriginal, b2i(c.PromptJSONOriginalTruncated), b2i(c.Melhora()), c.MelhoraInstrucoesID, c.MelhoraIndiceID, c.MelhoraExemplos)
 	if err != nil {
 		return 0, err
 	}

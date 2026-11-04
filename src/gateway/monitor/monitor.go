@@ -32,6 +32,7 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/cpu"
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
 	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
+	"github.com/cslsoftwares/mcpollama/gateway/melhora"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/pool"
 	"github.com/cslsoftwares/mcpollama/gateway/proxy"
@@ -104,10 +105,13 @@ type Config struct {
 	Treino       *treino.Store
 	TreinoSource treino.Source
 	TreinoKey    *hmackey.Key
-	Role         string // --role of this gateway
-	Version      string
-	BootID       string
-	MaxSSE       int // concurrent event streams, default 32
+	// Melhora is the improvement without training (Fase 12.8): its counters and the
+	// identity of what is active go into the state, never a text. nil: not shown.
+	Melhora *melhora.Transformer
+	Role    string // --role of this gateway
+	Version string
+	BootID  string
+	MaxSSE  int // concurrent event streams, default 32
 	// MaxSSEPerIP bounds the streams of one client IP (Fase 9.5, M3), so one
 	// machine cannot take every stream; default 4.
 	MaxSSEPerIP int
@@ -339,6 +343,9 @@ type State struct {
 	// Treino is the open summary of the error board (Fase 12.6): counts and the
 	// use of the ceiling, never a text. Absent when the feature is off.
 	Treino *treino.Summary `json:"treino,omitempty"`
+	// Melhora: counters (examples injected, failed searches, active version of the
+	// instructions and id of the index). In memory only, no database read, no text.
+	Melhora *melhora.Stats `json:"melhora,omitempty"`
 }
 
 const extrasTTL = 2 * time.Second
@@ -431,6 +438,10 @@ func (h *Handler) state() State {
 		st.Dropped = h.cfg.Store.Dropped()
 	}
 	st.Treino = h.treinoSummary()
+	if h.cfg.Melhora != nil {
+		ms := h.cfg.Melhora.Stats()
+		st.Melhora = &ms
+	}
 	return st
 }
 

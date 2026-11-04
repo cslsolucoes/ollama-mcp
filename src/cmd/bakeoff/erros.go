@@ -70,8 +70,14 @@ type errosOpts struct {
 	Timeout     time.Duration
 	RetryWait   time.Duration // 0 keeps the default (tests)
 	Hashes      treino.RetratoOptions
-	Now         func() time.Time
-	ShuffleSeed int64 // 0 = random (blind labels)
+	// Stage 12.8: the frozen index (id in treino.db) and the instructions file the
+	// candidate uses; k, the floor and the embedding model of mode `indice`.
+	IndiceID, InstrFile string
+	ExemplosK           int
+	ExemplosLimiar      float64
+	EmbedModel          string
+	Now                 func() time.Time
+	ShuffleSeed         int64 // 0 = random (blind labels)
 	// apurar: the result file of a comparison and the owner's answers to the blind review
 	Resultado, BlindRespostas string
 	S23MaxAge                 time.Duration // age limit of a score.json (default 48 h)
@@ -82,7 +88,7 @@ func (o options) errosOpts() errosOpts {
 	return errosOpts{Mode: o.errMode, DB: o.treinoDB, KeyFile: o.keyFile, GatewayURL: o.gwURL, AllowRemote: o.gwRemote,
 		RetratoID: o.retratoID, Atual: o.atual, Candidato: o.candidato, Alvo: o.alvo, Out: o.outExplicit(), Timeout: o.timeout,
 		Resultado: o.resultado, BlindRespostas: o.blindResp,
-		Hashes: treino.RetratoOptions{IndiceHash: o.indiceHash, InstrucoesID: o.instrID, InstrucoesHash: o.instrHash}}
+		IndiceID: o.indiceID, InstrFile: o.instrFile, ExemplosK: o.exemplosK, ExemplosLimiar: o.exemplosLimiar, EmbedModel: o.embedModel}
 }
 
 func runErros(o options, logf func(string, ...any)) int { return errosMain(o.errosOpts(), logf) }
@@ -203,11 +209,8 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 	if eo.S23MaxAge <= 0 {
 		eo.S23MaxAge = 48 * time.Hour
 	}
-	if eo.Transform == nil {
-		eo.Transform = identityTransform{}
-	}
-	if eo.Mode != "retrato" && eo.Mode != "base" && eo.Mode != "comparar" && eo.Mode != "apurar" {
-		logf("FATAL -erros-modo deve ser retrato, base, comparar ou apurar")
+	if eo.Mode != "indice" && eo.Mode != "indices-limpar" && eo.Mode != "retrato" && eo.Mode != "base" && eo.Mode != "comparar" && eo.Mode != "apurar" {
+		logf("FATAL -erros-modo deve ser indice, indices-limpar, retrato, base, comparar ou apurar")
 		return exitUsage
 	}
 	if eo.Out == "" {
@@ -239,6 +242,18 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 	defer st.Close()
 	ctx := context.Background()
 
+	if eo.Mode == "indice" {
+		return freezeIndexMode(ctx, st, eo, logf)
+	}
+	if eo.Mode == "indices-limpar" { // M-4: the indexes that went invalid are of no use
+		n, err := st.DeleteInvalidIndexes(ctx)
+		if err != nil {
+			logf("FATAL limpeza dos índices: %v", err)
+			return exitUsage
+		}
+		logf("INDICES-LIMPOS removidos=%d", n)
+		return exitOK
+	}
 	if eo.Mode == "retrato" {
 		return makeRetrato(ctx, st, eo, logf)
 	}
@@ -300,14 +315,6 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 		logf("FATAL retrato: %v", err)
 		return exitUsage
 	}
-	if eo.Mode == "comparar" && (rt.IndiceHash != treino.NoneValue || rt.InstrucoesID != treino.NoneValue || rt.InstrucoesHash != treino.NoneValue) {
-		// 12.8 (owner): the candidate of 12.8 is measured by TRANSFORMING the recorded
-		// prompt_json with the frozen instructions and examples; until that code exists
-		// (shared with mcpollama), a retrato that names an index or an instruction
-		// version cannot be compared honestly.
-		logf("FATAL o retrato registra índice de exemplos ou instruções (%s / %s / %s): a medição do candidato da 12.8 ainda não existe; só um retrato com \"nenhum\" é comparado (C-8.5, C-8.7)", rt.IndiceHash, rt.InstrucoesID, rt.InstrucoesHash)
-		return exitUsage
-	}
 	for _, c := range cases { // the recorded model has to be the current one
 		var m struct {
 			Model string `json:"model"`
@@ -325,6 +332,24 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 	}
 	if eo.RetryWait > 0 {
 		rc.retryWait = eo.RetryWait
+	}
+	// 12.8: the candidate is the current model with the instructions and examples the
+	// retrato records, built by the shared code of the gateway. What the retrato records
+	// and what was given must match, or the comparison is refused (C-8.5, C-8.7).
+	indexID := ""
+	if eo.Mode == "comparar" {
+		tr, idx, err := prepareCandidate(ctx, st, eo, rt, rc)
+		if err != nil {
+			logf("FATAL %v", err)
+			return exitUsage
+		}
+		if tr != nil && eo.Transform == nil {
+			eo.Transform = tr
+		}
+		indexID = idx
+	}
+	if eo.Transform == nil {
+		eo.Transform = identityTransform{}
 	}
 	logf("ERROS modo=%s retrato=%s casos=%d atual=%s candidato=%s", eo.Mode, rt.ID, len(cases), eo.Atual, eo.Candidato)
 
@@ -438,6 +463,11 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 		in.GateExtra = append(in.GateExtra, why)
 		in.Retrato.Valido = false
 	}
+	if why := recheckIndex(ctx, st, indexID, rt.IndiceHash); why != "" {
+		in.GateExtra = append(in.GateExtra, why)
+		in.Retrato.Valido = false
+	}
+	in.Calls += rc.embedCalls // the searches of the examples are calls to the gateway too
 	return finish(eo, outDir, in, results, blind, logf)
 }
 
@@ -513,7 +543,12 @@ func validID(id string) bool {
 }
 
 func makeRetrato(ctx context.Context, st *treino.Store, eo errosOpts, logf func(string, ...any)) int {
-	rt, err := st.CreateRetrato(ctx, eo.Hashes)
+	hashes, err := resolveHashes(ctx, st, eo)
+	if err != nil {
+		logf("FATAL %v", err)
+		return exitUsage
+	}
+	rt, err := st.CreateRetrato(ctx, hashes)
 	if errors.Is(err, treino.ErrNoCases) {
 		logf("DADOS INSUFICIENTES: nenhum caso elegível na partição de teste; nenhum retrato foi criado")
 		return exitGate
@@ -531,7 +566,7 @@ func makeRetrato(ctx context.Context, st *treino.Store, eo errosOpts, logf func(
 		names = append(names, c)
 	}
 	sort.Strings(names)
-	logf("RETRATO id=%s itens=%d indice_hash=%s instrucoes_id=%s instrucoes_hash=%s valido=1", rt.ID, len(rt.Itens), rt.IndiceHash, rt.InstrucoesID, rt.InstrucoesHash)
+	logf("RETRATO id=%s itens=%d indice_hash=%s instrucoes_id=%s instrucoes_hash=%s exemplos_k=%d exemplos_limiar=%.4f valido=1", rt.ID, len(rt.Itens), rt.IndiceHash, rt.InstrucoesID, rt.InstrucoesHash, rt.ExemplosK, rt.ExemplosLimiar)
 	for _, c := range names {
 		note := ""
 		if n[c] < minDecide {

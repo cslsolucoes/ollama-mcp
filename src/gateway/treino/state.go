@@ -34,15 +34,18 @@ func loadRow(ctx context.Context, tx *sql.Tx, id string) (row, error) {
 // test occurrence in the quota is NOT given back (C-4.11a, C-4.11b): the quota
 // lives in cota_grupos, which nothing in this file touches, and the partition and
 // grupo_id of the occurrence stay as they are.
-func dropExample(ctx context.Context, tx *sql.Tx, id string) error {
+func (s *Store) dropExample(ctx context.Context, tx *sql.Tx, id string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM embeddings WHERE ocorrencia_id=?`, id); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE ocorrencias SET exemplo_publico=0 WHERE id=?`, id); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(ctx, `UPDATE retratos SET valido=0 WHERE id IN (SELECT retrato_id FROM retrato_itens WHERE ocorrencia_id=?)`, id)
-	return err
+	if _, err := tx.ExecContext(ctx, `UPDATE retratos SET valido=0 WHERE id IN (SELECT retrato_id FROM retrato_itens WHERE ocorrencia_id=?)`, id); err != nil {
+		return err
+	}
+	// the frozen index of examples that lists it goes invalid and loses the vector copy (C-4.10, C-8.9)
+	return s.invalidateIndexesOf(ctx, tx, id)
 }
 
 // Confirm moves nova to confirmada (C-1.12). It needs a non-empty resposta_correta
@@ -87,7 +90,7 @@ func (s *Store) Discard(ctx context.Context, id string, a Actor) error {
 		}
 		now := s.opts.Now()
 		if r.estado == EstadoConfirmada {
-			if err := dropExample(ctx, tx, id); err != nil {
+			if err := s.dropExample(ctx, tx, id); err != nil {
 				return err
 			}
 		}
@@ -155,7 +158,7 @@ func (s *Store) Update(ctx context.Context, id string, e Edit, a Actor) (desconf
 			}
 		}
 		if changed && r.estado == EstadoConfirmada {
-			if err := dropExample(ctx, tx, id); err != nil {
+			if err := s.dropExample(ctx, tx, id); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE ocorrencias SET estado=?, atualizada_em=?, revisada_por=NULL, revisada_em=NULL WHERE id=?`,
@@ -197,7 +200,7 @@ func (s *Store) Delete(ctx context.Context, id string, a Actor) error {
 		if err != nil {
 			return err
 		}
-		if err := dropExample(ctx, tx, id); err != nil {
+		if err := s.dropExample(ctx, tx, id); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM ocorrencia_jobs WHERE ocorrencia_id=?`, id); err != nil {

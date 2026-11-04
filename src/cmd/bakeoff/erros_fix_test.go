@@ -370,12 +370,16 @@ func TestComparisonNeedsTheBaselineOfTheSameRetratoAndModel(t *testing.T) {
 
 // ---- 7. 12.8: hashes in the retrato, and the request transform -----------------------------------------
 
-func TestComparisonRefusedForARetratoWithIndexOrInstructions(t *testing.T) {
-	for name, h := range map[string]treino.RetratoOptions{
-		"index":        {IndiceHash: "abc"},
-		"instructions": {InstrucoesID: "v1", InstrucoesHash: "h"},
-		"id only":      {InstrucoesID: "v1"},
+func TestComparisonRefusedForARetratoWithIndexOrInstructionsThatWereNotGiven(t *testing.T) {
+	for name, tc := range map[string]struct {
+		h    treino.RetratoOptions
+		want string
+	}{
+		"index":        {treino.RetratoOptions{IndiceHash: "abc"}, "passe -indice"},
+		"instructions": {treino.RetratoOptions{InstrucoesID: "v1", InstrucoesHash: "h"}, "passe -instrucoes"},
+		"id only":      {treino.RetratoOptions{InstrucoesID: "v1"}, "inconsistente"},
 	} {
+		h := tc.h
 		f := newFixture(t, syntheticSet(), scenarioPolicy(false))
 		ro := f.opts("retrato")
 		ro.Hashes = h
@@ -392,7 +396,7 @@ func TestComparisonRefusedForARetratoWithIndexOrInstructions(t *testing.T) {
 		}
 		f.gw.reset()
 		ce := f.compareOpts(m[1], "omitiu")
-		if code, out := f.run(ce); code != exitUsage || !strings.Contains(out, "a medição do candidato da 12.8 ainda não existe") {
+		if code, out := f.run(ce); code != exitUsage || !strings.Contains(out, tc.want) {
 			t.Errorf("%s: code %d\n%s", name, code, out)
 		}
 		if n := len(f.gw.requests()); n != 0 {

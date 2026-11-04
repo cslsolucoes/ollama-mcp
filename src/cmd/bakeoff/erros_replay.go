@@ -54,11 +54,12 @@ func (g guardTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // replayClient sends the cases to the gateway.
 type replayClient struct {
-	base      *url.URL
-	hc        *http.Client
-	retryWait time.Duration
-	dialer    *net.Dialer
-	calls     int // counts the calls made (tests and the report)
+	base       *url.URL
+	hc         *http.Client
+	retryWait  time.Duration
+	dialer     *net.Dialer
+	calls      int // counts the calls made (tests and the report)
+	embedCalls int // embedding calls of the query of the examples (stage 12.8)
 }
 
 // allowedConnIP says whether the replay may connect to an address: loopback
@@ -283,4 +284,54 @@ func parseChunk(l []byte, v1 bool, text *strings.Builder, out *reply) error {
 		out.Final, out.Fim = true, c.DoneReason
 	}
 	return nil
+}
+
+// embed asks the gateway for the embedding of a text (stage 12.8): the query of the
+// examples of the candidate. It is an ordinary call to the same gateway host, with the
+// replay's tool name, so the queue sees it as part of the evaluation. 429 and 503 are
+// retried like in do. The error never carries the body of the answer.
+func (c *replayClient) embed(ctx context.Context, model, text string) ([]float32, error) {
+	body, _ := json.Marshal(map[string]any{"model": model, "input": text})
+	var lastErr error
+	for attempt := 0; attempt < 4; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(c.retryWait):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base.String()+"/api/embed", bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Mcpollama-Tool", replayTool)
+		c.embedCalls++
+		resp, err := c.hc.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("embedding no gateway falhou: %s", oneLine(err.Error(), 120))
+		}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+			io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+			resp.Body.Close()
+			lastErr = fmt.Errorf("gateway respondeu %d", resp.StatusCode)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+			resp.Body.Close()
+			return nil, fmt.Errorf("gateway respondeu %d", resp.StatusCode)
+		}
+		var out struct {
+			Embeddings [][]float32 `json:"embeddings"`
+		}
+		err = json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&out)
+		resp.Body.Close()
+		if err != nil || len(out.Embeddings) != 1 || len(out.Embeddings[0]) == 0 {
+			return nil, errors.New("resposta de embedding inválida")
+		}
+		return out.Embeddings[0], nil
+	}
+	return nil, lastErr
 }

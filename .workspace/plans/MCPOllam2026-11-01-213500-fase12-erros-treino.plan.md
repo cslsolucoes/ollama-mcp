@@ -1,6 +1,6 @@
 # Plano — Fase 12: o MCP organiza os erros do modelo local e gera o histórico para treinar o servidor de IA
 
-> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.7 concluída no código; próxima: 12.8). Contrato de dados **1.1.4 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
+> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.7 publicada; 12.8 em progresso). Contrato de dados **1.1.5 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
 > achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). O código começa na 12.2.
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
@@ -604,7 +604,7 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 | 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8; C-1.3, C-1.19, C-1.20); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis (até 64, C-1.17) e o backend de cada um; `job_do_erro` padrão `final`/`unico` e obrigatório em `translate` e em listas sem `final` (C-1.3); enums e limites (C-1.16, C-1.17); relato ao gateway do `job_do_erro` (C-1.11); os automáticos são só as três regras da C-1.20 (inclui `num_predict` ausente), nascem `nova` sem `resposta_correta` (C-1.19); o automático não atrasa nem quebra a tool; deduplicação (relato humano substitui o automático) | ✅ **concluída** (2026-11-03 10:40, sem commit ainda): Sonnet implementou; revisão Opus (pode publicar) com ajustes; decisões do owner no contrato 1.1.4; gate refeito pelo coordenador |
 | 12.6 | monitor: aba "Erros (treino)", "Marcar erro", confirmar/completar/descartar/apagar/exemplo público/**liberar quarentena** (rota `POST /monitor/api/treino/{id}/liberar-quarentena`), exportação com predicado e partição (D12-6, 7, 7a; C-1.13, C-3.x, C-4.x) | sonnet | Firefox headless 570–1400 px; ações só do admin com sessão, CSRF e same-site, cada uma no histórico (C-1.13); o predicado exclui cada caso proibido, inclusive imagem, `distribuida`, `fallback`, `quarentena` e `translate` montado, **um teste por condição, com um caso que falha só nela** (C-3.16); exportação por `parte=treino\|teste` só da partição pedida, em streaming, sem guardar no servidor, com `meta` sem texto livre e uma linha `exportou` **por ocorrência** (C-3.11 a C-3.15, C-7.7); grupos por `doc_hash`, por `conteudo_hmac` ou por job em comum, com todas as não apagadas, inclusive `nova` e `descartada` (C-4.5, C-4.15); cota de 30 grupos **com amostra exportável** por categoria, na ordem em que cada grupo ganha a primeira amostra exportável, com a categoria dessa amostra e partição **pendente** antes disso (contrato 1.1.0: C-4.6, C-4.7, C-1.8); partição estável e fusão de grupos do mesmo lado pelo menor `grupo_id` sem reavaliar (C-4.8); **união de grupos já atribuídos a lados opostos vai para quarentena** e invalida os retratos e o índice de exemplos; um lado só é herdado; nenhum lado fica pendente (C-4.9 1.1.0, C-4.10, teste dedicado para cada caso); `liberar-quarentena` grava `alterou`/`campo=particao` (C-4.11); desconfirmar/descartar (C-1.12b)/apagar ocorrência de teste não libera a vaga e invalida os retratos que a listam (C-4.11a); nenhum `job_id`, `doc_hash` ou `grupo_id` em treino e teste ao mesmo tempo (C-4.12); `doc_hash` guardado como HMAC com `key_id`, nunca o sha256 puro (C-4.2); ocorrência distribuída e `fallback` sem amostras; descartar vale também para `sem_pedido`/`distribuida`/`fallback` (C-1.12); histórico sem texto sensível (C-7.6); alterar `resposta_correta`, `descricao` ou `correcao_aplicada` confirmada desfaz a confirmação (C-6.5); embedding só ao marcar `exemplo_publico` (C-6.6); consultas com `context.Background()` e cache em segundo plano (C-6.10) | ✅ **concluída** (2026-11-03 13:30, sem commit ainda): Sonnet implementou; revisão Opus corrigida; desvio: telas com login conferidas no Chromium (Playwright), o visitante no Firefox headless |
 | 12.7 | banco de provas: `bakeoff -suites erros` com o protocolo da §8.5 + **retrato** do teste + **linha de base** do `qwen3-ia` atual | sonnet | relatório com o ID do retrato, N, acerto e intervalo de Wilson 95% por categoria (C-5.9); um retrato por avaliação, com os campos da C-4.13; replay com o `prompt_json` igual exceto `options.seed` e `X-Mcpollama-Tool: bakeoff-erros` (C-5.1); **3 rodadas pareadas** (seed 1/2/3), acerto com 2 de 3, modelo atual e candidato intercalados, e o relatório traz os casos que mudaram entre rodadas (C-5.15); a **linha de base** registrada e o modelo atual **medido de novo** a cada comparação, com aviso se divergirem mais de 3 pontos numa categoria (C-5.14, C-5.16); pontuação da C-5.2 (100% de precisão e cobertura), `formato_invalido` compara valores (C-5.3), C-5.4 (`contagem`/`calculo`/`truncado`); humana às cegas em `blind` com 1 rodada, conteúdo de cliente só pelo owner (C-5.5, C-5.6); `outro`/`idioma_errado` fora (C-5.7); reporta com ≥ 20 e decide com ≥ 30 (C-5.8); o gate falha com 0 casos, sem categoria com 30 casos ou com retrato `valido=0`, dizendo "dados insuficientes" (C-5.13) | ✅ **concluída no código** (2026-11-03 23:10, sem commit ainda); linha de base real só com dados (depois da 12.10) |
-| 12.8 | **melhora sem treino** (D12-15): (a) instruções por tool; (b) exemplos recuperados por embedding, com a regra de privacidade | sonnet | **medido pela 12.7** com os limiares da §8.5 (C-5.10 a C-5.12); só fica ligado o que passar, por tool e por flag, com padrão desligado (C-8.8); exemplos só de ocorrências `confirmadas` com `exemplo_publico=1`, com embedding só para elas (C-8.1, C-6.6); busca só na partição `treino`, excluindo a ocorrência, o grupo, o documento em avaliação e todo caso em `quarentena` (C-8.3, C-8.4); nenhuma ocorrência desconfirmada, descartada, apagada, `sem_pedido`, `distribuida` ou `fallback` como exemplo (C-8.9); índice congelado com o retrato e hash registrado (C-8.5); análise das instruções só no treino, versão com ID e hash congelada antes da avaliação (C-8.6, C-8.7); k e limiar de similaridade fixados aqui, medidos pela 12.7 e registrados no retrato (C-8.10) | pendente |
+| 12.8 | **melhora sem treino** (D12-15): (a) instruções por tool; (b) exemplos recuperados por embedding, com a regra de privacidade | sonnet | **medido pela 12.7** com os limiares da §8.5 (C-5.10 a C-5.12); só fica ligado o que passar, por tool e por flag, com padrão desligado (C-8.8); exemplos só de ocorrências `confirmadas` com `exemplo_publico=1`, com embedding só para elas (C-8.1, C-6.6); busca só na partição `treino`, excluindo a ocorrência, o grupo, o documento em avaliação e todo caso em `quarentena` (C-8.3, C-8.4); nenhuma ocorrência desconfirmada, descartada, apagada, `sem_pedido`, `distribuida` ou `fallback` como exemplo (C-8.9); índice congelado com o retrato e hash registrado (C-8.5); análise das instruções só no treino, versão com ID e hash congelada antes da avaliação (C-8.6, C-8.7); k e limiar de similaridade fixados aqui, medidos pela 12.7 e registrados no retrato (C-8.10) | ▶️ **em progresso** (2026-11-03 23:15, Sonnet; mecanismo completo, conteúdo vazio) |
 | 12.9 | revisão adversarial: relato forjado, flood, corpo gigante, injeção no JSONL exportado, **vazamento entre clientes pelos exemplos (D12-15b)**, **resposta do teste vazando pelos exemplos (B1)**, apagamento incompleto (histórico, amostras compartilhadas), vazamento na aba, CSRF, rota `/api/feedback`; ainda: chave HMAC (`--doc-key-file`) ausente ou diferente entre gateways (503, `key_id`, C-4.3a), gateway `--role fallback` guardando amostra (C-1.21), `liberar-quarentena` e cota manipuláveis (C-4.9 a C-4.11a), teto 507 contornável (C-6.2), apagar que deixe conteúdo além da linha mínima (C-6.3), linha de `historico` com texto (C-7.4, C-7.6) | **opus** | achados corrigidos; testes de ataque guardados em `.workspace/reports/...testes/` | pendente |
 | 12.10 | gate completo + implantação (gateway 0.13.0, mcpollama 0.10.0) + aceite ao vivo com o owner | coordenador + owner | `--doc-key-file` gerado pelo instalador, 0600, fora do backup comum, e a **mesma chave** em todos os gateways que atendem as mesmas estações, com o `key_id` conferido (C-4.3, C-4.3a); gateway de fallback (se existir) com `--role fallback` (C-1.21); relato real pela tool e pelo monitor; confirmação (com `resposta_correta`, C-1.12a); exportação com o par certo, só da partição pedida (C-3.11); relatório da 12.7 antes e depois da 12.8 | pendente |
 | 12.11 | documentação + **`~\.claude\CLAUDE.md` global** (§9.1 e o apontador para `RELATAR-ERROS-IA.md`) | sonnet + coordenador | instruções em vigor; o Claude de outro projeto consegue relatar; `docs/RELATAR-ERROS-IA.md` reflete o `job_do_erro` obrigatório em `translate` e em listas sem `final`, o limite de 64 jobs e os limites de tamanho (C-1.3, C-1.17), e que só o confirmado pelo admin e elegível pela C-3 entra no treino | pendente |
@@ -1251,3 +1251,80 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   - **Ataques (Sonnet, porque tocou o `treino.go`):** 888 PASS, 0 FAIL, 11 SKIP. Os `fase9_adv*` do monitor guardados continuam sem compilar no HEAD: **pendência**.
   - **Decisão a conferir:** num retrato só com categorias às cegas, a linha de base é registrada vazia.
 - 2026-11-03 23:10: o **owner perguntou** se o `D:\MCP` continua operacional. Conferido: `mcpollama-mcp.exe` **0.9.2-f367b35** (31/10 22:21, intocado); `list_models` pelo MCP respondeu normalmente. Nada da Fase 12 foi implantado.
+- 2026-11-03 23:15: **12.7 publicada** (`3fc8fa9`; segredos 0).
+  - **Decisões do owner (23:13) para a 12.8:** (a) a melhora é aplicada **no gateway**: pacote compartilhado com o `requestTransform` do bakeoff (SSOT), dados no servidor, sem atualizar as estações; (b) **mecanismo completo com conteúdo vazio**: instruções v0 vazias e k/limiar configuráveis, a definir com dados medidos pela 12.7.
+  - **Início da 12.8** num Sonnet novo.
+- 2026-11-04 00:45: **operação no servidor (owner, 00:42: "configure para 2 simultâneo"; opção "Aplicar direto e deixar").**
+  - **Mudanças:** `OLLAMA_NUM_PARALLEL` 1→2 em `/etc/systemd/system/ollama.service.d/10-performance.conf` e `--gen-slots` 1→2 em `/etc/systemd/system/mcpollama-gateway.service`. Backups com o sufixo `.bak-20261104-004517`.
+  - **Antes:** verificação de jobs pelo `/monitor/api/state` (`queue.running`/`waiting`/`in_use` = 0). A conexão aberta com o Ollama era só um keep-alive parado.
+  - **O que não deu certo:**
+    - (1) a 1ª checagem por `ss` abortou por causa do keep-alive;
+    - (2) erro no script: tratei `running` como int;
+    - (3) o `sed` do gateway falhou no escape de `\\`.
+    - Nenhum serviço foi reiniciado com arquivo pela metade (`set -e`). O estado foi conferido e a mudança terminada com um `sed` sem barra invertida.
+  - **Depois:**
+    - `daemon-reload`, restart do Ollama (0.40.13) e do gateway;
+    - `active`/`active`, `healthz` 200, `slots: geracao 2, embed 2`.
+  - **Conferido no log:** `msg="model architecture does not currently support parallel requests" architecture=qwen35` e `n_seq_max = 1`. **O `qwen3-ia` continua um por vez**: o gateway manda 2 pedidos e o 2º espera dentro do Ollama.
+    - VRAM igual, 12,2 GiB a 64k; GPUs ociosas a 30–35 W de 100 W.
+    - Teste `generate`: ok, 335 ms.
+  - **Repositório:** `deploy/servidor-ia/ollama-10-performance.conf`, `deploy/servidor-ia/README.md`, `deploy/gateway/mcpollama-gateway.service`, `CLAUDE.md` e `README.md` alinhados, e a memória `criterio-modelo-multiagente` atualizada. **Pendência:** o `CONEXAO-IA.md` (fora do repositório) e o `MANUAL-GATEWAY.md` na 12.10.
+- 2026-11-04 00:50: **12.8 implementada** pelo Sonnet (85 mutações: 79 mortas, 6 explicadas).
+  - **Arquivos:**
+    - `gateway/melhora/` (+ `feed/`), separado para não criar ciclo de import `treino→proxy→melhora→treino`;
+    - `treino/indice.go`: índice congelado e invalidação;
+    - `proxy/embedder.go`: busca antes do `Acquire`, pela raia de embed;
+    - bakeoff `erros_melhora.go` e o modo `indice`;
+    - flags `--melhora-*`.
+  - **Gate (coordenador, 00:50):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` **24 ok**;
+    - `-race` 24 ok, 0 FAIL;
+    - fora do escopo, tudo igual ao HEAD.
+  - **Ataques (Sonnet):** 1246 PASS, 0 FAIL. Os `fase9_adv*` do monitor foram adaptados só na cópia.
+  - **Revisão independente da 12.8** (Opus): **pode publicar com a melhora desligada** (o caminho quente fica idêntico); corrigir antes de ligar.
+    - **I-1:** os exemplos desmontam a defesa por nonce (todos viram `<id>`), e o corte deixa um `ARQUIVO_INICIO` aberto no `system`.
+    - **I-2:** o `prompt_json` gravado era o pedido antes da melhora, citando uma "nota 1.1.5" inexistente.
+    - **I-3:** desmarcar o exemplo deixava o vetor em `indice_itens`.
+    - **Menores:**
+      - M-1: cota única de embed;
+      - M-2: pendente sem amostra trava a fila;
+      - M-3: o hash não cobre o formato;
+      - M-4: índices nunca apagados;
+      - M-5: `--melhora-embeddings` vinha ligado.
+  - **Decisões do owner (00:56) → contrato 1.1.5:**
+    - I-2: **gravar os dois pedidos e o rastro** (C-2.10a), com os jobs de melhora fora da exportação e do retrato (C-3.10a);
+    - M-5: embeddings **desligados por padrão** (C-6.6).
+  - **Regras novas, sem decisão do owner:**
+    - C-8.10a: k e o limiar ficam congelados no índice (decisão do Sonnet, aceita);
+    - C-8.11: delimitação dos exemplos.
+  - Correções delegadas ao Sonnet da 12.8.
+- 2026-11-04 00:52: owner perguntou se há algo a configurar no `.mcp.json` (sem abrir o arquivo). **Nada agora.** Na 12.10, com o mcpollama 0.10.0, a `reportar_erro` aparece sem configuração; só `--auto-report` seria acrescentado, e só se o owner quiser os automáticos.
+- 2026-11-04 02:20: **operação no servidor: 5 simultâneos** (owner, 02:03: "pode aumentar para 5"; depois, "5 + run-timeout para 10min").
+  - **Aviso prévio do coordenador:** com 5 slots, o 5º pedido espera dentro do Ollama (o `qwen3-ia` gera 1 por vez) e esse tempo conta no run-timeout. O `--run-timeout` padrão já era 10 min (herdado do `--max-wait`); o owner manteve 10 min, agora explícito na unit.
+  - **Espera pela fila vazia:** 9 min sem brecha. A fila **não esvaziava** porque uma tool `cursor-file-explanation-single` mandava jobs sem parar (75 desde 00:45).
+    - **Erro de contagem do coordenador:** o "5 ocupados" somava `running` duas vezes (lista + `in_use`); eram 3 jobs.
+    - Owner (02:14): **aplicar agora**, aceitando a queda dos jobs ativos.
+  - **Incidente: gateway fora do ar por ~2 min (02:15–02:17), erro do coordenador.**
+    - O `sed` que inseria `--run-timeout` gravou um `\n` literal no `ExecStart`, porque nesta ferramenta o `\\` chega como `\` no `ssh 'bash -s'`. O gateway ficou em `activating`, reiniciando em loop. O Ollama já estava em 5.
+    - A tentativa de corrigir com `awk` não casou a linha (mesmo problema de escape).
+    - **Recuperação:** a unit original foi restaurada do backup, seguida de `daemon-reload` e restart (`active`, `healthz` 200, com 2 slots). A tentativa com Python também falhou na compilação pelo mesmo escape, sem efeito no serviço.
+    - **Solução final:** edição com Python **sem nenhuma barra invertida** (`chr(92)`/`chr(10)`) e rollback automático se o `healthz` não voltasse.
+  - **Estado final (02:16):**
+    - `OLLAMA_NUM_PARALLEL=5`;
+    - gateway com `--gen-slots 5`, `--run-timeout 10m` e `--embed-slots 2`;
+    - `active`/`active`, `healthz` 200, monitor com `geracao: 5`.
+    - Backups: `10-performance.conf.bak-20261104-021514` e `mcpollama-gateway.service.bak-20261104-021514` e `-021624`.
+  - **Repositório:** `deploy/servidor-ia/ollama-10-performance.conf`, `deploy/servidor-ia/README.md`, `deploy/gateway/mcpollama-gateway.service` (com comentário), `CLAUDE.md`, `README.md` e a memória `criterio-modelo-multiagente`, que guarda a lição sobre a barra invertida.
+  - **Lição para todos:** editar arquivo remoto sem barra invertida e sempre com rollback automático pelo `healthz`.
+- 2026-11-04 02:20: **correções da revisão da 12.8 concluídas** pelo Sonnet (33 mutações, todas mortas).
+  - **C-2.10a:** `prompt_json_original` e as colunas `melhora_*` no `content.db`/`treino.db`, copiadas para a amostra.
+  - **C-3.10a:** critério `melhora` no `Eligible`.
+  - **`--melhora-embeddings`:** padrão false.
+  - **C-8.11:** bloco `EXEMPLOS_INICIO/FIM <nonce>` sem as linhas `=====…=====` e sem `[sistema]`. O teste com o documento de ataque passa.
+  - **Desmarcar o exemplo** apaga as cópias em `indice_itens`.
+  - **Fila de pendentes:** o embedder pagina por rowid e marca `falha:` as linhas sem pedido (205 ruins não bloqueiam).
+  - **Índice:** `FormatVersion "ex1"` no hash; `DeleteInvalidIndexes` e o modo `indices-limpar`; o índice invalidado sai da memória.
+  - **Schema:** o `treino.db` passa para a versão 3; um gateway antigo recusa o arquivo, como deve.
+  - **Gate do Sonnet:** 24 ok, com e sem `-race`.
+  - **Ataques do Sonnet:** 1277 PASS, 0 FAIL.

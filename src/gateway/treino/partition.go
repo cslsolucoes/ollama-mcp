@@ -53,6 +53,7 @@ type ElRow struct {
 	HTTPStatus                                                               int
 	PromptTruncado, PromptJSONTruncado, TemImagem, RespFinal, RespTruncada   bool
 	HasPromptJSON                                                            bool
+	Melhora                                                                  bool // the request was changed by the improvement (C-3.10a)
 	RevisadaEm                                                               int64
 }
 
@@ -80,6 +81,8 @@ func Eligible(r ElRow, ignorePartition bool) (bool, string) {
 		return false, "quarentena"
 	case r.Tool == "translate" && !translatePartOK(r.Papel): // C-3.10
 		return false, "translate_montado"
+	case r.Melhora: // C-3.10a: the answer came from a request with instructions or examples added
+		return false, "melhora"
 	}
 	return true, ""
 }
@@ -96,16 +99,17 @@ func translatePartOK(papel string) bool {
 const elSelect = `SELECT o.id, o.estado, o.particao, COALESCE(o.tool,''), COALESCE(o.categoria,''), COALESCE(o.resposta_correta,''), COALESCE(o.job_do_erro,''),
 	COALESCE(oj.papel,''), a.job_id IS NOT NULL, COALESCE(a.endpoint,''), COALESCE(a.status,''), COALESCE(a.http_status,0),
 	COALESCE(a.prompt_truncado,1), COALESCE(a.prompt_json_truncado,1), COALESCE(a.tem_imagem,1), COALESCE(a.resp_final,0), COALESCE(a.resp_truncada,1),
-	COALESCE(length(a.prompt_json),0) > 0, COALESCE(o.revisada_em,0)
+	COALESCE(length(a.prompt_json),0) > 0, COALESCE(o.revisada_em,0), COALESCE(a.melhora,0)
 	FROM ocorrencias o
 	LEFT JOIN ocorrencia_jobs oj ON oj.ocorrencia_id=o.id AND oj.job_id=o.job_do_erro
-	LEFT JOIN amostras a INDEXED BY idx_amostras_pred ON a.job_id=o.job_do_erro `
+	LEFT JOIN amostras a INDEXED BY idx_amostras_pred2 ON a.job_id=o.job_do_erro `
 
 func scanEl(sc interface{ Scan(...any) error }) (ElRow, error) {
 	var r ElRow
-	var pt, pjt, img, rf, rt int
+	var pt, pjt, img, rf, rt, mel int
 	err := sc.Scan(&r.ID, &r.Estado, &r.Particao, &r.Tool, &r.Categoria, &r.RespostaCorreta, &r.JobDoErro, &r.Papel, &r.HasSample, &r.Endpoint, &r.Status,
-		&r.HTTPStatus, &pt, &pjt, &img, &rf, &rt, &r.HasPromptJSON, &r.RevisadaEm)
+		&r.HTTPStatus, &pt, &pjt, &img, &rf, &rt, &r.HasPromptJSON, &r.RevisadaEm, &mel)
+	r.Melhora = mel != 0
 	r.PromptTruncado, r.PromptJSONTruncado, r.TemImagem, r.RespFinal, r.RespTruncada = pt != 0, pjt != 0, img != 0, rf != 0, rt != 0
 	return r, err
 }
@@ -517,8 +521,14 @@ func (s *Store) SetExemploPublico(ctx context.Context, id string, on bool, a Act
 			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO embeddings(ocorrencia_id, vetor, modelo) VALUES(?, NULL, NULL)`, id); err != nil {
 				return err
 			}
-		} else if _, err := tx.ExecContext(ctx, `DELETE FROM embeddings WHERE ocorrencia_id=?`, id); err != nil {
-			return err
+		} else {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM embeddings WHERE ocorrencia_id=?`, id); err != nil {
+				return err
+			}
+			// the copies in the frozen indexes go too, and those indexes become invalid (C-6.6, I-3 of the review)
+			if err := s.invalidateIndexesOf(ctx, tx, id); err != nil {
+				return err
+			}
 		}
 		return hist(ctx, tx, now, id, AcaoAlterou, "exemplo_publico", itoa(b2i(cur != 0)), itoa(b2i(on)), a)
 	})

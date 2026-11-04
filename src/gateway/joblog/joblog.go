@@ -64,6 +64,9 @@ func (j *Journal) enqueue(rec queue.Record, prompt string, pj proxy.PromptJSON, 
 	case withJSON && pj.Failed:
 		// The body could not be scanned for images: keep no JSON (fail closed).
 		_, err = j.Content.SavePromptJSONFailed(rec.ID, prompt, time.Now())
+	case withJSON && pj.Melhora:
+		_, err = j.Content.SavePromptJSONMelhora(rec.ID, prompt, pj.JSON, pj.HasImage, content.MelhoraTrace{Original: pj.Original,
+			InstrucoesID: pj.InstrucoesID, IndiceID: pj.IndiceID, Exemplos: pj.Exemplos}, time.Now())
 	case withJSON:
 		_, err = j.Content.SavePromptJSON(rec.ID, prompt, pj.JSON, pj.HasImage, time.Now())
 	default:

@@ -36,6 +36,14 @@ type PromptJSON struct {
 	// Failed: the scan could not read the whole body. No JSON is kept; the job is
 	// stored with prompt_json NULL, tem_imagem=1 and prompt_json_truncated=1.
 	Failed bool
+	// The trace of the improvement without training (C-2.10a), set only when it changed the request:
+	// JSON above is then the body the Ollama received, Original the request before the improvement
+	// (images replaced by markers too), and the ids say what was added.
+	Melhora      bool
+	Original     []byte
+	InstrucoesID string
+	IndiceID     string
+	Exemplos     []string
 }
 
 // JSONJournal is the optional extension of Journal that receives the canonical

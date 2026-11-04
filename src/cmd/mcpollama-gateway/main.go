@@ -27,6 +27,8 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/gpu"
 	"github.com/cslsoftwares/mcpollama/gateway/hmackey"
 	"github.com/cslsoftwares/mcpollama/gateway/joblog"
+	"github.com/cslsoftwares/mcpollama/gateway/melhora"
+	"github.com/cslsoftwares/mcpollama/gateway/melhora/feed"
 	"github.com/cslsoftwares/mcpollama/gateway/models"
 	"github.com/cslsoftwares/mcpollama/gateway/monitor"
 	"github.com/cslsoftwares/mcpollama/gateway/pool"
@@ -134,9 +136,35 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	// Training database (Fase 12.4). Optional: without --treino-db the route
 	// POST /api/feedback answers 503. Like the job text, a database that does not
 	// open must not take the gateway down: it goes on without the feature.
+	//
+	// Improvement without training (Fase 12.8): the Transformer exists from the start
+	// (off unless --melhora-tools names tools); its embedding goes through the queue
+	// built further down (embedImpl is set before the server starts). The store tells
+	// it when a frozen index of examples goes invalid.
+	var instr *melhora.Instrucoes
+	if cfg.MelhoraInstr != "" {
+		instr, err = melhora.LoadInstrucoes(cfg.MelhoraInstr)
+		if err != nil {
+			fmt.Fprintln(stderr, "mcpollama-gateway: --melhora-instrucoes: "+err.Error())
+			return 2
+		}
+	}
+	var embedImpl melhora.EmbedFunc
+	mel := melhora.NewTransformer(melhora.Config{
+		Tools: cfg.MelhoraTools, Instr: instr, EmbedTimeout: cfg.MelhoraTimeout,
+		Embed: func(ctx context.Context, text string) ([]float32, error) {
+			if embedImpl == nil {
+				return nil, errors.New("embedding indisponível")
+			}
+			return embedImpl(ctx, text)
+		},
+	})
 	var tr *treino.Store
 	if cfg.TreinoDB != "" {
-		tr, err = treino.Open(cfg.TreinoDB, treino.Options{Logf: logf, OnEvent: st.Event, Key: docKey})
+		tr, err = treino.Open(cfg.TreinoDB, treino.Options{Logf: logf, OnEvent: st.Event, Key: docKey, OnIndexInvalidated: func(id string) {
+			mel.InvalidateIndex(id)
+			st.Event("melhora_indice_invalidado", "índice de exemplos "+id+": um membro deixou de ser exemplo (C-4.10); sem exemplos até trocar o índice")
+		}})
 		if err != nil {
 			tr = nil
 			logf("registro de erros DESLIGADO: %v (POST /api/feedback responde 503)", err)
@@ -147,6 +175,28 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		}
 	} else {
 		logf("sem --treino-db: o registro de erros (POST /api/feedback) está desligado")
+	}
+	if cfg.MelhoraIndice != "" && tr != nil {
+		// A bad index never takes the gateway down: it goes on without examples.
+		if ix, err := feed.LoadIndex(context.Background(), tr, cfg.MelhoraIndice); err != nil {
+			logf("melhora: índice %s não carregou (%v): o gateway segue sem exemplos", cfg.MelhoraIndice, err)
+			st.Event("melhora_indice_indisponivel", "índice de exemplos "+cfg.MelhoraIndice+" não carregou: "+err.Error())
+		} else if ix.Modelo != cfg.MelhoraModel {
+			// vectors of another model live in another space: the query must come from the same model
+			logf("melhora: o índice %s foi feito com o modelo de embedding %q e o gateway usa %q: o gateway segue sem exemplos", ix.ID, ix.Modelo, cfg.MelhoraModel)
+			st.Event("melhora_indice_indisponivel", "índice de exemplos "+ix.ID+": o modelo de embedding do índice difere de --melhora-embed-model")
+		} else {
+			mel.SetIndex(ix)
+			logf("melhora: índice %s (hash %s, %d exemplos, k=%d, limiar=%.4f)", ix.ID, ix.Hash, len(ix.Items), ix.K, ix.Limiar)
+		}
+	}
+	if len(cfg.MelhoraTools) > 0 {
+		logf("melhora LIGADA para: %s (instruções %s)", strings.Join(cfg.MelhoraTools, ","), func() string {
+			if instr == nil {
+				return "nenhuma"
+			}
+			return instr.ID
+		}())
 	}
 	jr := &joblog.Journal{Store: st, Content: cs, Backend: pool.DefaultPrimaryID, Logf: logf}
 	jr.RecoverResponses(context.Background())
@@ -279,13 +329,16 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		}
 	}
 
-	mon, err = monitor.New(monitor.Config{Pool: pl, Models: mcol, Queue: q, Store: st, Content: cs, Treino: tr, TreinoSource: treino.NewSource(st, cs), TreinoKey: docKey, Role: cfg.Role, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
+	// the embedding of the gateway itself (query of the examples; public examples in the background)
+	// goes through the queue, in the embed lane
+	embedImpl = proxy.NewEmbedder(proxy.EmbedderConfig{Upstream: cfg.Ollama, Queue: q, Model: cfg.MelhoraModel})
+	mon, err = monitor.New(monitor.Config{Melhora: monMelhora(mel, tr, cfg), Pool: pl, Models: mcol, Queue: q, Store: st, Content: cs, Treino: tr, TreinoSource: treino.NewSource(st, cs), TreinoKey: docKey, Role: cfg.Role, KeepDone: cfg.KeepDone, GPU: col, CPU: ccol, StreamEvery: streamEvery(cfg), Hub: hub, Admin: admin, Version: Version, BootID: bootID, Logf: logf})
 	if err != nil {
 		fmt.Fprintln(stderr, "mcpollama-gateway: "+err.Error())
 		return 1
 	}
 	px, err := proxy.New(proxy.Config{
-		Journal: jr, Backend: pool.DefaultPrimaryID, Pool: pl, DocKey: docKey,
+		Journal: jr, Backend: pool.DefaultPrimaryID, Pool: pl, DocKey: docKey, Melhora: mel,
 		Upstream: cfg.Ollama, Queue: q, PriorityNets: cfg.PriorityNets, AllowedModels: cfg.AllowedModels,
 		MaxBodyBytes: cfg.MaxBodyBytes, RunTimeout: cfg.RunTimeout, Logf: dbg,
 		DefaultThink: cfg.DefaultThink, ThinkSuffix: cfg.ThinkSuffix,
@@ -334,6 +387,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		start(func() { ccol.RunLoop(bg) })
 	}
 	start(func() { pl.Run(bg) })
+	if tr != nil && cfg.MelhoraBg {
+		emb := &feed.Embedder{Store: tr, Embed: embedImpl, Model: cfg.MelhoraModel, Logf: dbg, Note: mel.NoteBackground}
+		start(func() { emb.Run(bg) })
+	}
 	start(func() { pokeLoop(bg, q) })
 	start(func() { backendSamples(bg, pl, q, st, cfg.SampleStore) })
 
@@ -475,4 +532,14 @@ func streamEvery(cfg Config) time.Duration {
 		return cfg.GPUInterval
 	}
 	return 2 * time.Second
+}
+
+// monMelhora is the source of the counters of the improvement for the monitor: only
+// when the feature has something to show (an improvement configured, or a training
+// database whose public examples are being embedded).
+func monMelhora(mel *melhora.Transformer, tr *treino.Store, cfg Config) *melhora.Transformer {
+	if len(cfg.MelhoraTools) > 0 || cfg.MelhoraIndice != "" || cfg.MelhoraInstr != "" || (tr != nil && cfg.MelhoraBg) {
+		return mel
+	}
+	return nil
 }
