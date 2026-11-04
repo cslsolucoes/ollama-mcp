@@ -1,7 +1,7 @@
 # Relatar os erros do modelo local (qwen3-ia): instruções para o Claude
 
-> ⏳ **Instrução futura:** entra em vigor quando existir a tool `reportar_erro` (mcpollama 0.10.0, Fase 12). Até lá, **não** relate
-> por outro meio.
+> ✅ **Em vigor desde 2026-11-04** (mcpollama 0.10.0 e gateway 0.13.0, Fase 12). Sessão com mcpollama antigo, sem a tool
+> `reportar_erro`, **não** relata por outro meio: avise o usuário e siga.
 >
 > Fonte única destas instruções. Vale para **todo projeto que usa o servidor MCP `mcpOllama`** (tools `generate`, `chat`,
 > `summarize_file`, `extract`, `translate`, `embed`).
