@@ -157,7 +157,13 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
-### [0.13.0] - a implantar (Fase 12; ainda sem tag)
+### [0.13.1] - 2026-11-04 (ainda sem tag)
+
+- **Monitor:** o quadro "Em execução" mostra até 5 linhas e o "Fila de espera" até 10, com paginação do restante
+  ("‹ anterior · página X de N · T itens · próxima ›"). A página é guardada por quadro e não reinicia com a atualização de 1 s.
+  Os demais quadros não mudaram (pedido do owner).
+
+### [0.13.0] - 2026-11-04 13:02, em produção (Fase 12; ainda sem tag)
 
 Binário `0.13.0-<hash>` (Linux amd64) ainda **não** instalado no servidor. Commits da Fase 12: `8fc5558` (contrato 1.0.0), `1fd5b27`,
 `3531beb` (12.3), `a1a4f9f`, `a820b70` (12.4), `37706bb`, `d27a4ca`, `0493f7f` (12.6), `3fc8fa9` (12.7), `9e3c111` (12.8) e `481aee0`

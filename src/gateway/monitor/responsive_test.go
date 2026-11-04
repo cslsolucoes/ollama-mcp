@@ -19,6 +19,10 @@ func TestIndexIsResponsiveAndStable(t *testing.T) {
 		`function safeRender`,
 		`dataset.k`, // stable keys: buttons survive a redraw
 		`Erro ao desenhar o painel`,
+		`RUN_PAGE_SIZE = 5`,                          // "Em execução": at most 5 rows, the rest is paged
+		`WAIT_PAGE_SIZE = 10`,                        // "Fila de espera": at most 10 rows, the rest is paged
+		`pageOf("running", q.running, RUN_PAGE_SIZE`, // both boards really go through the pager
+		`pageOf("waiting", q.waiting, WAIT_PAGE_SIZE`,
 		`function openJob(id) { showTab("joblog");`, // "Detalhes" outside the log tab must open that tab (the box lives there)
 	} {
 		if !strings.Contains(page, want) {
