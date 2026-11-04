@@ -54,6 +54,7 @@ type ElRow struct {
 	PromptTruncado, PromptJSONTruncado, TemImagem, RespFinal, RespTruncada   bool
 	HasPromptJSON                                                            bool
 	Melhora                                                                  bool // the request was changed by the improvement (C-3.10a)
+	Forma                                                                    bool // the request has the form of a conversation (C-3.13, C-3.14; I-6 of the review of 12.9)
 	RevisadaEm                                                               int64
 }
 
@@ -83,6 +84,8 @@ func Eligible(r ElRow, ignorePartition bool) (bool, string) {
 		return false, "translate_montado"
 	case r.Melhora: // C-3.10a: the answer came from a request with instructions or examples added
 		return false, "melhora"
+	case !r.Forma: // C-3.13: a request without prompt or messages has no line to export
+		return false, "forma"
 	}
 	return true, ""
 }
@@ -99,17 +102,17 @@ func translatePartOK(papel string) bool {
 const elSelect = `SELECT o.id, o.estado, o.particao, COALESCE(o.tool,''), COALESCE(o.categoria,''), COALESCE(o.resposta_correta,''), COALESCE(o.job_do_erro,''),
 	COALESCE(oj.papel,''), a.job_id IS NOT NULL, COALESCE(a.endpoint,''), COALESCE(a.status,''), COALESCE(a.http_status,0),
 	COALESCE(a.prompt_truncado,1), COALESCE(a.prompt_json_truncado,1), COALESCE(a.tem_imagem,1), COALESCE(a.resp_final,0), COALESCE(a.resp_truncada,1),
-	COALESCE(length(a.prompt_json),0) > 0, COALESCE(o.revisada_em,0), COALESCE(a.melhora,0)
+	COALESCE(length(a.prompt_json),0) > 0, COALESCE(o.revisada_em,0), COALESCE(a.melhora,0), COALESCE(a.forma_ok,0)
 	FROM ocorrencias o
 	LEFT JOIN ocorrencia_jobs oj ON oj.ocorrencia_id=o.id AND oj.job_id=o.job_do_erro
-	LEFT JOIN amostras a INDEXED BY idx_amostras_pred2 ON a.job_id=o.job_do_erro `
+	LEFT JOIN amostras a INDEXED BY idx_amostras_pred3 ON a.job_id=o.job_do_erro `
 
 func scanEl(sc interface{ Scan(...any) error }) (ElRow, error) {
 	var r ElRow
-	var pt, pjt, img, rf, rt, mel int
+	var pt, pjt, img, rf, rt, mel, forma int
 	err := sc.Scan(&r.ID, &r.Estado, &r.Particao, &r.Tool, &r.Categoria, &r.RespostaCorreta, &r.JobDoErro, &r.Papel, &r.HasSample, &r.Endpoint, &r.Status,
-		&r.HTTPStatus, &pt, &pjt, &img, &rf, &rt, &r.HasPromptJSON, &r.RevisadaEm, &mel)
-	r.Melhora = mel != 0
+		&r.HTTPStatus, &pt, &pjt, &img, &rf, &rt, &r.HasPromptJSON, &r.RevisadaEm, &mel, &forma)
+	r.Melhora, r.Forma = mel != 0, forma != 0
 	r.PromptTruncado, r.PromptJSONTruncado, r.TemImagem, r.RespFinal, r.RespTruncada = pt != 0, pjt != 0, img != 0, rf != 0, rt != 0
 	return r, err
 }
@@ -123,6 +126,7 @@ type occ struct {
 
 type component struct {
 	members []*occ
+	keys    []string // the link keys of the members: j:<job>, d:<keyid>:<doc_hash>, c:<keyid>:<conteudo_hmac> (C-4.5)
 }
 
 // buildComponents groups every occurrence that is not erased: two occurrences are
@@ -158,7 +162,7 @@ func buildComponents(ctx context.Context, x execer) ([]component, error) {
 	}
 	rows.Close()
 	rows, err = x.QueryContext(ctx, `SELECT oj.ocorrencia_id, oj.job_id, COALESCE(a.key_id,''), COALESCE(a.doc_hash,''), COALESCE(a.conteudo_hmac,'')
-		FROM ocorrencia_jobs oj LEFT JOIN amostras a INDEXED BY idx_amostras_grupo ON a.job_id=oj.job_id`)
+		FROM ocorrencia_jobs oj LEFT JOIN amostras a INDEXED BY idx_amostras_grupo ON a.job_id=oj.job_id WHERE oj.valida=1`) // C-4.5a: a reference only never links
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +224,7 @@ func buildComponents(ctx context.Context, x execer) ([]component, error) {
 			order = append(order, r)
 		}
 		c.members = append(c.members, o)
+		c.keys = append(c.keys, keysOf[i]...)
 	}
 	out := make([]component, 0, len(order))
 	for _, r := range order {
@@ -300,6 +305,18 @@ func (s *Store) recompute(ctx context.Context, tx *sql.Tx, now time.Time) error 
 				anyQ = true
 			}
 		}
+		// C-4.8a: a member without a side yet takes the side the same job, document or content was given before,
+		// even if the occurrence that held it was erased. Opposite sides meet like live ones do.
+		for _, m := range c.members {
+			if m.particao == "" {
+				ht, he, err := s.inheritedSides(ctx, tx, c.keys)
+				if err != nil {
+					return err
+				}
+				hasT, hasE = hasT || ht, hasE || he
+				break
+			}
+		}
 		g := c.groupID(taken)
 		taken[g] = true
 		side := ""
@@ -371,8 +388,12 @@ func (s *Store) recompute(ctx context.Context, tx *sql.Tx, now time.Time) error 
 		}
 	}
 	for _, c := range comps {
+		recordSide := ""
 		for _, m := range c.members {
 			t := target[m.id]
+			if (t.particao == ParteTreino || t.particao == ParteTeste) && t.particao != m.particao {
+				recordSide = t.particao // a member just got this side: the keys of the group are written down (C-4.8a)
+			}
 			if t.grupo == m.grupo && t.particao == m.particao {
 				continue
 			}
@@ -388,6 +409,11 @@ func (s *Store) recompute(ctx context.Context, tx *sql.Tx, now time.Time) error 
 				if err := hist(ctx, tx, now, m.id, AcaoAlterou, "grupo_id", m.grupo, t.grupo, systemActor); err != nil {
 					return err
 				}
+			}
+		}
+		if recordSide != "" {
+			if err := recordSides(ctx, tx, c.keys, recordSide, now); err != nil {
+				return err
 			}
 		}
 	}
@@ -424,9 +450,8 @@ func (s *Store) ReleaseQuarantine(ctx context.Context, id, lado string, a Actor)
 // ReleaseInfo tells the administrator what a release touched (M-1 of the review of 12.6).
 type ReleaseInfo struct {
 	Membros int `json:"membros"`
-	// ExportadosNaOutraParte counts the members that were already exported to the OTHER part
-	// before the quarantine: releasing them to this side leaves the same case in a file that
-	// went to the other side. The release is not blocked (C-4.11 allows it); the admin is told.
+	// ExportadosNaOutraParte counts the members already exported to the OTHER part. Since 1.1.6 (C-4.11c) a release
+	// with a count above zero is refused with ErrReleaseExported: the count tells the administrator why.
 	ExportadosNaOutraParte int `json:"exportados_na_outra_parte"`
 }
 
@@ -471,12 +496,17 @@ func (s *Store) ReleaseQuarantineInfo(ctx context.Context, id, lado string, a Ac
 				continue
 			}
 			info.Membros = len(c.members)
-			for _, m := range c.members {
+			for _, m := range c.members { // C-4.11c: a case exported to the other part cannot be moved to this one
 				var ex int
 				if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM historico WHERE ocorrencia_id=? AND acao=? AND campo=?)`, m.id, AcaoExportou, other).Scan(&ex); err != nil {
 					return err
 				}
 				info.ExportadosNaOutraParte += ex
+			}
+			if info.ExportadosNaOutraParte > 0 {
+				return ErrReleaseExported
+			}
+			for _, m := range c.members {
 				if m.particao == lado {
 					continue
 				}
@@ -486,6 +516,9 @@ func (s *Store) ReleaseQuarantineInfo(ctx context.Context, id, lado string, a Ac
 				if err := hist(ctx, tx, now, m.id, AcaoAlterou, "particao", m.particao, lado, a); err != nil {
 					return err
 				}
+			}
+			if err := recordSides(ctx, tx, c.keys, lado, now); err != nil { // C-4.8a
+				return err
 			}
 		}
 		return s.recompute(ctx, tx, now)
@@ -539,4 +572,45 @@ func itoa(n int) string {
 		return "0"
 	}
 	return "1"
+}
+
+// inheritedSides says which sides the keys of a component were given before (C-4.8a): the table `lados`
+// holds only identifiers and HMACs, and outlives the occurrences that created them.
+func (s *Store) inheritedSides(ctx context.Context, x execer, keys []string) (treino, teste bool, err error) {
+	seen := map[string]bool{}
+	for _, k := range keys {
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		var lado string
+		switch err := x.QueryRowContext(ctx, `SELECT lado FROM lados WHERE chave=?`, k).Scan(&lado); err {
+		case nil:
+			if lado == ParteTreino {
+				treino = true
+			} else if lado == ParteTeste {
+				teste = true
+			}
+		case sql.ErrNoRows:
+		default:
+			return false, false, err
+		}
+	}
+	return treino, teste, nil
+}
+
+// recordSides writes the side of every key of a group (C-4.8a). A key keeps one side: the last one given.
+func recordSides(ctx context.Context, x execer, keys []string, lado string, now time.Time) error {
+	seen := map[string]bool{}
+	for _, k := range keys {
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		if _, err := x.ExecContext(ctx, `INSERT INTO lados(chave,lado,atribuida_em) VALUES(?,?,?)
+			ON CONFLICT(chave) DO UPDATE SET lado=excluded.lado, atribuida_em=excluded.atribuida_em`, k, lado, now.UnixMilli()); err != nil {
+			return err
+		}
+	}
+	return nil
 }

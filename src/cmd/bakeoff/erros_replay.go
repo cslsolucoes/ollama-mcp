@@ -81,6 +81,9 @@ func newReplayClient(raw string, allowRemote bool, timeout time.Duration) (*repl
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, errors.New("-gateway-url inválida")
 	}
+	if (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil || strings.Contains(raw, "?") || strings.Contains(raw, "#") { // m-16
+		return nil, errors.New("-gateway-url deve ser só esquema e host: sem caminho, consulta, fragmento nem usuário (o replay só chama os endpoints da lista)")
+	}
 	h := u.Hostname()
 	ip := net.ParseIP(h)
 	if !(h == "localhost" || (ip != nil && ip.IsLoopback())) {
@@ -215,10 +218,18 @@ func parseReply(endpoint string, body io.Reader) (reply, error) {
 					l = nil
 				}
 			}
-			if len(l) > 0 && l[0] == '{' {
+			switch {
+			case len(l) > 0 && l[0] == '{':
 				if perr := parseChunk(l, v1, &text, &out); perr != nil {
+					// m-13: a line that is not JSON, in the middle of the stream, may have lost text: the case is not measured.
+					// Only the last line, cut by the ceiling, may be partial.
+					if errors.Is(perr, errBadChunk) && lr.N <= 0 && err == io.EOF {
+						break
+					}
 					return reply{}, perr
 				}
+			case len(l) > 0 && !v1:
+				return reply{}, errBadChunk // m-13: the native stream is JSON lines only (a proxy error page, for one, is not)
 			}
 		}
 		if err != nil {
@@ -228,10 +239,13 @@ func parseReply(endpoint string, body io.Reader) (reply, error) {
 			break
 		}
 	}
-	if lr.N <= 0 {
-		out.Truncated = true
-	}
 	out.Text = text.String()
+	if lr.N <= 0 {
+		// m-14: an answer past the ceiling was never seen to the end; the text may have lost what decides the case. The
+		// reply comes back with the error so that `truncado`, which this reproves, can still use it.
+		out.Truncated = true
+		return out, errAnswerTooLong
+	}
 	// An answer that did not end (no done / finish_reason / [DONE]) is a cut stream:
 	// the case is NOT measured, in any category (only the 16 MiB ceiling is allowed
 	// to end an answer without it).
@@ -240,6 +254,12 @@ func parseReply(endpoint string, body io.Reader) (reply, error) {
 	}
 	return out, nil
 }
+
+// errBadChunk is a line of the stream that is not the JSON it should be; errAnswerTooLong is an answer that passed the ceiling.
+var (
+	errBadChunk      = errors.New("resposta com linha ilegível no stream")
+	errAnswerTooLong = errors.New("resposta acima do teto de 16 MiB")
+)
 
 func parseChunk(l []byte, v1 bool, text *strings.Builder, out *reply) error {
 	if v1 {
@@ -253,7 +273,7 @@ func parseChunk(l []byte, v1 bool, text *strings.Builder, out *reply) error {
 			} `json:"choices"`
 		}
 		if json.Unmarshal(l, &c) != nil {
-			return nil // a partial last line (truncated answer): ignored
+			return errBadChunk
 		}
 		if len(c.Error) > 0 && string(c.Error) != "null" {
 			return errors.New("o gateway devolveu erro no corpo")
@@ -274,7 +294,7 @@ func parseChunk(l []byte, v1 bool, text *strings.Builder, out *reply) error {
 		DoneReason string                   `json:"done_reason"`
 	}
 	if json.Unmarshal(l, &c) != nil {
-		return nil
+		return errBadChunk
 	}
 	if c.Error != "" {
 		return errors.New("o gateway devolveu erro no corpo")

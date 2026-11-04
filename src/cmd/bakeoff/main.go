@@ -46,6 +46,7 @@ type options struct {
 	bigDocs, step, expectBoot, monFile, from, to string
 	// Fase 12.7: suite erros (runs on the server, next to treino.db)
 	errMode, treinoDB, keyFile, gwURL, retratoID, atual, candidato, alvo string
+	candScore                                                            string
 	indiceID, instrFile, embedModel                                      string
 	exemplosK                                                            int
 	exemplosLimiar                                                       float64
@@ -109,6 +110,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.retratoID, "retrato", "", "erros: id do retrato (modos base e comparar)")
 	fs.StringVar(&o.atual, "atual", "qwen3-ia", "erros: nome do modelo atual (rótulo; pasta do score.json do S2/S3)")
 	fs.StringVar(&o.candidato, "candidato", "", "erros: modelo candidato (modo comparar)")
+	fs.StringVar(&o.candScore, "candidato-score", "", "erros/comparar: score.json do S2/S3 do candidato COM as instruções (vazio: <out>/<candidato>/score.json; igual ao do atual reprova o gate, C-5.12)")
 	fs.StringVar(&o.alvo, "alvo", "", "erros: categoria-alvo da mudança (C-5.10)")
 	fs.StringVar(&o.indiceID, "indice", "", "erros/retrato e comparar: id do índice de exemplos congelado em treino.db (12.8; vazio = nenhum)")
 	fs.StringVar(&o.instrFile, "instrucoes", "", "erros/retrato e comparar: arquivo JSON da versão das instruções (12.8; vazio = nenhuma)")

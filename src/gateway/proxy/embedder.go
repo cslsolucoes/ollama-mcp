@@ -64,7 +64,7 @@ func NewEmbedder(c EmbedderConfig) melhora.EmbedFunc {
 
 func embedThroughQueue(ctx context.Context, c EmbedderConfig, text string) (vec []float32, err error) {
 	tk, err := c.Queue.Acquire(ctx, queue.Request{
-		Lane: queue.LaneEmbed, ClientIP: "127.0.0.1", ClientLabel: EmbedLabel, Tool: EmbedTool,
+		Lane: queue.LaneEmbed, ClientIP: "127.0.0.1", ClientLabel: EmbedLabel, Tool: EmbedTool, Internal: true,
 		Endpoint: "/api/embed", Model: c.Model, PriorityIn: queue.Normal, PriorityFinal: queue.Normal, BytesIn: int64(len(text)),
 	})
 	if err != nil {

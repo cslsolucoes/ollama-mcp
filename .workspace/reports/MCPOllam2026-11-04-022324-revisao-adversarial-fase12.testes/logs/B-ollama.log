@@ -1,0 +1,11 @@
+﻿=== RUN   TestAdv12BFeedbackNeverFallsBackNorRetries
+    fase12_adv_ollama_test.go:74: VEC|O-01|OK|relato de job do primário com o primário fora do ar ou com 503+Retry-After: erro, 1 pedido no primário e 0 no fallback (não usa o fallback nem retenta como a geração); backend "", PRIMARIO, "fallback ", Fallback, outro: recusado sem pedido
+--- PASS: TestAdv12BFeedbackNeverFallsBackNorRetries (0.01s)
+=== RUN   TestAdv12BFallbackGetsOnlyItsOwnCredential
+    fase12_adv_ollama_test.go:141: VEC|O-02|OK|fallback sem chave própria recebe pedido SEM Authorization (a chave do primário não é copiada); userinfo e query da URL do fallback não vão no pedido (nem como Basic) e não aparecem no erro de conexão nem no debug; fallback http fora de loopback com chave recusado no New
+--- PASS: TestAdv12BFallbackGetsOnlyItsOwnCredential (0.00s)
+=== RUN   TestAdv12BFeedbackHangingServerIsBounded
+    fase12_adv_ollama_test.go:154: VEC|O-03|OK|MEDIDA servidor de feedback que nunca responde: erro de tempo esgotado em 700ms com --timeout 700ms (o relato manual usa o --timeout da geração, padrão 120 s; o automático tem teto próprio de 30 s)
+--- PASS: TestAdv12BFeedbackHangingServerIsBounded (0.70s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/ollama	0.740s

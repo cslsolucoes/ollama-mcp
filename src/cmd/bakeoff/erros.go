@@ -65,6 +65,7 @@ type errosOpts struct {
 	RetratoID   string
 	Atual       string // name of the current model (label and folder of its S2/S3 score)
 	Candidato   string
+	CandScore   string // score.json of the S2/S3 of the candidate (I-9); empty: <out>/<candidato>/score.json
 	Alvo        string // target category of the change
 	Out         string // output root (the same -out of the other suites)
 	Timeout     time.Duration
@@ -86,7 +87,7 @@ type errosOpts struct {
 
 func (o options) errosOpts() errosOpts {
 	return errosOpts{Mode: o.errMode, DB: o.treinoDB, KeyFile: o.keyFile, GatewayURL: o.gwURL, AllowRemote: o.gwRemote,
-		RetratoID: o.retratoID, Atual: o.atual, Candidato: o.candidato, Alvo: o.alvo, Out: o.outExplicit(), Timeout: o.timeout,
+		RetratoID: o.retratoID, Atual: o.atual, Candidato: o.candidato, CandScore: o.candScore, Alvo: o.alvo, Out: o.outExplicit(), Timeout: o.timeout,
 		Resultado: o.resultado, BlindRespostas: o.blindResp,
 		IndiceID: o.indiceID, InstrFile: o.instrFile, ExemplosK: o.exemplosK, ExemplosLimiar: o.exemplosLimiar, EmbedModel: o.embedModel}
 }
@@ -414,6 +415,9 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 				var rp reply
 				if err == nil {
 					rp, err = rc.do(ctx, c.Endpoint, body)
+					if errors.Is(err, errAnswerTooLong) && categoryMode(c.Categoria) == modeTrunc {
+						err = nil // m-14: an answer past the ceiling reproves `truncado`; in any other category it is not measured
+					}
 				}
 				if err != nil {
 					failed, failWhy = true, oneLine(err.Error(), 120)

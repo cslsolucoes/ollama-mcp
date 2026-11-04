@@ -1,6 +1,7 @@
 package treino
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -149,4 +150,36 @@ func clip(s string) string {
 		return s[:40] + "..."
 	}
 	return s
+}
+
+var (
+	reportFields = map[string]bool{"projeto": true, "jobs": true, "job_do_erro": true, "categoria": true, "descricao": true,
+		"resposta_correta": true, "correcao_aplicada": true, "severidade": true, "origem": true}
+	jobFields = map[string]bool{"id": true, "papel": true, "backend": true}
+)
+
+// checkFieldNames refuses a name that is not exactly one of the fields of the contract (C-1.17): the decoder of
+// encoding/json takes "CATEGORIA" or "deſcricao" for a known field, and an unknown field must be refused (m-1 of
+// the review of 12.9). It returns nil for a body that is not a JSON object: the decoder reports that.
+func checkFieldNames(b []byte) error {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(b, &top) != nil {
+		return nil
+	}
+	for k := range top {
+		if !reportFields[k] {
+			return fmt.Errorf("campo desconhecido %q", clip(k))
+		}
+	}
+	var jobs []map[string]json.RawMessage
+	if raw, ok := top["jobs"]; ok && json.Unmarshal(raw, &jobs) == nil {
+		for _, j := range jobs {
+			for k := range j {
+				if !jobFields[k] {
+					return fmt.Errorf("campo desconhecido %q em jobs[]", clip(k))
+				}
+			}
+		}
+	}
+	return nil
 }

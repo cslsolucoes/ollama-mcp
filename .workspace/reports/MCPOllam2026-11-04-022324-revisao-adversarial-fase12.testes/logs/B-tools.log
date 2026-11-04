@@ -1,0 +1,25 @@
+﻿=== RUN   TestAdv12BRoutingAndTokens
+    fase12_adv_tools_test.go:93: VEC|T1-01|OK|job_do_erro padrão/final→primário, papel ou id de job @fallback→fallback com o token do fallback; @fallback escrito à mão num id da lista primária não desvia (vale o backend da lista); sem fallback configurado: recusado com 0 pedidos; cada servidor só viu o próprio Bearer; debug sem token
+--- PASS: TestAdv12BRoutingAndTokens (0.01s)
+=== RUN   TestAdv12BRedirectAndEchoNeverCarryTheToken
+    fase12_adv_tools_test.go:160: VEC|T1-02|OK|307 do primário para o fallback (e do fallback para o primário) não é seguido (0 relatos no destino); servidores que ecoam o Authorization no corpo de 400/401/404/409/500/503/507/418, em JSON e HTML, do primário e do fallback: o token não chega ao Claude nem ao debug
+--- PASS: TestAdv12BRedirectAndEchoNeverCarryTheToken (0.04s)
+=== RUN   TestAdv12BAutoReportsNeverHoldTheTool
+    fase12_adv_tools_test.go:266: VEC|T2-01|OK|MEDIDA trava: pior generate 2ms, descartados 23, Close 1ms; 500: 1 envios; 409: 4 envios; Close na espera do 409 (Retry-After 999999): 0s; a tool sempre respondeu sem erro, nenhum envio depois do Close com a fila cheia, Done() fechou
+--- PASS: TestAdv12BAutoReportsNeverHoldTheTool (3.41s)
+=== RUN   TestAdv12BJobsParsingRefusesBeforeSending
+    fase12_adv_tools_test.go:359: VEC|T3-01|OK|MEDIDA 38 formas maliciosas recusadas antes de enviar (0 pedidos, 404ms no total, inclusive 10 MB): 65 jobs, papéis inválidos/repetidos/unicode, ids maiúsculos/31/33/NUL/@outro/@fallback duplo, mesmo id em 2 backends, JSON aninhado, tipos errados, job_do_erro fora da lista, translate sem job_do_erro, campo desconhecido; 5 formas válidas aceitas e decodificadas pelo decoder estrito do gateway
+--- PASS: TestAdv12BJobsParsingRefusesBeforeSending (0.42s)
+=== RUN   TestAdv12BFieldLimitsAreBytes
+    fase12_adv_tools_test.go:400: VEC|T3-02|OK|MEDIDA limites em bytes nas fronteiras multibyte (4 KB, 128 KB, 128 B, 4 KB; o 4097º byte no meio de um 'é' ou '€' recusa) e o texto chega intacto ao decoder estrito; 128 KB de '<' (C-1.17 do campo ok) recusado pelo teto do corpo porque o json.Marshal escapa '<' como \u003c (6 bytes): enviados=0, err="o relato ocupa 786746 bytes depois de codificado; o máximo é 262144 (256 KB): reduza `re"
+--- PASS: TestAdv12BFieldLimitsAreBytes (0.03s)
+=== RUN   TestAdv12BSchemaMatchesTheHandler
+    fase12_adv_tools_test.go:439: VEC|T3-03|FALHA|Menor reportar_erro.go:68 vs :253: o schema da tool declara required=[projeto jobs categoria erro severidade origem] (sem correcao_aplicada), mas o handler usa reqString e recusa a chamada que só tem os campos obrigatórios do schema: "`correcao_aplicada` is required (obrigatório)". O RELATAR-ERROS-IA.md diz que correcao_aplicada é obrigatória: o schema deveria listá-la
+    fase12_adv_tools_test.go:439: T3-03: Menor reportar_erro.go:68 vs :253: o schema da tool declara required=[projeto jobs categoria erro severidade origem] (sem correcao_aplicada), mas o handler usa reqString e recusa a chamada que só tem os campos obrigatórios do schema: "`correcao_aplicada` is required (obrigatório)". O RELATAR-ERROS-IA.md diz que correcao_aplicada é obrigatória: o schema deveria listá-la
+--- FAIL: TestAdv12BSchemaMatchesTheHandler (0.00s)
+=== RUN   TestAdv12BServerAnswerInjection
+    fase12_adv_tools_test.go:517: VEC|T4-01|OK|MEDIDA 200 com id/estado/contadores inválidos, não-JSON, lista e corpo > 16 MiB: recusado sem eco (valid()); 200 válido com campos extras de 10 MB: só id/estado/contadores chegam. Nas recusas 4xx/5xx o texto do servidor CHEGA ao Claude (status 400,404,413,500,503,507), mas numa linha só, sem ESC/quebra e cortado em 200 runas (erro máx 334 runas) mesmo com corpo de 10 MB; [uso] falso fica no meio da linha, nunca no início
+--- PASS: TestAdv12BServerAnswerInjection (3.75s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/tools	7.717s
+FAIL

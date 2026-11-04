@@ -30,6 +30,7 @@ type reportInput struct {
 	GateExtra              []string // reasons already known (invalid retrato)
 	Baseline               *baselineFile
 	AtualS23, CandS23      *s23
+	CandSameScore          bool   // the score of the candidate is the very file of the current model (I-9)
 	BlindFile              string // base name only
 	Now                    time.Time
 	Apurado                bool // the report of mode apurar: the blind categories carry the owner's counts
@@ -44,6 +45,7 @@ type resultFile struct {
 	Unmeasured, Fora, Calls           int
 	Baseline                          *baselineFile
 	AtualS23, CandS23                 *s23
+	CandSameScore                     bool
 	BlindFile                         string
 	GeradoEm                          string
 }
@@ -118,6 +120,9 @@ func evaluate(in reportInput) outcome {
 		o.GateFail = append(o.GateFail, fmt.Sprintf("medição incompleta: %d caso(s) não puderam ser medidos", in.Unmeasured))
 	}
 	if in.Mode == "comparar" {
+		if in.CandSameScore { // I-9: the model name is the same, so the S2/S3 of the plain model must not stand for the one with instructions
+			o.GateFail = append(o.GateFail, "C-5.12: o S2 e o S3 do candidato apontam o MESMO score.json do atual (o gateway só aceita o nome qwen3-ia, então o candidato com instruções tem o nome do atual): meça o S2/S3 com as instruções, grave num score.json próprio e passe -candidato-score")
+		}
 		if in.AtualS23 == nil || in.CandS23 == nil {
 			o.GateFail = append(o.GateFail, "o S2 e o S3 da Fase 8 não foram medidos para os dois modelos (C-5.12): rode as suítes s2 e s3 e depois -suites score")
 		}
@@ -158,7 +163,11 @@ func evaluate(in reportInput) outcome {
 		return o
 	}
 	for _, c := range in.Cats {
-		if !scored(c) || c.Atual.N < minDecide || c.Cand.N != c.Atual.N {
+		if !scored(c) || c.Atual.N < minDecide {
+			continue
+		}
+		if c.Cand.N != c.Atual.N { // m-12: the same cases were not measured for both: it does not decide, and it is not a pass
+			o.Rejects = append(o.Rejects, fmt.Sprintf("C-5.8: a categoria %s tem N=%d no atual e N=%d no candidato: os mesmos casos não foram medidos nos dois", c.Cat, c.Atual.N, c.Cand.N))
 			continue
 		}
 		n := c.Atual.N
@@ -376,7 +385,18 @@ func finish(eo errosOpts, outDir string, in reportInput, results []caseRes, blin
 			in.Baseline = bf
 		}
 		in.AtualS23, _ = readS23(filepath.Join(eo.Out, safeName(eo.Atual), "score.json"), eo.Atual, in.Now, eo.S23MaxAge)
-		in.CandS23, _ = readS23(filepath.Join(eo.Out, safeName(eo.Candidato), "score.json"), eo.Candidato, in.Now, eo.S23MaxAge)
+		// I-9: the candidate of an improvement has the NAME of the current model (the gateway accepts only qwen3-ia), so its S2/S3
+		// come from a score.json of its own (-candidato-score); the same file as the current model's measures nothing.
+		atualScore := filepath.Join(eo.Out, safeName(eo.Atual), "score.json")
+		candScore := eo.CandScore
+		if candScore == "" {
+			candScore = filepath.Join(eo.Out, safeName(eo.Candidato), "score.json")
+		}
+		if sameFile(atualScore, candScore) {
+			in.CandSameScore = true
+		} else {
+			in.CandS23, _ = readS23(candScore, eo.Candidato, in.Now, eo.S23MaxAge)
+		}
 	}
 	if eo.Mode == "base" {
 		in.AtualS23, _ = readS23(filepath.Join(eo.Out, safeName(eo.Atual), "score.json"), eo.Atual, in.Now, eo.S23MaxAge) // optional
@@ -411,7 +431,7 @@ func finish(eo errosOpts, outDir string, in reportInput, results []caseRes, blin
 	}
 	if eo.Mode == "comparar" && !in.Apurado { // what mode apurar needs to finish the verdict (ids and numbers only)
 		rf := resultFile{RetratoID: in.RetratoID, Atual: in.Atual, Candidato: in.Candidato, Alvo: in.Alvo, Cats: in.Cats,
-			Unmeasured: in.Unmeasured, Fora: in.Fora, Calls: in.Calls, Baseline: in.Baseline, AtualS23: in.AtualS23, CandS23: in.CandS23,
+			Unmeasured: in.Unmeasured, Fora: in.Fora, Calls: in.Calls, Baseline: in.Baseline, AtualS23: in.AtualS23, CandS23: in.CandS23, CandSameScore: in.CandSameScore,
 			BlindFile: in.BlindFile, GeradoEm: in.Now.Format(time.RFC3339)}
 		b, _ := json.MarshalIndent(rf, "", "  ")
 		name := "resultado-" + stamp + ".json"
@@ -498,4 +518,17 @@ func writeBlind(dir, name, retrato string, items []blindItem, seed int64) error 
 		return err
 	}
 	return nil
+}
+
+// sameFile says whether two paths name the same file: the same cleaned absolute path, or (when both exist) the same
+// file on disk (a link or a different spelling).
+func sameFile(a, b string) bool {
+	aa, e1 := filepath.Abs(a)
+	bb, e2 := filepath.Abs(b)
+	if e1 == nil && e2 == nil && filepath.Clean(aa) == filepath.Clean(bb) {
+		return true
+	}
+	fa, e1 := os.Stat(a)
+	fb, e2 := os.Stat(b)
+	return e1 == nil && e2 == nil && os.SameFile(fa, fb)
 }

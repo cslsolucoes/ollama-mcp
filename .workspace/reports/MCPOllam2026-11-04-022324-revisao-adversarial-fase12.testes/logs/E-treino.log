@@ -1,0 +1,104 @@
+﻿=== RUN   TestAdv12EE1JSONLInjection
+    fase12_adv_export_test.go:172: VEC|E1.1|OK|resposta_correta com \n, \r, U+2028/2029, aspas, barras, NUL e '}\n{"messages"...' sai em 1 linha, JSON vÃ¡lido, conteÃºdo idÃªntico ao gravado
+    fase12_adv_export_test.go:193: VEC|E1.2|OK|generate com system/prompt cheios de escapes e linhas forjadas: 1 linha, [system,user,assistant] iguais ao pedido decodificado
+    fase12_adv_export_test.go:226: VEC|E1.3|OK|MEDIDA chat com U+2028 cru, tool_calls, role tool, content em partes e objeto, role 'hacker': 1 linha vÃ¡lida, histÃ³rico idÃªntico + assistant; roles e content passam CRUS, sem validaÃ§Ã£o (sÃ³ leitura, Menor)
+    fase12_adv_export_test.go:245: VEC|E1.4|FALHA|Bloqueador export.go:56-59: a linha do chat sai com UTF-8 INVÃLIDO (json.RawMessage copiado cru do prompt_json); json.Valid=true, mas JSON Lines/RFC 8259 exigem UTF-8 e o Content-Type diz charset=utf-8 (leitor estrito aborta o arquivo). O Ollama aceitou o pedido=true; a polÃ­tica reescrita mantÃ©m os bytes=true
+    fase12_adv_export_test.go:245: E1.4: Bloqueador export.go:56-59: a linha do chat sai com UTF-8 INVÃLIDO (json.RawMessage copiado cru do prompt_json); json.Valid=true, mas JSON Lines/RFC 8259 exigem UTF-8 e o Content-Type diz charset=utf-8 (leitor estrito aborta o arquivo). O Ollama aceitou o pedido=true; a polÃ­tica reescrita mantÃ©m os bytes=true
+    fase12_adv_export_test.go:263: VEC|E1.5|OK|duas chaves "messages" iguais: export e Ollama usam a Ãºltima ('real')
+    fase12_adv_export_test.go:316: VEC|E1.6|FALHA|Importante export.go:56,62,65 (chaves exatas 'messages'/'prompt'/'system' num map, enquanto o Ollama e o prÃ³prio gateway â€” policy.go:104, journal.go:56, hmackey.go:211 â€” casam por case folding): o par exportado nÃ£o Ã© o que o modelo viu: prompt+PROMPT: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | Å¿ystem (U+017F): JSONL [map[content:p role:user]], Ollama viu [map[content:Responda sÃ³ em JSON. role:system] map[content:p role:user]] | messages+Messages: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | sÃ³ Prompt: NÃƒO exportado (Ollama viu [map[content:real role:user]])
+    fase12_adv_export_test.go:316: E1.6: Importante export.go:56,62,65 (chaves exatas 'messages'/'prompt'/'system' num map, enquanto o Ollama e o prÃ³prio gateway â€” policy.go:104, journal.go:56, hmackey.go:211 â€” casam por case folding): o par exportado nÃ£o Ã© o que o modelo viu: prompt+PROMPT: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | Å¿ystem (U+017F): JSONL [map[content:p role:user]], Ollama viu [map[content:Responda sÃ³ em JSON. role:system] map[content:p role:user]] | messages+Messages: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | sÃ³ Prompt: NÃƒO exportado (Ollama viu [map[content:real role:user]])
+    fase12_adv_export_test.go:337: VEC|E1.7|OK|MEDIDA (sÃ³ leitura, Menor): chat com assistant final (prefill) exporta 3 mensagens com 2 assistant seguidos=true; generate com suffix/raw/template/context exporta sÃ³ 2 mensagens (suffix, template, raw e context, que mudam o que o modelo viu, sÃ£o descartados em export.go:60-77)
+--- FAIL: TestAdv12EE1JSONLInjection (0.87s)
+=== RUN   TestAdv12EE2SinglePredicate
+    fase12_adv_export_test.go:433: VEC|E2.1|OK|'status=ok, http 200, resp_final=0' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.2|OK|'endpoint /api/embed' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.3|OK|'endpoint /api/embeddings' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.4|OK|'endpoint /v1/embeddings' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.5|OK|'endpoint /API/GENERATE' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.6|OK|'endpoint /api/generate/ (barra final)' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.7|OK|'status 'OK' (maiÃºsculo)' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.8|OK|'http_status 201' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.9|OK|'tool 'Generate'' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.10|OK|'tool 'bakeoff-erros'' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.11|OK|'tool vazia' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.12|OK|'translate papel reduce1' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.13|OK|'translate papel final' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.14|OK|'translate papel map0' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.15|OK|'translate papel mapX' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.16|OK|'translate papel map10000' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.17|OK|'translate sem linha em ocorrencia_jobs (papel vazio)' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.18|OK|'amostra com melhora=1' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.19|OK|'prompt_json vazio (blob de 0 bytes)' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:427: VEC|E2.20|OK|partiÃ§Ã£o pendente: fora do JSONL nas duas partes, do Summary e do retrato; MEDIDA (sÃ³ leitura, Menor) Detail.exportavel=true porque Eligible (partition.go:80) nÃ£o exige partiÃ§Ã£o atribuÃ­da; estado inalcanÃ§Ã¡vel pelo recompute
+    fase12_adv_export_test.go:433: VEC|E2.21|OK|'resposta sÃ³ de espaÃ§os Unicode (NBSP)' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.22|OK|'estado apagada por SQL' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.23|OK|'tem_imagem=1 com o resto perfeito' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.24|OK|'quarentena' (sÃ³ essa condiÃ§Ã£o): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:457: VEC|E2.25|OK|cada campo melhora_* sozinho (e prompt_json_original vazio nÃ£o-nulo) marca a amostra: fora do JSONL, do Summary, do Detail e do retrato (C-3.10a)
+    fase12_adv_export_test.go:482: VEC|E2.26|OK|job_do_erro=map1 de uma lista map1+final: a linha usa o pedido do map1 (meta.job_id/papel certos); sem a amostra do map1, a do final nÃ£o substitui
+    fase12_adv_export_test.go:498: VEC|E2.27|OK|duas ocorrÃªncias do mesmo job; apagar uma deixa a amostra e a linha da outra (C-6.4)
+    fase12_adv_export_test.go:507: VEC|E2.28|OK|MEDIDA amostra com key_id de outra chave: linhas=1 Summary=1 Detail=true retrato=true (o cap. 3 nÃ£o olha key_id; o retrato reconfere o prompt_hmac com a chave da loja)
+    fase12_adv_export_test.go:529: VEC|E2.29|FALHA|Menor export.go:56,62 x partition.go:64-88 (C-3.1 'se e somente se'): o predicado Ãºnico nÃ£o Ã© Ãºnico; generate sem prompt (o Ollama responde 200: sÃ³ carrega o modelo): JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | generate com prompt vazio: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | chat com messages []: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1; o grupo gasta vaga da cota (C-4.6) e entra no retrato sem nunca ir ao JSONL
+    fase12_adv_export_test.go:529: E2.29: Menor export.go:56,62 x partition.go:64-88 (C-3.1 'se e somente se'): o predicado Ãºnico nÃ£o Ã© Ãºnico; generate sem prompt (o Ollama responde 200: sÃ³ carrega o modelo): JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | generate com prompt vazio: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | chat com messages []: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1; o grupo gasta vaga da cota (C-4.6) e entra no retrato sem nunca ir ao JSONL
+--- FAIL: TestAdv12EE2SinglePredicate (4.04s)
+=== RUN   TestAdv12EE3PartitionFuzz
+    fase12_adv_export_test.go:735: VEC|E3.1|OK|MEDIDA fuzz semente 20261104, 1400 passos (relatos com ponte, doc_hash com 2 key_id, conteÃºdo repetido, confirmar/desconfirmar/descartar/apagar/liberar): a cada 20 passos nenhum job/doc_hash+key_id/conteudo_hmac+key_id/grupo nos dois lados, 1 lado por componente, cota (30 primeiros = teste, depois sÃ³ a regra dos 15%) nunca excedida nem liberada; 17 relatos caÃ­ram em quarentena, 14 liberaÃ§Ãµes, 142 apagamentos, atÃ© 87 linhas de cota numa categoria; o verificador acusou um vazamento forÃ§ado por SQL (prova de que o OK nÃ£o Ã© vazio)
+--- PASS: TestAdv12EE3PartitionFuzz (10.85s)
+=== RUN   TestAdv12EE3KeyIDAndSplitRelink
+    fase12_adv_export_test.go:769: VEC|E3.2|OK|mesmo doc_hash: com key_id igual liga (mesmo grupo), com key_id diferente nÃ£o liga (C-4.3a)
+    fase12_adv_export_test.go:801: VEC|E3.3|OK|treino+teste ligados -> quarentena; apagar a ponte divide em 2 partes ainda em quarentena (ids distintos); liberar uma p/ treino e outra p/ teste; nova ponte -> quarentena de novo, nada exportado
+--- PASS: TestAdv12EE3KeyIDAndSplitRelink (0.27s)
+=== RUN   TestAdv12EE3LeakAcrossTime
+    fase12_adv_export_test.go:838: VEC|E3.4|FALHA|Importante partition.go:434-494 (lacuna de contrato C-4.11 x C-4.12/C-5.1): o caso 4c7f8e2c foi ao arquivo de TREINO, a quarentena foi liberada para o TESTE (sÃ³ aviso: exportados_na_outra_parte=1) e o CreateRetrato o congelou como caso de avaliaÃ§Ã£o; a C-4.12 vale sÃ³ 'ao mesmo tempo', mas a avaliaÃ§Ã£o mede um caso que pode ter sido treinado. SugestÃ£o: recusar liberar para o teste (ou excluir do retrato) membro com 'exportou' campo=treino
+    fase12_adv_export_test.go:838: E3.4: Importante partition.go:434-494 (lacuna de contrato C-4.11 x C-4.12/C-5.1): o caso 4c7f8e2c foi ao arquivo de TREINO, a quarentena foi liberada para o TESTE (sÃ³ aviso: exportados_na_outra_parte=1) e o CreateRetrato o congelou como caso de avaliaÃ§Ã£o; a C-4.12 vale sÃ³ 'ao mesmo tempo', mas a avaliaÃ§Ã£o mede um caso que pode ter sido treinado. SugestÃ£o: recusar liberar para o teste (ou excluir do retrato) membro com 'exportou' campo=treino
+    fase12_adv_export_test.go:876: VEC|E3.5|FALHA|Importante partition.go:131-133 (buildComponents ignora apagadas, C-4.5) + state.go:189: o job 00000000 saiu no arquivo de TREINO, a ocorrÃªncia foi apagada, o mesmo job foi relatado de novo e caiu no TESTE (JSONL teste=true, retrato=true), sem nenhum aviso; o mesmo job_id em treino e teste ao longo do tempo (C-4.12 sÃ³ 'ao mesmo tempo'). SugestÃ£o: guardar os job_id/doc/conteÃºdo exportados (hash) e herdar o lado
+    fase12_adv_export_test.go:876: E3.5: Importante partition.go:131-133 (buildComponents ignora apagadas, C-4.5) + state.go:189: o job 00000000 saiu no arquivo de TREINO, a ocorrÃªncia foi apagada, o mesmo job foi relatado de novo e caiu no TESTE (JSONL teste=true, retrato=true), sem nenhum aviso; o mesmo job_id em treino e teste ao longo do tempo (C-4.12 sÃ³ 'ao mesmo tempo'). SugestÃ£o: guardar os job_id/doc/conteÃºdo exportados (hash) e herdar o lado
+--- FAIL: TestAdv12EE3LeakAcrossTime (0.38s)
+=== RUN   TestAdv12EE3CotaShownAboveThirty
+    fase12_adv_export_test.go:904: VEC|E3.6|FALHA|Menor query.go:96 (Summary.Cota 'cota_teste_por_categoria'): mostra 31 para 'omitiu', acima da cota de 30 (as 30 vagas da cota sÃ£o 30; o resto Ã© a regra dos 15% da C-4.7, que tambÃ©m grava em cota_grupos, partition.go:366). A cota em si nÃ£o foi excedida (E3.1), mas o JSON do /monitor/api/state (st.Treino, monitor.go:440) diz que foi; o index.html nÃ£o mostra o campo
+    fase12_adv_export_test.go:904: E3.6: Menor query.go:96 (Summary.Cota 'cota_teste_por_categoria'): mostra 31 para 'omitiu', acima da cota de 30 (as 30 vagas da cota sÃ£o 30; o resto Ã© a regra dos 15% da C-4.7, que tambÃ©m grava em cota_grupos, partition.go:366). A cota em si nÃ£o foi excedida (E3.1), mas o JSON do /monitor/api/state (st.Treino, monitor.go:440) diz que foi; o index.html nÃ£o mostra o campo
+--- FAIL: TestAdv12EE3CotaShownAboveThirty (0.23s)
+=== RUN   TestAdv12EE4Quarantine
+    fase12_adv_export_test.go:960: VEC|E4.1|OK|treino+teste ligados: componente em quarentena; retrato e Ã­ndice congelado com membros dele -> valido=0; fora do JSONL, do Summary, de um retrato novo e de um Ã­ndice novo (C-1.15, C-4.10)
+    fase12_adv_export_test.go:998: VEC|E4.2|OK|liberar com lado invÃ¡lido (6 grafias) -> ErrInvalid; fora da quarentena e de ocorrÃªncia apagada -> ErrTransition; inexistente -> ErrNotFound; nada muda, nenhum histÃ³rico
+    fase12_adv_export_test.go:1012: VEC|E4.3|OK|liberar nÃ£o revalida: retrato valido=0 (RetratoCases recusa), Ã­ndice valido=0 (LoadIndex: treino: Ã­ndice de exemplos invÃ¡lido (valido=0)); histÃ³rico 'alterou/particao' por admin
+--- PASS: TestAdv12EE4Quarantine (0.23s)
+=== RUN   TestAdv12EE5WriteAhead
+    fase12_adv_export_test.go:1115: VEC|E5.1|OK|MEDIDA writer falhando na linha k (entregues/registradas): k=1:0/20 k=2:1/20 k=20:19/20 k=21:20/40 k=22:21/40 k=40:39/40 k=41:40/45 k=45:44/45; nenhuma linha entregue sem `exportou`, excesso sÃ³ atÃ© o fim do lote de 20 (write-ahead)
+    fase12_adv_export_test.go:1145: VEC|E5.2|OK|MEDIDA ctx cancelado antes: 0 linhas, 0 registros, erro; cancelado na 5Âª linha: o lote em curso termina (20 linhas) e cada linha entregue tem o seu registro (20), depois erro context canceled
+    fase12_adv_export_test.go:1169: VEC|E5.3|OK|ExportUntil com prazo vencido: 0 linhas, 0 registros, ErrExportDeadline; duas exportaÃ§Ãµes = 2 linhas `exportou` por ocorrÃªncia, campo=treino, quem=admin, ip certo (C-7.7)
+--- PASS: TestAdv12EE5WriteAhead (2.74s)
+=== RUN   TestAdv12EE5BigSampleSlowReader
+    fase12_adv_export_test.go:1225: VEC|E5.4|OK|MEDIDA amostra de 12582927 bytes: montar a linha levou 101ms; com o cliente parado na escrita, relato+confirmar+editar de outra ocorrÃªncia levaram 5ms (a vez de escrever nÃ£o fica presa); linha de 12583172 bytes Ã­ntegra
+--- PASS: TestAdv12EE5BigSampleSlowReader (0.65s)
+=== RUN   TestAdv12EE6Retrato
+    fase12_adv_export_test.go:1260: VEC|E6.1|OK|RetratoCases reconfere cada caso: melhora, categoria, partiÃ§Ã£o, prompt_json trocado, categoria sem critÃ©rio e job trocado -> ErrRetratoInvalido, valido=0, nenhum conteÃºdo entregue
+    fase12_adv_export_test.go:1285: VEC|E6.2|OK|MEDIDA (sÃ³ leitura, Menor): o mesmo job relatado 2x pela mesma origem (humano; ingest.go:295-327 sÃ³ deduplica o automÃ¡tico) gera 2 ocorrÃªncias confirmÃ¡veis com respostas diferentes: mesmo grupo e lado (sem vazamento), mas o retrato tem 2 itens do mesmo job_id e o JSONL 2 linhas com o mesmo pedido e respostas diferentes (peso dobrado na avaliaÃ§Ã£o, par contraditÃ³rio no treino); itens ordenados por ocorrencia_id
+    fase12_adv_export_test.go:1320: VEC|E6.3|OK|MEDIDA 6 rodadas descartando o Ãºltimo caso durante RetratoCases: 2 vezes a lista saiu inteira com valido=1 e o retrato ficou invÃ¡lido logo depois (janela entre conferir e devolver, retrato.go:227-253, sem transaÃ§Ã£o), 4 recusas; a janela Ã© coberta pelo recheckRetrato do bakeoff antes do finish (cmd/bakeoff/erros.go:481-485)
+--- PASS: TestAdv12EE6Retrato (0.99s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/treino	21.297s
+FAIL
+
+==== -race (TestAdv12EE4|E5|E6) ====
+=== RUN   TestAdv12EE4Quarantine
+    fase12_adv_export_test.go:960: VEC|E4.1|OK|treino+teste ligados: componente em quarentena; retrato e índice congelado com membros dele -> valido=0; fora do JSONL, do Summary, de um retrato novo e de um índice novo (C-1.15, C-4.10)
+    fase12_adv_export_test.go:998: VEC|E4.2|OK|liberar com lado inválido (6 grafias) -> ErrInvalid; fora da quarentena e de ocorrência apagada -> ErrTransition; inexistente -> ErrNotFound; nada muda, nenhum histórico
+    fase12_adv_export_test.go:1012: VEC|E4.3|OK|liberar não revalida: retrato valido=0 (RetratoCases recusa), índice valido=0 (LoadIndex: treino: índice de exemplos inválido (valido=0)); histórico 'alterou/particao' por admin
+--- PASS: TestAdv12EE4Quarantine (2.65s)
+=== RUN   TestAdv12EE5WriteAhead
+    fase12_adv_export_test.go:1115: VEC|E5.1|OK|MEDIDA writer falhando na linha k (entregues/registradas): k=1:0/20 k=2:1/20 k=20:19/20 k=21:20/40 k=22:21/40 k=40:39/40 k=41:40/45 k=45:44/45; nenhuma linha entregue sem `exportou`, excesso só até o fim do lote de 20 (write-ahead)
+    fase12_adv_export_test.go:1145: VEC|E5.2|OK|MEDIDA ctx cancelado antes: 0 linhas, 0 registros, erro; cancelado na 5ª linha: o lote em curso termina (20 linhas) e cada linha entregue tem o seu registro (20), depois erro context canceled
+    fase12_adv_export_test.go:1169: VEC|E5.3|OK|ExportUntil com prazo vencido: 0 linhas, 0 registros, ErrExportDeadline; duas exportações = 2 linhas `exportou` por ocorrência, campo=treino, quem=admin, ip certo (C-7.7)
+--- PASS: TestAdv12EE5WriteAhead (27.42s)
+=== RUN   TestAdv12EE5BigSampleSlowReader
+    fase12_adv_export_test.go:1225: VEC|E5.4|OK|MEDIDA amostra de 12582927 bytes: montar a linha levou 2.491s; com o cliente parado na escrita, relato+confirmar+editar de outra ocorrência levaram 41ms (a vez de escrever não fica presa); linha de 12583172 bytes íntegra
+--- PASS: TestAdv12EE5BigSampleSlowReader (8.51s)
+=== RUN   TestAdv12EE6Retrato
+    fase12_adv_export_test.go:1260: VEC|E6.1|OK|RetratoCases reconfere cada caso: melhora, categoria, partição, prompt_json trocado, categoria sem critério e job trocado -> ErrRetratoInvalido, valido=0, nenhum conteúdo entregue
+    fase12_adv_export_test.go:1285: VEC|E6.2|OK|MEDIDA (só leitura, Menor): o mesmo job relatado 2x pela mesma origem (humano; ingest.go:295-327 só deduplica o automático) gera 2 ocorrências confirmáveis com respostas diferentes: mesmo grupo e lado (sem vazamento), mas o retrato tem 2 itens do mesmo job_id e o JSONL 2 linhas com o mesmo pedido e respostas diferentes (peso dobrado na avaliação, par contraditório no treino); itens ordenados por ocorrencia_id
+    fase12_adv_export_test.go:1320: VEC|E6.3|OK|MEDIDA 6 rodadas descartando o último caso durante RetratoCases: 0 vezes a lista saiu inteira com valido=1 e o retrato ficou inválido logo depois (janela entre conferir e devolver, retrato.go:227-253, sem transação), 6 recusas; a janela é coberta pelo recheckRetrato do bakeoff antes do finish (cmd/bakeoff/erros.go:481-485)
+--- PASS: TestAdv12EE6Retrato (6.91s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/treino	46.612s
+

@@ -16,6 +16,14 @@ import (
 	"github.com/cslsoftwares/mcpollama/gateway/queue"
 )
 
+// otherChar devolve um caractere hexadecimal/base64 sempre diferente de c.
+func otherChar(c byte) string {
+	if c == 'A' {
+		return "B"
+	}
+	return "A"
+}
+
 func vec(t *testing.T, id, sev, where, res string) {
 	t.Helper()
 	t.Logf("VEC|%s|%s|%s|%s", id, sev, where, res)
@@ -139,7 +147,13 @@ func TestAdvXSSFields(t *testing.T) {
 	}
 	tk.Release(queue.Result{ErrorClass: x, Status: queue.StatusError})
 	f.st.Flush()
-	f.h.extraAt = time.Time{}
+	// 0.12.6: o cache das partes do banco virou swrCache (extras); zerar
+	// have/at sob o mutex obriga o proximo /state a reler o banco, como o
+	// antigo extraAt = time.Time{} fazia (corrigido na revisao da 12.9).
+	f.h.extras.mu.Lock()
+	f.h.extras.have = false
+	f.h.extras.at = time.Time{}
+	f.h.extras.mu.Unlock()
 	bad := []string{}
 	for _, p := range []string{"/monitor/api/state", "/monitor/api/history", "/monitor/api/stats"} {
 		w := do(f.h, "GET", p, "", nil)
@@ -176,7 +190,9 @@ func TestAdvCSRF(t *testing.T) {
 	}
 	cases := []c{
 		{"sem token", map[string]string{"Cookie": cookie}, "", 403},
-		{"token errado", map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf[:len(csrf)-1] + "A"}, "", 403},
+		// 12.9: o ultimo caractere e trocado por um SEMPRE diferente (antes era
+		// "A", igual ao certo em 1 de 64 casos, e o vetor dava 409 esporadico).
+		{"token errado", map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf[:len(csrf)-1] + otherChar(csrf[len(csrf)-1])}, "", 403},
 		{"Origin null", map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf, "Origin": "null"}, "", 403},
 		{"Origin subdominio", map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf, "Origin": "https://evil.ia.cslsolucoes.com.br", "Host": "ia.cslsolucoes.com.br:8443"}, "", 403},
 		{"Origin sufixo", map[string]string{"Cookie": cookie, "X-CSRF-Token": csrf, "Origin": "https://ia.cslsolucoes.com.br.evil.com", "Host": "ia.cslsolucoes.com.br:8443"}, "", 403},

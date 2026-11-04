@@ -39,6 +39,9 @@ func Apply(path string, body []byte, instr string, examples []Example, nonce str
 	}
 	switch path {
 	case "/api/generate":
+		if foldDup(top, "system") {
+			return body, false, ErrUnsupportedBody
+		}
 		k, raw, ok := findKey(top, "system")
 		if !ok {
 			k = "system"
@@ -51,6 +54,9 @@ func Apply(path string, body []byte, instr string, examples []Example, nonce str
 		}
 		top[k] = marshalString(joinNonEmpty("\n\n", cur, add))
 	default: // /api/chat and /v1/chat/completions
+		if foldDup(top, "messages") {
+			return body, false, ErrUnsupportedBody
+		}
 		k, raw, ok := findKey(top, "messages")
 		if !ok {
 			return body, false, ErrUnsupportedBody
@@ -61,6 +67,9 @@ func Apply(path string, body []byte, instr string, examples []Example, nonce str
 		}
 		first := map[string]json.RawMessage(nil)
 		if len(msgs) > 0 && json.Unmarshal(msgs[0], &first) == nil && first != nil {
+			if foldDup(first, "role") || foldDup(first, "content") {
+				return body, false, ErrUnsupportedBody
+			}
 			if _, rr, ok := findKey(first, "role"); ok {
 				var role string
 				if json.Unmarshal(rr, &role) == nil && role == "system" {
@@ -98,6 +107,19 @@ func joinNonEmpty(sep string, parts ...string) string {
 }
 
 func isNullRaw(raw json.RawMessage) bool { return string(bytes.TrimSpace(raw)) == "null" }
+
+// foldDup says whether two or more keys of the object are the same name for the Ollama'"'"'s decoder (they differ only in case
+// or in Unicode folding): the decoder takes the last of them and a map cannot say which that was, so the body is not
+// extended (m-8 of the review of 12.9).
+func foldDup(m map[string]json.RawMessage, name string) bool {
+	n := 0
+	for k := range m {
+		if strings.EqualFold(k, name) {
+			n++
+		}
+	}
+	return n > 1
+}
 
 // findKey is a case-insensitive lookup; the key is returned as written.
 func findKey(m map[string]json.RawMessage, name string) (string, json.RawMessage, bool) {

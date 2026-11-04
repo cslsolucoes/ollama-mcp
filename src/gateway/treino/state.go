@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // The operations below are the Go API that the admin routes of stage 12.6 call.
@@ -125,6 +126,15 @@ func (s *Store) Update(ctx context.Context, id string, e Edit, a Actor) (desconf
 	if e.Descricao != nil && len(*e.Descricao) > MaxDescricao || e.RespostaCorreta != nil && len(*e.RespostaCorreta) > MaxResposta ||
 		e.CorrecaoAplicada != nil && len(*e.CorrecaoAplicada) > MaxCorrecao {
 		return false, ErrInvalid
+	}
+	// m-5: the same rules of the report (C-1.17): the description stays required, and no text has NUL or invalid UTF-8
+	if e.Descricao != nil && strings.TrimSpace(*e.Descricao) == "" {
+		return false, bad("descricao é obrigatória")
+	}
+	for name, v := range map[string]*string{"descricao": e.Descricao, "resposta_correta": e.RespostaCorreta, "correcao_aplicada": e.CorrecaoAplicada} {
+		if v != nil && (!utf8.ValidString(*v) || strings.ContainsRune(*v, 0)) {
+			return false, bad("%s não é texto UTF-8 válido", name)
+		}
 	}
 	err = s.withTx(ctx, func(tx *sql.Tx) error {
 		r, err := loadRow(ctx, tx, id)

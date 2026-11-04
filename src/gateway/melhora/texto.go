@@ -123,7 +123,7 @@ func cleanAnswer(s string) string {
 // FormatExamples. It is part of the hash of a frozen index (C-8.10a), so an index made
 // with another format is never served as if it were the same. Change it whenever any of
 // those changes (TestFormatExamplesGolden fails to remind you).
-const FormatVersion = "ex1"
+const FormatVersion = "ex2" // ex2 (review of 12.9): the markers go from any position of the text of an example
 
 // markerLineRe finds a line that looks like a marker of the file tools or of the block of
 // examples: it starts and ends with "=====". Such lines are removed from the text of an
@@ -131,9 +131,23 @@ const FormatVersion = "ex1"
 // block, and the cut can never leave one open.
 var markerLineRe = regexp.MustCompile(`(?m)^[ \t]*=====[^\n]*=====[ \t]*\r?$\n?`)
 
-// sanitizeExampleText removes the marker lines. The distinct nonces of distinct markers are
-// not unified: the lines are simply gone.
-func sanitizeExampleText(s string) string { return markerLineRe.ReplaceAllString(s, "") }
+// markerRe finds a marker of the file tools or of the block of examples ("=====LABEL_INICIO nonce=====" or "_FIM") in
+// ANY position of the text: in the middle of a line, with a tail, or between a carriage return, U+2028, U+0085 or any
+// other separator a reader may take for a line break (I-8 of the review of 12.9). It has no "=" inside and no line feed.
+var markerRe = regexp.MustCompile("=====[A-Z][A-Z_]*_(?:INICIO|FIM)[^=\n]*=====")
+
+// sanitizeExampleText removes the markers, in any position (C-8.11). The distinct nonces of distinct markers are
+// not unified: the markers are simply gone. A removal may join the two pieces around it into a new marker, so it
+// runs until the text stops changing (each pass makes the text shorter, so it ends).
+func sanitizeExampleText(s string) string {
+	for {
+		t := markerRe.ReplaceAllString(markerLineRe.ReplaceAllString(s, ""), "")
+		if t == s {
+			return s
+		}
+		s = t
+	}
+}
 
 // exampleRequestText is the request of a sample as an example shows it: the prompt or the
 // messages with their roles, WITHOUT the system text (it is the same fixed text for every

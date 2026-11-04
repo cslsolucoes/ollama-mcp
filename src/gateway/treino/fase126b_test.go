@@ -208,8 +208,9 @@ func TestExportOfTheV1Endpoints(t *testing.T) {
 	}
 }
 
-// M-1: releasing a quarantined component warns when a member was already exported to the other part.
-func TestReleaseWarnsAboutMembersExportedToTheOtherPart(t *testing.T) {
+// M-1 (changed by C-4.11c, 1.1.6): releasing a quarantined component is REFUSED when a member was already exported to
+// the other part, and nothing changes.
+func TestReleaseIsRefusedForMembersExportedToTheOtherPart(t *testing.T) {
 	s := openStore(t, Options{})
 	f := newFake()
 	twoGroups(t, s, f)             // a: test, b: training; both confirmed
@@ -221,11 +222,17 @@ func TestReleaseWarnsAboutMembersExportedToTheOtherPart(t *testing.T) {
 	if sideOf(t, s, c) != ParteQuarentena {
 		t.Fatal("setup")
 	}
-	info, err := s.ReleaseQuarantineInfo(ctx, c, ParteTreino, admin)
-	if err != nil || info.Membros != 3 || info.ExportadosNaOutraParte != 1 { // a (exported to the test) goes to the training
+	info, err := s.ReleaseQuarantineInfo(ctx, c, ParteTreino, admin) // a (exported to the test) would go to the training
+	if !errors.Is(err, ErrReleaseExported) || info.Membros != 3 || info.ExportadosNaOutraParte != 1 {
 		t.Errorf("release to training: %+v %v", info, err)
 	}
-	// without any earlier export there is nothing to warn about
+	if _, err = s.ReleaseQuarantineInfo(ctx, c, ParteTeste, admin); !errors.Is(err, ErrReleaseExported) { // b would go to the test
+		t.Errorf("release to test: %v", err)
+	}
+	if sideOf(t, s, c) != ParteQuarentena {
+		t.Errorf("a refused release changed the side: %q", sideOf(t, s, c))
+	}
+	// without any earlier export there is nothing to refuse
 	s2 := openStore(t, Options{})
 	f2 := newFake()
 	twoGroups(t, s2, f2)

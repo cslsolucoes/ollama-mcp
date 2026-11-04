@@ -16,7 +16,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +30,9 @@ const (
 
 // treinoExportMax is how long an export may run; a var so a test can shorten it.
 var treinoExportMax = 30 * time.Minute
+
+// treinoWriteStall is how long one write of the export may wait for the client to read.
+const treinoWriteStall = 60 * time.Second
 
 type treinoSum struct {
 	sum treino.Summary
@@ -168,14 +170,37 @@ func (h *Handler) apiTreinoExport(w http.ResponseWriter, r *http.Request) {
 	hd.Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	hd.Set("Content-Disposition", `attachment; filename="erros-`+parte+"-"+time.Now().Format("20060102-150405")+`.jsonl"`)
 	fl, _ := w.(http.Flusher)
+	// The deadline of the export is also the deadline of the writes (m-2): a client that does not read cannot hold
+	// the goroutine and the batch past it, and one write stalled for treinoWriteStall ends the export too.
+	rc := http.NewResponseController(w)
+	deadline := time.Now().Add(treinoExportMax)
+	arm := func() {
+		d := time.Now().Add(treinoWriteStall)
+		if d.After(deadline) {
+			d = deadline
+		}
+		_ = rc.SetWriteDeadline(d)
+	}
+	arm()
+	defer func() { _ = rc.SetWriteDeadline(time.Time{}) }() // the connection may serve another request
 	flush := func() {
 		if fl != nil {
 			fl.Flush()
 		}
+		arm()
 	}
 	// A context without Done (0.12.6); the deadline is checked between the lines instead.
-	if _, err := h.cfg.Treino.ExportUntil(context.Background(), parte, treino.AdminActor(proxy.ClientIP(r)), w, flush, time.Now().Add(treinoExportMax)); err != nil {
-		h.logf("monitor: treino export: %v", err) // the headers are gone: the cut file is the signal
+	n, err := h.cfg.Treino.ExportUntil(context.Background(), parte, treino.AdminActor(proxy.ClientIP(r)), w, flush, deadline)
+	if err != nil {
+		h.logf("monitor: treino export: %v", err)
+		if n == 0 {
+			// nothing was sent: the client can still be told
+			hd.Del("Content-Disposition")
+			jsonErr(w, http.StatusInternalServerError, "a exportação falhou antes de enviar qualquer linha: tente de novo")
+			return
+		}
+		// m-3: a cut file must not look complete (a normal end of the chunked body): the connection is aborted
+		panic(http.ErrAbortHandler)
 	}
 }
 
@@ -209,6 +234,10 @@ func readJSONLimit(w http.ResponseWriter, r *http.Request, max int64, v any) boo
 		jsonErr(w, http.StatusBadRequest, "JSON inválido ou com campo desconhecido")
 		return false
 	}
+	if _, err := dec.Token(); err != io.EOF { // m-4: nothing may follow the object
+		jsonErr(w, http.StatusBadRequest, "JSON inválido: há conteúdo depois do objeto")
+		return false
+	}
 	return true
 }
 
@@ -219,6 +248,8 @@ func (h *Handler) treinoError(w http.ResponseWriter, err error) {
 		jsonErr(w, http.StatusNotFound, "não encontrado")
 	case errors.Is(err, treino.ErrTransition):
 		jsonErr(w, http.StatusConflict, "ação não permitida neste estado")
+	case errors.Is(err, treino.ErrReleaseExported):
+		jsonErr(w, http.StatusConflict, "liberar recusado: um caso deste grupo já foi exportado para a outra parte; libere para a mesma parte em que foi exportado ou deixe em quarentena (C-4.11c)")
 	case errors.Is(err, treino.ErrNeedsAnswer):
 		jsonErr(w, http.StatusUnprocessableEntity, "confirmar exige a resposta correta (resposta_correta não vazia)")
 	case errors.Is(err, treino.ErrInvalid), errors.As(err, &ve):
@@ -288,10 +319,7 @@ func (h *Handler) treinoAction(kind string) http.HandlerFunc {
 		case "liberar-quarentena":
 			var info treino.ReleaseInfo
 			info, err = st.ReleaseQuarantineInfo(ctx, id, in.Lado, a)
-			out["membros"], out["exportados_na_outra_parte"] = info.Membros, info.ExportadosNaOutraParte
-			if info.ExportadosNaOutraParte > 0 {
-				out["aviso"] = "atenção: " + strconv.Itoa(info.ExportadosNaOutraParte) + " ocorrência(s) deste componente já foi(ram) exportada(s) para a OUTRA parte; o mesmo caso agora está nos dois arquivos baixados"
-			}
+			out["membros"] = info.Membros
 		}
 		if err != nil {
 			h.treinoError(w, err)

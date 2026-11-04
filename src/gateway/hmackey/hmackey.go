@@ -34,9 +34,13 @@ const MinKeyBytes = 32
 // Key is an HMAC key. A nil *Key is valid and means "no key configured": every
 // method then returns "".
 type Key struct {
-	key []byte
-	id  string
+	// The bytes are behind a pointer: a Key copied by value and printed by reflection (fmt, slog, panic) shows an
+	// address, never the bytes, even though the methods that hide them are on *Key (m-11 of the review of 12.9).
+	s  *secret
+	id string
 }
+
+type secret struct{ key []byte }
 
 // New builds a Key from raw bytes (at least MinKeyBytes).
 func New(raw []byte) (*Key, error) {
@@ -44,7 +48,7 @@ func New(raw []byte) (*Key, error) {
 		return nil, fmt.Errorf("chave HMAC curta demais: %d bytes (mínimo %d)", len(raw), MinKeyBytes)
 	}
 	sum := sha256.Sum256(raw)
-	return &Key{key: append([]byte(nil), raw...), id: hex.EncodeToString(sum[:])[:16]}, nil
+	return &Key{s: &secret{key: append([]byte(nil), raw...)}, id: hex.EncodeToString(sum[:])[:16]}, nil
 }
 
 // Load reads the key file written as hex. On Unix the file must be 0600 (no
@@ -113,7 +117,7 @@ func (k *Key) GoString() string { return k.String() }
 func (k *Key) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, k.String()) }
 
 // Configured tells whether a key is present.
-func (k *Key) Configured() bool { return k != nil && len(k.key) > 0 }
+func (k *Key) Configured() bool { return k != nil && k.s != nil && len(k.s.key) > 0 }
 
 // ID returns the key id (16 hex digits of the sha256 of the key), "" without key.
 func (k *Key) ID() string {
@@ -128,7 +132,7 @@ func (k *Key) MAC(data []byte) string {
 	if !k.Configured() {
 		return ""
 	}
-	m := hmac.New(sha256.New, k.key)
+	m := hmac.New(sha256.New, k.s.key)
 	m.Write(data)
 	return hex.EncodeToString(m.Sum(nil))
 }

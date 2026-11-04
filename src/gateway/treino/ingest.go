@@ -35,7 +35,7 @@ func (j Job) busy() bool { return j.Status == queue.StatusQueued || j.Status == 
 // station alone is declared and can be forged, so it never decides by itself.
 func sameOrigin(j Job, o Origin) bool {
 	ipOK := o.ClientIP != "" && j.ClientIP != "" && proxy.FairIP(o.ClientIP) == j.ClientIP
-	if j.StationComputer != "" && j.StationUser != "" {
+	if j.StationComputer != "" || j.StationUser != "" { // m-18: a partial station is a station: what it names must be equal too
 		return o.Computer == j.StationComputer && o.User == j.StationUser && ipOK
 	}
 	return ipOK
@@ -44,7 +44,7 @@ func sameOrigin(j Job, o Origin) bool {
 // sameOccOrigin is the same rule for an occurrence already stored.
 func sameOccOrigin(computer, user, ip string, o Origin) bool {
 	ipOK := o.ClientIP != "" && ip != "" && proxy.FairIP(ip) == proxy.FairIP(o.ClientIP)
-	if computer != "" && user != "" {
+	if computer != "" || user != "" {
 		return o.Computer == computer && o.User == user && ipOK
 	}
 	return ipOK
@@ -274,6 +274,14 @@ func (s *Store) IngestWith(ctx context.Context, rep Report, o Origin, role strin
 			return Result{}, ErrJobBusy
 		}
 	}
+	// C-4.5a: a job is "valid" (it links groups) only when this gateway validated it (it is local and known) and it is of the
+	// origin of the report; any other job stays a reference and never links, quarantines or enters a snapshot.
+	valid := map[string]bool{}
+	for id, jb := range jobs {
+		if same(jb) {
+			valid[id] = true
+		}
+	}
 	who := Actor{Who: o.Who(), IP: o.ClientIP}
 	if opts.Admin {
 		who = AdminActor(o.ClientIP)
@@ -319,7 +327,7 @@ func (s *Store) IngestWith(ctx context.Context, rep Report, o Origin, role strin
 
 		id := exID
 		if replace {
-			if err := s.replaceOccurrence(ctx, tx, now, exID, rep, o, who, key, estado); err != nil {
+			if err := s.replaceOccurrence(ctx, tx, now, exID, rep, o, who, key, estado, valid); err != nil {
 				return err
 			}
 		} else {
@@ -327,7 +335,7 @@ func (s *Store) IngestWith(ctx context.Context, rep Report, o Origin, role strin
 				return err
 			}
 			dh, kid := "", ""
-			if k := key.ID(); k != "" && jobErr.DocHash != "" {
+			if k := key.ID(); k != "" && jobErr.DocHash != "" && valid[rep.JobDoErro] { // never the hash of a job that is not of this origin (C-4.5a)
 				dh, kid = jobErr.DocHash, jobErr.DocKeyID
 			}
 			if _, err := tx.ExecContext(ctx, `INSERT INTO ocorrencias(id,criada_em,atualizada_em,estado,categoria,severidade,descricao,resposta_correta,correcao_aplicada,
@@ -341,7 +349,7 @@ func (s *Store) IngestWith(ctx context.Context, rep Report, o Origin, role strin
 				estado, rep.Origem, rep.Categoria, rep.Severidade, hashSize(key, rep.Descricao), hashSize(key, rep.RespostaCorreta), hashSize(key, rep.CorrecaoAplicada)), who); err != nil {
 				return err
 			}
-			if err := insertJobs(ctx, tx, id, rep.Jobs); err != nil {
+			if err := insertJobs(ctx, tx, id, rep.Jobs, valid); err != nil {
 				return err
 			}
 		}
@@ -443,10 +451,10 @@ func (s *Store) hasSampleOrContent(ctx context.Context, tx *sql.Tx, src Source, 
 	return p.OK && p.HasJSON, err
 }
 
-func insertJobs(ctx context.Context, tx *sql.Tx, id string, jobs []JobRef) error {
+func insertJobs(ctx context.Context, tx *sql.Tx, id string, jobs []JobRef, valid map[string]bool) error {
 	for i, j := range jobs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO ocorrencia_jobs(ocorrencia_id,job_id,papel,backend,ordem) VALUES(?,?,?,?,?)`,
-			id, j.ID, j.Papel, j.Backend, i); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO ocorrencia_jobs(ocorrencia_id,job_id,papel,backend,ordem,valida) VALUES(?,?,?,?,?,?)`,
+			id, j.ID, j.Papel, j.Backend, i, b2i(valid[j.ID])); err != nil {
 			return err
 		}
 	}
@@ -468,12 +476,12 @@ func (s *Store) insertSample(ctx context.Context, tx *sql.Tx, now time.Time, job
 	}
 	r, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO amostras(job_id,copiada_em,endpoint,modelo,think,prompt_json,prompt_texto,resposta,
 		prompt_hmac,conteudo_hmac,key_id,prompt_truncado,prompt_json_truncado,tem_imagem,doc_hash,resp_final,resp_truncada,status,http_status,
-		prompt_json_original,prompt_json_original_truncado,melhora,melhora_instrucoes_id,melhora_indice_id,melhora_exemplos)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		prompt_json_original,prompt_json_original_truncado,melhora,melhora_instrucoes_id,melhora_indice_id,melhora_exemplos,forma_ok)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		jobID, now.UnixMilli(), j.Endpoint, j.Model, j.Think, c.PromptJSON, []byte(c.Prompt), []byte(c.Response),
 		ph, ch, key.ID(), b2i(c.PromptTruncated), b2i(c.PromptJSONTruncated), b2i(c.HasImage), dh, b2i(c.RespFinal), b2i(c.RespTruncated),
 		j.Status, j.HTTPStatus,
-		c.PromptJSONOriginal, b2i(c.PromptJSONOriginalTruncated), b2i(c.Melhora()), c.MelhoraInstrucoesID, c.MelhoraIndiceID, c.MelhoraExemplos)
+		c.PromptJSONOriginal, b2i(c.PromptJSONOriginalTruncated), b2i(c.Melhora()), c.MelhoraInstrucoesID, c.MelhoraIndiceID, c.MelhoraExemplos, b2i(FormOK(j.Endpoint, c.PromptJSON)))
 	if err != nil {
 		return 0, err
 	}
@@ -513,7 +521,7 @@ func jobList(ctx context.Context, tx *sql.Tx, id string) (string, []string, erro
 // origin included, gets an `alterou` row. Content fields enter the history as
 // hmac and size only (C-7.4). When the new state is distribuida or fallback, or a
 // job left the list, the samples nobody else uses leave too (C-6.4).
-func (s *Store) replaceOccurrence(ctx context.Context, tx *sql.Tx, now time.Time, id string, rep Report, o Origin, who Actor, key *hmackey.Key, estado string) error {
+func (s *Store) replaceOccurrence(ctx context.Context, tx *sql.Tx, now time.Time, id string, rep Report, o Origin, who Actor, key *hmackey.Key, estado string, valid map[string]bool) error {
 	var old Report
 	var oldOrigem string
 	var oc, ou, od, om, oip, olb string
@@ -539,7 +547,7 @@ func (s *Store) replaceOccurrence(ctx context.Context, tx *sql.Tx, now time.Time
 	if _, err := tx.ExecContext(ctx, `DELETE FROM ocorrencia_jobs WHERE ocorrencia_id=?`, id); err != nil {
 		return err
 	}
-	if err := insertJobs(ctx, tx, id, rep.Jobs); err != nil {
+	if err := insertJobs(ctx, tx, id, rep.Jobs, valid); err != nil {
 		return err
 	}
 	newList, _, err := jobList(ctx, tx, id)

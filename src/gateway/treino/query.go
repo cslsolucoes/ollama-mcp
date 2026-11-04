@@ -104,6 +104,9 @@ func (s *Store) Summary(ctx context.Context) (Summary, error) {
 		if err := crow.Scan(&c, &n); err != nil {
 			return sm, err
 		}
+		if n > CotaPorCategoria { // m-7: the groups the 15% rule sent to the test are not the quota
+			n = CotaPorCategoria
+		}
 		sm.Cota[c] = n
 	}
 	return sm, crow.Err()

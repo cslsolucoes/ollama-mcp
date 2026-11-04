@@ -65,7 +65,7 @@ func (d Deps) reportarErroTool() mcp.ToolEntry {
 			Name:        "reportar_erro",
 			Title:       "Report model error",
 			Description: "Records ONE wrong local-model result. Paste its [uso] job=/jobs=, never the request or answers. Rules: docs/RELATAR-ERROS-IA.md.",
-			InputSchema: objectSchema([]string{"projeto", "jobs", "categoria", "erro", "severidade", "origem"}, schemaMap{
+			InputSchema: objectSchema([]string{"projeto", "jobs", "categoria", "erro", "correcao_aplicada", "severidade", "origem"}, schemaMap{
 				"projeto":           schemaMap{"type": "string"},
 				"jobs":              schemaMap{"type": "string"},
 				"job_do_erro":       stringProp("Role/id; default final."),

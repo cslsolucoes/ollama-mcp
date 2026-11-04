@@ -62,7 +62,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
 	if err != nil {
-		writeErr(w, http.StatusRequestEntityTooLarge, "corpo maior que 256 KB", nil)
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeErr(w, http.StatusRequestEntityTooLarge, "corpo maior que 256 KB", nil)
+		} else { // m-19: a body that broke off is not a body that was too big
+			writeErr(w, http.StatusBadRequest, "corpo incompleto ou ilegível", nil)
+		}
+		return
+	}
+	if err := checkFieldNames(b); err != nil {
+		writeErr(w, http.StatusBadRequest, "JSON inválido ou com campo desconhecido: "+err.Error(), nil)
 		return
 	}
 	var rep Report

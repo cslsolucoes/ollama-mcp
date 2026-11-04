@@ -145,6 +145,7 @@ func (t *Transformer) Transform(ctx context.Context, tool, path string, body []b
 	t.pedidos.Add(1)
 	instr := t.cfg.Instr.For(tool)
 	var examples []Example
+	var usedIx *Index // the index the examples came from: the trace names this one even if another is installed meanwhile (m-9)
 	if ix := t.index.Load(); ix.Valid() && t.cfg.Embed != nil && supportedPath(path) {
 		if ix.HasTool(tool) {
 			if text, ok := RequestText(path, body); ok {
@@ -159,6 +160,7 @@ func (t *Transformer) Transform(ctx context.Context, tool, path string, body []b
 					}
 					oc.EmbedFalhou = true
 				default:
+					usedIx = ix
 					examples = ix.Search(tool, vec, ix.K, ix.Limiar, ex)
 				}
 			}
@@ -180,7 +182,7 @@ func (t *Transformer) Transform(ctx context.Context, tool, path string, body []b
 			oc.InstrucoesID = t.cfg.Instr.ID
 		}
 		if len(examples) > 0 {
-			oc.IndiceID = t.index.Load().ID
+			oc.IndiceID = usedIx.ID
 			for _, e := range examples {
 				oc.ExemploIDs = append(oc.ExemploIDs, e.ID)
 			}

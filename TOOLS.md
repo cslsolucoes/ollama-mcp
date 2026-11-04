@@ -315,6 +315,7 @@ Input schema:
     "jobs",
     "categoria",
     "erro",
+    "correcao_aplicada",
     "severidade",
     "origem"
   ],

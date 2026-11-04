@@ -67,17 +67,18 @@ const (
 
 // Errors of the operations. The HTTP layer maps them to status codes.
 var (
-	ErrNotFound      = errors.New("treino: ocorrência não encontrada")
-	ErrTransition    = errors.New("treino: transição de estado não permitida")
-	ErrNeedsAnswer   = errors.New("treino: confirmar exige resposta_correta não vazia")
-	ErrInvalid       = errors.New("treino: valor inválido")
-	ErrJobNotFound   = errors.New("treino: job_do_erro não existe neste gateway")
-	ErrCapReached    = errors.New("treino: teto do treino.db atingido")
-	ErrNoKey         = errors.New("treino: gateway sem chave HMAC (--doc-key-file)")
-	ErrClosed        = errors.New("treino: base fechada")
-	ErrJobBusy       = errors.New("treino: job ainda na fila ou em execução")
-	ErrBusy          = errors.New("treino: base ocupada, tente de novo")
-	errInvalidSource = errors.New("treino: fonte de conteúdo ausente")
+	ErrNotFound        = errors.New("treino: ocorrência não encontrada")
+	ErrTransition      = errors.New("treino: transição de estado não permitida")
+	ErrNeedsAnswer     = errors.New("treino: confirmar exige resposta_correta não vazia")
+	ErrInvalid         = errors.New("treino: valor inválido")
+	ErrJobNotFound     = errors.New("treino: job_do_erro não existe neste gateway")
+	ErrCapReached      = errors.New("treino: teto do treino.db atingido")
+	ErrNoKey           = errors.New("treino: gateway sem chave HMAC (--doc-key-file)")
+	ErrClosed          = errors.New("treino: base fechada")
+	ErrJobBusy         = errors.New("treino: job ainda na fila ou em execução")
+	ErrBusy            = errors.New("treino: base ocupada, tente de novo")
+	ErrReleaseExported = errors.New("treino: liberar para esta parte é recusado: um caso do grupo já foi exportado para a outra parte (C-4.11c)")
+	errInvalidSource   = errors.New("treino: fonte de conteúdo ausente")
 )
 
 const schema = `
@@ -134,11 +135,14 @@ CREATE TABLE IF NOT EXISTS indice_itens(
   indice_id TEXT NOT NULL, ocorrencia_id TEXT NOT NULL, tool TEXT NOT NULL, grupo_id TEXT, doc_hash TEXT, doc_key_id TEXT,
   vetor BLOB NOT NULL, PRIMARY KEY(indice_id, ocorrencia_id));
 CREATE INDEX IF NOT EXISTS idx_indice_itens_oc ON indice_itens(ocorrencia_id);
+-- the side given to a job, a document and a content (C-4.8a): identifiers and HMACs only, no content; it outlives the occurrences
+CREATE TABLE IF NOT EXISTS lados(
+  chave TEXT PRIMARY KEY, lado TEXT NOT NULL CHECK(lado IN ('treino','teste')), atribuida_em INTEGER NOT NULL);
 `
 
 // schemaVersion is PRAGMA user_version after migrate. Version 2 (stage 12.8): the
 // retrato records k and the similarity floor of the index it used (C-8.10).
-const schemaVersion = 3
+const schemaVersion = 4
 
 // Options configures Open. Zero values take the defaults.
 type Options struct {
@@ -166,7 +170,7 @@ type Options struct {
 // creating a retrato while the gateway runs) waits with busy_timeout instead of
 // failing later, when a read transaction tries to become a write one.
 func dsn(path string, o Options) string {
-	d := path + "?_pragma=auto_vacuum(2)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=journal_size_limit(67108864)"
+	d := path + "?_pragma=auto_vacuum(2)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=journal_size_limit(67108864)&_pragma=secure_delete(ON)" // C-6.3a: a deleted row is overwritten, not left in the free space
 	if o.TxLockImmediate {
 		d += "&_txlock=immediate"
 	}
@@ -261,6 +265,10 @@ func migrate(db *sql.DB) error {
 		{"amostras", "melhora", "INTEGER NOT NULL DEFAULT 0"}, {"amostras", "melhora_instrucoes_id", "TEXT"},
 		{"amostras", "melhora_indice_id", "TEXT"}, {"amostras", "melhora_exemplos", "TEXT"},
 		{"indices", "formato", "TEXT NOT NULL DEFAULT ''"},
+		// version 4 (review 12.9, C-4.5a): 1 when the job was validated by this gateway and is of the origin of the report; 0 is a reference only
+		{"ocorrencia_jobs", "valida", "INTEGER NOT NULL DEFAULT 1"},
+		// version 4 (C-3.1): 1 when the request of the sample has the form of a conversation; a sample written before is taken as 1
+		{"amostras", "forma_ok", "INTEGER NOT NULL DEFAULT 1"},
 	} {
 		has, err := hasColumn(db, col.table, col.name)
 		if err != nil {
@@ -278,7 +286,8 @@ func migrate(db *sql.DB) error {
 	// the covering index of the export predicate, with the column of the improvement (C-3.10a)
 	for _, q := range []string{
 		`DROP INDEX IF EXISTS idx_amostras_pred`,
-		`CREATE INDEX IF NOT EXISTS idx_amostras_pred2 ON amostras(job_id, endpoint, status, http_status, prompt_truncado, prompt_json_truncado, tem_imagem, resp_final, resp_truncada, melhora, (COALESCE(length(prompt_json),0) > 0))`,
+		`DROP INDEX IF EXISTS idx_amostras_pred2`,
+		`CREATE INDEX IF NOT EXISTS idx_amostras_pred3 ON amostras(job_id, endpoint, status, http_status, prompt_truncado, prompt_json_truncado, tem_imagem, resp_final, resp_truncada, melhora, forma_ok, (COALESCE(length(prompt_json),0) > 0))`,
 	} {
 		if _, err := db.Exec(q); err != nil {
 			return err
@@ -472,5 +481,9 @@ func (s *Store) vacuum(ctx context.Context) {
 	defer s.release()
 	if _, err := s.db.ExecContext(ctx, `PRAGMA incremental_vacuum`); err != nil {
 		s.logf("treino: incremental_vacuum: %v", err)
+	}
+	// C-6.3a: the frames of the -wal still hold the old pages; the checkpoint copies them and truncates the file
+	if _, err := s.db.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+		s.logf("treino: wal_checkpoint: %v", err)
 	}
 }

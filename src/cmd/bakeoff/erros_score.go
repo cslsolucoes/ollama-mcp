@@ -404,6 +404,8 @@ func parseNumber(tok string) (*big.Rat, bool) {
 }
 
 func scoreNumber(got, want string) verdict {
+	// m-15: the Unicode minus sign (U+2212, common in pasted text) is a minus sign
+	got, want = strings.ReplaceAll(got, "−", "-"), strings.ReplaceAll(want, "−", "-")
 	w, ok := wantNumber(want)
 	if !ok {
 		return verdict{Why: "resposta_certa_sem_numero_unico"} // not applicable

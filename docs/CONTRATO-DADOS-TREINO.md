@@ -1,6 +1,6 @@
 # Contrato de dados da Fase 12 (erros do modelo local → base de treino)
 
-> **Versão:** 1.1.5 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21; 1.1.5 em 2026-11-04 00:57) (etapa 12.1) · **Data:** 2026-11-02
+> **Versão:** 1.1.6 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21; 1.1.5 em 2026-11-04 00:57; 1.1.6 às 03:23) (etapa 12.1) · **Data:** 2026-11-02
 > **Fonte única:** `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (decisões D12-1 a D12-17, §5, §8, §10, §13, §14, §15).
 > Este documento só fixa regras; o raciocínio e o histórico estão no plano.
 
@@ -105,12 +105,15 @@
 - **C-4.3a** Todos os **gateways** que calculam e guardam HMACs (primário e fallback) usam a **mesma chave**, copiada por canal protegido. Os servidores Ollama do pool, que ficam atrás de um gateway, não recebem a chave, porque não calculam nem guardam HMAC (1.1.0). Cada hash gravado leva `key_id` (os 16 primeiros hex do sha256 da chave), e o agrupamento só compara hashes com o mesmo `key_id`. Sem `--doc-key-file`, o gateway não aceita relatos (o `/api/feedback` responde 503 com mensagem explícita).
 - **C-4.4** Trocar a chave só é feito com o owner, e quebra os grupos antigos.
 - **C-4.5** Um **grupo** é um componente conectado de ocorrências ligadas pelo mesmo `doc_hash`, pelo mesmo `conteudo_hmac` (C-2.12) ou por um job em comum; o grupo inteiro cai do mesmo lado. Entram nos componentes **todas as ocorrências não apagadas**, inclusive `nova` e `descartada`, para não haver ligação oculta.
+- **C-4.5a** (1.1.6) Um job que ficou **só como referência** (de outra origem, C-1.11a, ou não validado pelo gateway) **não liga** grupos. Ele não entra no cálculo de componentes, de quarentena nem de retratos; um relato forjado com ids alheios não mexe na partição de ninguém.
 - **C-4.6** (1.1.0) A cota conta só grupos **com ao menos uma amostra exportável**, isto é, que passe em **todo** o predicado do cap. 3 (C-3.1). Os 30 primeiros desses grupos de cada categoria vão para o **teste**. "Primeiros" segue o momento em que o grupo passa a ter a primeira amostra exportável, e a categoria do grupo é a da ocorrência dessa primeira amostra. A partição é atribuída nesse momento; antes dele, o grupo fica com a partição **pendente** (vazia, C-1.8).
 - **C-4.7** Depois da cota, um grupo (no momento da C-4.6) vai para o teste se `sha256(id do grupo) mod 100 < 15`, senão vai para o treino.
 - **C-4.8** A partição, depois de atribuída, é estável: o mesmo grupo mantém o lado em reprocessamentos e novos relatos. Quando grupos do **mesmo** lado se fundem, o resultado usa o menor `grupo_id` anterior, mantém o lado e não é reavaliado pela cota nem pelos 15%.
+- **C-4.8a** (1.1.6) O lado atribuído a um job, a um `doc_hash` e a um `conteudo_hmac` fica guardado numa tabela sem conteúdo (só os identificadores e os HMACs). Quando o mesmo job ou documento é relatado de novo, mesmo depois de apagar a ocorrência, o novo grupo **herda esse lado**, e nunca troca de treino para teste nem o contrário.
 - **C-4.9** (1.1.0) Quando uma ocorrência nova liga grupos: (a) se entre eles há grupos já atribuídos a **lados opostos** (treino e teste), o componente inteiro (todos os grupos unidos mais a nova) vai para `quarentena`; (b) se só um lado aparece entre os grupos atribuídos, o componente inteiro herda esse lado; (c) se nenhum tem lado, o componente fica pendente até a C-4.6.
 - **C-4.10** Ao entrar em quarentena, os retratos que tinham casos desse componente passam a `valido=0`, e o índice de exemplos congelado que usava algum deles também é invalidado.
 - **C-4.11** O admin libera uma quarentena escolhendo um lado para o componente inteiro, pela rota `POST /monitor/api/treino/{id}/liberar-quarentena`; o histórico grava `alterou` com `campo=particao`.
+- **C-4.11c** (1.1.6) Liberar uma quarentena para uma parte é **recusado** se algum membro do componente já foi exportado na **outra** parte (`exportou`). O admin pode liberar para a mesma parte em que o membro foi exportado, ou deixar em quarentena.
 - **C-4.11a** Desconfirmar, descartar (C-1.12b) ou apagar uma ocorrência de teste **não libera** a vaga dela na cota, e invalida (`valido=0`) todo retrato que a lista.
 - **C-4.11b** (1.1.2) A cota é guardada numa tabela própria, `cota_grupos` (`grupo_id`, `categoria`, `particao`, `atribuida_em`), sem nenhum conteúdo. Desconfirmar, descartar ou apagar ocorrências não mexe nela, e é ela que conta as vagas da C-4.6.
 - **C-4.12** Nenhum `job_id`, `doc_hash` ou `grupo_id` aparece ao mesmo tempo em amostras exportáveis de treino e de teste.
@@ -143,6 +146,7 @@
 - **C-6.2** O teto do `treino.db` é 2 GiB de **dados vivos**, medido **depois** de o relato obter a vez de escrever e antes da transação (sem janela entre medir e gravar; 1.1.3), (páginas usadas, sem as livres e sem contar o `-wal` em dobro; 1.1.2); acima dele o gateway recusa novos relatos com **HTTP 507** e corpo de erro explícito, grava um evento e mostra aviso no monitor, e **não apaga nada sozinho**.
 - **C-6.2a** (1.1.2) O `treino.db` usa `auto_vacuum` incremental e `journal_size_limit`: depois de apagar, o espaço volta ao orçamento, e o relato que antes recebia 507 volta a ser aceito.
 - **C-6.3** Apagar é ação do admin, com histórico. Remove todo o conteúdo da ocorrência, os jobs dela e as amostras que ninguém mais usa, e deixa só uma linha mínima (`id`, `estado=apagada`, datas), sem nenhum campo de conteúdo.
+- **C-6.3a** (1.1.6) Apagar remove o conteúdo **também dos bytes em disco**: o `treino.db` usa `secure_delete`, e o `-wal` passa por checkpoint TRUNCATE depois de apagar.
 - **C-6.4** Uma amostra (e o embedding) só é removida quando nenhuma ocorrência a referencia mais (contagem de referências).
 - **C-6.5** Alterar `resposta_correta`, `descricao` ou `correcao_aplicada` de uma ocorrência `confirmada` desfaz a confirmação (volta a `nova`), apaga o embedding anterior e grava `desconfirmou` no histórico.
 - **C-6.6** O embedding (`nomic-embed-text`, 768 floats) só existe para ocorrência confirmada com `exemplo_publico=1`. Ele é calculado em segundo plano, **só quando o gateway roda com `--melhora-embeddings`** (padrão desligado, 1.1.5); antes disso fica pendente. É apagado, inclusive as cópias nos índices congelados, quando a marca sai ou a confirmação é desfeita.
@@ -258,3 +262,11 @@ Revisão da 12.8:
 - **C-6.6:** os embeddings em segundo plano vêm desligados por padrão.
 - **C-8.10a:** k e o limiar ficam congelados no índice.
 - **C-8.11:** os exemplos são delimitados com nonce próprio.
+
+## Versão 1.1.6 (owner, 2026-11-04 03:23)
+
+Lacunas encontradas pela revisão adversarial da Fase 12 (12.9):
+- **C-4.5a:** referência de outra origem não liga grupos.
+- **C-4.8a:** um novo relato do mesmo job ou documento herda o lado anterior.
+- **C-4.11c:** é recusado liberar uma quarentena para o lado oposto ao de uma exportação.
+- **C-6.3a:** apagar remove o conteúdo também do disco (`secure_delete` e checkpoint do WAL).

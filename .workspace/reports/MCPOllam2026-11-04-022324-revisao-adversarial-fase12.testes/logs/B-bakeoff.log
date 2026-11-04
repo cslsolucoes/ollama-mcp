@@ -1,0 +1,77 @@
+﻿=== RUN   TestAdv12BReplayURLRefusals
+    fase12_adv_bakeoff_test.go:82: VEC|B1-01|OK|25 URLs recusadas com e sem -gateway-remoto (nome, IP público v4/v6, link-local, zona %25, ::ffff:8.8.8.8, 0.0.0.0, [::], decimal/octal/hex, CGNAT, metadata, NAT64, 6to4, http privado, userinfo); 4 IPs privados em https aceitos
+--- PASS: TestAdv12BReplayURLRefusals (0.00s)
+=== RUN   TestAdv12BDialControlOnResolvedAddress
+    fase12_adv_bakeoff_test.go:117: VEC|B1-02|OK|Dialer.Control recusa 12 endereços já resolvidos (público, ::ffff:público, 0.0.0.0, link-local com zona, metadata, CGNAT, NAT64, 6to4, nome cru); 'localhost' chega resolvido ao Control e a chamada passa (DNS rebinding cai no Control)
+--- PASS: TestAdv12BDialControlOnResolvedAddress (0.03s)
+=== RUN   TestAdv12BRedirectsNeverFollowed
+    fase12_adv_bakeoff_test.go:143: VEC|B1-03|OK|301/302/303/307/308 para host externo, no replay e no embed: erro e 0 pedidos no host externo
+--- PASS: TestAdv12BRedirectsNeverFollowed (0.01s)
+=== RUN   TestAdv12BProxyEnvironmentIgnored
+    fase12_adv_bakeoff_test.go:197: VEC|B1-04|OK|HTTP(S)_PROXY/ALL_PROXY no ambiente e NO_PROXY vazio: o replay para 10.100.2.30 discou direto (erro "chamada ao gateway falhou: Post \"https://10.100.2.30:23103/a...") e o proxy recebeu só o pedido do controle (1)
+--- PASS: TestAdv12BProxyEnvironmentIgnored (2.05s)
+=== RUN   TestAdv12BBaseURLPathIsNotAnEndpointBypass
+    fase12_adv_bakeoff_test.go:219: VEC|B1-05|FALHA|Menor erros_replay.go:81 e :169: o caminho/consulta da -gateway-url não é recusado e o pedido do caso foi a "/api/pull?nome=/api/generate" (mesmo host, mas fora da lista replayEndpoints da linha 36)
+    fase12_adv_bakeoff_test.go:219: B1-05: Menor erros_replay.go:81 e :169: o caminho/consulta da -gateway-url não é recusado e o pedido do caso foi a "/api/pull?nome=/api/generate" (mesmo host, mas fora da lista replayEndpoints da linha 36)
+--- FAIL: TestAdv12BBaseURLPathIsNotAnEndpointBypass (0.00s)
+=== RUN   TestAdv12BWilsonAndTargetDecisionSweep
+    fase12_adv_bakeoff_test.go:252: VEC|B2-01|OK|MEDIDA Wilson (limite inferior) = fórmula independente em n=1..200, todos os k (desvio máx 3.3e-16)
+    fase12_adv_bakeoff_test.go:276: VEC|B2-02|OK|MEDIDA C-5.10 (≥10 pontos e limite inferior > ponto, estrito) igual ao oráculo independente em 14486 combinações (n=30,31,47,100)
+--- PASS: TestAdv12BWilsonAndTargetDecisionSweep (0.07s)
+=== RUN   TestAdv12BBoundariesOfNAndDrop
+    fase12_adv_bakeoff_test.go:318: VEC|B2-03|OK|N 19/20/29/30 (reporta/decide), queda de 3,01 vs 3,00 pontos (C-5.11) e S2 2,01 vs 2,00 (C-5.12) nas fronteiras certas, com inteiros
+--- PASS: TestAdv12BBoundariesOfNAndDrop (0.04s)
+=== RUN   TestAdv12BUnequalNIsSkippedNotRejected
+    fase12_adv_bakeoff_test.go:331: VEC|B2-04|FALHA|Menor erros_report.go:161: categoria com Cand.N != Atual.N é pulada (continue) em vez de falhar o gate: alvo sem ganho aceito=true (""); outra caindo 100 pontos aceita=true. Só alcançável por resultado-*.json corrompido/editado lido pelo modo apurar (erros_apurar.go:132), mas é fail-open
+    fase12_adv_bakeoff_test.go:331: B2-04: Menor erros_report.go:161: categoria com Cand.N != Atual.N é pulada (continue) em vez de falhar o gate: alvo sem ganho aceito=true (""); outra caindo 100 pontos aceita=true. Só alcançável por resultado-*.json corrompido/editado lido pelo modo apurar (erros_apurar.go:132), mas é fail-open
+--- FAIL: TestAdv12BUnequalNIsSkippedNotRejected (0.00s)
+=== RUN   TestAdv12BS2S3OfACandidateWithInstructionsIsNeverMeasured
+    fase12_adv_bakeoff_test.go:394: VEC|B2-05|FALHA|Importante erros_report.go:378-379 (e erros.go:271, sem recusa de -candidato = -atual): no comparar da melhora 12.8 o candidato é o mesmo nome de modelo (o gateway só aceita qwen3-ia), então o S2/S3 do candidato é lido do MESMO <out>/qwen3-ia/score.json do atual; o C-5.12 compara o modelo sem instruções com ele mesmo e a melhora foi ACEITA sem o S2/S3 com as instruções jamais ter sido medido
+    fase12_adv_bakeoff_test.go:394: B2-05: Importante erros_report.go:378-379 (e erros.go:271, sem recusa de -candidato = -atual): no comparar da melhora 12.8 o candidato é o mesmo nome de modelo (o gateway só aceita qwen3-ia), então o S2/S3 do candidato é lido do MESMO <out>/qwen3-ia/score.json do atual; o C-5.12 compara o modelo sem instruções com ele mesmo e a melhora foi ACEITA sem o S2/S3 com as instruções jamais ter sido medido
+--- FAIL: TestAdv12BS2S3OfACandidateWithInstructionsIsNeverMeasured (0.93s)
+=== RUN   TestAdv12BStaleOrForeignScoreFailsTheGate
+    fase12_adv_bakeoff_test.go:425: VEC|B2-06|OK|score.json do candidato antigo (>48 h), de outro modelo ou sem S3: o C-5.12 vira "não medido" e o gate falha (nunca "sem queda")
+--- PASS: TestAdv12BStaleOrForeignScoreFailsTheGate (1.19s)
+=== RUN   TestAdv12BMissingRoundIsNotTwoOfThree
+    fase12_adv_bakeoff_test.go:450: VEC|B2-07|OK|a rodada 3 de um caso falhou (500): o caso não é medido e o gate falha; 2 rodadas nunca valem como "2 de 3"
+--- PASS: TestAdv12BMissingRoundIsNotTwoOfThree (0.58s)
+=== RUN   TestAdv12BDuplicateOccurrenceOfTheSameJob
+    fase12_adv_bakeoff_test.go:465: VEC|B2-08|OK|MEDIDA duas ocorrências confirmadas do MESMO job_do_erro entram no retrato como 2 casos (omitiu=31): o mesmo pedido é medido 2x. Coerente com C-1.1 (a unidade é a ocorrência) e C-4.5 (mesmo grupo, mesmo lado), mas infla o N rumo ao mínimo de 30 (C-5.8); ver "só leitura"
+--- PASS: TestAdv12BDuplicateOccurrenceOfTheSameJob (0.48s)
+=== RUN   TestAdv12BNumberScoring
+    fase12_adv_bakeoff_test.go:478: VEC|B2-09|FALHA|Menor erros_score.go:290-291 e :296-307: o sinal de menos Unicode (U+2212, comum em texto colado) não é reconhecido na resposta certa, que vira positiva; a resposta do modelo com o sinal trocado passa: want "RESULTADO: −5" (U+2212) lido como 5 e a resposta 5 passou; want "−5" lido como 5
+    fase12_adv_bakeoff_test.go:478: B2-09: Menor erros_score.go:290-291 e :296-307: o sinal de menos Unicode (U+2212, comum em texto colado) não é reconhecido na resposta certa, que vira positiva; a resposta do modelo com o sinal trocado passa: want "RESULTADO: −5" (U+2212) lido como 5 e a resposta 5 passou; want "−5" lido como 5
+    fase12_adv_bakeoff_test.go:501: VEC|B2-10|OK|RESULTADO ambíguo (1,500) inaplicável; o último RESULTADO vale; dígito largo não conta; 12,0 = 12; prosa termina no último número
+--- FAIL: TestAdv12BNumberScoring (0.00s)
+=== RUN   TestAdv12BJSONAndItems
+    fase12_adv_bakeoff_test.go:543: VEC|B2-11|OK|JSON: chave duplicada por escape, 2 objetos, cerca, ordem de array, 1e999999999 (<2 s) e 200 mil níveis reprovam; itens repetidos/faltando/extras/zero-width/numerados reprovam e a lista certa passa
+--- PASS: TestAdv12BJSONAndItems (0.17s)
+=== RUN   TestAdv12BBaselineCannotBeReplacedOrBorrowed
+    fase12_adv_bakeoff_test.go:581: VEC|B2-12|OK|linha de base não é sobrescrita (2ª base = FATAL, arquivo idêntico); comparar recusa, sem chamar o gateway, a base de outro retrato, de outro modelo ou ilegível
+--- PASS: TestAdv12BBaselineCannotBeReplacedOrBorrowed (0.61s)
+=== RUN   TestAdv12BRetratoQuarantineAndMelhora
+    fase12_adv_bakeoff_test.go:661: VEC|B3-01|OK|melhora_* fora do retrato (C-3.10a); quarentena ou melhora depois do retrato, quarentena no meio da rodada e melhora entre base e comparar: gate falha, sem linha de base e (fora do meio da rodada) sem chamar o gateway; retrato só de casos inaplicáveis = "0 casos"
+--- PASS: TestAdv12BRetratoQuarantineAndMelhora (2.65s)
+=== RUN   TestAdv12BStreamShapes
+    fase12_adv_bakeoff_test.go:671: VEC|B4-01|FALHA|Menor erros_replay.go:255-256 e :276-277: uma linha JSON inválida NO MEIO do stream (não truncado) é ignorada e a resposta vale como medida (texto "item-1\nitem-2\nitem-3", omitiu pass=true): o pedaço perdido continha o item errado e o caso passou
+    fase12_adv_bakeoff_test.go:671: B4-01: Menor erros_replay.go:255-256 e :276-277: uma linha JSON inválida NO MEIO do stream (não truncado) é ignorada e a resposta vale como medida (texto "item-1\nitem-2\nitem-3", omitiu pass=true): o pedaço perdido continha o item errado e o caso passou
+    fase12_adv_bakeoff_test.go:678: VEC|B4-02|FALHA|Menor erros_replay.go:218: uma linha que não começa com '{' no meio do stream nativo é pulada sem erro e a resposta ("ab") vale como medida
+    fase12_adv_bakeoff_test.go:678: B4-02: Menor erros_replay.go:218: uma linha que não começa com '{' no meio do stream nativo é pulada sem erro e a resposta ("ab") vale como medida
+    fase12_adv_bakeoff_test.go:684: VEC|B4-03|OK|MEDIDA texto depois do done é somado (texto="ab" err=<nil>, Final=true); o Ollama não manda nada depois do done, por isso não conto como defeito
+    fase12_adv_bakeoff_test.go:692: VEC|B4-04|OK|done:false até o EOF, conexão quebrada e SSE com finish_reason null sem [DONE]: erro (caso não medido)
+    fase12_adv_bakeoff_test.go:696: VEC|B4-05|OK|MEDIDA done_reason=length é um fim normal: pontuado (omitiu pass=true err=<nil>) e, em truncado, reprova (pass=false); é comportamento do modelo com as opções gravadas
+    fase12_adv_bakeoff_test.go:708: VEC|B4-06|FALHA|Menor erros_replay.go:231-241 e erros.go:422: resposta acima de 16 MiB, cortada no teto e sem done, é PONTUADA como medida em categoria que não é truncado (omitiu pass=true; o item errado veio depois do corte). Na exportação a amostra com resp_truncada=1 é inelegível (C-3.6), mas no replay o corte vale como resposta
+    fase12_adv_bakeoff_test.go:708: B4-06: Menor erros_replay.go:231-241 e erros.go:422: resposta acima de 16 MiB, cortada no teto e sem done, é PONTUADA como medida em categoria que não é truncado (omitiu pass=true; o item errado veio depois do corte). Na exportação a amostra com resp_truncada=1 é inelegível (C-3.6), mas no replay o corte vale como resposta
+--- FAIL: TestAdv12BStreamShapes (0.28s)
+=== RUN   TestAdv12BAnswersFileParsing
+    fase12_adv_bakeoff_test.go:748: VEC|B5-01|OK|respostas do owner: CRLF/branco/comentário/maiúsculas/espaços/NBSP aceitos; BOM, rótulo minúsculo, repetido, extra, 4 campos, veredito inválido ou faltando recusados (fail-closed; o BOM recusa o arquivo inteiro com o rótulo "\ufeffC01")
+--- PASS: TestAdv12BAnswersFileParsing (0.01s)
+=== RUN   TestAdv12BApurarAndFilesHoldNoText
+    fase12_adv_bakeoff_test.go:835: VEC|B5-02|OK|comparar com blind = PENDENTE (exit 4, nada aceito); apurar com 1 rótulo sem resposta = gate falha; 13 arquivos gerados (relatórios, resultado-*.json, chave.tsv, linha de base) e todos os logs, inclusive de rodadas cujo gateway ecoa o pedido no corpo 500, num chunk de erro e no Location de um 307, sem nenhum texto de pedido/resposta
+--- PASS: TestAdv12BApurarAndFilesHoldNoText (1.14s)
+=== RUN   TestAdv12BPrivateModeConstant
+    fase12_adv_bakeoff_test.go:850: VEC|B5-03|OK|MEDIDA todo arquivo da suíte passa por writeNew (O_EXCL, 0600) e a pasta é 0700 (erros.go:280); o modo 0600 em si não é observável no Windows (prova no Linux, pendência da 12.10)
+--- PASS: TestAdv12BPrivateModeConstant (0.00s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/cmd/bakeoff	10.336s
+FAIL

@@ -635,8 +635,8 @@ func TestIndexHasNoHTMLSinksNorInlineAttributes(t *testing.T) {
 	}
 }
 
-// M-1: releasing a quarantine warns, in the answer, about the members already exported to the other part.
-func TestReleaseAnswerWarnsAboutExportsToTheOtherPart(t *testing.T) {
+// M-1, changed by C-4.11c (1.1.6): releasing a quarantine to the part opposite to an export is refused, in the answer.
+func TestReleaseAnswerRefusesExportsToTheOtherPart(t *testing.T) {
 	f := newTreinoFixture(t)
 	a := f.occ(t, 1, "omitiu", "certa")
 	b := f.occ(t, 2, "inventou", "certa")
@@ -657,18 +657,18 @@ func TestReleaseAnswerWarnsAboutExportsToTheOtherPart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// C-4.11c (1.1.6): the release is REFUSED, with a clear message the page shows (r.body.error), and nothing changes
 	w := f.adm("POST", "/monitor/api/treino/"+res.OcorrenciaID+"/liberar-quarentena", `{"lado":"treino"}`)
-	var out struct {
-		Aviso string
-		N     int `json:"exportados_na_outra_parte"`
-		M     int `json:"membros"`
-	}
-	json.Unmarshal(w.Body.Bytes(), &out)
-	if w.Code != 200 || out.N != 1 || out.M != 3 || !strings.Contains(out.Aviso, "OUTRA parte") {
+	if w.Code != 409 || !strings.Contains(w.Body.String(), "exportado para a outra parte") {
 		t.Errorf("release answer: %d %s", w.Code, w.Body)
 	}
-	if !strings.Contains(string(indexHTML), "r.body.aviso") {
-		t.Error("the page does not show the warning")
+	var part string
+	f.openDB(t).QueryRow(`SELECT particao FROM ocorrencias WHERE id=?`, res.OcorrenciaID).Scan(&part)
+	if part != treino.ParteQuarentena {
+		t.Errorf("a refused release changed the side: %q", part)
+	}
+	if !strings.Contains(string(indexHTML), "r.body.error") {
+		t.Error("the page does not show the refusal")
 	}
 }
 
@@ -683,8 +683,9 @@ func TestExportRouteStopsAtItsDeadline(t *testing.T) {
 	old := treinoExportMax
 	defer func() { treinoExportMax = old }()
 	treinoExportMax = -time.Second // already past
-	if w := f.adm("GET", "/monitor/api/treino/export?parte=treino", ""); strings.TrimSpace(w.Body.String()) != "" {
-		t.Errorf("an export past its deadline sent lines: %q", w.Body)
+	// nothing was sent before the deadline: the client is told with an error, never with a file that looks complete (m-3)
+	if w := f.adm("GET", "/monitor/api/treino/export?parte=treino", ""); w.Code == 200 || strings.Contains(w.Body.String(), "messages") {
+		t.Errorf("an export past its deadline sent lines or looked complete: %d %q", w.Code, w.Body)
 	}
 	treinoExportMax = old
 	if w := f.adm("GET", "/monitor/api/treino/export?parte=treino", ""); len(strings.Split(strings.TrimSpace(w.Body.String()), "\n")) != 3 {

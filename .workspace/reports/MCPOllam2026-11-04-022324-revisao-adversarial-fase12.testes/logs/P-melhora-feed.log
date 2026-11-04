@@ -1,0 +1,25 @@
+=== RUN   TestAdv12POnlyConfirmedPublicTrainingEnterTheIndex
+    fase12_adv_melhora_feed_test.go:116: VEC|P8.controle|OK|o exemplo público confirmado de treino entra e é servido
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.distribuida|OK|ocorrência distribuida com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.quarentena|OK|ocorrência quarentena com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.teste|OK|ocorrência teste com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.pendente|OK|ocorrência pendente com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.apagada|OK|ocorrência apagada com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.nova|OK|ocorrência nova com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.descartada|OK|ocorrência descartada com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.sem_pedido|OK|ocorrência sem_pedido com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.fallback|OK|ocorrência fallback com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+--- PASS: TestAdv12POnlyConfirmedPublicTrainingEnterTheIndex (0.15s)
+=== RUN   TestAdv12PMemberLeavesWhileServing
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.descartar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.apagar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.desmarcar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.editar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.quarentena|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.teste|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+--- PASS: TestAdv12PMemberLeavesWhileServing (0.49s)
+=== RUN   TestAdv12PPublicExampleShowsTheOriginalRequestVerbatim
+    fase12_adv_melhora_feed_test.go:239: VEC|P8.pedidoOriginalNoExemplo|OK|MEDIDA (risco de projeto, não defeito de código): o texto do PEDIDO de uma ocorrência real marcada pública vai literal (até 1200 runas) ao pedido de outro cliente; o admin só pode editar resposta_correta/descricao/correcao_aplicada (treino/state.go:113), então a C-8.1/C-8.2 depende só de o admin marcar apenas casos sintéticos
+--- PASS: TestAdv12PPublicExampleShowsTheOriginalRequestVerbatim (0.08s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/melhora/feed	0.755s

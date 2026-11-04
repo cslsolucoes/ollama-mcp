@@ -1,0 +1,26 @@
+=== RUN   TestAdv12PKeyFile
+    fase12_adv_hmackey_test.go:72: VEC|P5.perm|OK|no Linux recusa qualquer bit de grupo/outros e aceita 0600/0400; NESTA MÁQUINA (Windows) o teste de 0600 não vale: checkMode ignora o modo (hmackey.go:96) e o Load aceita o arquivo com qualquer ACL
+    fase12_adv_hmackey_test.go:116: VEC|P5.curta63|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.curta62|OK|recusado sem mostrar a chave: --doc-key-file: chave HMAC curta demais: 31 bytes (mínimo 32)
+    fase12_adv_hmackey_test.go:116: VEC|P5.vazia|OK|recusado sem mostrar a chave: --doc-key-file: chave HMAC curta demais: 0 bytes (mínimo 32)
+    fase12_adv_hmackey_test.go:114: VEC|P5.espacos|OK|aceito com o key_id certo (3fc6e6ddd6fbc496)
+    fase12_adv_hmackey_test.go:114: VEC|P5.crlf|OK|aceito com o key_id certo (3fc6e6ddd6fbc496)
+    fase12_adv_hmackey_test.go:114: VEC|P5.maiusculas|OK|aceito com o key_id certo (3fc6e6ddd6fbc496)
+    fase12_adv_hmackey_test.go:116: VEC|P5.espacoNoMeio|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.bom|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.utf16|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.prefixo0x|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.maiorQueLimit|OK|recusado sem mostrar a chave: --doc-key-file: arquivo grande demais para uma chave em hex
+    fase12_adv_hmackey_test.go:114: VEC|P5.limiteExato|OK|aceito com o key_id certo (3d04f22913c85311)
+    fase12_adv_hmackey_test.go:116: VEC|P5.naoHexComChave|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:122: VEC|P5.diretorio|OK|diretório recusado: --doc-key-file E:\MCPOllam\.tmp-adv\tmp-P\TestAdv12PKeyFile967628890\014 não é um arquivo comum
+    fase12_adv_hmackey_test.go:131: VEC|P5.symlink|OK|symlink para arquivo comum 0600 é seguido e o alvo é validado pelo handle (f.Stat): mesmo comportamento do --admin-file
+--- PASS: TestAdv12PKeyFile (0.01s)
+=== RUN   TestAdv12PKeyNeverPrinted
+    fase12_adv_hmackey_test.go:180: VEC|P5.fmtPonteiro|OK|19 formas (verbos, json, slog Text/JSON, log, errors, panic, struct com *Key exportado e não exportado) mostram só hmackey(<key_id>)
+    fase12_adv_hmackey_test.go:213: VEC|P5.fmtValor|FALHA|Menor gateway/hmackey/hmackey.go:36 (latente: nenhum código de produção guarda Key por valor) String/GoString/Format estão no receptor *Key; um Key desreferenciado ou embutido por valor imprime os bytes da chave por reflexão em 6 formas (*k %v, *k %+v, struct %+v, slog struct, panic *k, errorf *k %+v), ex.: "{[192 255 238 0 17 34 51 68 85 102 119 136 153 170 187 204 2..."
+    fase12_adv_hmackey_test.go:213: P5.fmtValor: Menor gateway/hmackey/hmackey.go:36 (latente: nenhum código de produção guarda Key por valor) String/GoString/Format estão no receptor *Key; um Key desreferenciado ou embutido por valor imprime os bytes da chave por reflexão em 6 formas (*k %v, *k %+v, struct %+v, slog struct, panic *k, errorf *k %+v), ex.: "{[192 255 238 0 17 34 51 68 85 102 119 136 153 170 187 204 2..."
+--- FAIL: TestAdv12PKeyNeverPrinted (0.02s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/hmackey	0.053s
+FAIL

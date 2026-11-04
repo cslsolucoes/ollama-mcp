@@ -769,7 +769,7 @@ function renderTreino(j) {
 }
 function trPost(id, kind, body, done) {
   post("/monitor/api/treino/" + id + "/" + kind, body).then(function (r) {
-    if (r.status === 200) msg((r.body && r.body.aviso) || ""); else msg((r.body && r.body.error) || ("Erro " + r.status));
+    if (r.status === 200) msg(""); else msg((r.body && r.body.error) || ("Erro " + r.status));
     if (r.status === 401) { loggedIn = false; renderAuth(); }
     if (done) done(r);
     loadTreino(); if (trSel === id) loadTreinoDetail();

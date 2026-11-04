@@ -1,0 +1,114 @@
+=== RUN   TestAdv12PImagesNeverInClear
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.plain|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.upper|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.longS|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.longS.esc|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.esc.i|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.esc.all|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:167: VEC|P1.gen.dotlessI|OK|chave com ı/İ (U+0131/U+0130) não é 'images' para o decoder Go do Ollama (0 imagens vistas, foldRune=SimpleFold); varredura consistente com ele (tem_imagem=false)
+    fase12_adv_proxy_test.go:167: VEC|P1.gen.dottedI|OK|chave com ı/İ (U+0131/U+0130) não é 'images' para o decoder Go do Ollama (0 imagens vistas, foldRune=SimpleFold); varredura consistente com ele (tem_imagem=false)
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.dup.last|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.dup.case|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.escval|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.hugeNums|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.unknownNested|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.history|OK|3 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.foldedKeys|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.dupMessages|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.escKeys|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.dataURIobj|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.dataURIstr|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.httpURL|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.CONTENT|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.history|OK|2 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+--- PASS: TestAdv12PImagesNeverInClear (0.00s)
+=== RUN   TestAdv12PMalformedBodiesNeverStored
+    fase12_adv_proxy_test.go:230: VEC|P1.lixoDepois|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.lixoTexto|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.comentario|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.nan|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.infinito|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.bom|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:245: VEC|P1.controle|OK|corpo válido: Ollama recebe a imagem; job log recebe só o marcador (prompt_json e texto)
+--- PASS: TestAdv12PMalformedBodiesNeverStored (0.01s)
+=== RUN   TestAdv12PScanCostWorstCases
+    fase12_adv_proxy_test.go:363: VEC|P2.tokens|OK|MEDIDA 30 MiB: varredura 1.037s, 270 MiB alocados, pico heap 72 MiB (política: 263ms, 60 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.irmaosImages|OK|MEDIDA 30 MiB: varredura 1.098s, 81 MiB alocados, pico heap 84 MiB (política: 234ms, 60 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.quaseImages|OK|MEDIDA 30 MiB: varredura 680ms, 104 MiB alocados, pico heap 72 MiB (política: 330ms, 60 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.escapesImagem|OK|MEDIDA 30 MiB: varredura 311ms, 370 MiB alocados, pico heap 184 MiB (política: 107ms, 120 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.chaveEnorme|OK|MEDIDA 30 MiB: varredura 71ms, 124 MiB alocados, pico heap 123 MiB (política: 42ms, 60 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.profundo|OK|MEDIDA 0 MiB: varredura 1ms, 1 MiB alocados, pico heap 3 MiB (política: 1ms, 0 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.profundoNaRegra|OK|MEDIDA 0 MiB: varredura 1ms, 1 MiB alocados, pico heap 3 MiB (política: 1ms, 0 MiB) failed=false imagem=true
+--- PASS: TestAdv12PScanCostWorstCases (5.52s)
+=== RUN   TestAdv12PDocHeaderNeverReachesTheOllama
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.minusculas|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.maiusculas|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.duplicado|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.trailer|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.trailerSemAnuncio|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.minusculas|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.maiusculas|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.duplicado|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.trailer|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.trailerSemAnuncio|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.minusculas|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.maiusculas|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.duplicado|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.trailer|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.trailerSemAnuncio|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.minusculas|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.maiusculas|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.duplicado|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.trailer|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.trailerSemAnuncio|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.minusculas|OK|Ollama recebeu 113 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.maiusculas|OK|Ollama recebeu 113 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.duplicado|OK|Ollama recebeu 113 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.trailer|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK) (só o NOME do cabeçalho aparece, numa linha Trailer:, sem o valor)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.trailerSemAnuncio|OK|Ollama recebeu 132 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.minusculas|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.maiusculas|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.duplicado|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.trailer|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.trailerSemAnuncio|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.minusculas|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.maiusculas|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.duplicado|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.trailer|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.trailerSemAnuncio|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.minusculas|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.maiusculas|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.duplicado|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.trailer|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.trailerSemAnuncio|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+--- PASS: TestAdv12PDocHeaderNeverReachesTheOllama (1.25s)
+=== RUN   TestAdv12PDocTrailerOverHTTP2Backend
+    fase12_adv_proxy_test.go:586: VEC|P3.pool.h2.api.generate.soDoc|FALHA|Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567
+    fase12_adv_proxy_test.go:586: P3.pool.h2.api.generate.soDoc: Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567
+    fase12_adv_proxy_test.go:586: VEC|P3.pool.h2.api.generate.docEEstacao|FALHA|Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567|x-mcpollama-station=computer=pc9;user=eva
+    fase12_adv_proxy_test.go:586: P3.pool.h2.api.generate.docEEstacao: Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567|x-mcpollama-station=computer=pc9;user=eva
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.generate.comAuthorization|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 502 Bad Gateway); trailers recebidos: "authorization=|x-mcpollama-doc="
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.show.soDoc|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 200 OK); trailers recebidos: "x-mcpollama-doc="
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.show.docEEstacao|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 200 OK); trailers recebidos: "x-mcpollama-doc=|x-mcpollama-station="
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.show.comAuthorization|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 200 OK); trailers recebidos: "authorization=|x-mcpollama-doc="
+--- FAIL: TestAdv12PDocTrailerOverHTTP2Backend (0.04s)
+=== RUN   TestAdv12PMelhoraSearchesChargeTheLoopbackQuota
+    fase12_adv_proxy_test.go:635: VEC|P9.cotaLoopback|FALHA|Menor gateway/proxy/embedder.go:79 as buscas da melhora disparadas por clientes REMOTOS contam na cota por IP de 127.0.0.1 (PerIP): um cliente local (bakeoff/ferramenta sem nginx) recebeu 503 {"error":"fila do servidor cheia (limite de pedidos em espera deste cliente); tente em 5 s"}
+    fase12_adv_proxy_test.go:635: P9.cotaLoopback: Menor gateway/proxy/embedder.go:79 as buscas da melhora disparadas por clientes REMOTOS contam na cota por IP de 127.0.0.1 (PerIP): um cliente local (bakeoff/ferramenta sem nginx) recebeu 503 {"error":"fila do servidor cheia (limite de pedidos em espera deste cliente); tente em 5 s"}
+--- FAIL: TestAdv12PMelhoraSearchesChargeTheLoopbackQuota (3.01s)
+=== RUN   TestAdv12PMelhoraBurstNoDeadlock
+    fase12_adv_proxy_test.go:713: VEC|P9.rajada.lento|OK|MEDIDA 40 pedidos (gen 5, embed 2, limite 400 ms, busca lento): ok=40 em 407ms; embed_falhas=40 exemplos=0; fila vazia no fim
+    fase12_adv_proxy_test.go:713: VEC|P9.rajada.morto|OK|MEDIDA 40 pedidos (gen 5, embed 2, limite 400 ms, busca morto): ok=40 em 13ms; embed_falhas=40 exemplos=0; fila vazia no fim
+    fase12_adv_proxy_test.go:713: VEC|P9.rajada.cancelado|OK|MEDIDA 40 pedidos (gen 5, embed 2, limite 400 ms, busca cancelado): ok=0 em 151ms; embed_falhas=40 exemplos=0; fila vazia no fim
+--- PASS: TestAdv12PMelhoraBurstNoDeadlock (0.58s)
+=== RUN   TestAdv12PIndexSwappedDuringTheSearch
+    fase12_adv_proxy_test.go:739: VEC|P10.trocaDuranteBusca|FALHA|Menor gateway/melhora/transformer.go:180 exemplos do índice idx-A, mas o rastro (melhora_indice_id) diz "idx-B": t.index.Load() é lido de novo depois da busca (latente: hoje o gateway só chama SetIndex na partida, main.go:189; InvalidateIndex troca por um stub com o MESMO id)
+    fase12_adv_proxy_test.go:739: P10.trocaDuranteBusca: Menor gateway/melhora/transformer.go:180 exemplos do índice idx-A, mas o rastro (melhora_indice_id) diz "idx-B": t.index.Load() é lido de novo depois da busca (latente: hoje o gateway só chama SetIndex na partida, main.go:189; InvalidateIndex troca por um stub com o MESMO id)
+    fase12_adv_proxy_test.go:753: VEC|P10.removidoDuranteBusca|OK|índice retirado durante a busca: o pânico de t.index.Load().ID (nil) é recuperado e o pedido segue sem melhora (contado como corpo_pulado, não como falha de embed)
+--- FAIL: TestAdv12PIndexSwappedDuringTheSearch (0.00s)
+=== RUN   TestAdv12PMelhoraEmbedCarriesNoDocHeader
+    fase12_adv_proxy_test.go:788: VEC|P3.melhoraEmbed|OK|busca de embedding + geração com exemplo (HTTP/1.1 200 OK): nenhum dos dois pedidos leva o valor do X-Mcpollama-Doc (cabeçalho e trailer)
+--- PASS: TestAdv12PMelhoraEmbedCarriesNoDocHeader (0.05s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/proxy	10.499s
+FAIL

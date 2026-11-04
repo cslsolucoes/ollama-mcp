@@ -162,7 +162,7 @@ func errosApurar(ctx context.Context, st *treino.Store, eo errosOpts, logf func(
 	}
 	in := reportInput{Mode: "comparar", Apurado: true, RetratoID: rf.RetratoID, Atual: rf.Atual, Candidato: rf.Candidato, Alvo: rf.Alvo,
 		Cats: cats, Unmeasured: rf.Unmeasured, Fora: rf.Fora, Calls: rf.Calls, Baseline: rf.Baseline,
-		AtualS23: rf.AtualS23, CandS23: rf.CandS23, BlindFile: rf.BlindFile}
+		AtualS23: rf.AtualS23, CandS23: rf.CandS23, CandSameScore: rf.CandSameScore, BlindFile: rf.BlindFile}
 	rt, cases, err := st.RetratoCases(ctx, rf.RetratoID)
 	switch {
 	case errors.Is(err, treino.ErrRetratoNotFound):

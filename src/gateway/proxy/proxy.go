@@ -206,6 +206,10 @@ func New(cfg Config) (*Handler, error) {
 				"Authorization", "Cookie", HeaderClient, HeaderStation, HeaderTool, HeaderPriority, HeaderThink, HeaderRequestID, HeaderDoc} {
 				pr.Out.Header.Del(k)
 			}
+			// I-7: the trailers the client sent (and the Trailer header that announced them) are not the backend's business:
+			// a trailer named X-Mcpollama-Doc, X-Mcpollama-Station or any header removed above would carry it to the backend
+			pr.Out.Trailer = nil
+			pr.Out.Header.Del("Trailer")
 			// The only credential that reaches a backend is its own.
 			if sec != nil && sec.Token() != "" {
 				pr.Out.Header.Set("Authorization", "Bearer "+sec.Token())
@@ -572,6 +576,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	out.Body = io.NopCloser(bytes.NewReader(fwd))
 	out.ContentLength = int64(len(fwd))
 	out.TransferEncoding = nil
+	out.Trailer = nil
 	h.proxy.ServeHTTP(w, out)
 }
 

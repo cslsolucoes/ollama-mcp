@@ -1,0 +1,137 @@
+﻿=== RUN   TestAdv12FForgedOrigin
+    fase12_adv_feedback_test.go:141: VEC|F1a|OK|mesma estação declarada, outro IP verificado (X-Real-Ip 10.0.0.2 do nginx): estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1b|OK|X-Real-Ip forjado (10.0.0.1) vindo de par não-loopback 10.0.0.2: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1c|OK|X-Forwarded-For 10.0.0.1 do nginx com X-Real-Ip 10.0.0.2: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1c2|OK|X-Forwarded-For/Forwarded/CF-Connecting-IP 10.0.0.1 de par não-loopback: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1d|OK|estação vazia, mesmo IP 10.0.0.1 (o job tem estação): estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1d2|OK|estação inválida (vira vazia), mesmo IP: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1e|OK|job sem estação, relato de outro IP 10.0.0.2 com estação qualquer: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1f|OK|duas linhas X-Real-Ip (10.0.0.1 e 10.0.0.1) do nginx: o gateway cai no par 127.0.0.1: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1f2|OK|IPv4 mapeado em IPv6 ::ffff:10.0.0.2 (outro IP): estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:150: VEC|F1ctl|OK|controle: a mesma estação e o mesmo IP copiam a amostra (o caminho atacado é o real)
+--- PASS: TestAdv12FForgedOrigin (3.04s)
+=== RUN   TestAdv12FPartialStationJob
+    fase12_adv_feedback_test.go:167: VEC|F1g|OK|MEDIDA: job com estação parcial (só computer) é tratado como sem estação: estação OUTRO/mallory do MESMO IP copia; o IP verificado continua sendo a barreira (C-1.11a fala em máquina E usuário; ver relatório, só leitura ingest.go:38)
+--- PASS: TestAdv12FPartialStationJob (0.28s)
+=== RUN   TestAdv12FNoLeakAndOracle
+    fase12_adv_feedback_test.go:207: VEC|F1h|OK|resposta ao relato de job alheio só traz [sem_pedido jobs_externos jobs_outra_origem ocorrencia_id estado amostras_copiadas] (sem estado/texto/estação/tool do job)
+    fase12_adv_feedback_test.go:210: VEC|F1h2|OK|MEDIDA: oráculo de existência e de execução existe (alheio pronto 200 sem_pedido, alheio em execução 409, inexistente 404): imposto pela C-1.4/C-1.4a; os ids são 128 bits aleatórios e o /monitor (leitura livre na LAN) já lista os jobs, então não revela nada novo; cada sonda grava uma ocorrência sem_pedido (estatística poluível)
+--- PASS: TestAdv12FNoLeakAndOracle (0.26s)
+=== RUN   TestAdv12FForeignLinkForcesQuarantine
+    fase12_adv_feedback_test.go:310: VEC|F1i|FALHA|Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado sem_pedido, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+    fase12_adv_feedback_test.go:310: vetor F1i: Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado sem_pedido, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+    fase12_adv_feedback_test.go:310: VEC|F8a|FALHA|Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado distribuida, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+    fase12_adv_feedback_test.go:310: vetor F8a: Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado distribuida, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+--- FAIL: TestAdv12FForeignLinkForcesQuarantine (0.89s)
+=== RUN   TestAdv12FFlood
+    fase12_adv_feedback_test.go:344: VEC|F2a|OK|MEDIDA: 300 relatos seguidos da mesma estação e do mesmo job: todos 200, 300 ocorrências (humano não deduplica), 303104 bytes vivos (+1010 B/relato), média dos 10 primeiros 21.812ms e dos 10 últimos 76.083ms (o recompute percorre todas as ocorrências a cada relato); não há limite por IP/estação no gateway (só o nginx: 600/min, rajada 100)
+    fase12_adv_feedback_test.go:377: VEC|F2b|OK|32 relatos paralelos com a vez de escrever presa: todos 503 com Retry-After 5, nada gravado (oc=300 jobs=300 amostras=1 hist=300); Summary+List responderam em 94ms
+--- PASS: TestAdv12FFlood (12.94s)
+=== RUN   TestAdv12FFloodFillsTheCeilingForEveryone
+    fase12_adv_feedback_test.go:402: VEC|F2c|OK|MEDIDA: uma estação encheu o teto (3 MiB de folga) com 24 relatos de 128 KB de resposta_correta; a estação PC02 passou a receber 507: o teto é global e não há cota por cliente (o contrato C-6.2 não pede; em produção 2 GiB/~140 KB ≈ 15 mil relatos, ~25 min a 600/min)
+--- PASS: TestAdv12FFloodFillsTheCeilingForEveryone (1.25s)
+=== RUN   TestAdv12FBodyAndJSON
+    fase12_adv_feedback_test.go:488: VEC|F3a|OK|corpo de exatamente 256 KB (JSON válido + espaços): 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3a2|OK|corpo de 256 KB + 1: 413, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3c|OK|aninhamento profundo (100 mil '['): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3d1|OK|duas 'categoria' (válida e depois inválida): vence a última: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3d2|OK|duas 'job_do_erro' (inválida e depois a da lista): 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3e1|OK|campo desconhecido: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f1|OK|enum com homóglifo cirílico (о U+043E): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f2|OK|enum com BOM no início: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f3|OK|BOM antes do objeto: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f4|OK|\u0000 na descricao: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f5|OK|NUL cru dentro da string: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f6|OK|\u0000 no projeto: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f7|OK|enum em NFD/maiúsculas (OMITIU): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3g1|OK|número enorme num campo texto: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3g2|OK|número no id do job: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3h1|OK|64 jobs: 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3h2|OK|65 jobs: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i1|OK|id com maiúsculas: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i2|OK|id com 31 hex: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i3|OK|id com 33 hex: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i4|OK|job_do_erro com maiúsculas: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j1|OK|papel map0: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j2|OK|papel 'map1\n': 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j3|OK|papel 'final ' com espaço: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j4|OK|papel repetido: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j5|OK|unico numa lista de 2: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j6|OK|backend 'Primario': 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j7|OK|lista sem final e sem job_do_erro: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k1|OK|descricao com 4096 bytes multibyte (2048 ç): 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3k2|OK|descricao com 4097 bytes (2048 ç + a): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k3|OK|descricao com 4097 bytes cortando um rune (2047 ç + 3 bytes de 'ã'+'a'): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k4|OK|projeto com 128 bytes: 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3k5|OK|projeto com 129 bytes: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k6|OK|correcao_aplicada com 4097 bytes: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k7|OK|resposta_correta com 128 KB + 1: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3l1|OK|descricao só com NBSP/tab/quebra: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n1|OK|dois objetos seguidos: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n2|OK|array no topo: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n3|OK|null: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n4|OK|objeto vazio: 400, gravou=false
+    fase12_adv_feedback_test.go:498: VEC|F3d3|OK|MEDIDA: chave duplicada aceita com 'vence a última' (encoding/json); o valor final é validado, sem desvio de enum
+    fase12_adv_feedback_test.go:510: VEC|F3e2|FALHA|Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "CATEGORIA", que não é campo do contrato, foi aceita como "categoria" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:510: vetor F3e2: Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "CATEGORIA", que não é campo do contrato, foi aceita como "categoria" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:510: VEC|F3e3|FALHA|Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "deſcricao", que não é campo do contrato, foi aceita como "descricao" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:510: vetor F3e3: Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "deſcricao", que não é campo do contrato, foi aceita como "descricao" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:523: VEC|F3f8|OK|MEDIDA: UTF-8 inválido e surrogate solto viram U+FFFD no decoder (aceito, nenhum byte inválido gravado)
+--- FAIL: TestAdv12FBodyAndJSON (0.65s)
+=== RUN   TestAdv12FBodyOnTheWire
+    fase12_adv_feedback_test.go:571: VEC|F3b1|OK|chunked de 300 KB sem Content-Length: 413, nada gravado
+    fase12_adv_feedback_test.go:578: VEC|F3b2|OK|Content-Length menor que o corpo: lê só o declarado, JSON cortado, 400, nada gravado
+    fase12_adv_feedback_test.go:587: VEC|F3b3|OK|MEDIDA: Content-Length maior que o corpo (cliente fecha): nada gravado, mas a resposta é 413 'corpo maior que 256 KB' (rótulo errado, http.go:64-66 trata todo erro de leitura como 413)
+    fase12_adv_feedback_test.go:594: VEC|F3b4|OK|Content-Length de 10 MiB: 413 depois de 256 KB lidos
+--- PASS: TestAdv12FBodyOnTheWire (0.76s)
+=== RUN   TestAdv12FRacesReportsVsAdmin
+    fase12_adv_feedback_test.go:705: VEC|F4a|OK|180 relatos (1/3 automáticos, mesmos jobs) x 160 ações do admin em paralelo (race=true): 120 ocorrências, 17 apagadas; invariantes zeradas (orfas=0 jobs_de_apagadas=0 jobs_sem_ocorrencia=0 historico_sem_linha=0 sem_criou=0 sem_amostra=0 apagada_suja=0 confirmada_sem_resposta=0)
+--- PASS: TestAdv12FRacesReportsVsAdmin (4.36s)
+=== RUN   TestAdv12FCeiling
+    fase12_adv_feedback_test.go:775: VEC|F5a|OK|16 relatos simultâneos de 10 a 160 KB com 400 KB de folga: 6 aceitos, 10 com 507; amostras somam 390466 B (folga 400000); tamanho final -2688 B em relação ao teto (no máximo um relato acima, conforme C-6.2); 1 evento(s) (o evento é limitado a 1 por minuto, os 507 seguintes não gravam evento novo)
+    fase12_adv_feedback_test.go:797: VEC|F5b|OK|MEDIDA: com 4 KB de folga, um relato sem amostra nova mas com 132 KB de texto foi aceito e deixou o banco 131072 B ACIMA do teto: o orçamento (ingest.go:353-385) só conta as amostras; a C-6.2 mede antes da transação, então ultrapassar por UM relato é conforme; o seguinte recebe 507
+    fase12_adv_feedback_test.go:805: VEC|F5b2|OK|acima do teto o relato seguinte recebe 507
+    fase12_adv_feedback_test.go:843: VEC|F5c|OK|MEDIDA: a edição do admin cresce o banco sem teto (admin é confiável); o relato seguinte dá 507 sem apagar nada (contagens iguais); depois de apagar 3 ocorrências o espaço volta e o relato é aceito (C-6.2a)
+--- PASS: TestAdv12FCeiling (0.93s)
+=== RUN   TestAdv12FBusyNoKeyAndFallback
+    fase12_adv_feedback_test.go:866: VEC|F6a-na_fila-job_do_erro|OK|job_do_erro na_fila: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:866: VEC|F6a-na_fila-outro_local|OK|outro local na_fila: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:866: VEC|F6a-em_execucao-job_do_erro|OK|job_do_erro em_execucao: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:866: VEC|F6a-em_execucao-outro_local|OK|outro local em_execucao: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:879: VEC|F6a2|OK|MEDIDA: job local em execução rotulado 'fallback' escapa do 409 (backend é declarado), mas a ocorrência vira distribuida e nada é copiado, então nenhuma amostra fica incompleta
+    fase12_adv_feedback_test.go:890: VEC|F6b|OK|sem chave (true): 503 com mensagem explícita, nada gravado
+    fase12_adv_feedback_test.go:890: VEC|F6b|OK|sem chave (false): 503 com mensagem explícita, nada gravado
+    fase12_adv_feedback_test.go:903: VEC|F6c|OK|prazo da vez de escrever: 503 com Retry-After 5 em 101ms, nada gravado
+    fase12_adv_feedback_test.go:919: VEC|F6d|OK|role fallback: a substituição do automático (que tinha 2 amostras) virou fallback e as amostras saíram; relato novo no fallback: 0 amostras (C-1.21, C-1.12d)
+--- PASS: TestAdv12FBusyNoKeyAndFallback (1.89s)
+=== RUN   TestAdv12FNoTextNoPlainHashAndRemanence
+    fase12_adv_feedback_test.go:1036: VEC|F7a|OK|historico depois de automático→humano, editar, confirmar, desconfirmar, descartar: nenhum texto e nenhum sha256 puro (58 agulhas)
+    fase12_adv_feedback_test.go:1050: VEC|F7b|OK|bytes de treino.db, -wal e -shm: nenhum sha256 puro (hex minúsculo, maiúsculo ou binário) de prompt_json, conteúdo canônico, X-Mcpollama-Doc, textos e respostas
+    fase12_adv_feedback_test.go:1066: VEC|F7c|OK|os textos do relato só aparecem em ocorrencias (colunas de conteúdo); nenhuma outra tabela os tem
+    fase12_adv_feedback_test.go:1091: VEC|F7d|FALHA|Importante treino.go:169 (dsn sem secure_delete; C-6.3 'remove todo o conteúdo'): depois de apagar, nenhuma linha tem o texto, mas os BYTES do arquivo ainda têm: logo após apagar [descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal resposta_modelo em treino.db-wal]; depois de wal_checkpoint(TRUNCATE)+incremental_vacuum [resposta_correta em treino.db pedido em treino.db resposta_modelo em treino.db descricao em treino.db]. Páginas livres/espaço livre da página e quadros do -wal guardam o texto em claro; o contrato fala de campos, não de bytes (lacuna); correção: _pragma=secure_delete(ON) no dsn e checkpoint(TRUNCATE) depois de apagar
+    fase12_adv_feedback_test.go:1091: vetor F7d: Importante treino.go:169 (dsn sem secure_delete; C-6.3 'remove todo o conteúdo'): depois de apagar, nenhuma linha tem o texto, mas os BYTES do arquivo ainda têm: logo após apagar [descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal resposta_modelo em treino.db-wal]; depois de wal_checkpoint(TRUNCATE)+incremental_vacuum [resposta_correta em treino.db pedido em treino.db resposta_modelo em treino.db descricao em treino.db]. Páginas livres/espaço livre da página e quadros do -wal guardam o texto em claro; o contrato fala de campos, não de bytes (lacuna); correção: _pragma=secure_delete(ON) no dsn e checkpoint(TRUNCATE) depois de apagar
+--- FAIL: TestAdv12FNoTextNoPlainHashAndRemanence (0.27s)
+=== RUN   TestAdv12FOtherForgeries
+    fase12_adv_feedback_test.go:1116: VEC|F8b|OK|relato cujo job_do_erro é um embed: aceito (estatística), confirmado, mas inelegível e fora das duas exportações (C-3.5)
+    fase12_adv_feedback_test.go:1133: VEC|F8c|OK|automático forjado por outra origem para o job da vítima vira sem_pedido próprio; o automático da vítima nasce nova com a amostra e é substituído pelo humano dela; o forjado não é tocado
+    fase12_adv_feedback_test.go:1153: VEC|F8d|OK|MEDIDA: projeto com HTML e CR/LF é aceito e guardado como dado declarado (C-1.18, sem filtro de caracteres de controle); List/Detail saem em JSON com <, > e CR/LF escapados; o rótulo HTML vira "invalido"
+--- PASS: TestAdv12FOtherForgeries (0.59s)
+=== RUN   TestAdv12FSecureDeleteFixHypothesis
+    fase12_adv_feedback_test.go:1208: VEC|F7e|OK|hipótese do F7d confirmada pelo caminho real (Ingest+Delete): secure_delete=0 deixa o texto apagado (logo após [descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal resposta_modelo em treino.db-wal]; após checkpoint(TRUNCATE) [resposta_modelo em treino.db descricao em treino.db resposta_correta em treino.db pedido em treino.db]); com secure_delete=1 em todas as conexões, após checkpoint(TRUNCATE) nada sobra (logo após, ainda no -wal: [descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal resposta_modelo em treino.db-wal])
+--- PASS: TestAdv12FSecureDeleteFixHypothesis (0.39s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/treino	28.582s
+=== RUN   TestAdv12FEndToEndOrigin
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-a|OK|gateway inteiro: estação A declarada, X-Real-Ip 10.0.0.2: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-b|OK|gateway inteiro: X-Forwarded-For 10.0.0.1 com X-Real-Ip 10.0.0.2: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-c|OK|gateway inteiro: estação vazia, mesmo IP 10.0.0.1: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-d|OK|gateway inteiro: estação com outro usuário, mesmo IP: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:134: VEC|F1e2e-v6|OK|MEDIDA: IPv6: outro /64 não copia; um vizinho do MESMO /64 (2001:db8::2 para o job de 2001:db8::1) copia, porque o job log guarda o /64 (proxy.fairIP) e a C-1.11a manda usar o mesmo cálculo
+    fase12_adv_feedback_test.go:141: VEC|F1e2e-ctl|OK|controle no gateway inteiro: mesma estação e mesmo IP copiam
+    fase12_adv_feedback_test.go:152: VEC|F8e2e-a|OK|o próprio /api/feedback não vira job (sem X-Request-Id, nenhuma linha em requests); usar o ocorrencia_id como job_do_erro dá 404
+    fase12_adv_feedback_test.go:159: VEC|F8e2e-b|OK|MEDIDA: relato de job de embed aceito no gateway inteiro (estado nova, 1 amostra); a exportação o exclui pela C-3.5 (vetor F8b do pacote treino)
+--- PASS: TestAdv12FEndToEndOrigin (1.18s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	2.263s
+FAIL
+

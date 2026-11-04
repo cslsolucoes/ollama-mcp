@@ -1,0 +1,616 @@
+=== RUN   TestAdv12FEndToEndOrigin
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-a|OK|gateway inteiro: estação A declarada, X-Real-Ip 10.0.0.2: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-b|OK|gateway inteiro: X-Forwarded-For 10.0.0.1 com X-Real-Ip 10.0.0.2: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-c|OK|gateway inteiro: estação vazia, mesmo IP 10.0.0.1: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:125: VEC|F1e2e-d|OK|gateway inteiro: estação com outro usuário, mesmo IP: sem_pedido, 0 amostras
+    fase12_adv_feedback_test.go:134: VEC|F1e2e-v6|OK|MEDIDA: IPv6: outro /64 não copia; um vizinho do MESMO /64 (2001:db8::2 para o job de 2001:db8::1) copia, porque o job log guarda o /64 (proxy.fairIP) e a C-1.11a manda usar o mesmo cálculo
+    fase12_adv_feedback_test.go:141: VEC|F1e2e-ctl|OK|controle no gateway inteiro: mesma estação e mesmo IP copiam
+    fase12_adv_feedback_test.go:152: VEC|F8e2e-a|OK|o próprio /api/feedback não vira job (sem X-Request-Id, nenhuma linha em requests); usar o ocorrencia_id como job_do_erro dá 404
+    fase12_adv_feedback_test.go:159: VEC|F8e2e-b|OK|MEDIDA: relato de job de embed aceito no gateway inteiro (estado nova, 1 amostra); a exportação o exclui pela C-3.5 (vetor F8b do pacote treino)
+--- PASS: TestAdv12FEndToEndOrigin (1.35s)
+=== RUN   TestAdv12PEndToEndNoImageNoPlainHash
+    fase12_adv_proxy_test.go:256: VEC|P4.e2e.aoVivo|OK|nenhum sha256 puro (documento, prompt_json, original, conteúdo canônico; hex, HEX e bruto), nenhuma imagem (base64 e bruta) e nenhum pedaço da chave em stderr(--debug)=1166B, gw.db=4096B, content.db=4096B, content.db-wal=148352B, treino.db=4096B, treino.db-wal=510912B, gw.db-shm=32768B, content.db-shm=32768B, gw.db-wal=626272B, treino.db-shm=32768B; o doc_hash HMAC está lá (controle)
+    fase12_adv_proxy_test.go:256: VEC|P4.e2e.depoisDeParar|OK|nenhum sha256 puro (documento, prompt_json, original, conteúdo canônico; hex, HEX e bruto), nenhuma imagem (base64 e bruta) e nenhum pedaço da chave em stderr(--debug)=1197B, gw.db=90112B, content.db=20480B, treino.db=131072B; o doc_hash HMAC está lá (controle)
+    fase12_adv_proxy_test.go:279: VEC|P3.e2e|OK|9 chamadas ao Ollama (generate, chat, /v1, embed, com melhora ligada) sem X-Mcpollama-Doc
+    fase12_adv_proxy_test.go:287: VEC|P1.e2e.melhoraOriginal|OK|job alterado pela melhora: prompt_json (com a instrução) e prompt_json_original têm imagem_hmac, nenhum o base64; tem_imagem=1
+    fase12_adv_proxy_test.go:298: VEC|P1.e2e.temImagem|OK|chat com histórico (imageſ), /v1 data-URI e número 1e400 gravados com tem_imagem=1
+--- PASS: TestAdv12PEndToEndNoImageNoPlainHash (2.25s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	4.714s
+=== RUN   TestAdv12BReplayURLRefusals
+    fase12_adv_bakeoff_test.go:82: VEC|B1-01|OK|25 URLs recusadas com e sem -gateway-remoto (nome, IP público v4/v6, link-local, zona %25, ::ffff:8.8.8.8, 0.0.0.0, [::], decimal/octal/hex, CGNAT, metadata, NAT64, 6to4, http privado, userinfo); 4 IPs privados em https aceitos
+--- PASS: TestAdv12BReplayURLRefusals (0.00s)
+=== RUN   TestAdv12BDialControlOnResolvedAddress
+    fase12_adv_bakeoff_test.go:117: VEC|B1-02|OK|Dialer.Control recusa 12 endereços já resolvidos (público, ::ffff:público, 0.0.0.0, link-local com zona, metadata, CGNAT, NAT64, 6to4, nome cru); 'localhost' chega resolvido ao Control e a chamada passa (DNS rebinding cai no Control)
+--- PASS: TestAdv12BDialControlOnResolvedAddress (0.03s)
+=== RUN   TestAdv12BRedirectsNeverFollowed
+    fase12_adv_bakeoff_test.go:143: VEC|B1-03|OK|301/302/303/307/308 para host externo, no replay e no embed: erro e 0 pedidos no host externo
+--- PASS: TestAdv12BRedirectsNeverFollowed (0.02s)
+=== RUN   TestAdv12BProxyEnvironmentIgnored
+    fase12_adv_bakeoff_test.go:197: VEC|B1-04|OK|HTTP(S)_PROXY/ALL_PROXY no ambiente e NO_PROXY vazio: o replay para 10.100.2.30 discou direto (erro "chamada ao gateway falhou: Post \"https://10.100.2.30:56100/a...") e o proxy recebeu só o pedido do controle (1)
+--- PASS: TestAdv12BProxyEnvironmentIgnored (2.05s)
+=== RUN   TestAdv12BBaseURLPathIsNotAnEndpointBypass
+    fase12_adv_bakeoff_test.go:219: VEC|B1-05|FALHA|Menor erros_replay.go:81 e :169: o caminho/consulta da -gateway-url não é recusado e o pedido do caso foi a "/api/pull?nome=/api/generate" (mesmo host, mas fora da lista replayEndpoints da linha 36)
+    fase12_adv_bakeoff_test.go:219: B1-05: Menor erros_replay.go:81 e :169: o caminho/consulta da -gateway-url não é recusado e o pedido do caso foi a "/api/pull?nome=/api/generate" (mesmo host, mas fora da lista replayEndpoints da linha 36)
+--- FAIL: TestAdv12BBaseURLPathIsNotAnEndpointBypass (0.00s)
+=== RUN   TestAdv12BWilsonAndTargetDecisionSweep
+    fase12_adv_bakeoff_test.go:252: VEC|B2-01|OK|MEDIDA Wilson (limite inferior) = fórmula independente em n=1..200, todos os k (desvio máx 3.3e-16)
+    fase12_adv_bakeoff_test.go:276: VEC|B2-02|OK|MEDIDA C-5.10 (≥10 pontos e limite inferior > ponto, estrito) igual ao oráculo independente em 14486 combinações (n=30,31,47,100)
+--- PASS: TestAdv12BWilsonAndTargetDecisionSweep (0.11s)
+=== RUN   TestAdv12BBoundariesOfNAndDrop
+    fase12_adv_bakeoff_test.go:318: VEC|B2-03|OK|N 19/20/29/30 (reporta/decide), queda de 3,01 vs 3,00 pontos (C-5.11) e S2 2,01 vs 2,00 (C-5.12) nas fronteiras certas, com inteiros
+--- PASS: TestAdv12BBoundariesOfNAndDrop (0.02s)
+=== RUN   TestAdv12BUnequalNIsSkippedNotRejected
+    fase12_adv_bakeoff_test.go:331: VEC|B2-04|FALHA|Menor erros_report.go:161: categoria com Cand.N != Atual.N é pulada (continue) em vez de falhar o gate: alvo sem ganho aceito=true (""); outra caindo 100 pontos aceita=true. Só alcançável por resultado-*.json corrompido/editado lido pelo modo apurar (erros_apurar.go:132), mas é fail-open
+    fase12_adv_bakeoff_test.go:331: B2-04: Menor erros_report.go:161: categoria com Cand.N != Atual.N é pulada (continue) em vez de falhar o gate: alvo sem ganho aceito=true (""); outra caindo 100 pontos aceita=true. Só alcançável por resultado-*.json corrompido/editado lido pelo modo apurar (erros_apurar.go:132), mas é fail-open
+--- FAIL: TestAdv12BUnequalNIsSkippedNotRejected (0.00s)
+=== RUN   TestAdv12BS2S3OfACandidateWithInstructionsIsNeverMeasured
+    fase12_adv_bakeoff_test.go:394: VEC|B2-05|FALHA|Importante erros_report.go:378-379 (e erros.go:271, sem recusa de -candidato = -atual): no comparar da melhora 12.8 o candidato é o mesmo nome de modelo (o gateway só aceita qwen3-ia), então o S2/S3 do candidato é lido do MESMO <out>/qwen3-ia/score.json do atual; o C-5.12 compara o modelo sem instruções com ele mesmo e a melhora foi ACEITA sem o S2/S3 com as instruções jamais ter sido medido
+    fase12_adv_bakeoff_test.go:394: B2-05: Importante erros_report.go:378-379 (e erros.go:271, sem recusa de -candidato = -atual): no comparar da melhora 12.8 o candidato é o mesmo nome de modelo (o gateway só aceita qwen3-ia), então o S2/S3 do candidato é lido do MESMO <out>/qwen3-ia/score.json do atual; o C-5.12 compara o modelo sem instruções com ele mesmo e a melhora foi ACEITA sem o S2/S3 com as instruções jamais ter sido medido
+--- FAIL: TestAdv12BS2S3OfACandidateWithInstructionsIsNeverMeasured (2.34s)
+=== RUN   TestAdv12BStaleOrForeignScoreFailsTheGate
+    fase12_adv_bakeoff_test.go:425: VEC|B2-06|OK|score.json do candidato antigo (>48 h), de outro modelo ou sem S3: o C-5.12 vira "não medido" e o gate falha (nunca "sem queda")
+--- PASS: TestAdv12BStaleOrForeignScoreFailsTheGate (4.46s)
+=== RUN   TestAdv12BMissingRoundIsNotTwoOfThree
+    fase12_adv_bakeoff_test.go:450: VEC|B2-07|OK|a rodada 3 de um caso falhou (500): o caso não é medido e o gate falha; 2 rodadas nunca valem como "2 de 3"
+--- PASS: TestAdv12BMissingRoundIsNotTwoOfThree (1.84s)
+=== RUN   TestAdv12BDuplicateOccurrenceOfTheSameJob
+    fase12_adv_bakeoff_test.go:465: VEC|B2-08|OK|MEDIDA duas ocorrências confirmadas do MESMO job_do_erro entram no retrato como 2 casos (omitiu=31): o mesmo pedido é medido 2x. Coerente com C-1.1 (a unidade é a ocorrência) e C-4.5 (mesmo grupo, mesmo lado), mas infla o N rumo ao mínimo de 30 (C-5.8); ver "só leitura"
+--- PASS: TestAdv12BDuplicateOccurrenceOfTheSameJob (1.11s)
+=== RUN   TestAdv12BNumberScoring
+    fase12_adv_bakeoff_test.go:478: VEC|B2-09|FALHA|Menor erros_score.go:290-291 e :296-307: o sinal de menos Unicode (U+2212, comum em texto colado) não é reconhecido na resposta certa, que vira positiva; a resposta do modelo com o sinal trocado passa: want "RESULTADO: −5" (U+2212) lido como 5 e a resposta 5 passou; want "−5" lido como 5
+    fase12_adv_bakeoff_test.go:478: B2-09: Menor erros_score.go:290-291 e :296-307: o sinal de menos Unicode (U+2212, comum em texto colado) não é reconhecido na resposta certa, que vira positiva; a resposta do modelo com o sinal trocado passa: want "RESULTADO: −5" (U+2212) lido como 5 e a resposta 5 passou; want "−5" lido como 5
+    fase12_adv_bakeoff_test.go:501: VEC|B2-10|OK|RESULTADO ambíguo (1,500) inaplicável; o último RESULTADO vale; dígito largo não conta; 12,0 = 12; prosa termina no último número
+--- FAIL: TestAdv12BNumberScoring (0.00s)
+=== RUN   TestAdv12BJSONAndItems
+    fase12_adv_bakeoff_test.go:543: VEC|B2-11|OK|JSON: chave duplicada por escape, 2 objetos, cerca, ordem de array, 1e999999999 (<2 s) e 200 mil níveis reprovam; itens repetidos/faltando/extras/zero-width/numerados reprovam e a lista certa passa
+--- PASS: TestAdv12BJSONAndItems (0.30s)
+=== RUN   TestAdv12BBaselineCannotBeReplacedOrBorrowed
+    fase12_adv_bakeoff_test.go:581: VEC|B2-12|OK|linha de base não é sobrescrita (2ª base = FATAL, arquivo idêntico); comparar recusa, sem chamar o gateway, a base de outro retrato, de outro modelo ou ilegível
+--- PASS: TestAdv12BBaselineCannotBeReplacedOrBorrowed (2.16s)
+=== RUN   TestAdv12BRetratoQuarantineAndMelhora
+    fase12_adv_bakeoff_test.go:661: VEC|B3-01|OK|melhora_* fora do retrato (C-3.10a); quarentena ou melhora depois do retrato, quarentena no meio da rodada e melhora entre base e comparar: gate falha, sem linha de base e (fora do meio da rodada) sem chamar o gateway; retrato só de casos inaplicáveis = "0 casos"
+--- PASS: TestAdv12BRetratoQuarantineAndMelhora (7.86s)
+=== RUN   TestAdv12BStreamShapes
+    fase12_adv_bakeoff_test.go:671: VEC|B4-01|FALHA|Menor erros_replay.go:255-256 e :276-277: uma linha JSON inválida NO MEIO do stream (não truncado) é ignorada e a resposta vale como medida (texto "item-1\nitem-2\nitem-3", omitiu pass=true): o pedaço perdido continha o item errado e o caso passou
+    fase12_adv_bakeoff_test.go:671: B4-01: Menor erros_replay.go:255-256 e :276-277: uma linha JSON inválida NO MEIO do stream (não truncado) é ignorada e a resposta vale como medida (texto "item-1\nitem-2\nitem-3", omitiu pass=true): o pedaço perdido continha o item errado e o caso passou
+    fase12_adv_bakeoff_test.go:678: VEC|B4-02|FALHA|Menor erros_replay.go:218: uma linha que não começa com '{' no meio do stream nativo é pulada sem erro e a resposta ("ab") vale como medida
+    fase12_adv_bakeoff_test.go:678: B4-02: Menor erros_replay.go:218: uma linha que não começa com '{' no meio do stream nativo é pulada sem erro e a resposta ("ab") vale como medida
+    fase12_adv_bakeoff_test.go:684: VEC|B4-03|OK|MEDIDA texto depois do done é somado (texto="ab" err=<nil>, Final=true); o Ollama não manda nada depois do done, por isso não conto como defeito
+    fase12_adv_bakeoff_test.go:692: VEC|B4-04|OK|done:false até o EOF, conexão quebrada e SSE com finish_reason null sem [DONE]: erro (caso não medido)
+    fase12_adv_bakeoff_test.go:696: VEC|B4-05|OK|MEDIDA done_reason=length é um fim normal: pontuado (omitiu pass=true err=<nil>) e, em truncado, reprova (pass=false); é comportamento do modelo com as opções gravadas
+    fase12_adv_bakeoff_test.go:708: VEC|B4-06|FALHA|Menor erros_replay.go:231-241 e erros.go:422: resposta acima de 16 MiB, cortada no teto e sem done, é PONTUADA como medida em categoria que não é truncado (omitiu pass=true; o item errado veio depois do corte). Na exportação a amostra com resp_truncada=1 é inelegível (C-3.6), mas no replay o corte vale como resposta
+    fase12_adv_bakeoff_test.go:708: B4-06: Menor erros_replay.go:231-241 e erros.go:422: resposta acima de 16 MiB, cortada no teto e sem done, é PONTUADA como medida em categoria que não é truncado (omitiu pass=true; o item errado veio depois do corte). Na exportação a amostra com resp_truncada=1 é inelegível (C-3.6), mas no replay o corte vale como resposta
+--- FAIL: TestAdv12BStreamShapes (1.52s)
+=== RUN   TestAdv12BAnswersFileParsing
+    fase12_adv_bakeoff_test.go:748: VEC|B5-01|OK|respostas do owner: CRLF/branco/comentário/maiúsculas/espaços/NBSP aceitos; BOM, rótulo minúsculo, repetido, extra, 4 campos, veredito inválido ou faltando recusados (fail-closed; o BOM recusa o arquivo inteiro com o rótulo "\ufeffC01")
+--- PASS: TestAdv12BAnswersFileParsing (0.01s)
+=== RUN   TestAdv12BApurarAndFilesHoldNoText
+    fase12_adv_bakeoff_test.go:835: VEC|B5-02|OK|comparar com blind = PENDENTE (exit 4, nada aceito); apurar com 1 rótulo sem resposta = gate falha; 13 arquivos gerados (relatórios, resultado-*.json, chave.tsv, linha de base) e todos os logs, inclusive de rodadas cujo gateway ecoa o pedido no corpo 500, num chunk de erro e no Location de um 307, sem nenhum texto de pedido/resposta
+--- PASS: TestAdv12BApurarAndFilesHoldNoText (3.51s)
+=== RUN   TestAdv12BPrivateModeConstant
+    fase12_adv_bakeoff_test.go:850: VEC|B5-03|OK|MEDIDA todo arquivo da suíte passa por writeNew (O_EXCL, 0600) e a pasta é 0700 (erros.go:280); o modo 0600 em si não é observável no Windows (prova no Linux, pendência da 12.10)
+--- PASS: TestAdv12BPrivateModeConstant (0.00s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/cmd/bakeoff	27.560s
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/content	1.129s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/cpu	1.072s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/gpu	1.071s [no tests to run]
+=== RUN   TestAdv12PKeyFile
+    fase12_adv_hmackey_test.go:72: VEC|P5.perm|OK|no Linux recusa qualquer bit de grupo/outros e aceita 0600/0400; NESTA MÁQUINA (Windows) o teste de 0600 não vale: checkMode ignora o modo (hmackey.go:96) e o Load aceita o arquivo com qualquer ACL
+    fase12_adv_hmackey_test.go:116: VEC|P5.curta63|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.curta62|OK|recusado sem mostrar a chave: --doc-key-file: chave HMAC curta demais: 31 bytes (mínimo 32)
+    fase12_adv_hmackey_test.go:116: VEC|P5.vazia|OK|recusado sem mostrar a chave: --doc-key-file: chave HMAC curta demais: 0 bytes (mínimo 32)
+    fase12_adv_hmackey_test.go:114: VEC|P5.espacos|OK|aceito com o key_id certo (3fc6e6ddd6fbc496)
+    fase12_adv_hmackey_test.go:114: VEC|P5.crlf|OK|aceito com o key_id certo (3fc6e6ddd6fbc496)
+    fase12_adv_hmackey_test.go:114: VEC|P5.maiusculas|OK|aceito com o key_id certo (3fc6e6ddd6fbc496)
+    fase12_adv_hmackey_test.go:116: VEC|P5.espacoNoMeio|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.bom|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.utf16|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.prefixo0x|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:116: VEC|P5.maiorQueLimit|OK|recusado sem mostrar a chave: --doc-key-file: arquivo grande demais para uma chave em hex
+    fase12_adv_hmackey_test.go:114: VEC|P5.limiteExato|OK|aceito com o key_id certo (3d04f22913c85311)
+    fase12_adv_hmackey_test.go:116: VEC|P5.naoHexComChave|OK|recusado sem mostrar a chave: --doc-key-file: o conteúdo precisa ser a chave em hexadecimal (64 caracteres ou mais)
+    fase12_adv_hmackey_test.go:122: VEC|P5.diretorio|OK|diretório recusado: --doc-key-file E:\MCPOllam\.tmp-adv\tmp\TestAdv12PKeyFile2380023405\014 não é um arquivo comum
+    fase12_adv_hmackey_test.go:131: VEC|P5.symlink|OK|symlink para arquivo comum 0600 é seguido e o alvo é validado pelo handle (f.Stat): mesmo comportamento do --admin-file
+--- PASS: TestAdv12PKeyFile (0.03s)
+=== RUN   TestAdv12PKeyNeverPrinted
+    fase12_adv_hmackey_test.go:180: VEC|P5.fmtPonteiro|OK|19 formas (verbos, json, slog Text/JSON, log, errors, panic, struct com *Key exportado e não exportado) mostram só hmackey(<key_id>)
+    fase12_adv_hmackey_test.go:213: VEC|P5.fmtValor|FALHA|Menor gateway/hmackey/hmackey.go:36 (latente: nenhum código de produção guarda Key por valor) String/GoString/Format estão no receptor *Key; um Key desreferenciado ou embutido por valor imprime os bytes da chave por reflexão em 6 formas (panic *k, errorf *k %+v, *k %v, *k %+v, struct %+v, slog struct), ex.: "{[192 255 238 0 17 34 51 68 85 102 119 136 153 170 187 204 2..."
+    fase12_adv_hmackey_test.go:213: P5.fmtValor: Menor gateway/hmackey/hmackey.go:36 (latente: nenhum código de produção guarda Key por valor) String/GoString/Format estão no receptor *Key; um Key desreferenciado ou embutido por valor imprime os bytes da chave por reflexão em 6 formas (panic *k, errorf *k %+v, *k %v, *k %+v, struct %+v, slog struct), ex.: "{[192 255 238 0 17 34 51 68 85 102 119 136 153 170 187 204 2..."
+--- FAIL: TestAdv12PKeyNeverPrinted (0.03s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/hmackey	0.137s
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/joblog	1.162s [no tests to run]
+=== RUN   TestAdv12PExampleCannotCarryAFileMarker
+    fase12_adv_melhora_test.go:128: VEC|P6.marcadorNoMeioDaLinha|FALHA|Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: P6.marcadorNoMeioDaLinha: Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: VEC|P6.marcadorComCauda|FALHA|Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: P6.marcadorComCauda: Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: VEC|P6.marcadorSoCR|FALHA|Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: P6.marcadorSoCR: Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: VEC|P6.marcadorU2028|FALHA|Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: P6.marcadorU2028: Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:131: VEC|P6.marcadorNEL|OK|só marcador(es) de FECHAMENTO soltos com nonce de outro pedido (["=====ARQUIVO_FIM 0123456789abcdef====="]): não abrem região nem casam o nonce do bloco (o nonce do bloco é outro, declarado no cabeçalho)
+    fase12_adv_melhora_test.go:131: VEC|P6.fimDoBlocoNaCerta|OK|só marcador(es) de FECHAMENTO soltos com nonce de outro pedido (["=====EXEMPLOS_FIM fedcba9876543210====="]): não abrem região nem casam o nonce do bloco (o nonce do bloco é outro, declarado no cabeçalho)
+    fase12_adv_melhora_test.go:128: VEC|P6.nonceUnificado|FALHA|Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: P6.nonceUnificado: Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====ARQUIVO_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: VEC|P6.marcadorNaErrada|FALHA|Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====PARCIAL_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:128: P6.marcadorNaErrada: Importante gateway/melhora/texto.go:144 (markerLineRe só remove LINHAS inteiras ^=====...=====$ terminadas em \n; marcador no meio da linha, com cauda, ou separado por \r, U+2028, U+0085 passa) o bloco de exemplos leva marcador de arquivo ABERTO (C-8.11): ["=====PARCIAL_INICIO 0123456789abcdef====="]
+    fase12_adv_melhora_test.go:145: VEC|P6.instrucaoNoExemplo|OK|texto de instrução/[sistema] do exemplo fica só dentro do bloco fc580fc70b9fe2df, declarado como DADOS antes de abrir
+--- FAIL: TestAdv12PExampleCannotCarryAFileMarker (0.01s)
+=== RUN   TestAdv12PNonceFreshAndUnforgeable
+    fase12_adv_melhora_test.go:169: VEC|P6.nonceNovo|OK|2000 pedidos idênticos: 2000 nonces distintos de 16 hex (crypto/rand, block.go:47), nenhum de reserva 000…0
+    fase12_adv_melhora_test.go:182: VEC|P6.nonceNoTexto|OK|o nonce nunca é um que aparece no texto do exemplo (NewNonce confere e sorteia de novo)
+    fase12_adv_melhora_test.go:198: VEC|P7.clienteForjaBloco|OK|marcadores forjados pelo cliente ficam ANTES do bloco real; o bloco do gateway é o fim do system e fecha só com o nonce novo, que o cliente não conhece
+--- PASS: TestAdv12PNonceFreshAndUnforgeable (1.08s)
+=== RUN   TestAdv12PApplyKeepsWhatTheOllamaSees
+    fase12_adv_melhora_test.go:237: VEC|P7.dupSystemCaixa|FALHA|Menor gateway/melhora/apply.go:41 (findKey escolhe a 1ª chave em ordem de bytes; o Ollama usa a ÚLTIMA que casa por folding) antes o Ollama lia system="B", depois lê "A\n\nINSTRUCAO-NOVA", mas o rastro diz instrucao=true
+    fase12_adv_melhora_test.go:237: P7.dupSystemCaixa: Menor gateway/melhora/apply.go:41 (findKey escolhe a 1ª chave em ordem de bytes; o Ollama usa a ÚLTIMA que casa por folding) antes o Ollama lia system="B", depois lê "A\n\nINSTRUCAO-NOVA", mas o rastro diz instrucao=true
+    fase12_adv_melhora_test.go:237: VEC|P7.dupSystemFold|FALHA|Menor gateway/melhora/apply.go:41 (findKey escolhe a 1ª chave em ordem de bytes; o Ollama usa a ÚLTIMA que casa por folding) antes o Ollama lia system="B", depois lê "B", mas o rastro diz instrucao=true
+    fase12_adv_melhora_test.go:237: P7.dupSystemFold: Menor gateway/melhora/apply.go:41 (findKey escolhe a 1ª chave em ordem de bytes; o Ollama usa a ÚLTIMA que casa por folding) antes o Ollama lia system="B", depois lê "B", mas o rastro diz instrucao=true
+    fase12_adv_melhora_test.go:237: VEC|P7.dupSystemFold2|FALHA|Menor gateway/melhora/apply.go:41 (findKey escolhe a 1ª chave em ordem de bytes; o Ollama usa a ÚLTIMA que casa por folding) antes o Ollama lia system="A", depois lê "B", mas o rastro diz instrucao=true
+    fase12_adv_melhora_test.go:237: P7.dupSystemFold2: Menor gateway/melhora/apply.go:41 (findKey escolhe a 1ª chave em ordem de bytes; o Ollama usa a ÚLTIMA que casa por folding) antes o Ollama lia system="A", depois lê "B", mas o rastro diz instrucao=true
+    fase12_adv_melhora_test.go:239: VEC|P7.systemEscapado|OK|o Ollama lê o system do cliente + a instrução, como o rastro diz
+    fase12_adv_melhora_test.go:261: VEC|P7.dupMessages|FALHA|Menor gateway/melhora/apply.go:56 com 'messages' repetido por caixa/folding o Ollama passa a ler outras mensagens: antes "REAL", depois "ISCA" (instrução vista=true)
+    fase12_adv_melhora_test.go:261: P7.dupMessages: Menor gateway/melhora/apply.go:56 com 'messages' repetido por caixa/folding o Ollama passa a ler outras mensagens: antes "REAL", depois "ISCA" (instrução vista=true)
+    fase12_adv_melhora_test.go:261: VEC|P7.dupMessagesFold|FALHA|Menor gateway/melhora/apply.go:56 com 'messages' repetido por caixa/folding o Ollama passa a ler outras mensagens: antes "REAL", depois "REAL" (instrução vista=false)
+    fase12_adv_melhora_test.go:261: P7.dupMessagesFold: Menor gateway/melhora/apply.go:56 com 'messages' repetido por caixa/folding o Ollama passa a ler outras mensagens: antes "REAL", depois "REAL" (instrução vista=false)
+--- FAIL: TestAdv12PApplyKeepsWhatTheOllamaSees (0.00s)
+=== RUN   TestAdv12PIndexEdgeValues
+    fase12_adv_melhora_test.go:285: VEC|P10.vetoresRuins|OK|NaN, Inf, zero e dimensão diferente são descartados pelo NewIndex (e o feed.LoadIndex recusa o índice inteiro por ErrIndexCorrupt quando isso tira itens)
+    fase12_adv_melhora_test.go:336: VEC|P10.queryNaN|OK|busca devolveu ""
+    fase12_adv_melhora_test.go:336: VEC|P10.queryInf|OK|busca devolveu ""
+    fase12_adv_melhora_test.go:336: VEC|P10.queryEnorme|OK|busca devolveu "near"
+    fase12_adv_melhora_test.go:336: VEC|P10.queryDim|OK|busca devolveu ""
+    fase12_adv_melhora_test.go:336: VEC|P10.k0|OK|busca devolveu ""
+    fase12_adv_melhora_test.go:336: VEC|P10.kNegativo|OK|busca devolveu ""
+    fase12_adv_melhora_test.go:336: VEC|P10.limiarAcima1|OK|busca devolveu ""
+    fase12_adv_melhora_test.go:336: VEC|P10.limiarNegativo|OK|busca devolveu "near,far"
+    fase12_adv_melhora_test.go:330: VEC|P10.limiarNaN|OK|MEDIDA limiar NaN em memória deixa passar TODOS (near,far, até o oposto) porque s<NaN é falso (indice.go:142); inalcançável pelo treino.db: FreezeIndex recusa limiar fora de (0,1] e o hash cobre o valor (defesa só lá: NewIndex/LoadIndex não revalidam k e limiar)
+    fase12_adv_melhora_test.go:349: VEC|P10.invalidadoDuranteBusca|OK|índice invalidado durante a busca: a Search no objeto original já vê invalid=true e não serve nada
+--- PASS: TestAdv12PIndexEdgeValues (0.00s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/melhora	1.170s
+=== RUN   TestAdv12POnlyConfirmedPublicTrainingEnterTheIndex
+    fase12_adv_melhora_feed_test.go:116: VEC|P8.controle|OK|o exemplo público confirmado de treino entra e é servido
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.pendente|OK|ocorrência pendente com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.apagada|OK|ocorrência apagada com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.descartada|OK|ocorrência descartada com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.sem_pedido|OK|ocorrência sem_pedido com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.fallback|OK|ocorrência fallback com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.teste|OK|ocorrência teste com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.nova|OK|ocorrência nova com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.distribuida|OK|ocorrência distribuida com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+    fase12_adv_melhora_feed_test.go:126: VEC|P8.congela.quarentena|OK|ocorrência quarentena com exemplo_publico=1 e embedding pronto fica fora do índice congelado
+--- PASS: TestAdv12POnlyConfirmedPublicTrainingEnterTheIndex (1.13s)
+=== RUN   TestAdv12PMemberLeavesWhileServing
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.descartar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.apagar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.desmarcar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.editar|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.quarentena|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+    fase12_adv_melhora_feed_test.go:197: VEC|P8.servindo.teste|OK|índice invalidado na hora em memória (0 exemplos) e no banco (valido=0, LoadIndex: treino: índice de exemplos inválido (valido=0))
+--- PASS: TestAdv12PMemberLeavesWhileServing (2.72s)
+=== RUN   TestAdv12PPublicExampleShowsTheOriginalRequestVerbatim
+    fase12_adv_melhora_feed_test.go:239: VEC|P8.pedidoOriginalNoExemplo|OK|MEDIDA (risco de projeto, não defeito de código): o texto do PEDIDO de uma ocorrência real marcada pública vai literal (até 1200 runas) ao pedido de outro cliente; o admin só pode editar resposta_correta/descricao/correcao_aplicada (treino/state.go:113), então a C-8.1/C-8.2 depende só de o admin marcar apenas casos sintéticos
+--- PASS: TestAdv12PPublicExampleShowsTheOriginalRequestVerbatim (0.41s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/melhora/feed	5.424s
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/models	1.070s [no tests to run]
+=== RUN   TestAdv12MM1GatesOnEveryRoute
+    fase12_adv_monitor_test.go:245: VEC|M1.1|OK|15 rotas POST (enumeradas por go/ast, inclusive as 7 da 12.6) x 19 sondas = 252 pedidos: sem cookie 401; sem CSRF/CSRF trocado por caractere sempre diferente/sufixo/prefixo 403; Origin null/sufixo/subdominio/irmao 403; Sec-Fetch-Site same-site e cross-site 403; form simples sem CSRF 403; text/plain e multipart com CSRF 415; estado identico
+    fase12_adv_monitor_test.go:265: VEC|M1.2|OK|sessao expirada: POST 401 e export 401; cookie depois do logout: POST apagar 401, detalhe 401, lista volta a visao de visitante; nada mudou
+    fase12_adv_monitor_test.go:283: VEC|M1.3|OK|15 rotas POST x GET/HEAD/PUT/DELETE/PATCH/OPTIONS (com cookie e CSRF validos) = 405; nada mudou
+    fase12_adv_monitor_test.go:325: VEC|M1.4|OK|export (GET), detalhe e conteudo: sem cookie 401; Sec-Fetch-Site cross-site/same-site e Origin estranho/null 403; cookie SameSite=Strict+HttpOnly+Secure+Path=/monitor. MEDIDA: GET do export com cookie e sem Fetch Metadata (navegador antigo) = 200, so o SameSite=Strict barra o <a>/<img> cross-site; Origin do mesmo host em outra porta passa a camada Origin (POST com CSRF valido = 404, monitor.go:757 compara so o hostname)
+--- PASS: TestAdv12MM1GatesOnEveryRoute (0.84s)
+=== RUN   TestAdv12MM1Login
+    fase12_adv_monitor_test.go:355: VEC|M1.5|OK|login cross-site, same-site, Origin null/outro e text/plain recusados sem cookie (login CSRF barrado)
+--- PASS: TestAdv12MM1Login (0.50s)
+=== RUN   TestAdv12MM1HeadExport
+    fase12_adv_monitor_test.go:382: VEC|M1.6|OK|MEDIDA: HEAD /monitor/api/treino/export (com sessao) = 200, 0 bytes de corpo entregues e 3 linhas `exportou` gravadas (treino.go:154 roda o export num HEAD; write-ahead fica do lado seguro: registro sem entrega, nunca entrega sem registro; HEAD exige a mesma sessao + same-site)
+--- PASS: TestAdv12MM1HeadExport (0.59s)
+=== RUN   TestAdv12MM2VisitorLeaks
+    fase12_adv_monitor_test.go:500: VEC|M2.1|OK|601 respostas de visitante (todas as rotas GET por go/ast, id de ocorrencia e de job, 4 tipos de visitante, filtros) + 1 evento SSE: nenhum texto (descricao, resposta_correta, correcao, prompt, resposta, system), projeto, estacao, dominio, id de ocorrencia/job, grupo, prompt_hmac/conteudo_hmac/hmac do historico nem key_id. O visitante ve so o resumo: cota_teste_por_categoria,embeddings_pendentes,enabled,exportaveis_teste,exportaveis_treino,max_bytes,por_categoria,por_estado,por_particao,quarentena,size_bytes,total
+--- PASS: TestAdv12MM2VisitorLeaks (1.31s)
+=== RUN   TestAdv12MM3XSS
+    fase12_adv_monitor_test.go:600: VEC|M3.1|OK|payload </script>, <img onerror>, javascript:, aspas, &, U+2028/2029 em descricao, resposta_correta, correcao_aplicada, projeto, estacao (maquina/usuario/dominio), prompt e resposta (relato e Marcar erro): detalhe, lista, export e erro ecoado sem <, >, & nem U+2028/2029 crus (encoding/json escapa), Content-Type JSON/ndjson + nosniff, attachment com nome fixo; o payload volta intacto ao decodificar (4 respostas)
+--- PASS: TestAdv12MM3XSS (0.62s)
+=== RUN   TestAdv12MM3PageSinks
+    fase12_adv_monitor_test.go:673: VEC|M3.2|OK|index.html (script inteiro e a secao Erros): nenhum innerHTML/outerHTML/insertAdjacentHTML/document.write/eval/new Function/srcdoc/window.open/javascript:; setAttribute so de geometria SVG e aria; as 2 unicas atribuicoes de location.href tem prefixo fixo (trExport so com "treino"/"teste"); URLs da aba Erros so com id do servidor; CSP sem unsafe-*, default-src/form-action 'none'. Observacao: className vem de r.severidade/estado (enum validado no servidor), sem efeito de script
+--- PASS: TestAdv12MM3PageSinks (0.25s)
+=== RUN   TestAdv12MM4M5ExportOverRealServer
+    fase12_adv_monitor_test.go:898: VEC|M4.1|OK|export de 150 linhas x 120 KiB (~17 MiB) para um cliente que nao le: state (visitante e admin), lista, resumo, SSE, POST /api/feedback, acao do admin e um 2o export responderam, 1s no total (nenhum mutex do monitor nem a vez de escrita do treino ficam presos; C-6.10)
+    fase12_adv_monitor_test.go:920: VEC|M4.2|FALHA|Menor monitor/treino.go:170-177 + treino/export.go:157-160/179-182: com o cliente sem ler, o export ficou 10s preso em Write apesar de treinoExportMax=1.5s (o prazo so e conferido ENTRE linhas; o handler nao faz SetWriteDeadline como o SSE em monitor.go:499; o servidor nao tem WriteTimeout, cmd/mcpollama-gateway/main.go:369). Custo: 1 goroutine + o lote montado (ate 20 linhas / 8 MiB) enquanto a conexao viver; so o admin dispara; o nginx nao amortece (proxy_buffering off no /monitor, deploy/gateway/ollama.conf:91) e so o send_timeout padrao (60 s) dele corta um cliente parado, nao um que leia a conta-gotas. 20 de 150 linhas `exportou` gravadas para 0 linhas lidas (write-ahead, lado seguro). Correcao: http.NewResponseController(w).SetWriteDeadline(prazo) antes do ExportUntil
+    fase12_adv_monitor_test.go:920: M4.2: Menor monitor/treino.go:170-177 + treino/export.go:157-160/179-182: com o cliente sem ler, o export ficou 10s preso em Write apesar de treinoExportMax=1.5s (o prazo so e conferido ENTRE linhas; o handler nao faz SetWriteDeadline como o SSE em monitor.go:499; o servidor nao tem WriteTimeout, cmd/mcpollama-gateway/main.go:369). Custo: 1 goroutine + o lote montado (ate 20 linhas / 8 MiB) enquanto a conexao viver; so o admin dispara; o nginx nao amortece (proxy_buffering off no /monitor, deploy/gateway/ollama.conf:91) e so o send_timeout padrao (60 s) dele corta um cliente parado, nao um que leia a conta-gotas. 20 de 150 linhas `exportou` gravadas para 0 linhas lidas (write-ahead, lado seguro). Correcao: http.NewResponseController(w).SetWriteDeadline(prazo) antes do ExportUntil
+    fase12_adv_monitor_test.go:944: VEC|M5.1|OK|MEDIDA: cliente leu 10 linhas e cortou a conexao; 20 linhas `exportou` gravadas para ele (write-ahead em lotes de 20: excesso de 10, lado seguro); toda linha recebida tem a sua `exportou` com quem=admin e o ip dele
+    fase12_adv_monitor_test.go:972: VEC|M5.2|OK|2 exports em paralelo: 150 e 150 linhas (completas), 150 e 150 linhas `exportou` (uma por ocorrencia por download, sem perda nem duplicata)
+    fase12_adv_monitor_test.go:1007: VEC|M5.3|FALHA|Menor monitor/treino.go:177-179: o export cortado pelo prazo (ErrExportDeadline; vale o mesmo para erro de banco no meio) entregou 20 de 150 linhas e TERMINOU LIMPO para o cliente (HTTP 200, fim de chunked normal, io.EOF, sem trailer nem marca): o comentario "the cut file is the signal" nao vale, o navegador mostra o download como completo e o admin pode treinar/avaliar com um arquivo parcial sem saber. O historico bate (20 exportou para 20 linhas, lado seguro). Correcao: num erro depois do 1o byte, abortar a conexao (panic(http.ErrAbortHandler)) ou gravar uma ultima linha/trailer de erro
+    fase12_adv_monitor_test.go:1007: M5.3: Menor monitor/treino.go:177-179: o export cortado pelo prazo (ErrExportDeadline; vale o mesmo para erro de banco no meio) entregou 20 de 150 linhas e TERMINOU LIMPO para o cliente (HTTP 200, fim de chunked normal, io.EOF, sem trailer nem marca): o comentario "the cut file is the signal" nao vale, o navegador mostra o download como completo e o admin pode treinar/avaliar com um arquivo parcial sem saber. O historico bate (20 exportou para 20 linhas, lado seguro). Correcao: num erro depois do 1o byte, abortar a conexao (panic(http.ErrAbortHandler)) ou gravar uma ultima linha/trailer de erro
+--- FAIL: TestAdv12MM4M5ExportOverRealServer (35.94s)
+=== RUN   TestAdv12MM6IdsPagingAndDetailSize
+    fase12_adv_monitor_test.go:1049: VEC|M6.1|OK|75 pedidos com id malicioso (..%2F, %2e%2e, %00, CRLF, 31/33 hex, maiusculas, espaco, %2F embutido) no detalhe, confirmar, apagar, liberar-quarentena e marcar-erro: 400/404/301/405, nunca 200/5xx, sem cabecalho injetado; estado identico (idRe ^[0-9a-f]{32}$)
+    fase12_adv_monitor_test.go:1092: VEC|M6.2|OK|paginacao: limite enorme/negativo/0/abc/1e9 cai em 100 (teto 500), offset negativo vira 0, offset int64 max devolve 0 linhas, overflow vira 0; desde/ate invalidos 400. MEDIDA: 40 listas de 500 em paralelo em 190ms; /state no meio respondeu em 169ms
+    fase12_adv_monitor_test.go:1139: VEC|M6.3|OK|detalhe com amostra de 2796200 bytes multibyte e campos de 1 MiB: cada campo cortado em <= 256 KiB + marca, em fronteira de caractere, prompt_bytes/resp_bytes com o tamanho real; JSON do detalhe 1312365 bytes; lista com 30 linhas 10640 bytes (descricao cortada em 200 caracteres)
+--- PASS: TestAdv12MM6IdsPagingAndDetailSize (1.66s)
+=== RUN   TestAdv12MM7ActionBodies
+    fase12_adv_monitor_test.go:1188: VEC|M7.1|OK|22 corpos maliciosos recusados com o codigo certo (campos desconhecidos, limites C-1.17 +1 byte, corpo > 256 KiB 413, JSON truncado, tipo errado, lado vazio/quarentena/maiusculo/NUL, confirmar sem resposta 422, transicao proibida 409, marcar-erro com jobs/origem forjados/NUL/enum); nada gravado
+    fase12_adv_monitor_test.go:1225: VEC|M7.2|FALHA|Menor monitor/treino.go:206-210 (readJSONLimit) aceita conteudo depois do objeto JSON (rotas completar, marcar-erro (o 2o objeto foi ignorado: origem=usuario, 1 job) responderam 200 com um 2o objeto com campos desconhecidos, ignorado em silencio), enquanto o SSOT do relato, treino/http.go:75-77, recusa o mesmo corpo com 400 ("ha conteudo depois do objeto"); a C-1.17 manda recusar campo desconhecido no relato, e o Marcar erro e um relato. Correcao: dec.Token()==io.EOF como em http.go. Medido tambem: chave duplicada -> 200, vale a ultima ("segunda"); chave em maiusculas -> 200 ("maiuscula")
+    fase12_adv_monitor_test.go:1225: M7.2: Menor monitor/treino.go:206-210 (readJSONLimit) aceita conteudo depois do objeto JSON (rotas completar, marcar-erro (o 2o objeto foi ignorado: origem=usuario, 1 job) responderam 200 com um 2o objeto com campos desconhecidos, ignorado em silencio), enquanto o SSOT do relato, treino/http.go:75-77, recusa o mesmo corpo com 400 ("ha conteudo depois do objeto"); a C-1.17 manda recusar campo desconhecido no relato, e o Marcar erro e um relato. Correcao: dec.Token()==io.EOF como em http.go. Medido tambem: chave duplicada -> 200, vale a ultima ("segunda"); chave em maiusculas -> 200 ("maiuscula")
+    fase12_adv_monitor_test.go:1242: VEC|M7.3|FALHA|Menor treino/state.go:124-128 (Update) nao aplica as regras do relato (treino/report.go:67-68 descricao obrigatoria, :82-84 UTF-8 sem NUL): descricao so de espacos -> 200; descricao vazia -> 200; resposta_correta com NUL -> 200. A C-1.17 diz descricao obrigatoria; a edicao do admin deixa a ocorrencia sem ela. Correcao: validar no Update como no Validate
+    fase12_adv_monitor_test.go:1242: M7.3: Menor treino/state.go:124-128 (Update) nao aplica as regras do relato (treino/report.go:67-68 descricao obrigatoria, :82-84 UTF-8 sem NUL): descricao so de espacos -> 200; descricao vazia -> 200; resposta_correta com NUL -> 200. A C-1.17 diz descricao obrigatoria; a edicao do admin deixa a ocorrencia sem ela. Correcao: validar no Update como no Validate
+    fase12_adv_monitor_test.go:1324: VEC|M7.4|OK|exemplo-publico, liberar-quarentena (alterou campo=particao, C-4.11), completar de confirmada (desconfirmou), descartar, apagar e marcar-erro (criou) gravam historico com quem=admin e ip=10.100.2.50; nenhuma linha com texto
+--- FAIL: TestAdv12MM7ActionBodies (1.02s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/monitor	42.867s
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/pool	1.134s [no tests to run]
+=== RUN   TestAdv12PImagesNeverInClear
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.plain|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.upper|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.longS|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.longS.esc|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.esc.i|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.esc.all|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:167: VEC|P1.gen.dotlessI|OK|chave com ı/İ (U+0131/U+0130) não é 'images' para o decoder Go do Ollama (0 imagens vistas, foldRune=SimpleFold); varredura consistente com ele (tem_imagem=false)
+    fase12_adv_proxy_test.go:167: VEC|P1.gen.dottedI|OK|chave com ı/İ (U+0131/U+0130) não é 'images' para o decoder Go do Ollama (0 imagens vistas, foldRune=SimpleFold); varredura consistente com ele (tem_imagem=false)
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.dup.last|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.dup.case|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.escval|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.hugeNums|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.gen.unknownNested|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.history|OK|3 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.foldedKeys|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.dupMessages|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.chat.escKeys|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.dataURIobj|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.dataURIstr|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.httpURL|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.CONTENT|OK|1 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+    fase12_adv_proxy_test.go:173: VEC|P1.v1.history|OK|2 imagem(ns) vista(s) pelo decoder Go trocada(s) por imagem_hmac no prompt_json e ausentes do texto achatado
+--- PASS: TestAdv12PImagesNeverInClear (0.02s)
+=== RUN   TestAdv12PMalformedBodiesNeverStored
+    fase12_adv_proxy_test.go:230: VEC|P1.lixoTexto|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.comentario|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.nan|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.infinito|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.bom|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:230: VEC|P1.lixoDepois|OK|corpo recusado com 400 pela política (json.Unmarshal estrito): não chega ao Ollama nem ao job log
+    fase12_adv_proxy_test.go:245: VEC|P1.controle|OK|corpo válido: Ollama recebe a imagem; job log recebe só o marcador (prompt_json e texto)
+--- PASS: TestAdv12PMalformedBodiesNeverStored (0.02s)
+=== RUN   TestAdv12PScanCostWorstCases
+    fase12_adv_proxy_test.go:363: VEC|P2.tokens|OK|MEDIDA 30 MiB: varredura 12.84s, 300 MiB alocados, pico heap 91 MiB (política: 6.177s, 90 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.irmaosImages|OK|MEDIDA 30 MiB: varredura 7.755s, 128 MiB alocados, pico heap 91 MiB (política: 3.024s, 90 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.quaseImages|OK|MEDIDA 30 MiB: varredura 7.425s, 151 MiB alocados, pico heap 91 MiB (política: 3.325s, 90 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.escapesImagem|OK|MEDIDA 30 MiB: varredura 2.082s, 430 MiB alocados, pico heap 185 MiB (política: 1.208s, 210 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.chaveEnorme|OK|MEDIDA 30 MiB: varredura 1.141s, 154 MiB alocados, pico heap 153 MiB (política: 1.243s, 90 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.profundo|OK|MEDIDA 0 MiB: varredura 10ms, 1 MiB alocados, pico heap 3 MiB (política: 9ms, 0 MiB) failed=false imagem=true
+    fase12_adv_proxy_test.go:363: VEC|P2.profundoNaRegra|OK|MEDIDA 0 MiB: varredura 9ms, 1 MiB alocados, pico heap 3 MiB (política: 11ms, 0 MiB) failed=false imagem=true
+--- PASS: TestAdv12PScanCostWorstCases (66.00s)
+=== RUN   TestAdv12PDocHeaderNeverReachesTheOllama
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.minusculas|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.maiusculas|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.duplicado|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.trailer|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.completions.trailerSemAnuncio|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.minusculas|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.maiusculas|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.duplicado|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.trailer|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embed.trailerSemAnuncio|OK|Ollama recebeu 134 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.minusculas|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.maiusculas|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.duplicado|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.trailer|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.embeddings.trailerSemAnuncio|OK|Ollama recebeu 140 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.minusculas|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.maiusculas|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.duplicado|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.trailer|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.embeddings.trailerSemAnuncio|OK|Ollama recebeu 138 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.minusculas|OK|Ollama recebeu 113 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.maiusculas|OK|Ollama recebeu 113 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.duplicado|OK|Ollama recebeu 113 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.trailer|OK|Ollama recebeu 158 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK) (só o NOME do cabeçalho aparece, numa linha Trailer:, sem o valor)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.show.trailerSemAnuncio|OK|Ollama recebeu 132 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.minusculas|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.maiusculas|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.duplicado|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.trailer|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.generate.trailerSemAnuncio|OK|Ollama recebeu 144 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.minusculas|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.maiusculas|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.duplicado|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.trailer|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.api.chat.trailerSemAnuncio|OK|Ollama recebeu 170 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.minusculas|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.maiusculas|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.duplicado|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.trailer|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+    fase12_adv_proxy_test.go:511: VEC|P3.v1.chat.completions.trailerSemAnuncio|OK|Ollama recebeu 193 bytes sem o valor do cabeçalho (HTTP/1.1 200 OK)
+--- PASS: TestAdv12PDocHeaderNeverReachesTheOllama (1.28s)
+=== RUN   TestAdv12PDocTrailerOverHTTP2Backend
+    fase12_adv_proxy_test.go:586: VEC|P3.pool.h2.api.generate.soDoc|FALHA|Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567
+    fase12_adv_proxy_test.go:586: P3.pool.h2.api.generate.soDoc: Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567
+    fase12_adv_proxy_test.go:586: VEC|P3.pool.h2.api.generate.docEEstacao|FALHA|Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567|x-mcpollama-station=computer=pc9;user=eva
+    fase12_adv_proxy_test.go:586: P3.pool.h2.api.generate.docEEstacao: Importante gateway/proxy/proxy.go:571 (out := r.WithContext mantém r.Trailer preenchido pelo io.ReadAll da linha 460; o Rewrite da linha 205 apaga só pr.Out.Header) o valor do X-Mcpollama-Doc enviado como TRAILER chegou ao backend HTTP/2.0 (transporte do pool: ollama.NewTLSTransport, HTTP/2); trailers recebidos: x-mcpollama-doc=f2c90eaedabb917919c3a376aa578ae86976d21280f3050c7e38af6c6e555567|x-mcpollama-station=computer=pc9;user=eva
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.generate.comAuthorization|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 502 Bad Gateway); trailers recebidos: "x-mcpollama-doc=|authorization="
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.show.soDoc|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 200 OK); trailers recebidos: "x-mcpollama-doc="
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.show.docEEstacao|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 200 OK); trailers recebidos: "x-mcpollama-doc=|x-mcpollama-station="
+    fase12_adv_proxy_test.go:589: VEC|P3.pool.h2.api.show.comAuthorization|OK|backend HTTP/2.0 não viu o valor do X-Mcpollama-Doc (HTTP/1.1 200 OK); trailers recebidos: "authorization=|x-mcpollama-doc="
+--- FAIL: TestAdv12PDocTrailerOverHTTP2Backend (0.06s)
+=== RUN   TestAdv12PMelhoraSearchesChargeTheLoopbackQuota
+    fase12_adv_proxy_test.go:635: VEC|P9.cotaLoopback|FALHA|Menor gateway/proxy/embedder.go:79 as buscas da melhora disparadas por clientes REMOTOS contam na cota por IP de 127.0.0.1 (PerIP): um cliente local (bakeoff/ferramenta sem nginx) recebeu 503 {"error":"fila do servidor cheia (limite de pedidos em espera deste cliente); tente em 5 s"}
+    fase12_adv_proxy_test.go:635: P9.cotaLoopback: Menor gateway/proxy/embedder.go:79 as buscas da melhora disparadas por clientes REMOTOS contam na cota por IP de 127.0.0.1 (PerIP): um cliente local (bakeoff/ferramenta sem nginx) recebeu 503 {"error":"fila do servidor cheia (limite de pedidos em espera deste cliente); tente em 5 s"}
+--- FAIL: TestAdv12PMelhoraSearchesChargeTheLoopbackQuota (3.01s)
+=== RUN   TestAdv12PMelhoraBurstNoDeadlock
+    fase12_adv_proxy_test.go:713: VEC|P9.rajada.lento|OK|MEDIDA 40 pedidos (gen 5, embed 2, limite 400 ms, busca lento): ok=40 em 414ms; embed_falhas=40 exemplos=0; fila vazia no fim
+    fase12_adv_proxy_test.go:713: VEC|P9.rajada.morto|OK|MEDIDA 40 pedidos (gen 5, embed 2, limite 400 ms, busca morto): ok=40 em 30ms; embed_falhas=40 exemplos=0; fila vazia no fim
+    fase12_adv_proxy_test.go:713: VEC|P9.rajada.cancelado|OK|MEDIDA 40 pedidos (gen 5, embed 2, limite 400 ms, busca cancelado): ok=0 em 152ms; embed_falhas=40 exemplos=0; fila vazia no fim
+--- PASS: TestAdv12PMelhoraBurstNoDeadlock (0.63s)
+=== RUN   TestAdv12PIndexSwappedDuringTheSearch
+    fase12_adv_proxy_test.go:739: VEC|P10.trocaDuranteBusca|FALHA|Menor gateway/melhora/transformer.go:180 exemplos do índice idx-A, mas o rastro (melhora_indice_id) diz "idx-B": t.index.Load() é lido de novo depois da busca (latente: hoje o gateway só chama SetIndex na partida, main.go:189; InvalidateIndex troca por um stub com o MESMO id)
+    fase12_adv_proxy_test.go:739: P10.trocaDuranteBusca: Menor gateway/melhora/transformer.go:180 exemplos do índice idx-A, mas o rastro (melhora_indice_id) diz "idx-B": t.index.Load() é lido de novo depois da busca (latente: hoje o gateway só chama SetIndex na partida, main.go:189; InvalidateIndex troca por um stub com o MESMO id)
+    fase12_adv_proxy_test.go:753: VEC|P10.removidoDuranteBusca|OK|índice retirado durante a busca: o pânico de t.index.Load().ID (nil) é recuperado e o pedido segue sem melhora (contado como corpo_pulado, não como falha de embed)
+--- FAIL: TestAdv12PIndexSwappedDuringTheSearch (0.00s)
+=== RUN   TestAdv12PMelhoraEmbedCarriesNoDocHeader
+    fase12_adv_proxy_test.go:788: VEC|P3.melhoraEmbed|OK|busca de embedding + geração com exemplo (HTTP/1.1 200 OK): nenhum dos dois pedidos leva o valor do X-Mcpollama-Doc (cabeçalho e trailer)
+--- PASS: TestAdv12PMelhoraEmbedCarriesNoDocHeader (0.06s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/proxy	71.241s
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/queue	1.119s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/cslsoftwares/mcpollama/gateway/store	1.152s [no tests to run]
+=== RUN   TestAdv12EE1JSONLInjection
+    fase12_adv_export_test.go:172: VEC|E1.1|OK|resposta_correta com \n, \r, U+2028/2029, aspas, barras, NUL e '}\n{"messages"...' sai em 1 linha, JSON válido, conteúdo idêntico ao gravado
+    fase12_adv_export_test.go:193: VEC|E1.2|OK|generate com system/prompt cheios de escapes e linhas forjadas: 1 linha, [system,user,assistant] iguais ao pedido decodificado
+    fase12_adv_export_test.go:226: VEC|E1.3|OK|MEDIDA chat com U+2028 cru, tool_calls, role tool, content em partes e objeto, role 'hacker': 1 linha válida, histórico idêntico + assistant; roles e content passam CRUS, sem validação (só leitura, Menor)
+    fase12_adv_export_test.go:245: VEC|E1.4|FALHA|Bloqueador export.go:56-59: a linha do chat sai com UTF-8 INVÁLIDO (json.RawMessage copiado cru do prompt_json); json.Valid=true, mas JSON Lines/RFC 8259 exigem UTF-8 e o Content-Type diz charset=utf-8 (leitor estrito aborta o arquivo). O Ollama aceitou o pedido=true; a política reescrita mantém os bytes=true
+    fase12_adv_export_test.go:245: E1.4: Bloqueador export.go:56-59: a linha do chat sai com UTF-8 INVÁLIDO (json.RawMessage copiado cru do prompt_json); json.Valid=true, mas JSON Lines/RFC 8259 exigem UTF-8 e o Content-Type diz charset=utf-8 (leitor estrito aborta o arquivo). O Ollama aceitou o pedido=true; a política reescrita mantém os bytes=true
+    fase12_adv_export_test.go:263: VEC|E1.5|OK|duas chaves "messages" iguais: export e Ollama usam a última ('real')
+    fase12_adv_export_test.go:316: VEC|E1.6|FALHA|Importante export.go:56,62,65 (chaves exatas 'messages'/'prompt'/'system' num map, enquanto o Ollama e o próprio gateway — policy.go:104, journal.go:56, hmackey.go:211 — casam por case folding): o par exportado não é o que o modelo viu: prompt+PROMPT: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | ſystem (U+017F): JSONL [map[content:p role:user]], Ollama viu [map[content:Responda só em JSON. role:system] map[content:p role:user]] | messages+Messages: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | só Prompt: NÃO exportado (Ollama viu [map[content:real role:user]])
+    fase12_adv_export_test.go:316: E1.6: Importante export.go:56,62,65 (chaves exatas 'messages'/'prompt'/'system' num map, enquanto o Ollama e o próprio gateway — policy.go:104, journal.go:56, hmackey.go:211 — casam por case folding): o par exportado não é o que o modelo viu: prompt+PROMPT: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | ſystem (U+017F): JSONL [map[content:p role:user]], Ollama viu [map[content:Responda só em JSON. role:system] map[content:p role:user]] | messages+Messages: JSONL [map[content:isca role:user]], Ollama viu [map[content:real role:user]] | só Prompt: NÃO exportado (Ollama viu [map[content:real role:user]])
+    fase12_adv_export_test.go:337: VEC|E1.7|OK|MEDIDA (só leitura, Menor): chat com assistant final (prefill) exporta 3 mensagens com 2 assistant seguidos=true; generate com suffix/raw/template/context exporta só 2 mensagens (suffix, template, raw e context, que mudam o que o modelo viu, são descartados em export.go:60-77)
+--- FAIL: TestAdv12EE1JSONLInjection (3.73s)
+=== RUN   TestAdv12EE2SinglePredicate
+    fase12_adv_export_test.go:433: VEC|E2.1|OK|'status=ok, http 200, resp_final=0' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.2|OK|'endpoint /api/embed' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.3|OK|'endpoint /api/embeddings' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.4|OK|'endpoint /v1/embeddings' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.5|OK|'endpoint /API/GENERATE' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.6|OK|'endpoint /api/generate/ (barra final)' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.7|OK|'status 'OK' (maiúsculo)' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.8|OK|'http_status 201' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.9|OK|'tool 'Generate'' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.10|OK|'tool 'bakeoff-erros'' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.11|OK|'tool vazia' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.12|OK|'translate papel reduce1' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.13|OK|'translate papel final' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.14|OK|'translate papel map0' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.15|OK|'translate papel mapX' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.16|OK|'translate papel map10000' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.17|OK|'translate sem linha em ocorrencia_jobs (papel vazio)' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.18|OK|'amostra com melhora=1' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.19|OK|'prompt_json vazio (blob de 0 bytes)' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:427: VEC|E2.20|OK|partição pendente: fora do JSONL nas duas partes, do Summary e do retrato; MEDIDA (só leitura, Menor) Detail.exportavel=true porque Eligible (partition.go:80) não exige partição atribuída; estado inalcançável pelo recompute
+    fase12_adv_export_test.go:433: VEC|E2.21|OK|'resposta só de espaços Unicode (NBSP)' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.22|OK|'estado apagada por SQL' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.23|OK|'tem_imagem=1 com o resto perfeito' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:433: VEC|E2.24|OK|'quarentena' (só essa condição): fora do JSONL nas duas partes, do Summary, do Detail.exportavel e do retrato
+    fase12_adv_export_test.go:457: VEC|E2.25|OK|cada campo melhora_* sozinho (e prompt_json_original vazio não-nulo) marca a amostra: fora do JSONL, do Summary, do Detail e do retrato (C-3.10a)
+    fase12_adv_export_test.go:482: VEC|E2.26|OK|job_do_erro=map1 de uma lista map1+final: a linha usa o pedido do map1 (meta.job_id/papel certos); sem a amostra do map1, a do final não substitui
+    fase12_adv_export_test.go:498: VEC|E2.27|OK|duas ocorrências do mesmo job; apagar uma deixa a amostra e a linha da outra (C-6.4)
+    fase12_adv_export_test.go:507: VEC|E2.28|OK|MEDIDA amostra com key_id de outra chave: linhas=1 Summary=1 Detail=true retrato=true (o cap. 3 não olha key_id; o retrato reconfere o prompt_hmac com a chave da loja)
+    fase12_adv_export_test.go:529: VEC|E2.29|FALHA|Menor export.go:56,62 x partition.go:64-88 (C-3.1 'se e somente se'): o predicado único não é único; generate sem prompt (o Ollama responde 200: só carrega o modelo): JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | generate com prompt vazio: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | chat com messages []: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1; o grupo gasta vaga da cota (C-4.6) e entra no retrato sem nunca ir ao JSONL
+    fase12_adv_export_test.go:529: E2.29: Menor export.go:56,62 x partition.go:64-88 (C-3.1 'se e somente se'): o predicado único não é único; generate sem prompt (o Ollama responde 200: só carrega o modelo): JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | generate com prompt vazio: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1 | chat com messages []: JSONL 0 linhas, mas Summary=1 Detail.exportavel=true retrato=true cota_grupos=1; o grupo gasta vaga da cota (C-4.6) e entra no retrato sem nunca ir ao JSONL
+--- FAIL: TestAdv12EE2SinglePredicate (12.62s)
+=== RUN   TestAdv12EE3PartitionFuzz
+    fase12_adv_export_test.go:735: VEC|E3.1|OK|MEDIDA fuzz semente 20261104, 1400 passos (relatos com ponte, doc_hash com 2 key_id, conteúdo repetido, confirmar/desconfirmar/descartar/apagar/liberar): a cada 20 passos nenhum job/doc_hash+key_id/conteudo_hmac+key_id/grupo nos dois lados, 1 lado por componente, cota (30 primeiros = teste, depois só a regra dos 15%) nunca excedida nem liberada; 26 relatos caíram em quarentena, 18 liberações, 141 apagamentos, até 87 linhas de cota numa categoria; o verificador acusou um vazamento forçado por SQL (prova de que o OK não é vazio)
+--- PASS: TestAdv12EE3PartitionFuzz (99.17s)
+=== RUN   TestAdv12EE3KeyIDAndSplitRelink
+    fase12_adv_export_test.go:769: VEC|E3.2|OK|mesmo doc_hash: com key_id igual liga (mesmo grupo), com key_id diferente não liga (C-4.3a)
+    fase12_adv_export_test.go:801: VEC|E3.3|OK|treino+teste ligados -> quarentena; apagar a ponte divide em 2 partes ainda em quarentena (ids distintos); liberar uma p/ treino e outra p/ teste; nova ponte -> quarentena de novo, nada exportado
+--- PASS: TestAdv12EE3KeyIDAndSplitRelink (1.37s)
+=== RUN   TestAdv12EE3LeakAcrossTime
+    fase12_adv_export_test.go:838: VEC|E3.4|FALHA|Importante partition.go:434-494 (lacuna de contrato C-4.11 x C-4.12/C-5.1): o caso 40d09a38 foi ao arquivo de TREINO, a quarentena foi liberada para o TESTE (só aviso: exportados_na_outra_parte=1) e o CreateRetrato o congelou como caso de avaliação; a C-4.12 vale só 'ao mesmo tempo', mas a avaliação mede um caso que pode ter sido treinado. Sugestão: recusar liberar para o teste (ou excluir do retrato) membro com 'exportou' campo=treino
+    fase12_adv_export_test.go:838: E3.4: Importante partition.go:434-494 (lacuna de contrato C-4.11 x C-4.12/C-5.1): o caso 40d09a38 foi ao arquivo de TREINO, a quarentena foi liberada para o TESTE (só aviso: exportados_na_outra_parte=1) e o CreateRetrato o congelou como caso de avaliação; a C-4.12 vale só 'ao mesmo tempo', mas a avaliação mede um caso que pode ter sido treinado. Sugestão: recusar liberar para o teste (ou excluir do retrato) membro com 'exportou' campo=treino
+    fase12_adv_export_test.go:876: VEC|E3.5|FALHA|Importante partition.go:131-133 (buildComponents ignora apagadas, C-4.5) + state.go:189: o job 00000000 saiu no arquivo de TREINO, a ocorrência foi apagada, o mesmo job foi relatado de novo e caiu no TESTE (JSONL teste=true, retrato=true), sem nenhum aviso; o mesmo job_id em treino e teste ao longo do tempo (C-4.12 só 'ao mesmo tempo'). Sugestão: guardar os job_id/doc/conteúdo exportados (hash) e herdar o lado
+    fase12_adv_export_test.go:876: E3.5: Importante partition.go:131-133 (buildComponents ignora apagadas, C-4.5) + state.go:189: o job 00000000 saiu no arquivo de TREINO, a ocorrência foi apagada, o mesmo job foi relatado de novo e caiu no TESTE (JSONL teste=true, retrato=true), sem nenhum aviso; o mesmo job_id em treino e teste ao longo do tempo (C-4.12 só 'ao mesmo tempo'). Sugestão: guardar os job_id/doc/conteúdo exportados (hash) e herdar o lado
+--- FAIL: TestAdv12EE3LeakAcrossTime (2.09s)
+=== RUN   TestAdv12EE3CotaShownAboveThirty
+    fase12_adv_export_test.go:904: VEC|E3.6|FALHA|Menor query.go:96 (Summary.Cota 'cota_teste_por_categoria'): mostra 31 para 'omitiu', acima da cota de 30 (as 30 vagas da cota são 30; o resto é a regra dos 15% da C-4.7, que também grava em cota_grupos, partition.go:366). A cota em si não foi excedida (E3.1), mas o JSON do /monitor/api/state (st.Treino, monitor.go:440) diz que foi; o index.html não mostra o campo
+    fase12_adv_export_test.go:904: E3.6: Menor query.go:96 (Summary.Cota 'cota_teste_por_categoria'): mostra 31 para 'omitiu', acima da cota de 30 (as 30 vagas da cota são 30; o resto é a regra dos 15% da C-4.7, que também grava em cota_grupos, partition.go:366). A cota em si não foi excedida (E3.1), mas o JSON do /monitor/api/state (st.Treino, monitor.go:440) diz que foi; o index.html não mostra o campo
+--- FAIL: TestAdv12EE3CotaShownAboveThirty (0.94s)
+=== RUN   TestAdv12EE4Quarantine
+    fase12_adv_export_test.go:960: VEC|E4.1|OK|treino+teste ligados: componente em quarentena; retrato e índice congelado com membros dele -> valido=0; fora do JSONL, do Summary, de um retrato novo e de um índice novo (C-1.15, C-4.10)
+    fase12_adv_export_test.go:998: VEC|E4.2|OK|liberar com lado inválido (6 grafias) -> ErrInvalid; fora da quarentena e de ocorrência apagada -> ErrTransition; inexistente -> ErrNotFound; nada muda, nenhum histórico
+    fase12_adv_export_test.go:1012: VEC|E4.3|OK|liberar não revalida: retrato valido=0 (RetratoCases recusa), índice valido=0 (LoadIndex: treino: índice de exemplos inválido (valido=0)); histórico 'alterou/particao' por admin
+--- PASS: TestAdv12EE4Quarantine (1.29s)
+=== RUN   TestAdv12EE5WriteAhead
+    fase12_adv_export_test.go:1115: VEC|E5.1|OK|MEDIDA writer falhando na linha k (entregues/registradas): k=1:0/20 k=2:1/20 k=20:19/20 k=21:20/40 k=22:21/40 k=40:39/40 k=41:40/45 k=45:44/45; nenhuma linha entregue sem `exportou`, excesso só até o fim do lote de 20 (write-ahead)
+    fase12_adv_export_test.go:1145: VEC|E5.2|OK|MEDIDA ctx cancelado antes: 0 linhas, 0 registros, erro; cancelado na 5ª linha: o lote em curso termina (20 linhas) e cada linha entregue tem o seu registro (20), depois erro context canceled
+    fase12_adv_export_test.go:1169: VEC|E5.3|OK|ExportUntil com prazo vencido: 0 linhas, 0 registros, ErrExportDeadline; duas exportações = 2 linhas `exportou` por ocorrência, campo=treino, quem=admin, ip certo (C-7.7)
+--- PASS: TestAdv12EE5WriteAhead (13.97s)
+=== RUN   TestAdv12EE5BigSampleSlowReader
+    fase12_adv_export_test.go:1225: VEC|E5.4|OK|MEDIDA amostra de 12582927 bytes: montar a linha levou 1.489s; com o cliente parado na escrita, relato+confirmar+editar de outra ocorrência levaram 30ms (a vez de escrever não fica presa); linha de 12583172 bytes íntegra
+--- PASS: TestAdv12EE5BigSampleSlowReader (4.80s)
+=== RUN   TestAdv12EE6Retrato
+    fase12_adv_export_test.go:1260: VEC|E6.1|OK|RetratoCases reconfere cada caso: melhora, categoria, partição, prompt_json trocado, categoria sem critério e job trocado -> ErrRetratoInvalido, valido=0, nenhum conteúdo entregue
+    fase12_adv_export_test.go:1285: VEC|E6.2|OK|MEDIDA (só leitura, Menor): o mesmo job relatado 2x pela mesma origem (humano; ingest.go:295-327 só deduplica o automático) gera 2 ocorrências confirmáveis com respostas diferentes: mesmo grupo e lado (sem vazamento), mas o retrato tem 2 itens do mesmo job_id e o JSONL 2 linhas com o mesmo pedido e respostas diferentes (peso dobrado na avaliação, par contraditório no treino); itens ordenados por ocorrencia_id
+    fase12_adv_export_test.go:1320: VEC|E6.3|OK|MEDIDA 6 rodadas descartando o último caso durante RetratoCases: 0 vezes a lista saiu inteira com valido=1 e o retrato ficou inválido logo depois (janela entre conferir e devolver, retrato.go:227-253, sem transação), 6 recusas; a janela é coberta pelo recheckRetrato do bakeoff antes do finish (cmd/bakeoff/erros.go:481-485)
+--- PASS: TestAdv12EE6Retrato (5.84s)
+=== RUN   TestAdv12FForgedOrigin
+    fase12_adv_feedback_test.go:141: VEC|F1a|OK|mesma estação declarada, outro IP verificado (X-Real-Ip 10.0.0.2 do nginx): estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1b|OK|X-Real-Ip forjado (10.0.0.1) vindo de par não-loopback 10.0.0.2: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1c|OK|X-Forwarded-For 10.0.0.1 do nginx com X-Real-Ip 10.0.0.2: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1c2|OK|X-Forwarded-For/Forwarded/CF-Connecting-IP 10.0.0.1 de par não-loopback: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1d|OK|estação vazia, mesmo IP 10.0.0.1 (o job tem estação): estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1d2|OK|estação inválida (vira vazia), mesmo IP: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1e|OK|job sem estação, relato de outro IP 10.0.0.2 com estação qualquer: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1f|OK|duas linhas X-Real-Ip (10.0.0.1 e 10.0.0.1) do nginx: o gateway cai no par 127.0.0.1: estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:141: VEC|F1f2|OK|IPv4 mapeado em IPv6 ::ffff:10.0.0.2 (outro IP): estado=sem_pedido, jobs_outra_origem=1, 0 amostras
+    fase12_adv_feedback_test.go:150: VEC|F1ctl|OK|controle: a mesma estação e o mesmo IP copiam a amostra (o caminho atacado é o real)
+--- PASS: TestAdv12FForgedOrigin (1.98s)
+=== RUN   TestAdv12FPartialStationJob
+    fase12_adv_feedback_test.go:167: VEC|F1g|OK|MEDIDA: job com estação parcial (só computer) é tratado como sem estação: estação OUTRO/mallory do MESMO IP copia; o IP verificado continua sendo a barreira (C-1.11a fala em máquina E usuário; ver relatório, só leitura ingest.go:38)
+--- PASS: TestAdv12FPartialStationJob (0.19s)
+=== RUN   TestAdv12FNoLeakAndOracle
+    fase12_adv_feedback_test.go:207: VEC|F1h|OK|resposta ao relato de job alheio só traz [ocorrencia_id estado amostras_copiadas sem_pedido jobs_externos jobs_outra_origem] (sem estado/texto/estação/tool do job)
+    fase12_adv_feedback_test.go:210: VEC|F1h2|OK|MEDIDA: oráculo de existência e de execução existe (alheio pronto 200 sem_pedido, alheio em execução 409, inexistente 404): imposto pela C-1.4/C-1.4a; os ids são 128 bits aleatórios e o /monitor (leitura livre na LAN) já lista os jobs, então não revela nada novo; cada sonda grava uma ocorrência sem_pedido (estatística poluível)
+--- PASS: TestAdv12FNoLeakAndOracle (0.19s)
+=== RUN   TestAdv12FForeignLinkForcesQuarantine
+    fase12_adv_feedback_test.go:310: VEC|F1i|FALHA|Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado sem_pedido, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+    fase12_adv_feedback_test.go:310: vetor F1i: Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado sem_pedido, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+    fase12_adv_feedback_test.go:310: VEC|F8a|FALHA|Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado distribuida, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+    fase12_adv_feedback_test.go:310: vetor F8a: Importante ingest.go:333-347 + partition.go:131-211 (lacuna de contrato C-4.5/C-1.11/C-1.11a): relato de OUTRA origem (IP 10.0.0.66, estado distribuida, 0 amostras) só com referências aos jobs da vítima ligou um grupo de treino e um de teste já CONFIRMADOS: os dois foram para quarentena e o retrato r1 ficou valido=0, sem confirmação do admin (C-1.18); descartar o forjado deixa "quarentena" e apagá-lo deixa "quarentena" (a quarentena persiste até o admin liberar à mão); os ids dos jobs são públicos no /monitor da LAN
+--- FAIL: TestAdv12FForeignLinkForcesQuarantine (0.60s)
+=== RUN   TestAdv12FFlood
+    fase12_adv_feedback_test.go:344: VEC|F2a|OK|MEDIDA: 300 relatos seguidos da mesma estação e do mesmo job: todos 200, 300 ocorrências (humano não deduplica), 303104 bytes vivos (+1010 B/relato), média dos 10 primeiros 9.502ms e dos 10 últimos 47.264ms (o recompute percorre todas as ocorrências a cada relato); não há limite por IP/estação no gateway (só o nginx: 600/min, rajada 100)
+    fase12_adv_feedback_test.go:377: VEC|F2b|OK|32 relatos paralelos com a vez de escrever presa: todos 503 com Retry-After 5, nada gravado (oc=300 jobs=300 amostras=1 hist=300); Summary+List responderam em 61ms
+--- PASS: TestAdv12FFlood (8.78s)
+=== RUN   TestAdv12FFloodFillsTheCeilingForEveryone
+    fase12_adv_feedback_test.go:402: VEC|F2c|OK|MEDIDA: uma estação encheu o teto (3 MiB de folga) com 24 relatos de 128 KB de resposta_correta; a estação PC02 passou a receber 507: o teto é global e não há cota por cliente (o contrato C-6.2 não pede; em produção 2 GiB/~140 KB ≈ 15 mil relatos, ~25 min a 600/min)
+--- PASS: TestAdv12FFloodFillsTheCeilingForEveryone (0.91s)
+=== RUN   TestAdv12FBodyAndJSON
+    fase12_adv_feedback_test.go:488: VEC|F3a|OK|corpo de exatamente 256 KB (JSON válido + espaços): 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3a2|OK|corpo de 256 KB + 1: 413, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3c|OK|aninhamento profundo (100 mil '['): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3d1|OK|duas 'categoria' (válida e depois inválida): vence a última: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3d2|OK|duas 'job_do_erro' (inválida e depois a da lista): 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3e1|OK|campo desconhecido: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f1|OK|enum com homóglifo cirílico (о U+043E): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f2|OK|enum com BOM no início: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f3|OK|BOM antes do objeto: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f4|OK|\u0000 na descricao: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f5|OK|NUL cru dentro da string: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f6|OK|\u0000 no projeto: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3f7|OK|enum em NFD/maiúsculas (OMITIU): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3g1|OK|número enorme num campo texto: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3g2|OK|número no id do job: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3h1|OK|64 jobs: 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3h2|OK|65 jobs: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i1|OK|id com maiúsculas: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i2|OK|id com 31 hex: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i3|OK|id com 33 hex: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3i4|OK|job_do_erro com maiúsculas: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j1|OK|papel map0: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j2|OK|papel 'map1\n': 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j3|OK|papel 'final ' com espaço: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j4|OK|papel repetido: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j5|OK|unico numa lista de 2: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j6|OK|backend 'Primario': 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3j7|OK|lista sem final e sem job_do_erro: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k1|OK|descricao com 4096 bytes multibyte (2048 ç): 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3k2|OK|descricao com 4097 bytes (2048 ç + a): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k3|OK|descricao com 4097 bytes cortando um rune (2047 ç + 3 bytes de 'ã'+'a'): 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k4|OK|projeto com 128 bytes: 200, gravou=true
+    fase12_adv_feedback_test.go:488: VEC|F3k5|OK|projeto com 129 bytes: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k6|OK|correcao_aplicada com 4097 bytes: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3k7|OK|resposta_correta com 128 KB + 1: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3l1|OK|descricao só com NBSP/tab/quebra: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n1|OK|dois objetos seguidos: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n2|OK|array no topo: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n3|OK|null: 400, gravou=false
+    fase12_adv_feedback_test.go:488: VEC|F3n4|OK|objeto vazio: 400, gravou=false
+    fase12_adv_feedback_test.go:498: VEC|F3d3|OK|MEDIDA: chave duplicada aceita com 'vence a última' (encoding/json); o valor final é validado, sem desvio de enum
+    fase12_adv_feedback_test.go:510: VEC|F3e2|FALHA|Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "CATEGORIA", que não é campo do contrato, foi aceita como "categoria" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:510: vetor F3e2: Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "CATEGORIA", que não é campo do contrato, foi aceita como "categoria" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:510: VEC|F3e3|FALHA|Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "deſcricao", que não é campo do contrato, foi aceita como "descricao" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:510: vetor F3e3: Menor http.go:69-70 (C-1.17 1.1.2 'campo JSON desconhecido é recusado'): a chave "deſcricao", que não é campo do contrato, foi aceita como "descricao" (encoding/json casa nomes sem diferenciar caixa e com dobra Unicode); corrigir conferindo os nomes exatos antes do Decode
+    fase12_adv_feedback_test.go:523: VEC|F3f8|OK|MEDIDA: UTF-8 inválido e surrogate solto viram U+FFFD no decoder (aceito, nenhum byte inválido gravado)
+--- FAIL: TestAdv12FBodyAndJSON (0.50s)
+=== RUN   TestAdv12FBodyOnTheWire
+    fase12_adv_feedback_test.go:571: VEC|F3b1|OK|chunked de 300 KB sem Content-Length: 413, nada gravado
+    fase12_adv_feedback_test.go:578: VEC|F3b2|OK|Content-Length menor que o corpo: lê só o declarado, JSON cortado, 400, nada gravado
+    fase12_adv_feedback_test.go:587: VEC|F3b3|OK|MEDIDA: Content-Length maior que o corpo (cliente fecha): nada gravado, mas a resposta é 413 'corpo maior que 256 KB' (rótulo errado, http.go:64-66 trata todo erro de leitura como 413)
+    fase12_adv_feedback_test.go:594: VEC|F3b4|OK|Content-Length de 10 MiB: 413 depois de 256 KB lidos
+--- PASS: TestAdv12FBodyOnTheWire (0.68s)
+=== RUN   TestAdv12FRacesReportsVsAdmin
+    fase12_adv_feedback_test.go:705: VEC|F4a|OK|180 relatos (1/3 automáticos, mesmos jobs) x 160 ações do admin em paralelo (race=true): 120 ocorrências, 16 apagadas; invariantes zeradas (orfas=0 jobs_de_apagadas=0 jobs_sem_ocorrencia=0 historico_sem_linha=0 sem_criou=0 sem_amostra=0 apagada_suja=0 confirmada_sem_resposta=0)
+--- PASS: TestAdv12FRacesReportsVsAdmin (3.62s)
+=== RUN   TestAdv12FCeiling
+    fase12_adv_feedback_test.go:775: VEC|F5a|OK|16 relatos simultâneos de 10 a 160 KB com 400 KB de folga: 5 aceitos, 11 com 507; amostras somam 390389 B (folga 400000); tamanho final -2688 B em relação ao teto (no máximo um relato acima, conforme C-6.2); 1 evento(s) (o evento é limitado a 1 por minuto, os 507 seguintes não gravam evento novo)
+    fase12_adv_feedback_test.go:797: VEC|F5b|OK|MEDIDA: com 4 KB de folga, um relato sem amostra nova mas com 132 KB de texto foi aceito e deixou o banco 131072 B ACIMA do teto: o orçamento (ingest.go:353-385) só conta as amostras; a C-6.2 mede antes da transação, então ultrapassar por UM relato é conforme; o seguinte recebe 507
+    fase12_adv_feedback_test.go:805: VEC|F5b2|OK|acima do teto o relato seguinte recebe 507
+    fase12_adv_feedback_test.go:843: VEC|F5c|OK|MEDIDA: a edição do admin cresce o banco sem teto (admin é confiável); o relato seguinte dá 507 sem apagar nada (contagens iguais); depois de apagar 3 ocorrências o espaço volta e o relato é aceito (C-6.2a)
+--- PASS: TestAdv12FCeiling (0.80s)
+=== RUN   TestAdv12FBusyNoKeyAndFallback
+    fase12_adv_feedback_test.go:866: VEC|F6a-na_fila-job_do_erro|OK|job_do_erro na_fila: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:866: VEC|F6a-na_fila-outro_local|OK|outro local na_fila: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:866: VEC|F6a-em_execucao-job_do_erro|OK|job_do_erro em_execucao: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:866: VEC|F6a-em_execucao-outro_local|OK|outro local em_execucao: 409 com Retry-After 5, nada gravado
+    fase12_adv_feedback_test.go:879: VEC|F6a2|OK|MEDIDA: job local em execução rotulado 'fallback' escapa do 409 (backend é declarado), mas a ocorrência vira distribuida e nada é copiado, então nenhuma amostra fica incompleta
+    fase12_adv_feedback_test.go:890: VEC|F6b|OK|sem chave (true): 503 com mensagem explícita, nada gravado
+    fase12_adv_feedback_test.go:890: VEC|F6b|OK|sem chave (false): 503 com mensagem explícita, nada gravado
+    fase12_adv_feedback_test.go:903: VEC|F6c|OK|prazo da vez de escrever: 503 com Retry-After 5 em 102ms, nada gravado
+    fase12_adv_feedback_test.go:919: VEC|F6d|OK|role fallback: a substituição do automático (que tinha 2 amostras) virou fallback e as amostras saíram; relato novo no fallback: 0 amostras (C-1.21, C-1.12d)
+--- PASS: TestAdv12FBusyNoKeyAndFallback (1.74s)
+=== RUN   TestAdv12FNoTextNoPlainHashAndRemanence
+    fase12_adv_feedback_test.go:1036: VEC|F7a|OK|historico depois de automático→humano, editar, confirmar, desconfirmar, descartar: nenhum texto e nenhum sha256 puro (58 agulhas)
+    fase12_adv_feedback_test.go:1050: VEC|F7b|OK|bytes de treino.db, -wal e -shm: nenhum sha256 puro (hex minúsculo, maiúsculo ou binário) de prompt_json, conteúdo canônico, X-Mcpollama-Doc, textos e respostas
+    fase12_adv_feedback_test.go:1066: VEC|F7c|OK|os textos do relato só aparecem em ocorrencias (colunas de conteúdo); nenhuma outra tabela os tem
+    fase12_adv_feedback_test.go:1091: VEC|F7d|FALHA|Importante treino.go:169 (dsn sem secure_delete; C-6.3 'remove todo o conteúdo'): depois de apagar, nenhuma linha tem o texto, mas os BYTES do arquivo ainda têm: logo após apagar [resposta_modelo em treino.db-wal descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal]; depois de wal_checkpoint(TRUNCATE)+incremental_vacuum [descricao em treino.db resposta_correta em treino.db pedido em treino.db resposta_modelo em treino.db]. Páginas livres/espaço livre da página e quadros do -wal guardam o texto em claro; o contrato fala de campos, não de bytes (lacuna); correção: _pragma=secure_delete(ON) no dsn e checkpoint(TRUNCATE) depois de apagar
+    fase12_adv_feedback_test.go:1091: vetor F7d: Importante treino.go:169 (dsn sem secure_delete; C-6.3 'remove todo o conteúdo'): depois de apagar, nenhuma linha tem o texto, mas os BYTES do arquivo ainda têm: logo após apagar [resposta_modelo em treino.db-wal descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal]; depois de wal_checkpoint(TRUNCATE)+incremental_vacuum [descricao em treino.db resposta_correta em treino.db pedido em treino.db resposta_modelo em treino.db]. Páginas livres/espaço livre da página e quadros do -wal guardam o texto em claro; o contrato fala de campos, não de bytes (lacuna); correção: _pragma=secure_delete(ON) no dsn e checkpoint(TRUNCATE) depois de apagar
+--- FAIL: TestAdv12FNoTextNoPlainHashAndRemanence (0.27s)
+=== RUN   TestAdv12FOtherForgeries
+    fase12_adv_feedback_test.go:1116: VEC|F8b|OK|relato cujo job_do_erro é um embed: aceito (estatística), confirmado, mas inelegível e fora das duas exportações (C-3.5)
+    fase12_adv_feedback_test.go:1133: VEC|F8c|OK|automático forjado por outra origem para o job da vítima vira sem_pedido próprio; o automático da vítima nasce nova com a amostra e é substituído pelo humano dela; o forjado não é tocado
+    fase12_adv_feedback_test.go:1153: VEC|F8d|OK|MEDIDA: projeto com HTML e CR/LF é aceito e guardado como dado declarado (C-1.18, sem filtro de caracteres de controle); List/Detail saem em JSON com <, > e CR/LF escapados; o rótulo HTML vira "invalido"
+--- PASS: TestAdv12FOtherForgeries (0.61s)
+=== RUN   TestAdv12FSecureDeleteFixHypothesis
+    fase12_adv_feedback_test.go:1208: VEC|F7e|OK|hipótese do F7d confirmada pelo caminho real (Ingest+Delete): secure_delete=0 deixa o texto apagado (logo após [descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal resposta_modelo em treino.db-wal]; após checkpoint(TRUNCATE) [pedido em treino.db resposta_modelo em treino.db descricao em treino.db resposta_correta em treino.db]); com secure_delete=1 em todas as conexões, após checkpoint(TRUNCATE) nada sobra (logo após, ainda no -wal: [descricao em treino.db-wal resposta_correta em treino.db-wal pedido em treino.db-wal resposta_modelo em treino.db-wal])
+--- PASS: TestAdv12FSecureDeleteFixHypothesis (0.41s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/gateway/treino	167.254s
+=== RUN   TestAdv12BRoutingAndTokens
+    fase12_adv_tools_test.go:93: VEC|T1-01|OK|job_do_erro padrão/final→primário, papel ou id de job @fallback→fallback com o token do fallback; @fallback escrito à mão num id da lista primária não desvia (vale o backend da lista); sem fallback configurado: recusado com 0 pedidos; cada servidor só viu o próprio Bearer; debug sem token
+--- PASS: TestAdv12BRoutingAndTokens (0.02s)
+=== RUN   TestAdv12BRedirectAndEchoNeverCarryTheToken
+    fase12_adv_tools_test.go:160: VEC|T1-02|OK|307 do primário para o fallback (e do fallback para o primário) não é seguido (0 relatos no destino); servidores que ecoam o Authorization no corpo de 400/401/404/409/500/503/507/418, em JSON e HTML, do primário e do fallback: o token não chega ao Claude nem ao debug
+--- PASS: TestAdv12BRedirectAndEchoNeverCarryTheToken (0.07s)
+=== RUN   TestAdv12BAutoReportsNeverHoldTheTool
+    fase12_adv_tools_test.go:266: VEC|T2-01|OK|MEDIDA trava: pior generate 4ms, descartados 23, Close 0s; 500: 1 envios; 409: 4 envios; Close na espera do 409 (Retry-After 999999): 0s; a tool sempre respondeu sem erro, nenhum envio depois do Close com a fila cheia, Done() fechou
+--- PASS: TestAdv12BAutoReportsNeverHoldTheTool (3.45s)
+=== RUN   TestAdv12BJobsParsingRefusesBeforeSending
+    fase12_adv_tools_test.go:359: VEC|T3-01|OK|MEDIDA 38 formas maliciosas recusadas antes de enviar (0 pedidos, 2.53s no total, inclusive 10 MB): 65 jobs, papéis inválidos/repetidos/unicode, ids maiúsculos/31/33/NUL/@outro/@fallback duplo, mesmo id em 2 backends, JSON aninhado, tipos errados, job_do_erro fora da lista, translate sem job_do_erro, campo desconhecido; 5 formas válidas aceitas e decodificadas pelo decoder estrito do gateway
+--- PASS: TestAdv12BJobsParsingRefusesBeforeSending (2.57s)
+=== RUN   TestAdv12BFieldLimitsAreBytes
+    fase12_adv_tools_test.go:400: VEC|T3-02|OK|MEDIDA limites em bytes nas fronteiras multibyte (4 KB, 128 KB, 128 B, 4 KB; o 4097º byte no meio de um 'é' ou '€' recusa) e o texto chega intacto ao decoder estrito; 128 KB de '<' (C-1.17 do campo ok) recusado pelo teto do corpo porque o json.Marshal escapa '<' como \u003c (6 bytes): enviados=0, err="o relato ocupa 786746 bytes depois de codificado; o máximo é 262144 (256 KB): reduza `re"
+--- PASS: TestAdv12BFieldLimitsAreBytes (0.18s)
+=== RUN   TestAdv12BSchemaMatchesTheHandler
+    fase12_adv_tools_test.go:439: VEC|T3-03|FALHA|Menor reportar_erro.go:68 vs :253: o schema da tool declara required=[projeto jobs categoria erro severidade origem] (sem correcao_aplicada), mas o handler usa reqString e recusa a chamada que só tem os campos obrigatórios do schema: "`correcao_aplicada` is required (obrigatório)". O RELATAR-ERROS-IA.md diz que correcao_aplicada é obrigatória: o schema deveria listá-la
+    fase12_adv_tools_test.go:439: T3-03: Menor reportar_erro.go:68 vs :253: o schema da tool declara required=[projeto jobs categoria erro severidade origem] (sem correcao_aplicada), mas o handler usa reqString e recusa a chamada que só tem os campos obrigatórios do schema: "`correcao_aplicada` is required (obrigatório)". O RELATAR-ERROS-IA.md diz que correcao_aplicada é obrigatória: o schema deveria listá-la
+--- FAIL: TestAdv12BSchemaMatchesTheHandler (0.00s)
+=== RUN   TestAdv12BServerAnswerInjection
+    fase12_adv_tools_test.go:514: VEC|T4-01|FALHA|Importante feedback.go:130-145: 409: quebra/ANSI no erro ou lento (6.2713829s)
+    fase12_adv_tools_test.go:514: T4-01: Importante feedback.go:130-145: 409: quebra/ANSI no erro ou lento (6.2713829s)
+--- FAIL: TestAdv12BServerAnswerInjection (25.10s)
+FAIL
+FAIL	github.com/cslsoftwares/mcpollama/tools	31.600s
+=== RUN   TestAdv12BFeedbackNeverFallsBackNorRetries
+    fase12_adv_ollama_test.go:74: VEC|O-01|OK|relato de job do primário com o primário fora do ar ou com 503+Retry-After: erro, 1 pedido no primário e 0 no fallback (não usa o fallback nem retenta como a geração); backend "", PRIMARIO, "fallback ", Fallback, outro: recusado sem pedido
+--- PASS: TestAdv12BFeedbackNeverFallsBackNorRetries (0.02s)
+=== RUN   TestAdv12BFallbackGetsOnlyItsOwnCredential
+    fase12_adv_ollama_test.go:141: VEC|O-02|OK|fallback sem chave própria recebe pedido SEM Authorization (a chave do primário não é copiada); userinfo e query da URL do fallback não vão no pedido (nem como Basic) e não aparecem no erro de conexão nem no debug; fallback http fora de loopback com chave recusado no New
+--- PASS: TestAdv12BFallbackGetsOnlyItsOwnCredential (0.01s)
+=== RUN   TestAdv12BFeedbackHangingServerIsBounded
+    fase12_adv_ollama_test.go:154: VEC|O-03|OK|MEDIDA servidor de feedback que nunca responde: erro de tempo esgotado em 700ms com --timeout 700ms (o relato manual usa o --timeout da geração, padrão 120 s; o automático tem teto próprio de 30 s)
+--- PASS: TestAdv12BFeedbackHangingServerIsBounded (0.70s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/ollama	1.816s
+FAIL
+EXIT=1

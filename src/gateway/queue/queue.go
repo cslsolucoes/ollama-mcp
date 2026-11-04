@@ -186,6 +186,10 @@ type Request struct {
 	PriorityFinal Priority // what the gateway granted
 	BytesIn       int64
 	Think         string // reasoning mode: on, off, modelo or "" (Fase 9.6a)
+	// Internal marks a request the gateway makes for itself (the search of examples of the improvement, m-10 of the review
+	// of 12.9): it counts in the quota of its own client (IP + label) but not in the quota of the IP, which belongs to the
+	// clients that really come from that address (127.0.0.1 is also the address of the local tools).
+	Internal bool
 
 	// Station* is what the workstation declared in X-Mcpollama-Station, already
 	// validated by the proxy ("" when absent or invalid). Not authenticated.
@@ -480,7 +484,7 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 	// of distinct labels per IP is bounded.
 	t.req.ClientLabel = m.normLabelLocked(req.ClientIP, req.ClientLabel)
 	t.key = clientKey(t.req.ClientIP, t.req.ClientLabel)
-	if m.perIP[req.ClientIP] >= m.cfg.PerIP || m.perClient[t.key] >= m.cfg.PerClient {
+	if (!req.Internal && m.perIP[req.ClientIP] >= m.cfg.PerIP) || m.perClient[t.key] >= m.cfg.PerClient {
 		return reject(ErrClientFull)
 	}
 	if m.totalWaitingLocked() >= m.cfg.QueueMax {
@@ -492,7 +496,9 @@ func (m *Manager) Acquire(ctx context.Context, req Request) (*Ticket, error) {
 	m.waiting[req.Lane] = append(m.waiting[req.Lane], t)
 	m.byID[t.ID] = t
 	m.perClient[t.key]++
-	m.perIP[req.ClientIP]++
+	if !req.Internal {
+		m.perIP[req.ClientIP]++
+	}
 	m.refLabelLocked(t, +1)
 	m.dispatchLocked()
 	if t.st == stRunning {
@@ -767,10 +773,12 @@ func (m *Manager) refLabelLocked(t *Ticket, d int) {
 }
 
 func (m *Manager) dropPerClientLocked(t *Ticket) {
-	if n := m.perIP[t.req.ClientIP] - 1; n > 0 {
-		m.perIP[t.req.ClientIP] = n
-	} else {
-		delete(m.perIP, t.req.ClientIP)
+	if !t.req.Internal {
+		if n := m.perIP[t.req.ClientIP] - 1; n > 0 {
+			m.perIP[t.req.ClientIP] = n
+		} else {
+			delete(m.perIP, t.req.ClientIP)
+		}
 	}
 	if n := m.perClient[t.key] - 1; n > 0 {
 		m.perClient[t.key] = n
@@ -1271,6 +1279,9 @@ func (m *Manager) checkInvariants() string {
 	perIP := map[string]int{}
 	for _, w := range m.waiting {
 		for _, t := range w {
+			if t.req.Internal {
+				continue
+			}
 			perIP[t.req.ClientIP]++
 		}
 	}

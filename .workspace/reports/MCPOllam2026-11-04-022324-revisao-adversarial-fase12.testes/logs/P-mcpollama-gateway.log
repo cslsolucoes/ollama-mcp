@@ -1,0 +1,9 @@
+=== RUN   TestAdv12PEndToEndNoImageNoPlainHash
+    fase12_adv_proxy_test.go:256: VEC|P4.e2e.aoVivo|OK|nenhum sha256 puro (documento, prompt_json, original, conteúdo canônico; hex, HEX e bruto), nenhuma imagem (base64 e bruta) e nenhum pedaço da chave em treino.db=4096B, content.db-shm=32768B, gw.db=4096B, content.db=4096B, treino.db-wal=510912B, gw.db-shm=32768B, treino.db-shm=32768B, stderr(--debug)=1166B, gw.db-wal=626272B, content.db-wal=148352B; o doc_hash HMAC está lá (controle)
+    fase12_adv_proxy_test.go:256: VEC|P4.e2e.depoisDeParar|OK|nenhum sha256 puro (documento, prompt_json, original, conteúdo canônico; hex, HEX e bruto), nenhuma imagem (base64 e bruta) e nenhum pedaço da chave em stderr(--debug)=1197B, gw.db=90112B, content.db=20480B, treino.db=131072B; o doc_hash HMAC está lá (controle)
+    fase12_adv_proxy_test.go:279: VEC|P3.e2e|OK|9 chamadas ao Ollama (generate, chat, /v1, embed, com melhora ligada) sem X-Mcpollama-Doc
+    fase12_adv_proxy_test.go:287: VEC|P1.e2e.melhoraOriginal|OK|job alterado pela melhora: prompt_json (com a instrução) e prompt_json_original têm imagem_hmac, nenhum o base64; tem_imagem=1
+    fase12_adv_proxy_test.go:298: VEC|P1.e2e.temImagem|OK|chat com histórico (imageſ), /v1 data-URI e número 1e400 gravados com tem_imagem=1
+--- PASS: TestAdv12PEndToEndNoImageNoPlainHash (1.67s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/cmd/mcpollama-gateway	1.710s
