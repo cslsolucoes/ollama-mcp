@@ -1,0 +1,136 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Delete|StrReplace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.workspace','scripts','gestorerp-hook-protect-frozen-docs_V1.1.0.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','pre-read.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','pre-write.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','pre-bash.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','post-read.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','post-write.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','post-bash.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','precompact.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','session-start.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','session-end.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','user-prompt-submit.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('path'),f=require('fs');let d=process.env.CLAUDE_PROJECT_DIR||process.cwd();for(;;){const s=p.join(d,'.wolf','hooks','stop.js');if(f.existsSync(s)){process.argv[1]=s;import(require('url').pathToFileURL(s).href);break}const u=p.dirname(d);if(u===d)break;d=u}\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

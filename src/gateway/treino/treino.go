@@ -265,8 +265,9 @@ func migrate(db *sql.DB) error {
 		{"amostras", "melhora", "INTEGER NOT NULL DEFAULT 0"}, {"amostras", "melhora_instrucoes_id", "TEXT"},
 		{"amostras", "melhora_indice_id", "TEXT"}, {"amostras", "melhora_exemplos", "TEXT"},
 		{"indices", "formato", "TEXT NOT NULL DEFAULT ''"},
-		// version 4 (review 12.9, C-4.5a): 1 when the job was validated by this gateway and is of the origin of the report; 0 is a reference only
-		{"ocorrencia_jobs", "valida", "INTEGER NOT NULL DEFAULT 1"},
+		// version 4 (review 12.9, C-4.5a): 1 when the job was validated by this gateway and is of the origin of the report; 0 is a reference only.
+		// Default 0 (fail closed): a row written before this column was never checked, so it links no group; the only insert sets it explicitly.
+		{"ocorrencia_jobs", "valida", "INTEGER NOT NULL DEFAULT 0"},
 		// version 4 (C-3.1): 1 when the request of the sample has the form of a conversation; a sample written before is taken as 1
 		{"amostras", "forma_ok", "INTEGER NOT NULL DEFAULT 1"},
 	} {

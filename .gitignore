@@ -40,3 +40,6 @@ referencias/*
 
 # pastas de smoke test geradas por outras ferramentas (podem conter imagens de clientes)
 .workspace/ollama-native-smoke-*/
+
+# Codex: config com o token do Ollama (--api-key), como o .mcp.json; nunca no git
+.codex/config.toml
