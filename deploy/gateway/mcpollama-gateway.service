@@ -10,13 +10,16 @@ User=mcpgw
 Group=mcpgw
 # Fase 9.6 (owner 2026-10-29): qwen3-ia = qwen3.5:9b roda com 1 slot no Ollama -> 1 slot de geracao aqui,
 # a espera fica visivel na fila do gateway. Prioridade alta aceita de toda a LAN (owner).
+# 2026-11-04 (owner): --gen-slots 5 e --run-timeout 10m (com OLLAMA_NUM_PARALLEL=5). O qwen3-ia continua
+# gerando 1 por vez (arquitetura qwen35 sem paralelo): os demais esperam dentro do Ollama, contando no run-timeout.
 # 2026-10-30 (owner): ate 64 em espera por cliente e por IP, fila total 128 (o rotulo virou
 # <maquina>/<usuario>, entao as sessoes do mesmo usuario dividem um cliente).
 ExecStart=/usr/local/bin/mcpollama-gateway \
   --listen 127.0.0.1:11500 \
   --ollama 127.0.0.1:11434 \
   --db /var/lib/mcpollama-gateway/gateway.db \
-  --gen-slots 1 \
+  --gen-slots 5 \
+  --run-timeout 10m \
   --embed-slots 2 \
   --priority-ips 10.100.2.0/24 \
   --queue-max 128 \

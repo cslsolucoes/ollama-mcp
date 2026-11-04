@@ -177,7 +177,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     erros, ~700–790 tok/s somados (~2.000 com documentos grandes), S2 80–85% e S3 100%.
   - Report: `.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md`.
   - Embeddings: `nomic-embed-text` (768 dimensões), residente junto.
-- **Config atual: 4 GPUs a 100 W**, `num_ctx` 65536, `NUM_PARALLEL=1`, `MAX_QUEUE=32`
+- **Config atual: 4 GPUs a 100 W**, `num_ctx` 65536, `NUM_PARALLEL=5` e gateway `--gen-slots 5` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3-ia` segue com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
   (2026-10-29). A causa dos reboots é a **fonte de 850 W, que não aguenta as 4 placas**
   (owner, 2026-10-28; não são os risers). Os 100 W valem até a troca da fonte; a VRAM de 32 GB
   é a prioridade. **Não fixar o contexto no código:** usar o teto configurável.
