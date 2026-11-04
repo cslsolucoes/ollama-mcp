@@ -285,7 +285,7 @@ Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico
 | Limite conhecido | a **fonte de 850 W** não aguenta as 4 placas (causa dos reboots); os 100 W e o clock travado valem até a troca. A segunda fonte está planejada |
 | Modelo | `qwen3-ia` = alias do **`qwen3.5:9b`** (Q4_K_M, 100% GPU, `num_ctx` 65536, 13 GB), desde 2026-10-29. Raciocina por padrão; o mcpollama manda `think:false` e o gateway também |
 | Embeddings | `nomic-embed-text` (768 dim), residente junto |
-| Concorrência | o Ollama roda essa arquitetura com **1 slot**; `NUM_PARALLEL=5` e gateway `--gen-slots 5` (`--run-timeout 10m`) desde 2026-11-04 (sem ganho com o `qwen3-ia`: o Ollama avisa "does not currently support parallel requests"), `MAX_QUEUE=32`; a fila de verdade é a do gateway |
+| Concorrência | o Ollama roda essa arquitetura com **1 slot**; `NUM_PARALLEL=3` e gateway `--gen-slots 3` (`--run-timeout 10m`) desde 2026-11-04 (sem ganho com o `qwen3-ia`: o Ollama avisa "does not currently support parallel requests"), `MAX_QUEUE=32`; a fila de verdade é a do gateway |
 | Carga medida (Fase 8.9) | 10 agentes × 32k de contexto, 0 erros, **~700–790 tok/s somados** (~2.000 com documentos grandes) |
 | Carga a frio | ~16–22 s |
 
