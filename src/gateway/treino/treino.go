@@ -144,6 +144,21 @@ type Options struct {
 	// one event a minute for the same kind.
 	OnEvent func(kind, detail string)
 	Now     func() time.Time // tests
+	// TxLockImmediate: see dsn. Default false: the gateway behaves as before.
+	TxLockImmediate bool
+}
+
+// dsn is the connection string. TxLockImmediate (off for the gateway, which has
+// one process and its own writers' turn) makes every transaction take the write
+// lock when it begins: a second process that writes to the same file (the bake-off
+// creating a retrato while the gateway runs) waits with busy_timeout instead of
+// failing later, when a read transaction tries to become a write one.
+func dsn(path string, o Options) string {
+	d := path + "?_pragma=auto_vacuum(2)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=journal_size_limit(67108864)"
+	if o.TxLockImmediate {
+		d += "&_txlock=immediate"
+	}
+	return d
 }
 
 // Store is the training database. Safe for concurrent use.
@@ -177,7 +192,7 @@ func Open(path string, o Options) (*Store, error) {
 		return nil, fmt.Errorf("treino: cannot create %s: %w", path, err)
 	}
 	f.Close()
-	db, err := sql.Open("sqlite", path+"?_pragma=auto_vacuum(2)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=journal_size_limit(67108864)")
+	db, err := sql.Open("sqlite", dsn(path, o))
 	if err != nil {
 		return nil, err
 	}

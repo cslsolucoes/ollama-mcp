@@ -1,6 +1,6 @@
 # Plano — Fase 12: o MCP organiza os erros do modelo local e gera o histórico para treinar o servidor de IA
 
-> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.6 concluída; próxima: 12.7). Contrato de dados **1.1.4 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
+> **Estado:** ▶️ **APROVADO pelo owner em 2026-11-02 19:45** ("ok, execute o plano"); **em execução** (12.2 concluída e publicada; 12.7 concluída no código; próxima: 12.8). Contrato de dados **1.1.4 aprovado** (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40) (`docs/CONTRATO-DADOS-TREINO.md`), que **prevalece** sobre este plano onde divergirem. Revisado **três vezes** por uma IA externa (GPT-6 Codex, 2026-11-02 15:23, 15:39 e 15:59), com os
 > achados incorporados (§15). As questões da §14 foram fechadas pelo owner (15:50). O código começa na 12.2.
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
@@ -603,7 +603,7 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 | 12.4 | gateway: `treino.db` (ocorrências, jobs, amostras, histórico) + `POST /api/feedback` em rota própria (D12-4, 5, 10, 16); flag `--role` (C-1.21) | sonnet | testes, um por regra do contrato nesta etapa (C-0.4): validação dos enums e limites (C-1.16, C-1.17: corpo 256 KB, `descricao` 4 KB, `resposta_correta` 128 KB, 64 jobs); `job_do_erro` inexistente → 404 sem gravar nada (C-1.4) e obrigatório em `translate`/listas sem `final` (C-1.3); transação única com as amostras de todos os jobs (C-1.5); `sem_pedido` só pelo `job_do_erro` expirado ou sem `prompt_json`, e `nova` quando expiram só os outros (C-1.9, C-1.9a); `distribuida` sem amostras com `jobs_externos` (C-1.10) e `fallback` com `--role fallback` sem amostras (C-1.21), com a precedência da C-1.9; transições da C-1.12 e confirmar sem `resposta_correta` recusado (C-1.12a); candidato automático substituído por relato humano com `alterou`/`campo=origem` (C-1.19); 503 sem `--doc-key-file` (C-4.3a); 507 no teto de 2 GiB sem apagar nada (C-6.2); apagar deixa só a linha mínima e respeita a contagem de referências (C-6.3, C-6.4); alterar a correção desfaz a confirmação e apaga o embedding (C-6.5); histórico sem texto, só hash e tamanho, e sem expirar (C-7.4, C-7.6, C-7.9); consultas com `context.Background()` (C-6.10); ataques 9.5/10.L/10.5 ok | ✅ **concluída** (2026-11-03 00:43, sem commit ainda): Sonnet implementou; revisão Opus (6 importantes, 6 menores) corrigida com o contrato 1.1.2; gate refeito pelo coordenador |
 | 12.5 | mcpollama: tool `reportar_erro` (ocorrência, `job_do_erro`) + automáticos (a)–(c) (D12-2, 3, 8; C-1.3, C-1.19, C-1.20); `TOOLS.md` | sonnet | o relato chega com todos os jobs e papéis (até 64, C-1.17) e o backend de cada um; `job_do_erro` padrão `final`/`unico` e obrigatório em `translate` e em listas sem `final` (C-1.3); enums e limites (C-1.16, C-1.17); relato ao gateway do `job_do_erro` (C-1.11); os automáticos são só as três regras da C-1.20 (inclui `num_predict` ausente), nascem `nova` sem `resposta_correta` (C-1.19); o automático não atrasa nem quebra a tool; deduplicação (relato humano substitui o automático) | ✅ **concluída** (2026-11-03 10:40, sem commit ainda): Sonnet implementou; revisão Opus (pode publicar) com ajustes; decisões do owner no contrato 1.1.4; gate refeito pelo coordenador |
 | 12.6 | monitor: aba "Erros (treino)", "Marcar erro", confirmar/completar/descartar/apagar/exemplo público/**liberar quarentena** (rota `POST /monitor/api/treino/{id}/liberar-quarentena`), exportação com predicado e partição (D12-6, 7, 7a; C-1.13, C-3.x, C-4.x) | sonnet | Firefox headless 570–1400 px; ações só do admin com sessão, CSRF e same-site, cada uma no histórico (C-1.13); o predicado exclui cada caso proibido, inclusive imagem, `distribuida`, `fallback`, `quarentena` e `translate` montado, **um teste por condição, com um caso que falha só nela** (C-3.16); exportação por `parte=treino\|teste` só da partição pedida, em streaming, sem guardar no servidor, com `meta` sem texto livre e uma linha `exportou` **por ocorrência** (C-3.11 a C-3.15, C-7.7); grupos por `doc_hash`, por `conteudo_hmac` ou por job em comum, com todas as não apagadas, inclusive `nova` e `descartada` (C-4.5, C-4.15); cota de 30 grupos **com amostra exportável** por categoria, na ordem em que cada grupo ganha a primeira amostra exportável, com a categoria dessa amostra e partição **pendente** antes disso (contrato 1.1.0: C-4.6, C-4.7, C-1.8); partição estável e fusão de grupos do mesmo lado pelo menor `grupo_id` sem reavaliar (C-4.8); **união de grupos já atribuídos a lados opostos vai para quarentena** e invalida os retratos e o índice de exemplos; um lado só é herdado; nenhum lado fica pendente (C-4.9 1.1.0, C-4.10, teste dedicado para cada caso); `liberar-quarentena` grava `alterou`/`campo=particao` (C-4.11); desconfirmar/descartar (C-1.12b)/apagar ocorrência de teste não libera a vaga e invalida os retratos que a listam (C-4.11a); nenhum `job_id`, `doc_hash` ou `grupo_id` em treino e teste ao mesmo tempo (C-4.12); `doc_hash` guardado como HMAC com `key_id`, nunca o sha256 puro (C-4.2); ocorrência distribuída e `fallback` sem amostras; descartar vale também para `sem_pedido`/`distribuida`/`fallback` (C-1.12); histórico sem texto sensível (C-7.6); alterar `resposta_correta`, `descricao` ou `correcao_aplicada` confirmada desfaz a confirmação (C-6.5); embedding só ao marcar `exemplo_publico` (C-6.6); consultas com `context.Background()` e cache em segundo plano (C-6.10) | ✅ **concluída** (2026-11-03 13:30, sem commit ainda): Sonnet implementou; revisão Opus corrigida; desvio: telas com login conferidas no Chromium (Playwright), o visitante no Firefox headless |
-| 12.7 | banco de provas: `bakeoff -suites erros` com o protocolo da §8.5 + **retrato** do teste + **linha de base** do `qwen3-ia` atual | sonnet | relatório com o ID do retrato, N, acerto e intervalo de Wilson 95% por categoria (C-5.9); um retrato por avaliação, com os campos da C-4.13; replay com o `prompt_json` igual exceto `options.seed` e `X-Mcpollama-Tool: bakeoff-erros` (C-5.1); **3 rodadas pareadas** (seed 1/2/3), acerto com 2 de 3, modelo atual e candidato intercalados, e o relatório traz os casos que mudaram entre rodadas (C-5.15); a **linha de base** registrada e o modelo atual **medido de novo** a cada comparação, com aviso se divergirem mais de 3 pontos numa categoria (C-5.14, C-5.16); pontuação da C-5.2 (100% de precisão e cobertura), `formato_invalido` compara valores (C-5.3), C-5.4 (`contagem`/`calculo`/`truncado`); humana às cegas em `blind` com 1 rodada, conteúdo de cliente só pelo owner (C-5.5, C-5.6); `outro`/`idioma_errado` fora (C-5.7); reporta com ≥ 20 e decide com ≥ 30 (C-5.8); o gate falha com 0 casos, sem categoria com 30 casos ou com retrato `valido=0`, dizendo "dados insuficientes" (C-5.13) | pendente |
+| 12.7 | banco de provas: `bakeoff -suites erros` com o protocolo da §8.5 + **retrato** do teste + **linha de base** do `qwen3-ia` atual | sonnet | relatório com o ID do retrato, N, acerto e intervalo de Wilson 95% por categoria (C-5.9); um retrato por avaliação, com os campos da C-4.13; replay com o `prompt_json` igual exceto `options.seed` e `X-Mcpollama-Tool: bakeoff-erros` (C-5.1); **3 rodadas pareadas** (seed 1/2/3), acerto com 2 de 3, modelo atual e candidato intercalados, e o relatório traz os casos que mudaram entre rodadas (C-5.15); a **linha de base** registrada e o modelo atual **medido de novo** a cada comparação, com aviso se divergirem mais de 3 pontos numa categoria (C-5.14, C-5.16); pontuação da C-5.2 (100% de precisão e cobertura), `formato_invalido` compara valores (C-5.3), C-5.4 (`contagem`/`calculo`/`truncado`); humana às cegas em `blind` com 1 rodada, conteúdo de cliente só pelo owner (C-5.5, C-5.6); `outro`/`idioma_errado` fora (C-5.7); reporta com ≥ 20 e decide com ≥ 30 (C-5.8); o gate falha com 0 casos, sem categoria com 30 casos ou com retrato `valido=0`, dizendo "dados insuficientes" (C-5.13) | ✅ **concluída no código** (2026-11-03 23:10, sem commit ainda); linha de base real só com dados (depois da 12.10) |
 | 12.8 | **melhora sem treino** (D12-15): (a) instruções por tool; (b) exemplos recuperados por embedding, com a regra de privacidade | sonnet | **medido pela 12.7** com os limiares da §8.5 (C-5.10 a C-5.12); só fica ligado o que passar, por tool e por flag, com padrão desligado (C-8.8); exemplos só de ocorrências `confirmadas` com `exemplo_publico=1`, com embedding só para elas (C-8.1, C-6.6); busca só na partição `treino`, excluindo a ocorrência, o grupo, o documento em avaliação e todo caso em `quarentena` (C-8.3, C-8.4); nenhuma ocorrência desconfirmada, descartada, apagada, `sem_pedido`, `distribuida` ou `fallback` como exemplo (C-8.9); índice congelado com o retrato e hash registrado (C-8.5); análise das instruções só no treino, versão com ID e hash congelada antes da avaliação (C-8.6, C-8.7); k e limiar de similaridade fixados aqui, medidos pela 12.7 e registrados no retrato (C-8.10) | pendente |
 | 12.9 | revisão adversarial: relato forjado, flood, corpo gigante, injeção no JSONL exportado, **vazamento entre clientes pelos exemplos (D12-15b)**, **resposta do teste vazando pelos exemplos (B1)**, apagamento incompleto (histórico, amostras compartilhadas), vazamento na aba, CSRF, rota `/api/feedback`; ainda: chave HMAC (`--doc-key-file`) ausente ou diferente entre gateways (503, `key_id`, C-4.3a), gateway `--role fallback` guardando amostra (C-1.21), `liberar-quarentena` e cota manipuláveis (C-4.9 a C-4.11a), teto 507 contornável (C-6.2), apagar que deixe conteúdo além da linha mínima (C-6.3), linha de `historico` com texto (C-7.4, C-7.6) | **opus** | achados corrigidos; testes de ataque guardados em `.workspace/reports/...testes/` | pendente |
 | 12.10 | gate completo + implantação (gateway 0.13.0, mcpollama 0.10.0) + aceite ao vivo com o owner | coordenador + owner | `--doc-key-file` gerado pelo instalador, 0600, fora do backup comum, e a **mesma chave** em todos os gateways que atendem as mesmas estações, com o `key_id` conferido (C-4.3, C-4.3a); gateway de fallback (se existir) com `--role fallback` (C-1.21); relato real pela tool e pelo monitor; confirmação (com `resposta_correta`, C-1.12a); exportação com o par certo, só da partição pedida (C-3.11); relatório da 12.7 antes e depois da 12.8 | pendente |
@@ -1175,3 +1175,79 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   - **Ataques (Sonnet):** 2ª rodada com 627 PASS, 0 FAIL, 10 SKIP.
     - Na 1ª rodada, 1 FAIL esporádico em `TestAdvCSRF` (Fase 9): o vetor troca o último caractere do token por `A` e, em 1 de cada 64 casos, o token "errado" é igual ao certo e a resposta sai 409.
     - **Pendência:** endurecer o vetor guardado (trocar o caractere por outro sempre diferente).
+- 2026-11-03 13:35: **12.6 publicada** (`0493f7f`; segredos 0). Pergunta ao owner sobre a ordem: a 12.7 e a 12.8 só medem com dados reais (≥ 30 confirmados por categoria). **Decisão do owner: seguir a ordem do plano**: código da 12.7 e da 12.8 agora, com dados sintéticos; linha de base e medição quando houver casos, depois da 12.10. **Início da 12.7** num Sonnet novo (os anteriores acumularam muito contexto).
+- 2026-11-03 18:45: **12.7 implementada** pelo Sonnet (74 mutações: 72 mortas, 1 equivalente, 1 só provável no Linux, o modo 0600).
+  - **Arquivos:**
+    - `treino/retrato.go`: `CreateRetrato`, `GetRetrato`, `InvalidateRetrato`, `RetratoCases`, com reconferência e invalidação na leitura (só aditivo; reusa `Eligible`);
+    - `cmd/bakeoff/erros*.go`: modos `retrato`, `base` e `comparar`; replay com seeds 1/2/3 intercalados; pontuação das C-5.2 a C-5.7; Wilson; limiares; gate; arquivo blind 0600; `linha-de-base.json`;
+    - `main.go` com 12 flags.
+  - **Onde roda:** no servidor, ao lado do `treino.db`, contra `127.0.0.1:11500`. O cliente recusa outro host, ignora proxy e não segue redirect, e fora de loopback só roda com `-gateway-remoto`. O relatório e os logs só têm ids e números.
+  - **Exit codes:** 0 aceito; 1 gate falhou ("dados insuficientes"/"medição incompleta"); 2 uso; 3 reprovado.
+  - **O que não deu certo:**
+    - o **teste de escala da 12.6** (`TestScaleRecomputeAndSummary`) falhou na suíte completa do coordenador, com o `Summary` acima de 100 ms. Isolado, deu 112–138 ms no recompute e 70–90 ms no `Summary`; com TEMP no E:, 117/71 ms. Em paralelo com os outros pacotes e com a revisão rodando, a máquina fica carregada.
+    - **Solução (coordenador):** o teste de tempo deixou de ser gate e passou a ser opcional por `MCPOLLAMA_TEST_SCALE=1` (mesmo padrão dos testes `live`/`ocr`). Rodado à parte às 18:44: **112 ms / 73 ms, PASS**.
+  - **Gate (coordenador, 18:44):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` 22 ok;
+    - `-race -count=1 ./...` 22 ok, 0 FAIL;
+    - `gateway/proxy|monitor|store|queue`, `ollama`, `tools` e `mcpollama-mcp` iguais ao HEAD;
+    - nenhum processo velho.
+  - **Ataques (Sonnet, numa cópia):** 803 PASS, 10 SKIP.
+    - `TestAdvRequestsGrowthWithoutCap` deu "disk is full" no D: e passou com TEMP no E:.
+    - **Os `fase9_adv_test.go` e `fase9_adv_m8_test.go` do monitor guardados não compilam no HEAD** (`extraAt` e `vec` sumiram na 0.12.6). Nas etapas anteriores eram adaptados na cópia; desta vez foram excluídos, sem efeito, porque a 12.7 não toca no monitor. **Pendência: corrigir os dois arquivos guardados de vez.**
+  - **Disco D: com 2,6 GB livres (99%).** Cache do Go (`go-build`) com 4,88 GB e scratchpad com 1,1 GB. Perguntar ao owner sobre a limpeza.
+  - **Decisões de implementação:**
+    1. O candidato troca só `model` e `seed`; uma amostra `qwen3-ia-think` precisa de um nome de candidato próprio.
+    2. Retrato vazio é recusado.
+    3. Caso não medido falha o gate ("medição incompleta").
+    4. Só as categorias automáticas contam para o ≥ 30; as do blind ficam pendentes da avaliação humana.
+    5. A linha de base só é gravada com o gate passando, e nunca é sobrescrita.
+    6. N < 20 não mostra taxas.
+  - **Pendências para a 12.8:** `-indice-hash`/`-instrucoes-*` no retrato; k e o limiar de similaridade sem coluna no retrato.
+  - **Pendências para a 12.10:** compilar o `bakeoff` para Linux e rodá-lo com o usuário do gateway; segundo processo abrindo o `treino.db` vivo ainda não exercitado ao vivo.
+  - Revisão independente em Opus em andamento.
+- 2026-11-03 22:10: **owner: não mexer no disco D:** (2,6 GB livres; nem o cache do Go nem o scratchpad). Agentes passam a usar TEMP no E: quando precisarem de espaço.
+- 2026-11-03 22:10: **revisão independente da 12.7** (Opus, só leitura): **corrigir antes de publicar**.
+  - **Bloqueadores:**
+    - (1) o retrato não era conferido de novo no fim da rodada, que leva horas;
+    - (2) stream cortado era pontuado como medição;
+    - (3) o veredito ignorava as categorias às cegas não avaliadas, dando "aceita" antes de o owner ler o blind.
+  - **Importantes:**
+    - (4) o `-gateway-remoto` aceitava qualquer host, inclusive passando pelo Cloudflare;
+    - (5) comparar sem linha de base;
+    - (6) número final extraído da resposta certa em prosa;
+    - (7) a 12.8 não seria medível, porque o replay não aplica instruções nem exemplos.
+  - **Decisão do owner (22:09) sobre (7):** a 12.8 vai ser medida **transformando o `prompt_json` no bakeoff** com as instruções e os exemplos congelados, num código compartilhado com o mcpollama. Até lá, o comparar é recusado quando o retrato tem índice ou instruções.
+  - **Menores:**
+    - JSON com chave duplicada;
+    - `_txlock=immediate`;
+    - modelo gravado deve ser igual ao `-atual`;
+    - `score.json` com modelo e data;
+    - `-out` obrigatório.
+  - Todas as correções foram delegadas ao Sonnet da 12.7.
+- 2026-11-03 23:10: **correções da revisão da 12.7 concluídas** (Sonnet; todas as mutações mortas, exceto o P17, que é equivalente). Gate refeito pelo coordenador.
+  - **Bloqueadores:**
+    - (1) `recheckRetrato` refaz a conferência antes do `finish`; um retrato mudado durante a rodada faz o gate falhar, sem linha de base;
+    - (2) resposta sem `done`/`[DONE]` não é medida, em qualquer categoria ("medição incompleta");
+    - (3) com blind pendente, o resultado é **"PENDENTE da revisão às cegas", exit 4**; se a parte automática já reprovar, vale REPROVADA. Modo `apurar` com o arquivo de respostas do owner: `rótulo<TAB>certa|errada<TAB>certa|errada`; todos os rótulos são obrigatórios; o modo não chama o gateway e reconfere o retrato.
+  - **Importantes:**
+    - (4) `-gateway-remoto` só aceita IP literal privado, em `https`, reconferido no `Dialer.Control`;
+    - (5) comparar exige a `linha-de-base.json` do mesmo retrato e do mesmo modelo;
+    - (6) o `want` precisa de `RESULTADO: n` ou de um número único; casos ambíguos são inaplicáveis e não entram no replay;
+    - (7) comparar é recusado com índice ou instruções; `requestTransform` (identidade por padrão, só para o candidato) é o ponto de extensão da 12.8.
+  - **Menores:**
+    - chave duplicada → `chave_duplicada`;
+    - `treino.Options.TxLockImmediate` (padrão false; o **DSN do gateway não mudou**, conferido no diff), usado só pelo bakeoff;
+    - o modelo gravado tem de ser o `-atual`;
+    - o `score.json` passa a ter `modelo`/`gerado_em`, com janela de 48 h;
+    - `-out` obrigatório.
+  - **Gate (coordenador, 23:07):**
+    - `build` 0; `vet` 0; `gofmt` vazio;
+    - `go test -count=1 ./...` 22 ok;
+    - `-race -count=1 ./...` 22 ok, 0 FAIL;
+    - fora do escopo, tudo igual ao HEAD;
+    - nenhum processo velho;
+    - `.tmp-gate` removido.
+  - **Ataques (Sonnet, porque tocou o `treino.go`):** 888 PASS, 0 FAIL, 11 SKIP. Os `fase9_adv*` do monitor guardados continuam sem compilar no HEAD: **pendência**.
+  - **Decisão a conferir:** num retrato só com categorias às cegas, a linha de base é registrada vazia.
+- 2026-11-03 23:10: o **owner perguntou** se o `D:\MCP` continua operacional. Conferido: `mcpollama-mcp.exe` **0.9.2-f367b35** (31/10 22:21, intocado); `list_models` pelo MCP respondeu normalmente. Nada da Fase 12 foi implantado.

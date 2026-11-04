@@ -11,6 +11,7 @@
 //	bakeoff -suites score -models a,b   # automatic scoring of S1-S4 outputs
 //	bakeoff -suites blind -models a,b   # anonymised S1 packets for the human review
 //	bakeoff -exe X -model m -suites multi -agents 5 -tasks 3 -step 5x32k   # 8.9: N concurrent agents
+//	bakeoff -suites erros -erros-modo retrato|base|comparar ...             # 12.7: erros do modelo (roda no servidor)
 //	bakeoff -suites monpeak -mon-file F -from HH:MM:SS -to HH:MM:SS         # 8.9: power/AER of a window
 package main
 
@@ -43,6 +44,19 @@ type options struct {
 	agents, tasks                                int
 	jitter                                       time.Duration
 	bigDocs, step, expectBoot, monFile, from, to string
+	// Fase 12.7: suite erros (runs on the server, next to treino.db)
+	errMode, treinoDB, keyFile, gwURL, retratoID, atual, candidato, alvo string
+	indiceHash, instrID, instrHash                                       string
+	gwRemote, outSet                                                     bool
+	resultado, blindResp                                                 string
+}
+
+// outExplicit is -out only when the user typed it: the suite erros has no default folder.
+func (o options) outExplicit() string {
+	if !o.outSet {
+		return ""
+	}
+	return o.out
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
@@ -52,7 +66,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.exe, "exe", "", "mcpollama binary under test (never the one in D:\\MCP)")
 	fs.StringVar(&o.model, "model", "", "model under test (--model)")
 	fs.StringVar(&o.allowed, "allowed-models", "", "--allowed-models (default \"<model>;nomic-embed-text\")")
-	fs.StringVar(&o.suites, "suites", "load,s5,s1,s2,s3,s4,s6", "comma list: load,ps,s1..s6 | ref | score | blind")
+	fs.StringVar(&o.suites, "suites", "load,s5,s1,s2,s3,s4,s6", "comma list: load,ps,s1..s6 | ref | score | blind | multi | monpeak | erros")
 	fs.StringVar(&o.out, "out", `E:\MCPOllam\.workspace\bakeoff\out`, "output root (git-ignored)")
 	fs.StringVar(&o.corpus, "corpus", `E:\MCPOllam\.workspace\bakeoff\corpus`, "corpus folder")
 	fs.StringVar(&o.env, "env", `D:\Users\claiton.linhares\.openclaude\csl-ollama.env`, "file with OPENAI_API_KEY=")
@@ -85,9 +99,28 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.monFile, "mon-file", "", "monpeak: monitor output file")
 	fs.StringVar(&o.from, "from", "", "monpeak: window start HH:MM:SS")
 	fs.StringVar(&o.to, "to", "", "monpeak: window end HH:MM:SS")
+	fs.StringVar(&o.errMode, "erros-modo", "comparar", "erros: retrato (congela o teste) | base (linha de base do modelo atual) | comparar (candidato x atual) | apurar (aplica as respostas do owner ao blind)")
+	fs.StringVar(&o.treinoDB, "treino-db", "", "erros: caminho do treino.db (o replay roda no servidor; o conteúdo dos casos não sai da rede, C-5.6)")
+	fs.StringVar(&o.keyFile, "doc-key-file", "", "erros: arquivo da chave HMAC (0600); com ele o retrato confere o prompt_hmac recalculado")
+	fs.StringVar(&o.gwURL, "gateway-url", "http://127.0.0.1:11500", "erros: gateway do replay (loopback)")
+	fs.BoolVar(&o.gwRemote, "gateway-remoto", false, "erros: aceita um gateway que não é loopback (rede interna, decisão do owner)")
+	fs.StringVar(&o.retratoID, "retrato", "", "erros: id do retrato (modos base e comparar)")
+	fs.StringVar(&o.atual, "atual", "qwen3-ia", "erros: nome do modelo atual (rótulo; pasta do score.json do S2/S3)")
+	fs.StringVar(&o.candidato, "candidato", "", "erros: modelo candidato (modo comparar)")
+	fs.StringVar(&o.alvo, "alvo", "", "erros: categoria-alvo da mudança (C-5.10)")
+	fs.StringVar(&o.indiceHash, "indice-hash", "", "erros/retrato: hash do índice de exemplos congelado (12.8; vazio = nenhum)")
+	fs.StringVar(&o.instrID, "instrucoes-id", "", "erros/retrato: id da versão das instruções (12.8; vazio = nenhum)")
+	fs.StringVar(&o.instrHash, "instrucoes-hash", "", "erros/retrato: hash da versão das instruções (12.8; vazio = nenhum)")
+	fs.StringVar(&o.resultado, "resultado", "", "erros/apurar: resultado-*.json escrito pelo modo comparar")
+	fs.StringVar(&o.blindResp, "blind-respostas", "", "erros/apurar: arquivo de respostas do owner (rotulo<TAB>certa|errada<TAB>certa|errada)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "out" {
+			o.outSet = true
+		}
+	})
 	w := bufio.NewWriter(stdout)
 	defer w.Flush()
 	var mu sync.Mutex
@@ -111,6 +144,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runBlind(o, logf)
 	case "monpeak":
 		return runMonPeak(o, logf)
+	case "erros":
+		return runErros(o, logf)
 	}
 	if o.exe == "" || o.model == "" {
 		fmt.Fprintln(stderr, "bakeoff: -exe e -model são obrigatórios")

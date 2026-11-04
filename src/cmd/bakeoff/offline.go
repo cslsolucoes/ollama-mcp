@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cslsoftwares/mcpollama/doctext"
 )
@@ -115,7 +116,7 @@ func runScore(o options, logf func(string, ...any)) int {
 	logf("GAB itens=%d", len(gab))
 	for _, m := range splitList(o.models) {
 		dir := filepath.Join(o.out, safeName(m))
-		score := map[string]any{"modelo": m}
+		score := map[string]any{"modelo": m, "gerado_em": time.Now().Format(time.RFC3339)}
 		// S2
 		var s2 []s2Score
 		sumNum, sumNT, valid, strict, inv := 0, 0, 0, 0, 0
