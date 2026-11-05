@@ -133,7 +133,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   `--allowed-models`/`MCPOLLAMA_ALLOWED_MODELS` (default fixo `qwen3.8:27b;nomic-embed-text`: **só
   modelos otimizados para o hardware**, decisão do owner de 2026-10-26; modelo fora da lista é
   recusado na partida e por chamada, sem chegar ao Ollama),
-  `--timeout`/`OLLAMA_TIMEOUT` (default 120 s, decisão P-7; o Claude Code aceita tools de ~87 s ou mais),
+  `--timeout`/`OLLAMA_TIMEOUT` (default **30 min** desde o mcpollama 0.10.1, igual ao `--max-wait 30m` do gateway; antes 120 s, decisão P-7; o Claude Code aceita tools longas e, no interativo, passa a chamada para segundo plano após 2 min),
   `--max-prompt-chars`/`MCPOLLAMA_MAX_PROMPT_CHARS` (default 128000),
   `--max-file-bytes`/`MCPOLLAMA_MAX_FILE_BYTES`,
   `--max-doc-bytes`/`MCPOLLAMA_MAX_DOC_BYTES` (default 32 MiB, só `.docx/.pptx/.pdf`),

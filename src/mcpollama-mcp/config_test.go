@@ -26,7 +26,7 @@ func TestDefaults(t *testing.T) {
 	c := parse(t, nil, nil)
 	if c.Model != "qwen3.8:27b" || c.EmbedModel != "nomic-embed-text" || c.MaxPromptChars != 128000 ||
 		c.ToolsVerbosity != "full" || c.Insecure || c.Debug || c.TraceFile != "" || c.AuditLogPath != "" ||
-		c.OllamaURL != "" || c.APIKey != "" || c.Timeout != 120*time.Second || c.AutoReport {
+		c.OllamaURL != "" || c.APIKey != "" || c.Timeout != 30*time.Minute || c.AutoReport {
 		t.Fatalf("defaults: %+v", c)
 	}
 	if err := c.validate(); err != nil {

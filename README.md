@@ -201,7 +201,7 @@ diagnóstico, está no [CLAUDE.md](CLAUDE.md).
 | `--model` | `OLLAMA_MODEL` | `qwen3.8:27b` |
 | `--embed-model` | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
 | `--allowed-models` | `MCPOLLAMA_ALLOWED_MODELS` | `qwen3.8:27b;nomic-embed-text` (só modelos otimizados para o hardware) |
-| `--timeout` | `OLLAMA_TIMEOUT` | `120s` (limite efetivo de cada tool) |
+| `--timeout` | `OLLAMA_TIMEOUT` | `30m` desde a 0.10.1 (antes `120s`; limite efetivo de cada tool, fila + execução; o gateway espera na fila até `--max-wait 30m`) |
 | `--allow-root` | `MCPOLLAMA_ALLOW_ROOT` | sem padrão (sem ele, as tools de arquivo não existem) |
 | `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` |
 | `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |

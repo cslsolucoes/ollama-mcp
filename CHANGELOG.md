@@ -35,8 +35,17 @@ mcpollama 0.10.1 em `D:\MCP` e reinício das sessões.
   O nome virtual de raciocínio passa a ser `qwen3.8:27b-think`. Motivo: o owner quer ver o modelo que roda, e as amostras de treino da
   Fase 12 ficam separadas pelo campo `modelo` (o `treino.db` tinha 0 ocorrências na data da decisão). **Incompatível com o servidor
   antigo:** só funciona depois que o servidor tiver o `qwen3.8:27b` e o gateway aceitar o nome (`deploy/gateway/mcpollama-gateway.service`).
+- **`--timeout` padrão de 120 s para 30 min** (owner, 2026-11-05): igual ao `--max-wait 30m` do gateway (aplicado às 11:40). No aceite, o
+  `qwen3.8:27b` leu um prompt de 40k em ~90 s e, com 10 agentes e `think`, 27 de 60 chamadas estouraram 300 s esperando na fila.
 - **Bake-off** (`src/cmd/bakeoff`, ferramenta de teste): padrão de `-atual` = `qwen3.8:27b`; nova opção **`-think`**, que envia
-  `think:true` nas chamadas de `generate`, `chat`, `summarize_file`, `extract` e `translate` (teste `TestWithThink`).
+  `think:true` nas chamadas de `generate`, `chat`, `summarize_file`, `extract` e `translate` (teste `TestWithThink`); com `-think`, o S6
+  reserva 4.096 tokens (com 50, o raciocínio esgotava o limite e a resposta vinha vazia).
+
+#### Corrigido
+- **Marcadores de arquivo repetidos na resposta** (aceite 2026-11-05): o `qwen3.8:27b` repetiu `=====ARQUIVO_INICIO <id>=====` e
+  `=====ARQUIVO_FIM <id>=====` em 1 de 3 traduções. As tools de arquivo removem da resposta as linhas que só repetem os marcadores
+  **daquele pedido** (o id é aleatório por pedido e ausente do documento); qualquer outro texto fica. Testes `TestStripEchoedMarkers` e
+  `TestTranslateDropsEchoedMarkers` (este falha sem a correção).
 
 ### [0.10.0] - 2026-11-04, em `D:\MCP` (Fase 12; ainda sem tag)
 
@@ -187,6 +196,8 @@ em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo sã
 #### Alterado
 - `deploy/gateway/mcpollama-gateway.service`: `--allowed-models "qwen3.8:27b;nomic-embed-text"` (modelo de produção com o nome real);
   `deploy/gateway/stage2.sh` testa com `qwen3.8:27b`; `deploy/servidor-ia/ollama-warm.sh` carrega o `qwen3.8:27b` a 64k no boot.
+- **`--max-wait 30m`** na unit (owner, 2026-11-05 11:39: "aumente o timeout na fila para 30 minutos"; antes o padrão de 10 min); já
+  aplicado no servidor às 11:40 (backup `mcpollama-gateway.service.bak-20261105-114002`). O `--run-timeout` (execução) continua 10 min.
 
 ### [0.13.1] - 2026-11-04 (ainda sem tag)
 

@@ -253,11 +253,17 @@ func (r *runner) suiteS6(countFiles []countCase) {
 		want int
 	}{{"17*23 + 144/12", 403}, {"48*12 - 96/8", 564}, {"125*4 + 81/9", 509}, {"36*27 - 512/16", 940}, {"19*19 + 210/14", 376}}
 	totD, totS := 0, 0
+	// With -think the reasoning counts in num_predict: 50 tokens leave the
+	// answer empty (qwen3.8:27b, 2026-11-05: ~70 tokens of reasoning).
+	npD, npS := 50, 1500
+	if r.c.think {
+		npD, npS = 4096, 4096
+	}
 	for i, e := range exprs {
 		okD, okS := 0, 0
 		var gotD, gotS []string
 		for k := 1; k <= 3; k++ {
-			res := r.call("s6", fmt.Sprintf("p3d-%d-r%d", i, k), "generate", map[string]any{"prompt": "Responda apenas com o número, sem texto: quanto é " + e.q + "?", "temperature": 0, "num_predict": 50}, fmt.Sprintf("p3d-%d-r%d.txt", i, k))
+			res := r.call("s6", fmt.Sprintf("p3d-%d-r%d", i, k), "generate", map[string]any{"prompt": "Responda apenas com o número, sem texto: quanto é " + e.q + "?", "temperature": 0, "num_predict": npD}, fmt.Sprintf("p3d-%d-r%d.txt", i, k))
 			g := firstIntRe.FindString(bodyOf(res.text))
 			gotD = append(gotD, g)
 			if g == strconv.Itoa(e.want) {
@@ -265,7 +271,7 @@ func (r *runner) suiteS6(countFiles []countCase) {
 			}
 		}
 		for k := 1; k <= 2; k++ {
-			res := r.call("s6", fmt.Sprintf("p3s-%d-r%d", i, k), "generate", map[string]any{"prompt": "Calcule passo a passo e termine com uma linha no formato RESULTADO: <número>. Quanto é " + e.q + "?", "temperature": 0, "num_predict": 1500}, fmt.Sprintf("p3s-%d-r%d.txt", i, k))
+			res := r.call("s6", fmt.Sprintf("p3s-%d-r%d", i, k), "generate", map[string]any{"prompt": "Calcule passo a passo e termine com uma linha no formato RESULTADO: <número>. Quanto é " + e.q + "?", "temperature": 0, "num_predict": npS}, fmt.Sprintf("p3s-%d-r%d.txt", i, k))
 			g := ""
 			if m := resultRe.FindStringSubmatch(bodyOf(res.text)); m != nil {
 				g = m[1]

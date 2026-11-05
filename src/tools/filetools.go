@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -415,8 +416,45 @@ func (j *fileJob) call(ctx context.Context, prompt, role string) (string, error)
 		j.u.backend = resp.Backend // any part served by the fallback marks the result
 	}
 	j.u.jobs = append(j.u.jobs, newJobRef(resp.JobID, role, resp.Backend))
-	j.lastText = resp.Response
-	return resp.Response, nil
+	text := stripEchoedMarkers(prompt, resp.Response)
+	j.lastText = text
+	return text, nil
+}
+
+// markerStartRe finds the opening marker of a file prompt; its nonce is fresh
+// for the request and absent from the document (newNonce), so the first match
+// in the prompt is the real one (the task text before it has no hex nonce).
+var markerStartRe = regexp.MustCompile(`=====(?:ARQUIVO|PARCIAL)_INICIO ([0-9a-f]{16})=====`)
+
+// stripEchoedMarkers removes from the answer the lines that only repeat the
+// markers of this prompt. qwen3.8:27b echoed "=====ARQUIVO_INICIO <nonce>====="
+// and the closing line in 1 of 3 translations (aceite 2026-11-05); the markers
+// are the tool's framing, never content, and the nonce makes a false match
+// impossible. Any other text, including a marker with another id, stays.
+func stripEchoedMarkers(prompt, out string) string {
+	m := markerStartRe.FindStringSubmatch(prompt)
+	if m == nil || !strings.Contains(out, m[1]) {
+		return out
+	}
+	drop := map[string]bool{}
+	for _, l := range []string{"ARQUIVO", "PARCIAL"} {
+		drop["====="+l+"_INICIO "+m[1]+"====="] = true
+		drop["====="+l+"_FIM "+m[1]+"====="] = true
+	}
+	lines := strings.Split(out, "\n")
+	keep := lines[:0]
+	dropped := false
+	for _, l := range lines {
+		if drop[strings.TrimSpace(l)] {
+			dropped = true
+			continue
+		}
+		keep = append(keep, l)
+	}
+	if !dropped {
+		return out
+	}
+	return strings.Trim(strings.Join(keep, "\n"), "\n")
 }
 
 func (d Deps) runFile(ctx context.Context, path, model string, think bool, task fileTask) (mcp.ToolCallResult, error) {
