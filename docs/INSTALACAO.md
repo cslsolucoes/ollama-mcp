@@ -65,7 +65,7 @@ Para reproduzir a configuração:
 - GPUs NVIDIA com VRAM somada suficiente para o modelo a 64k de contexto: **cerca de 19,6 GB** para o `qwen3.8:27b` (27,3B denso, Q4_K_M,
   17 GB em disco, `OLLAMA_KV_CACHE_TYPE=q4_0`) mais o `nomic-embed-text` residente junto (≈ 24 GB no total dos 32 GB; com o
   `qwen3.5:9b`, usado até a Fase 12, eram ~13 GB). Na medição do bake-off (2026-11-04/05), o `qwen3.8:27b` ficou a 64k com 66/66
-  camadas na GPU, na VRAM somada das 4 placas (`OLLAMA_SCHED_SPREAD=1` espalha as camadas). Implantação pendente do aceite de 2026-11-05.
+  camadas na GPU, na VRAM somada das 4 placas (`OLLAMA_SCHED_SPREAD=1` espalha as camadas). Implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1).
 - **A fonte precisa aguentar as placas.** Com 4 placas, a 850 W houve reboots secos (ver [B.3](#b3-limite-de-potência-e-clock-nvidia-powercapservice)
   e [H.1](#h1-reboots-do-servidor)). Se montar com fonte maior ou menos placas, os limites da B.3 podem ser revistos.
 - Rede: IP fixo na LAN (`10.100.2.2` hoje) e DNS interno resolvendo `ia.cslsolucoes.com.br` para ele (split-horizon).
@@ -183,7 +183,7 @@ Este guia **não** cobre a instalação do Ollama; ele deve estar instalado e fu
 | Modelos | `qwen3.8:27b` (nome real, **sem alias**) e `nomic-embed-text` |
 | Escuta | só `127.0.0.1:11434` (nada em `0.0.0.0`) |
 
-**Modelos.** Desde a release mcpollama 0.10.1 / gateway 0.13.2 (Fase 12, 2026-11-05; implantação pendente do aceite de 2026-11-05) o modelo de
+**Modelos.** Desde a release mcpollama 0.10.1 / gateway 0.13.2 (Fase 12, 2026-11-05; implantado em 2026-11-05: gateway 0.13.2-bb51ed6, mcpollama 0.10.1-bb51ed6) o modelo de
 geração é o **`qwen3.8:27b` com o nome real, sem alias** (o nome `qwen3-ia` deixa de existir; antes ele era um alias do `qwen3.5:9b`, criado por `ollama cp`):
 
 ```bash
@@ -604,9 +604,9 @@ Como conferir (no servidor): `systemctl is-active mcpollama-gateway` (`active`),
 `ss -tlnH | grep -E '11434|11500'` (ambos em 127.0.0.1). Na LAN: `https://ia.cslsolucoes.com.br:8443/monitor` abre o painel.
 Tabela de diagnóstico completa: seção 10 do [MANUAL](MANUAL-GATEWAY.md#10-diagnóstico).
 
-### C.1 Fase 12 (gateway 0.13.0): chave HMAC e variáveis (a implantar)
+### C.1 Fase 12 (gateway 0.13.0): chave HMAC e variáveis
 
-A Fase 12 (erros do modelo → base de treino; detalhes na seção 17 do [MANUAL](MANUAL-GATEWAY.md#17-erros-do-modelo-e-base-de-treino-fase-12-a-implantar)) acrescenta dois passos
+A Fase 12 (erros do modelo → base de treino; detalhes na seção 17 do [MANUAL](MANUAL-GATEWAY.md#17-erros-do-modelo-e-base-de-treino-fase-12)) acrescenta dois passos
 a esta parte, **sem comando extra**: o instalador já faz os dois.
 
 1. **Chave HMAC.** A etapa 1 (`stage1.sh`) cria `/etc/mcpollama-gateway/doc.key` **se não existir**: 32 bytes aleatórios em hex (64 caracteres),

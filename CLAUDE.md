@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## O projeto
 
 **mcpollama**: servidor **MCP em Go** (stdio, JSON-RPC 2.0) que expõe o Ollama self-hosted
-da CSL (`qwen3-ia`) como tools para Claude Code (CLI/VS Code) e Cursor. O Claude **orquestra**;
+da CSL (`qwen3.8:27b`; antes de 2026-11-05, o alias `qwen3-ia`) como tools para Claude Code (CLI/VS Code) e Cursor. O Claude **orquestra**;
 o trabalho mecânico em volume (resumir, extrair, traduzir, rascunhos, embeddings, dados sensíveis)
 vai para o modelo local, para **economizar tokens Anthropic**. Objetivo, configs de cliente e
 links de referência estão no [README.md](README.md).
@@ -169,7 +169,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
 
 - `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.13 (desde 2026-10-31 09:50; antes 0.40.8) · modelo **`qwen3.8:27b`** (nome
   real, **sem alias**; decisão do owner de 2026-11-05, release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12;
-  **implantação pendente do aceite de 2026-11-05**; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco,
+  **implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1)**; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco,
   64k de contexto com 66/66 camadas na GPU, ~19,6 GB + nomic ≈ 24 GB dos 32 GB). Nome virtual de raciocínio:
   `qwen3.8:27b-think`. O nome `qwen3-ia` deixa de existir. Antes: `qwen3-ia` = alias do `qwen3.5:9b`
   desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M, 100% GPU, 13 GB a 64k)
@@ -204,8 +204,8 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   Desde a fila (2026-10-30), o `ia-local` (`/v1`) chega **sem raciocínio** por padrão; com
   `OPENAI_MODEL=qwen3.8:27b-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
 - **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
-  `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção:
-  gateway `0.12.6-a155513`** (com o pool de backends; desde 2026-11-01; fila 64 por cliente/IP e 128 no total,
+  `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção desde 2026-11-05: gateway `0.13.2-bb51ed6` (`--max-wait 30m`) e mcpollama `0.10.1-bb51ed6`.** Antes (2026-11-01 a 2026-11-04):
+  gateway `0.12.6-a155513` (com o pool de backends; desde 2026-11-01; fila 64 por cliente/IP e 128 no total,
   nginx 80 conexões por IP e burst 100). **Incidente 2026-11-01 (0.12.5):** o `/monitor/api/state` travou por um impasse no
   `database/sql`, porque o `store.Stats` usava o ctx da aba sob o mutex do monitor; os pedidos se acumularam até o `limit_conn 80` e a
   estação passou a receber 429. A 0.12.6 lê o banco com ctx próprio, em cache de segundo plano, e tem o teste de regressão
@@ -231,7 +231,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     foi removido (merge `736c205`; o commit `d38fb61` está só na tag local `archive/wip-fase10-4-pool`). O
     secundário planejado é um PC com 4× RTX 2060, sem data (10.S);
   - **fallback do mcpollama** (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`): vai no binário
-    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`), **desligado por padrão**; binário atual em `D:\MCP`:
+    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`), **desligado por padrão**; binário em `D:\MCP` até 2026-11-05 (hoje `0.10.1-bb51ed6`):
     **`0.9.2-f367b35`** (tag `mcpollama-v0.9.2`, sessões reiniciadas 2026-11-01 00:11; rótulo padrão `<máquina>/<usuário>`
     + `X-Mcpollama-Station`);
   - **Fase 11 (túnel WebSocket + jobs assíncronos): congelada em 2026-10-30 23:50** por decisão do owner; só o spike 11.1

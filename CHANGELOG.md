@@ -18,7 +18,7 @@ feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-f
 `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; contrato de dados: `docs/CONTRATO-DADOS-TREINO.md`;
 instruções para o Claude em `docs/RELATAR-ERROS-IA.md` (em vigor desde 2026-11-04).
 
-**Release de ajuste da Fase 12, preparada e NÃO implantada (2026-11-05):** **gateway 0.13.2** (falso alarme "fora da GPU") e
+**Release de ajuste da Fase 12, IMPLANTADA em 2026-11-05 12:02–12:06:** **gateway 0.13.2** (falso alarme "fora da GPU") e
 **mcpollama 0.10.1** (modelo de produção `qwen3.8:27b` com o nome real, sem alias). A troca do modelo depende do aceite do
 `qwen3.8:27b` em curso (S1/S4/S5, `think` em tarefa grande, carga contínua) e da liberação do owner. Ordem prevista: no servidor,
 baixar o `qwen3.8:27b`, ajustar o `ollama-warm` e o `--allowed-models` do gateway e só depois apagar o `qwen3-ia`; em seguida,
@@ -27,7 +27,7 @@ mcpollama 0.10.1 em `D:\MCP` e reinício das sessões.
 
 ## mcpollama
 
-### [0.10.1] - preparada, não implantada (ajuste da Fase 12; ainda sem tag)
+### [0.10.1] - 2026-11-05 12:06, em `D:\MCP` (`0.10.1-bb51ed6`; ajuste da Fase 12; ainda sem tag)
 
 #### Alterado
 - **Modelo de produção com o nome real** (decisão do owner, 2026-11-05, opção "b"): o padrão de `--model`/`OLLAMA_MODEL` e a lista
@@ -182,7 +182,7 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
-### [0.13.2] - preparada, não implantada (ajuste da Fase 12; ainda sem tag)
+### [0.13.2] - 2026-11-05 12:02, em produção (`0.13.2-bb51ed6`; ajuste da Fase 12; ainda sem tag)
 
 #### Corrigido
 - **Falso alarme "degradado (fora da GPU)"** (2026-11-04, com o `gemma4:26b`): o `/api/ps` conta em `size` um buffer em memória do

@@ -27,7 +27,7 @@ e da revisão adversarial da Fase 9. Onde o plano e o código divergem, vale o c
 14. [Referências](#14-referências)
 15. [Notas de conferência](#15-notas-de-conferência)
 16. [Pool de backends e secundário (Fase 10.4)](#16-pool-de-backends-e-secundário-fase-104)
-17. [Erros do modelo e base de treino (Fase 12, a implantar)](#17-erros-do-modelo-e-base-de-treino-fase-12-a-implantar)
+17. [Erros do modelo e base de treino (Fase 12)](#17-erros-do-modelo-e-base-de-treino-fase-12)
 
 ---
 
@@ -259,8 +259,8 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--queue-per-client N` | `MCPGW_QUEUE_PER_CLIENT` | `16` | Esperando por IP + rótulo | **`64`** (antes 16) |
 | `--queue-per-ip N` | `MCPGW_QUEUE_PER_IP` | = `--queue-per-client` | Esperando por IP, todos os rótulos juntos | **`64`** (antes 16) |
 | `--labels-per-ip N` | `MCPGW_LABELS_PER_IP` | `16` | Rótulos distintos por IP; acima disso viram `<ip>/outros` (variar o rótulo não multiplica a cota) | padrão (16) |
-| `--max-wait D` | `MCPGW_MAX_WAIT` | `10m` | Maior espera na fila; depois, **504** | padrão (10m) |
-| `--run-timeout D` | `MCPGW_RUN_TIMEOUT` | = `--max-wait` | Maior tempo de execução de um pedido já iniciado; depois o slot é liberado e o cliente recebe 504 (ou uma linha final de erro no stream) | padrão (10m) |
+| `--max-wait D` | `MCPGW_MAX_WAIT` | `10m` | Maior espera na fila; depois, **504** | **`30m`** em produção desde 2026-11-05 (alinhado ao `--timeout` 30 min do mcpollama 0.10.1) |
+| `--run-timeout D` | `MCPGW_RUN_TIMEOUT` | = `--max-wait` | Maior tempo de execução de um pedido já iniciado; depois o slot é liberado e o cliente recebe 504 (ou uma linha final de erro no stream) | **`10m`** explícito em produção (`--run-timeout 10m`) |
 | `--age-after D` | `MCPGW_AGE_AFTER` | `5m` | Um pedido `baixa` que espera isso passa a competir como `normal` | padrão (5m) |
 | `--start-stagger D` | `MCPGW_START_STAGGER` | `300ms` | Intervalo mínimo entre o início de duas gerações (suaviza o pico de energia da fonte). `0` desliga. Só vale para a faixa de geração | `300ms` |
 | `--priority-ips LIST` | `MCPGW_PRIORITY_IPS` | vazio (ninguém) | IPs/CIDRs (separados por `,` ou `;`) que podem pedir prioridade `alta`. IPv4 mapeado em IPv6 é normalizado | `10.100.2.0/24` |
@@ -345,7 +345,7 @@ Rótulo válido: `^[A-Za-z0-9._:/@+-]{1,64}$`; fora disso vira `invalido`; vazio
 | --- | --- | --- |
 | Fila total cheia (`--queue-max`; padrão 64, **128 em produção**) | **503** `fila do servidor cheia (fila cheia); tente em 5 s` + `Retry-After: 5` | pedido nunca rodou; registrado `rejeitado` |
 | IP com 64 esperando (`--queue-per-ip`) ou IP+rótulo com 64 (`--queue-per-client`); padrão do código 16, **64 em produção** | **503** `... (limite de pedidos em espera deste cliente) ...` + `Retry-After: 5` | idem |
-| Esperou mais que `--max-wait` (10 min) | **504** `tempo máximo de espera na fila esgotado` | registrado `expirado` |
+| Esperou mais que `--max-wait` (30 min em produção desde 2026-11-05; padrão do código 10 min) | **504** `tempo máximo de espera na fila esgotado` | registrado `expirado` |
 | Rodando há mais que `--run-timeout` (10 min) | antes dos headers: **504** `tempo máximo de execução no servidor esgotado`; no meio do stream: linha final `{"error":"tempo máximo de execução no servidor esgotado"}` | registrado `erro` / `run_timeout`; o slot volta |
 | Administrador **removeu** da fila | **409** `removido da fila pelo administrador` | registrado `removido` |
 | Administrador **cancelou** em execução | antes dos headers: **409** `cancelado pelo administrador`; no meio do stream: linha final `{"error":"cancelado pelo administrador"}` | registrado `cancelado_admin` |
@@ -876,7 +876,7 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje (`0.12.6`, em produção desde 2026-11-01)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
+**O gateway de hoje (`0.13.2-bb51ed6`, em produção desde 2026-11-05; o `0.12.6` ficou de 2026-11-01 a 2026-11-04)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
 **pool de backends** (seção 16). Em produção o pool tem **um único backend, o `gpu-local`** (o Ollama do próprio servidor,
 `127.0.0.1:11434`): sem `--backends` tudo se comporta como antes da 10.4. Com `--backends`, o gateway repassa o trabalho que
 **ainda não começou** a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (`--overload-wait` e
@@ -1129,9 +1129,9 @@ Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primári
 
 ---
 
-## 17. Erros do modelo e base de treino (Fase 12, a implantar)
+## 17. Erros do modelo e base de treino (Fase 12)
 
-> **Estado:** código pronto e revisado (gateway **0.13.0**, mcpollama **0.10.0**); **ainda não instalado** (aguarda a ordem do owner).
+> **Estado:** implantado (gateway **0.13.0** e mcpollama **0.10.0** em 2026-11-04; release de ajuste em 2026-11-05: gateway **0.13.2-bb51ed6**, mcpollama **0.10.1-bb51ed6**).
 > Contrato de dados (regras `C-x.y`, testáveis): [`CONTRATO-DADOS-TREINO.md`](CONTRATO-DADOS-TREINO.md) (1.1.6). Instruções para o Claude
 > relatar erros: [`RELATAR-ERROS-IA.md`](RELATAR-ERROS-IA.md). Plano: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`.
 
