@@ -188,3 +188,15 @@ Assim o gemma4 não espera atrás do qwen3.5, e o monitor mostra a fila de cada 
 ## 9. Changelog
 
 - 2026-11-04 03:35: plano criado a partir do pedido do owner (03:34) e da conversa das 02:55–03:20 (modelos, VRAM, acerto por tipo, rota proposta).
+- 2026-11-04 14:02 → 2026-11-05 10:35: **viabilidade testada, plano NÃO executado** (ordem do owner: "não execute fase 13").
+  Relatório: `.workspace/reports/MCPOllam2026-11-04-181000-fase13-viabilidade-etapa-b-bakeoff.report.md` (§2 etapa B, §3–§5 bake-off,
+  §9b `qwen3.8:27b`, §9c `think` em conta direta).
+  - **Deu certo:** com `NUM_PARALLEL=1` as duplas `qwen3-ia` + `gemma4:12b`/`e4b` (32k) cabem 100% na GPU; o `gemma4:12b` acerta 100%
+    da numeração (qwen3-ia 86%); o `gemma4:26b` sozinho faz 25/30 com 10 agentes; o **`qwen3.8:27b` sozinho** é o melhor: S2 100% sem
+    inventar, S3 100% sem cerca, 10 agentes 30/30, conta direta 15/15 com `think`.
+  - **Não deu certo:** `NUM_PARALLEL=3` (rodada 1) jogou o `qwen3-ia` na CPU; `NUM_PARALLEL=2` + 48k piorou tudo; o `gemma4:31b` acerta
+    as contas mas só faz 6/30 com 10 agentes; o `e4b` não acrescenta qualidade.
+  - **Consequência para este plano:** com um modelo só bom em numeração, extração e (com `think`) contas, a rota automática perde quase
+    todo o sentido; sobra decidir **quando ligar o `think`**. O owner decidiu (2026-11-05 10:51) adotar o `qwen3.8:27b` com o **nome real,
+    sem alias**, como ajuste da Fase 12 (etapa 12.13), condicionado ao aceite em curso. Este plano fica **em espera**, a reavaliar depois
+    da troca (escopo provável: só a política de `think`).

@@ -1,129 +1,182 @@
-# Plano — Fase 11: túnel WebSocket entre o MCP da estação e o servidor da IA, com jobs assíncronos
+# Plano — Fase 11: jobs assíncronos, lotes e registro integral (HTTPS primeiro; WebSocket depois)
 
-> **Estado:** 🧊 **CONGELADO** em 2026-10-30 23:50 por decisão explícita do owner ("vamos suspender a execução, volta ao estado
-> antes do início do plano de websocket, vamos congelar ele agora"). Aprovado às 23:25; só a parte "spike" da 11.1 foi executada.
-> Nada foi implementado: **nenhuma mudança em `src/`, `deploy/` nem no servidor de IA** (conferido por `git diff 55fd624 HEAD --
-> src deploy`, vazio). Produção segue: gateway `0.12.3-55fd624`, mcpollama `0.9.1-755f168`.
-> **Ao descongelar:** retomar na decisão pendente da §8.
-> **Versões alvo:** gateway `0.13.0` · mcpollama `0.10.0` (mudança incompatível nas tools: passam a devolver ID).
-> **Origem:** pedido do owner (2026-10-30 22:40): "um websocket para ter comunicação bidirecional, sendo o servidor da IA o
-> servidor e a estação o MCP; o MCP não fica esperando o response; quando a IA finalizar o job, envia para a estação solicitante".
+> **Reescrito em 2026-11-04 18:25** (ordem do owner: "reescreve o antigo atualizando data e hora"), a partir da conversa de 2026-11-04
+> 16:56–17:51, do report de entendimento e da **avaliação independente do Codex (18:11)**:
+> `.workspace/reports/MCPOllam2026-11-04-175900-fase11-reestruturacao-entendimento-para-revisao.report.md` (§1–§13 entendimento;
+> §14 avaliação). Criado em 2026-10-30 22:45 com o título "túnel WebSocket entre o MCP da estação e o servidor da IA, com jobs
+> assíncronos".
+>
+> **Estado:** 🧊 **CONGELADO — em redesenho.** Nada a executar sem ordem explícita do owner. Desde o congelamento (2026-10-30 23:50)
+> nenhuma mudança de código, deploy ou servidor foi feita **por esta fase**. Só existe o spike 11.1 (2026-10-30, commit `f8c723e`).
+> **Produção hoje (para referência, não é desta fase):** gateway `0.13.1-8f9cf6a` (0.13.2 pronto, não implantado), mcpollama
+> `0.10.0-5372f4c`, Claude Code 2.1.296.
+> **Versões-alvo propostas:** gateway `0.14.0` · mcpollama `0.11.0` (os números 0.13.0/0.10.0 do plano original já foram usados pela
+> Fase 12).
+> **Critério do owner que governa o desenho (2026-11-04 15:19):** qualidade e economia de IA paga **acima do tempo de execução**.
+> **Cliente-alvo (2026-11-04 17:26):** Claude Code (extensão no Cursor); o owner não usa a IA do Cursor.
 
-## 1. Entendimento fechado com o owner (perguntas de 22:41–22:44)
+## 1. Objetivo e entendimento
 
-Fluxo combinado (palavras do owner): o túnel WebSocket fica aberto para comunicação bidirecional; o MCP da estação envia o job e
-recebe o ID do job; o MCP fica escutando o servidor; a cada job concluído o servidor devolve o ID e o resultado; o MCP devolve a
-quem solicitou.
+### 1.1 Pedido original (2026-10-30 22:40)
+
+"Um websocket para ter comunicação bidirecional, sendo o servidor da IA o servidor e a estação o MCP; o MCP não fica esperando o
+response; quando a IA finalizar o job, envia para a estação solicitante."
+
+### 1.2 Ampliação (2026-11-04, conversa 16:56–17:51; detalhe literal no report §6)
+
+1. A fila hoje é **síncrona**: a resposta volta pela mesma conexão; com `--gen-slots 1`, um job por vez; se a IA desiste (timeout de
+   120 s do mcpollama), o gateway **cancela** o job e o trabalho se perde; a regra global manda subir para IA paga → custo.
+   Evidência medida hoje: 10 agentes × 3 tarefas no `gemma4:26b` → **25/30 ok, 5 timeouts a 300 s, p50 228 s**; no `gemma4:31b`
+   **6/30 ok, 24 timeouts**.
+2. O owner quer: **enviar jobs e lotes**, seguir trabalhando, **buscar os resultados mesmo no dia seguinte**, ser **avisado sem gastar
+   tokens na espera**, e **registro de 100% do que entra e sai** com dados de projeto/sessão/usuário/modelo, sem perder informação
+   (dentro de limites explícitos, ver D11-31).
+3. Webhook não alcança a IA (stdio, NAT); WebSocket é **transporte**, não acorda o modelo; o que acorda o Claude Code é um **comando em
+   segundo plano** ou **subagente** que termina enquanto a sessão está ativa (medido nesta sessão) e, no dia seguinte, um **hook
+   `SessionStart`** que informa os lotes prontos. `claude --resume <sessão>` abre rodada nova automaticamente, mas **consome uso pago**
+   (Codex §14.2).
+4. A espera de uma ferramenta não consome tokens; consultas repetidas do modelo consomem (report §7.5).
+
+### 1.3 Fronteiras (Codex §14.1, adotadas)
+
+- **Job assíncrono** desacopla a geração da conexão original.
+- **Aviso** (WebSocket/notificação MCP) entrega um evento a um processo; **não** cria rodada do modelo.
+- **Nova rodada do Claude** só acontece se uma execução ativa receber uma tarefa concluída, ou se outra execução for iniciada.
+- **Fase 11 ≠ Fase 13:** a Fase 11 resolve espera, persistência e retomada; não melhora a precisão nem reduz GPU. O aceite roda com o
+  modelo escolhido na Fase 13 (não com servidor temporário de bake-off).
+
+## 2. Decisões
+
+### 2.1 Decisões do plano original (2026-10-30) e situação após o redesenho
+
+| # | Decisão (resumo fiel) | Situação em 2026-11-04 |
+| --- | --- | --- |
+| D11-1 | Tools enviar/resultado: a tool devolve o ID na hora; o Claude busca com outra tool | **mantida** |
+| D11-2 | Estação/sessão cai antes do fim → guardar e entregar ao voltar (não cancela) | **mantida**, reforçada por fila durável (D11-35) |
+| D11-3 | Só o mcpollama usa WebSocket | **mantida para quando houver WS**; WS adiado (D11-33) |
+| D11-4 | LAN (nginx :8443) e internet (túnel Cloudflare), mesmo Bearer | **ajustada**: mesmo caminho, com **token por usuário** (D11-32) |
+| D11-5 | Resultado de job não terminado responde na hora com o estado; opcional esperar N s | **mantida** (espera longa por HTTPS, D11-33) |
+| D11-6 | **Todas** as tools assíncronas (`generate`, `chat`, `summarize_file`, `extract`, `translate`, `embed`) devolvem ID | **mantida até o owner decidir o contrário** (Codex §14.4-8); a alternativa compatível `assincrono:true` é a pendência P11-7 |
+| D11-7 | Quem busca = mesma máquina/usuário + ID | **substituída** por D11-32 (dono = token do usuário; mesma pessoa busca de qualquer máquina) |
+| D11-8 | `list_models` síncrona | mantida |
+| D11-9 | `embed` também assíncrona | mantida (segue D11-6) |
+| D11-10 | Biblioteca `github.com/coder/websocket` | **adiada** com o WS (D11-33); se entrar, registrar no NOTICE |
+| D11-11 | Segredo por job no perfil do usuário (`%LOCALAPPDATA%\mcpollama\jobs.json`), servidor guarda só o hash | **substituída** por D11-32 (token por usuário); segredo por job fica como opção futura de reforço |
+| D11-12 | Resultado guardado 30 min para entrega | **substituída** por D11-31 (90 dias) |
+| D11-13 | Mesma fila do gateway (prioridade, justiça, limites, pool, políticas) | mantida, + faixa de lote (D11-38) |
+| D11-14 | Sem túnel WS, fallback HTTP em segundo plano local com o mesmo ID | **obsoleta**: o transporte principal já é HTTPS (D11-33) |
+| D11-15 | Map-reduce como job composto **local** na estação | **reaberta** → D11-37 |
+| D11-16 | Servidor empurra o `result` assim que conclui | **adiada** com o WS (D11-33) |
+| D11-17 | Toda resposta de tool leva "jobs concluídos aguardando leitura: N" | mantida |
+| D11-18 | Notificação do Windows (toast sem conteúdo, `--notify`) | mantida como opcional |
+| D11-19 | `aguardar_jobs(ids[], timeout_s)` em ciclo (owner 5 min; spike recomendou 100 s, máx. 110 s) | **reaberta** → D11-36 (`--esperar` em segundo plano como padrão; ciclo ≤ 100 s como reserva) |
+| D11-20 | Fallback HTTP com garantia menor | obsoleta (ver D11-14) |
+| D11-21 | Limpeza do `jobs.json` local | obsoleta (sem `jobs.json`; D11-32) |
+| D11-22 | Composto interrompido = "reenvie" | **reaberta** → D11-37 |
+| D11-23 | Entrega "pelo menos uma vez"; `ack` quando o Claude lê; idempotência por ID; **nenhum conteúdo em disco na estação** | mantida (vale para HTTPS e, depois, WS) |
+| D11-24 | Cancelar composto | segue D11-37 |
+| D11-25 | Fallback com ≤ 2 HTTP simultâneos e 10 min por parte | obsoleta |
+| D11-26 | Cancelamento idempotente e tolerante a cruzamento | mantida |
+| D11-27 | Esperas sobre registro, sem erro espúrio na reconexão | mantida (adaptada a HTTPS) |
+| D11-28 | `listar_jobs` só pendentes/não lidos, máx. 20, filtros | mantida, + filtros por lote/rótulo/data |
+| D11-29 | Justiça por IP real + rótulo também no novo transporte | mantida, + dono por token (D11-32) |
+
+### 2.2 Decisões novas do owner (2026-11-04 18:24, após a avaliação do Codex)
 
 | # | Decisão | Escolha do owner |
 | --- | --- | --- |
-| D11-1 | Como o Claude recebe o resultado | **Tools enviar/resultado**: a tool devolve o ID na hora; o Claude busca o resultado com outra tool |
-| D11-2 | Estação ou sessão cai antes do fim | **Guardar e entregar ao voltar** (o job não é cancelado pela queda) |
-| D11-3 | Quem usa o WebSocket | **Só o MCP** (mcpollama). ia-local, curl e outros continuam no HTTP de hoje, sem mudança |
-| D11-4 | Por onde conecta | **LAN (nginx :8443) e internet (túnel Cloudflare)**, mesmo token Bearer |
-| D11-5 | Tool de resultado com job ainda não terminado | **Responde na hora com o estado** (na fila, posição, rodando há); opcional esperar até N s se o Claude pedir |
-| D11-6 | Tools atuais | **Tudo assíncrono**: `generate`, `chat`, `summarize_file`, `extract`, `translate` (e `embed`, ver D11-9) devolvem o ID |
-| D11-7 | Quem busca um resultado guardado | **Mesma máquina/usuário + ID** |
+| D11-30 | **Texto extraído pelo OCR** é conteúdo (não metadado) | **guardar**, com o prazo do registro (D11-31), mesmo acesso (admin e dono); junto os metadados (hash do arquivo e por página, páginas totais/lidas, dimensões/DPI/megapixels, motor/versão/idioma/tessdata, confiança e tempo por página, se a imagem foi direto ao modelo). **Bytes da imagem não são guardados** (decisão de 17:49) |
+| D11-31 | **"100% registrado" = cobertura de toda chamada aceita, dentro de limites explícitos** | **90 dias** (configurável), compactação mensal, **backup cifrado no TrueNAS**, **teto de disco com alerta** (ao atingir avisa e não apaga sozinho), todo corte por tamanho **marcado**; **exclusões expressas**: bytes de imagem e vetores de embedding |
+| D11-32 | **Dono do job** | **token por usuário** (ou por estação) no gateway, revogável e rotacionável; o dono é o token; a mesma pessoa busca de qualquer máquina com o seu token. Cabeçalho `X-Mcpollama-Station` segue como informação declarada, **não** credencial |
+| D11-33 | **Transporte** | **HTTPS primeiro** (envio, consulta com espera longa, cancelamento, listagem); **WebSocket depois**, só se um aceite provar que o aviso imediato agrega valor. Substitui por enquanto D11-16 e adia D11-10/D11-3 |
 
-Fatos verificados na documentação do Claude Code (2026-10-30, `code.claude.com/docs/en/mcp.md` e `channels.md`) que moldaram as
-opções: (1) o modelo só vê um resultado quando uma tool devolve: um servidor MCP não acorda a sessão (os *channels* que fazem isso
-estão em preview e só aceitam plugins de allowlist); (2) as *tasks* MCP assíncronas exigem Claude Code ≥ 2.1.304 (instalado:
-2.1.296) — não escolhidas; (3) chamada MCP > 2 min vai sozinha para segundo plano; o corte real hoje é o `--timeout` 120 s do
-mcpollama, e com a fila de 64 a espera pode passar disso — o modelo assíncrono resolve.
+### 2.3 Decisões técnicas propostas (a confirmar na 11.0)
 
-## 2. Decisões técnicas propostas (confirmar na aprovação)
-
-| # | Proposta | Motivo |
+| # | Proposta | Motivo (Codex §14.3) |
 | --- | --- | --- |
-| D11-8 | `list_models` continua síncrona | não entra na fila; responde em ms |
-| D11-9 | `embed` também vira assíncrona — **confirmado pelo owner (22:47)** | consistência com D11-6 |
-| D11-10 | Biblioteca WebSocket em Go: `github.com/coder/websocket` (ex-nhooyr), nos dois lados | mantida, sem cgo, `context` nativo; a stdlib não tem WebSocket e `x/net/websocket` está desaconselhado. Nova dependência → registrar no NOTICE |
-| D11-11 | **Confirmado pelo owner (22:47).** "Mesma máquina/usuário" garantido por **segredo por job**: o mcpollama gera um segredo aleatório por job, manda só o hash ao servidor e guarda o segredo num arquivo do perfil do usuário (`%LOCALAPPDATA%\mcpollama\jobs.json`, ACL só do usuário) | o rótulo `<máquina>/<usuário>` é declarado pelo cliente e qualquer um com o token poderia forjá-lo; o segredo no perfil é o que de fato prende o resultado àquela máquina e usuário, e sobrevive a reiniciar a sessão |
-| D11-12 | **Confirmado pelo owner (22:47).** Resultado guardado para entrega por **30 min** depois do fim (configurável), em memória + SQLite do gateway; entregue = apagado da área de entrega (o `content.db` de 7 dias continua como hoje, só admin) | reaproveita o armazenamento existente (SSOT); limita o que fica no servidor |
-| D11-13 | O job **entra na mesma fila** do gateway (prioridade, justiça por cliente, limites 64/128, pool de backends, políticas `think`/`keep_alive`) | uma fila só; o `/monitor` mostra os jobs do WebSocket como os demais |
-| D11-14 | Se o WebSocket não conectar, o mcpollama roda o job pelo HTTP de hoje **em segundo plano local** e devolve o mesmo ID ao Claude | o contrato com o Claude (enviar/resultado) não depende do transporte; nada para de funcionar se o túnel cair |
-| D11-16 | **Owner (23:03): entrega imediata.** Assim que o job termina, o servidor **empurra** `result` para a conexão da estação que pediu, sem esperar ser perguntado (a notificação do Windows sai nessa hora). O `ack_result` e a remoção no servidor seguem a D11-23 (quando o Claude lê); a retenção de 30 min (D11-12) é o teto | é o "envia para a estação assim que concluir" do owner |
-| D11-17 | **Owner (23:05): aviso na próxima resposta.** Toda resposta de tool do mcpollama leva no fim "Jobs concluídos aguardando leitura: N (ids…)" enquanto houver resultado recebido e não lido; o `resultado_job` entrega na hora (já está na estação) | o Claude só vê algo quando chama uma tool; assim percebe sem perguntar ID a ID |
-| D11-18 | **Owner (23:05): notificação do Windows.** Ao receber um resultado, o mcpollama mostra um aviso na área de notificação do Windows ("Job a1b2c3 concluído — extract, 12,4 s"). Sem dependência nova: via PowerShell/WinRT (`Windows.UI.Notifications`) em processo filho; flag `--notify` (padrão ligado no Windows, sem efeito no Linux); sem conteúdo do resultado no aviso (só id, tool, tempo, ok/erro) | o owner vê a conclusão mesmo sem olhar o Claude; o texto do aviso não expõe dados de cliente |
-| D11-19 | **Owner (23:20), ponto 1 da revisão externa:** nova tool **`aguardar_jobs(ids[], timeout_s≤300)`**: bloqueia até **algum** job da lista terminar e volta **na hora** com o resultado; se der 5 min sem conclusão, devolve o estado de cada um ("na fila, posição N" / "rodando há X") e o Claude chama de novo, **a cada 5 min, até concluir**. As descrições das tools instruem: "sem outra tarefa, chame aguardar_jobs". Interação com o auto-background do Claude Code (chamada > 2 min vai para segundo plano, `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS`): **provar no spike da 11.1** se o modelo é avisado ao fim; se não for, usar timeout < 2 min por chamada ou parar e consultar o owner | resolve o "Claude ocioso nunca vê o aviso" (D11-17 sozinho não basta) |
-| D11-20 | **Owner (23:20), ponto 2:** fallback HTTP **com garantia menor**. Sem túnel, o mcpollama roda o job por HTTP numa goroutine local e, ao terminar, **ele mesmo** dispara a notificação do Windows (D11-18) e o aviso (D11-17), com o mesmo ID. Não há push do servidor nem retenção (D11-2/D11-12): se o processo cair, o servidor cancela o job (499). A resposta da tool informa "modo HTTP, sem retenção" | o push (D11-16) só existe no WebSocket; o evento de conclusão no fallback é local |
-| D11-21 | **Ponto 3 (correção, sem decisão do owner):** limpeza do registro local `jobs.json`: a entrada sai quando o Claude lê o resultado ou quando expira (fim + 30 min + 1 h de folga); compactação na partida; gravação atômica (arquivo temporário + rename); teto de entradas (ex.: 1000, as mais antigas saem primeiro) | evita crescimento sem fim do arquivo |
-| D11-22 | **Owner (23:20), ponto 4:** job composto (map-reduce de arquivo grande) que estava em andamento quando o processo reiniciou fica **"interrompido — reenvie"**; o Claude reenvia. Registro local do composto: `{id, tool, caminho, sha256 do texto, partes[{sub_id, estado}], etapa}` só para listar/mostrar e cancelar os sub-jobs no servidor (`cancel`); sem retomada | simples e sem risco de juntar partes de versões diferentes do arquivo |
-| D11-23 | **Owner (23:20), ponto 5:** entrega **"pelo menos uma vez"**. O `ack_result` só é enviado **quando o Claude lê** o resultado (`resultado_job`/`aguardar_jobs`); até lá o servidor guarda (máx. 30 min). Na (re)conexão, depois do `hello`/`resume` com os claims, o servidor **reenvia sozinho** todo resultado concluído e não confirmado daquela estação; a estação **descarta repetidos pelo ID** (idempotente). Nenhum conteúdo de resultado é gravado em disco na estação (fica só em memória do processo) | fecha a corrida de rede no envio do `result`; sem dados de cliente no disco da estação |
-| D11-24 | **Revisão externa, ponto 6 (correção):** cancelar job composto. O registro local mapeia ID mestre → sub-IDs; `cancelar_job(mestre)` envia `cancel` a cada sub-job pendente e `ack_result` a cada sub-job já concluído (o servidor apaga da área de entrega); o mestre fica "cancelado" | sem lixo no servidor |
-| D11-25 | **Ponto 7 (correção):** fallback HTTP de job composto não precisa de polling (cada parte é um pedido HTTP que espera a sua resposta, como hoje). Limites no fallback: **no máximo 2 pedidos HTTP simultâneos por processo** (a GPU atende 1 por vez) e **timeout de 10 min por parte** (o Claude não está bloqueado; o corte de 120 s era para a espera síncrona) | não esgota `limit_conn` do nginx nem corta por espera na fila |
-| D11-26 | **Ponto 8 (correção):** cancelamento idempotente e tolerante a cruzamento. Estação: `result` de job marcado cancelado → descarta e envia `ack_result`. Servidor: `cancel` de job já concluído → responde `cancel_result {id, outcome:"ja_concluido"}` e apaga; de job desconhecido → `outcome:"desconhecido"`. Toda mensagem é idempotente por ID | pacotes cruzados não deixam estado pendurado |
-| D11-27 | **Ponto 9 (correção):** esperas (`resultado_job` com `esperar_s`, `aguardar_jobs`) são sobre o **registro local em memória**, não sobre o túnel. Queda do túnel durante a espera: a reconexão (backoff 1→30 s + `resume`) corre em segundo plano; a espera devolve o resultado se ele chegar, ou, ao fim do prazo, o estado com "túnel reconectando". Erro só se, após reconectar, o servidor disser que o job não existe ("perdido") | sem erro espúrio nem bloqueio além do prazo pedido |
-| D11-28 | **Ponto 10 (correção):** `listar_jobs` mostra só pendentes e não lidos (mais recentes primeiro), **no máximo 20**, com filtro opcional (`estado`, `desde`); jobs lidos saem do registro (D11-21) | não polui o contexto do Claude |
-| D11-29 | **Ponto 11 (já tratado no HTTP; estender ao WebSocket):** a justiça da fila usa `IP real + rótulo` (`queue.clientKey`); o nginx calcula o IP real (`$ollama_client_ip`: `remote_addr` na LAN, `CF-Connecting-IP` no túnel) e o gateway só confia no `X-Real-IP` vindo do loopback (`proxy.clientIP`). A `location /api/ws` (11.3) repete `proxy_set_header X-Real-IP $ollama_client_ip`, os mesmos `limit_conn`/`limit_req` e o Bearer. Ressalva documentada: estações atrás de NAT (ex.: 10.100.2.1) dividem o limite de 64 por IP, mas seguem separadas na justiça pelo rótulo `<máquina>/<usuário>` | mesma regra de justiça nos dois transportes |
-| D11-15 | `summarize_file`/`extract`/`translate` continuam lendo o arquivo **na estação** (o texto não sai do lado do cliente antes do envio); o map-reduce de arquivo grande é um **job composto** local: um ID para o Claude, vários sub-jobs no servidor | o arquivo só existe na estação; o servidor guarda cada sub-resultado (D11-12) |
+| D11-34 | **Uma fonte única de estado durável**: um banco novo do gateway (nome provisório `jobs.db`, 0600, `mcpgw`) é a **autoridade** de estado do job assíncrono/lote, dono, idempotência, tentativas, resultado e texto integral (90 dias). `gateway.db` (métricas) e `content.db` (log síncrono de 7 dias) passam a ser **projeções**; falha de projeção não altera o estado; reconciliação documentada | SQLite não faz transação entre arquivos; evitar máquina de estados duplicada (achado 4) |
+| D11-35 | **Execução pelo menos uma vez, resultado exatamente uma vez**: chave de idempotência por envio, contador de tentativas, *lease* do job em execução, **resultado gravado de forma durável antes de anunciar conclusão**; job `interrompido_reboot`/`interrompido_gateway` volta à fila até N tentativas; duplicação de cálculo permitida, duplicação/mistura de resultado não | achado 5 |
+| D11-36 | **Espera da IA**: padrão = `mcpollama-mcp.exe --esperar <job|lote>` em `Bash run_in_background` (zero tokens na espera; o Claude Code reativa o modelo ao terminar, com a sessão ativa); reserva = `job_resultado(aguardar_s ≤ 100)` (volta antes do auto-background de 120 s); dia seguinte = hook `SessionStart` com `--lotes-prontos` devolvendo **só IDs/estado/resumo mínimo**, nunca texto de documento | achados 14.2; spike 11.1 |
+| D11-37 | **Extração e OCR continuam na estação.** Map-reduce: o mcpollama envia as partes de texto já extraídas e o gateway orquestra as partes e a junção (sobrevive ao fim da sessão), com vínculo a hash do arquivo, versão das instruções, IDs/ordem das partes e resultado da redução. O texto das partes é retido pelo prazo da D11-31 (aprovado em 18:24) | achado 8 |
+| D11-38 | **Lotes**: prioridade baixa por padrão, **limite de lote admitido e ativo** (jobs por lote, lotes por dono, bytes), envelhecimento existente; sem preempção (um job de lote já iniciado não é interrompido): **medir a espera interativa no aceite** | achado 10 |
+| D11-39 | **Fixar no job**: modelo resolvido + **digest**, `think`, contexto/parâmetros efetivos e versão da instrução da tool | achado 9 |
+| D11-40 | **Fronteira do registro integral**: o gateway registra o corpo enviado ao Ollama e a resposta (incluindo `[raciocínio]`, que **já é gravado** por `respTee`, `src/gateway/proxy/journal.go:214-250`); o mcpollama envia **envelope** (tool, argumentos sem segredos, caminho e hash do arquivo, versão da tool, cliente/versão do `initialize`, projeto/diretório) e **fechamento** (texto final entregue ao Claude, estado de entrega, marcadores de truncamento). Sem tokens/segredos em nenhum registro | achados 2 e 7 |
 
-## 3. Protocolo (rascunho, vira `docs/PROTOCOLO-WEBSOCKET.md`)
+## 3. Arquitetura alvo (rascunho)
 
-- Endpoint: `wss://ia.cslsolucoes.com.br:8443/api/ws` (LAN) e `wss://ia.cslsolucoes.com.br/api/ws` (internet). Auth: `Authorization: Bearer` no handshake (nginx, igual ao HTTP). Cabeçalhos `X-Mcpollama-Client` e versão.
-- Mensagens JSON, uma por frame:
-  - estação → servidor: `submit {ref, endpoint, body, claim_hash, priority?}` · `status {ids[]}` · `resume {ids[], claims[]}` · `cancel {id, claim}` · `ack_result {id}` · `ping`
-  - servidor → estação: `accepted {ref, id, position}` · `rejected {ref, reason}` · `progress {id, state, position, running_ms}` (opcional, ao mudar) · `result {id, status, http_status, body, prompt_eval_count, eval_count}` · `cancel_result {id, outcome}` (D11-26) · `pong`
-- Entrega "pelo menos uma vez" (D11-23): `ack_result` só quando o Claude lê; reenvio automático na reconexão; idempotência por ID.
-- Keepalive: ping a cada 25 s (o Cloudflare fecha WebSocket ocioso por ~100 s). Reconexão com backoff (1 s → 30 s) e `resume` dos IDs pendentes.
-- Limites: tamanho máximo de mensagem = `--max-prompt-chars`/corpo atual; jobs pendentes por conexão sujeitos aos limites da fila.
+```
+Claude Code ──stdio──▶ mcpollama 0.11.0 ──HTTPS (token do usuário)──▶ nginx ──▶ gateway 0.14.0 ──▶ Ollama
+     ▲                     │  --esperar <id> (processo local, long-poll)        │ jobs.db (autoridade: estado, dono, lote,
+     │ notificação de      │  --lotes-prontos (hook SessionStart)               │   idempotência, tentativas, resultado, texto 90 d)
+     └─ tarefa concluída ◀─┘                                                    │ gateway.db (métricas, projeção)
+                                                                                │ content.db (log síncrono 7 d, projeção)
+```
 
-## 4. Tools do mcpollama (contrato com o Claude)
+Endpoints HTTPS (rascunho, viram `docs/PROTOCOLO-JOBS.md`; todos exigem o token do usuário, dono = token):
 
-- `generate`, `chat`, `summarize_file`, `extract`, `translate`, `embed` → devolvem `{job_id, estado: "na_fila", posicao}` em ms.
-- **Nova** `resultado_job(job_id, esperar_s?=0)` → `{estado, posicao?, rodando_ms?}` ou o resultado completo (mesmo formato de
-  hoje, com os contadores `[uso]`); `esperar_s` até 60.
-- **Nova** `aguardar_jobs(job_ids[], timeout_s≤300)` → volta assim que algum terminar (com o resultado) ou, aos 5 min, com o
-  estado de cada um; "sem outra tarefa, chame de novo" (D11-19).
-- **Nova** `listar_jobs()` → jobs desta máquina/usuário (pendentes e prontos para entrega).
-- **Nova** `cancelar_job(job_id)`.
-- Descrições das tools ensinam o Claude a seguir trabalhando e buscar depois; `TOOLS.md` regenerado por `src/cmd/dumptools`.
+| Método e caminho | Função |
+| --- | --- |
+| `POST /api/jobs` | envia um job (corpo do pedido + envelope D11-40 + `idempotency_key`); devolve `job_id`, posição, espera estimada |
+| `GET /api/jobs/{id}?aguardar_s=N` | estado ou resultado; segura até concluir ou N s (≤ 100 por padrão do cliente) |
+| `GET /api/jobs?estado=&lote=&rotulo=&desde=&limite=` | lista do dono |
+| `POST /api/jobs/{id}/cancelar` | cancelamento idempotente (D11-26) |
+| `POST /api/jobs/{id}/fechamento` | o mcpollama registra o texto final entregue ao Claude (D11-40) |
+| `POST /api/lotes` · `GET /api/lotes/{id}` · `GET /api/lotes?prontos=1` | lotes |
 
-## 5. Etapas
+Tools do mcpollama (D11-6 mantida): as tools atuais devolvem `{job_id, estado, posicao}`; novas `resultado_job(job_id, aguardar_s)`,
+`listar_jobs(filtros)`, `cancelar_job(job_id)`, `enviar_lote(rotulo, pedidos[])`, `resultado_lote(lote_id, pagina)`. CLI
+`--esperar <id>` e `--lotes-prontos`. Descrições das tools ensinam: enviar → seguir → esperar em segundo plano → ler. `TOOLS.md`
+regenerado por `src/cmd/dumptools`.
+
+## 4. Etapas
 
 | # | Etapa | Modelo | Estado |
 | --- | --- | --- | --- |
-| 11.0 | Aprovação deste plano e das D11-8…D11-29 | owner | **concluído** (2026-10-30 23:25) |
-| 11.1 | **Spike primeiro (gate da fase):** um servidor MCP mínimo com uma tool que bloqueia 3 min, chamado de uma sessão real do Claude Code — provar (a) se a chamada vai para segundo plano aos 2 min, (b) se o modelo é avisado/acordado quando ela termina, (c) o comportamento com timeout de 5 min (D11-19). Resultado decide o timeout da `aguardar_jobs`. Depois: protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`, com entrega "pelo menos uma vez", `resume` e reenvio automático — D11-23) + testes de contrato | sonnet | **spike concluído em `-p` (2026-10-30 23:46)**, resultado parcial: relatório `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`. 300 s sem background devolve o resultado; com background (>120 s) o modelo recebe só "movida para segundo plano" e a notificação final **não foi provada** (precisa de teste interativo). Recomendação: `aguardar_jobs` com `timeout_s` padrão 100 s e máx. 110 s por chamada. **Pendentes:** teste interativo pelo owner e protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`) + testes de contrato |
-| 11.2 | Gateway: endpoint `/api/ws`, ligação com a fila, jobs independentes da conexão, área de entrega 30 min, dono por `claim_hash`, `resume`, `cancel`, métricas | sonnet | pendente |
-| 11.3 | nginx: `location /api/ws` (Upgrade/Connection, `proxy_read_timeout` longo, mesmos limites e Bearer); conferir o túnel Cloudflare | sonnet | pendente |
-| 11.4 | mcpollama: cliente WebSocket persistente (reconexão, keepalive), recebimento imediato com `ack_result` (D11-16), registro local de jobs com segredo no perfil do usuário, fallback HTTP em segundo plano (D11-14), jobs compostos (D11-15), aviso na próxima resposta (D11-17) e notificação do Windows (D11-18) | sonnet | pendente |
-| 11.5 | mcpollama: tools assíncronas + `resultado_job`/`listar_jobs`/`cancelar_job`; `TOOLS.md` | sonnet | pendente |
-| 11.6 | `/monitor`: conexões WebSocket ativas por cliente; estado "aguardando entrega" | sonnet | pendente |
-| 11.7 | Revisão adversarial (dono do resultado, forja de rótulo, `resume` com claim errado, flood de submit, mensagens gigantes, reconexão em massa) + testes de ataque guardados em `.workspace/reports/...testes/` | **opus** | pendente |
-| 11.8 | Gate: build/vet/gofmt, `go test -count=1 ./...`, `-race`, build Linux, ataques 9.5/10.5/10.L/11.7 | sonnet | pendente |
-| 11.9 | Implantação: gateway 0.13.0 (instalador), nginx, mcpollama 0.10.0 em `D:\MCP`; reiniciar sessões | coordenador | pendente |
-| 11.10 | Aceite ao vivo: 30 jobs enviados de uma vez → 30 IDs na hora; cada conclusão chega na estação na hora (notificação do Windows + aviso na próxima resposta); Claude segue trabalhando; resultados buscados; queda de rede no meio (desligar Wi-Fi/cabo) → resultado entregue ao voltar; reiniciar a sessão do Claude → `listar_jobs` recupera; via internet (Cloudflare); outra máquina/usuário NÃO lê o resultado | coordenador + owner | pendente |
-| 11.11 | Documentação: README, CLAUDE.md, MANUAL-GATEWAY, CHANGELOG, **CLAUDE.md global** (a seção do nível `local` ensina o uso das tools: passa a ser enviar → seguir → `resultado_job`), CONEXAO-IA; relatório final | sonnet | pendente |
+| 11.0 | Aprovação deste plano: confirmar D11-34…D11-40 e as pendências P11-x; contrato `docs/PROTOCOLO-JOBS.md` + contrato de registro (completude, limites, exclusões, truncamento, retenção, backup, disco cheio) | owner + opus | **pendente** |
+| 11.1 | Spike de espera (2026-10-30, `claude -p`): **feito** (300 s sem background devolvem o resultado; background aos 120 s com `CLAUDE_AUTO_BACKGROUND_TASKS=1`; notificação final não provada em `-p`) | sonnet | **concluído (parcial)** |
+| 11.1b | **Prova no Claude Code dentro do Cursor** (Codex §14.4-6): comando local de espera em segundo plano concluindo com o turno ativo; sessão fechada e reaberta com job pronto antes do `SessionStart`; medir o uso do Claude na conclusão; registrar versões | sonnet + owner | pendente |
+| 11.2 | Tokens por usuário no gateway (emissão, revogação, rotação, nginx, `.mcp.json` das estações; compatibilidade com o token único atual durante a transição) | sonnet | pendente |
+| 11.3 | `jobs.db` (D11-34): esquema, máquina de estados, idempotência, *lease*, tentativas (D11-35), projeções e reconciliação | sonnet | pendente |
+| 11.4 | Endpoints HTTPS (§3) com espera longa, listagem e cancelamento; dono por token | sonnet | pendente |
+| 11.5 | Registro integral (D11-30/31/40): envelope e fechamento, metadados e texto OCR, campos `TEXT` (tratar bytes inválidos), 90 dias, compactação mensal, teto com alerta, marcação de cortes, backup cifrado no TrueNAS | sonnet | pendente |
+| 11.6 | Map-reduce orquestrado no gateway com partes extraídas na estação (D11-37) | sonnet | pendente |
+| 11.7 | Lotes (D11-38): faixa, limites, rótulo, `enviar_lote`/`resultado_lote` | sonnet | pendente |
+| 11.8 | mcpollama: tools assíncronas (D11-6), `--esperar`, `--lotes-prontos`, aviso D11-17, toast D11-18 opcional; fixar modelo/digest (D11-39) | sonnet | pendente |
+| 11.9 | Hook `SessionStart` (modelo de configuração para as estações; só IDs/estado) | haiku | pendente |
+| 11.10 | `/monitor`: jobs assíncronos, lotes, "pronto não buscado", tokens por usuário (sem expor segredo) | sonnet | pendente |
+| 11.11 | Revisão adversarial (dono/IDOR, token revogado, idempotência, flood de lotes, lote gigante, disco cheio, envelope/fechamento mentiroso, reconciliação de projeções, reboot no meio) + testes de ataque guardados em `.workspace/reports/...testes/` | **opus** | pendente |
+| 11.12 | Gate: build/vet/gofmt, `go test -count=1 ./...`, `-race`, build Linux, ataques 9/10.5/12/11 | sonnet | pendente |
+| 11.13 | Implantação com rollback (instalador `-Modo Atualizar`), mcpollama em `D:\MCP`, reiniciar sessões | coordenador | pendente |
+| 11.14 | Aceite ao vivo com o modelo escolhido na Fase 13: 30 jobs de uma vez; lote de madrugada e busca no dia seguinte; reboot do servidor no meio (job volta e conclui uma vez); outra pessoa não lê; espera interativa medida com lote ativo; via internet | coordenador + owner | pendente |
+| 11.15 | Documentação: README, CLAUDE.md (projeto e global: novo fluxo do nível `local`), MANUAL-GATEWAY, `TOOLS.md`, `D:\MCP\Documentation\Ollama`, CHANGELOG; relatório final | sonnet | pendente |
+| 11.16 | (Depois, condicional) WebSocket como otimização de aviso (D11-33), mantendo D11-23 | sonnet | condicional |
+| 11.17 | (Independente) opção `-think` no bake-off e medição com raciocínio (útil a lotes) | sonnet | pendente |
 
-## 6. Riscos e pendências conhecidas
+## 5. Riscos
 
-1. Mudança incompatível: sessões com mcpollama ≤ 0.9.x continuam no HTTP síncrono (servidor aceita os dois); o GestorERP precisa
-   reiniciar para pegar o 0.10.0.
-2. O modelo precisa lembrar de buscar o resultado (D11-1). Mitigação: a resposta do envio diz "busque com resultado_job"; o
-   `listar_jobs` mostra o que ficou pendente.
-3. Job composto (map-reduce): se o processo reiniciar no meio, fica "interrompido — reenvie" (D11-22); os sub-jobs pendentes são
-   cancelados no servidor.
-6. A `aguardar_jobs` depende de como o Claude Code trata chamadas longas (auto-background aos 2 min); o spike da 11.1 é o gate:
-   se o modelo não for avisado no fim, o timeout por chamada fica abaixo de 2 min ou o owner é consultado.
-4. Dados sensíveis: o resultado fica até 30 min na área de entrega do gateway, além do `content.db` (7 dias, só admin) que já
-   existe. A área de entrega segue a mesma regra de backup pendente (excluir ou cifrar).
-5. Cloudflare: WebSocket pelo túnel precisa estar liberado na zona (padrão: liberado); conferir na 11.3.
+1. **Energia (fonte de 850 W):** lotes longos mantêm as GPUs sob carga por horas; reinícios já ocorreram; a fila durável mitiga perda,
+   não a causa.
+2. **1 slot sem preempção:** um job de lote iniciado segura o interativo (D11-38); medir.
+3. **Disco:** 90 dias de texto integral + compactação; teto com alerta (D11-31).
+4. **Dados de cliente acumulados** 90 dias + backup cifrado: LGPD, acesso só admin/dono.
+5. **Transição de token único para token por usuário:** quebra de estações não atualizadas; período de convivência.
+6. **Execução repetida** em reboot (custo de GPU), aceito por D11-35.
+7. **Comportamento do cliente:** depende do Claude Code (auto-background, notificação de tarefas, hooks); mudanças de versão.
+8. **Mudança incompatível das tools (D11-6):** sessões antigas seguem no síncrono; servidor aceita os dois.
 
-## 8. Ponto de retomada (congelado em 2026-10-30 23:50)
+## 6. Pendências numeradas (P11-x)
 
-1. **Decisão pendente do owner (D11-19, tempo de espera da `aguardar_jobs`):** o spike 11.1
-   (`.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`, commit `f8c723e`) provou em `claude -p`
-   (Claude Code 2.1.296): sem auto-background, esperas de 170 s e 300 s voltam normais com o resultado; com
-   `CLAUDE_AUTO_BACKGROUND_TASKS=1`, aos ~120 s a chamada vai para segundo plano e o modelo recebe "você receberá uma notificação
-   com o resultado quando terminar" — se essa notificação acorda o modelo no uso interativo **não foi provado**. Opções
-   apresentadas ao owner: (a) teste interativo curto (`claude --mcp-config <spike>` num terminal, ~10 min); (b) ciclo de ~100 s
-   por chamada (provado); (c) `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=0` nas estações + 5 min (não testado).
-2. Restante da 11.1: protocolo escrito (`docs/PROTOCOLO-WEBSOCKET.md`) + testes de contrato.
-3. Etapas 11.2–11.11: não iniciadas.
-4. Considerar atualizar o Claude Code (≥ 2.1.304 habilita as *tasks* MCP), o que pode reabrir a D11-1.
-5. O servidor de spike fica no scratchpad da sessão (`scratchpad\spike111\`, fora do repo, temporário); o código está descrito
-   no relatório.
+1. P11-1 — Confirmar D11-34…D11-40 (11.0).
+2. P11-2 — Executar a prova 11.1b no Cursor + Claude Code.
+3. P11-3 — Definir o limite de disco/alerta e o destino exato do backup cifrado no TrueNAS (caminho, chave, rotação).
+4. P11-4 — Definir limites de lote (D11-38) e prioridade padrão.
+5. P11-5 — Esquema de emissão/distribuição dos tokens por usuário (quem emite, como revoga, como a estação guarda — sem colocar em git).
+6. P11-6 — Verificar se o Claude Code expõe ID de sessão e modelo da IA chamadora ao servidor MCP (para o envelope D11-40); hoje só o
+   `clientInfo` do `initialize` é garantido.
+7. P11-7 — Owner decidir se mantém D11-6 (tudo assíncrono, incompatível) ou adota `assincrono:true` + tools novas (compatível).
+8. P11-8 — Atualizar o Claude Code para ≥ 2.1.304 (MCP *tasks*) e reavaliar o desenho.
+9. P11-9 — Webhook para integrações com servidor (n8n/ERP): fora do escopo inicial.
+10. P11-10 — `BLOB` × `TEXT` no `content.db`: confirmar o motivo do `BLOB` e a estratégia para bytes inválidos.
 
 ## 7. Changelog do plano
 
@@ -138,26 +191,29 @@ mcpollama, e com a fila de 64 a espera pode passar disso — o modelo assíncron
   → `aguardar_jobs` com ciclo de 5 min escolhido pelo owner (D11-19) + spike obrigatório na 11.1; (2) fallback HTTP sem push →
   conclusão local dispara aviso/notificação, sem retenção (D11-20, owner); (3) `jobs.json` sem limpeza → D11-21; (4) job composto
   sem modelo de dados → "interrompido — reenvie" + registro mínimo (D11-22, owner); (5) corrida no reconectar → entrega "pelo menos
-  uma vez", ack quando o Claude lê, reenvio automático e descarte de repetidos (D11-23, owner). Risco 3 da §6 substituído pela D11-22.
+  uma vez", ack quando o Claude lê, reenvio automático e descarte de repetidos (D11-23, owner).
 - 2026-10-30 23:25 — 2ª rodada da revisão externa (pontos 6–11): 6, 8, 9 e 10 procedem → D11-24, D11-26, D11-27, D11-28; 7 procede
-  em parte (não precisa de polling; o risco real é conexões e o corte de 120 s) → D11-25; 11 já é tratado no HTTP (conferido em
-  `src/gateway/queue/queue.go` `clientKey` e `src/gateway/proxy/proxy.go` `clientIP` + `ollama.conf` `$ollama_client_ip`) →
-  estender ao WebSocket (D11-29). Protocolo da §3 ganha `cancel_result`.
-- 2026-10-30 23:50 — **CONGELADO** por decisão do owner, logo após o spike 11.1 (resultado na §8). Nada de código/implantação foi
-  feito; plano movido para `.workspace/plans/congelados/`.
-- 2026-10-30 23:46 — **11.1, parte "spike" (em `claude -p`, Claude Code 2.1.296, haiku)**; relatório
-  `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`. Servidor MCP stdio mínimo em Go (fora do repo,
-  tool `esperar(s)`), 5 cenários.
-  - **Deu certo:** A (40 s) normal; B0 (170 s) e C0 (300 s) sem a variável: **sem background e sem corte**, o resultado voltou
-    íntegro ao modelo (170,8 s e 300,0 s); com `CLAUDE_AUTO_BACKGROUND_TASKS=1` (B1, C1b) a chamada foi movida para segundo plano aos
-    ~120 s (`task_type: mcp_task`) e o modelo recebeu na hora um `tool_result` "movida para segundo plano, receberá notificação".
-  - **Não deu certo / não provado:** nas execuções com background o `-p` de um tiro terminou antes da tarefa; a tarefa virou
-    `stopped`, o servidor só viu o stdin fechar (sem `notifications/cancelled`) e o resultado nunca chegou ao modelo. Portanto
-    **(b), se o modelo é avisado/acordado ao fim, não foi provado** (a doc diz que sim, via task notification). Erro de processo meu:
-    o laço em background continuou depois da interrupção e disparou um C1 extra em paralelo, que intercalou os arquivos `C1.*`; repeti
-    o cenário sozinho como C1b e uso só ele.
-  - **Solução/decisão proposta:** `aguardar_jobs` com `timeout_s` **padrão 100 s, máx. 110 s** por chamada (volta antes do auto-background
-    de 120 s, o resultado entra como `tool_result` normal), com o ciclo "chame de novo" do D11-19; manter 300 s só se o teste interativo
-    provar que a notificação acorda o modelo, ou se o owner usar `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=0` nas estações. **Pendente:**
-    decisão do owner sobre o D11-19 (100 s em vez de 5 min) e teste interativo (CLI e extensão VS Code) com o `spike.exe` num `.mcp.json`
-    temporário, roteiro no §7 do relatório; protocolo escrito e testes de contrato da 11.1 seguem pendentes.
+  em parte → D11-25; 11 já é tratado no HTTP (`queue.clientKey`, `proxy.clientIP`, `$ollama_client_ip`) → estender (D11-29).
+- 2026-10-30 23:46 — **11.1, parte "spike"** (`claude -p`, Claude Code 2.1.296, haiku); relatório
+  `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`. **Deu certo:** 40 s, 170 s e 300 s sem a
+  variável voltaram íntegros; com `CLAUDE_AUTO_BACKGROUND_TASKS=1` a chamada foi para segundo plano aos ~120 s com aviso ao modelo.
+  **Não provado:** se a notificação final acorda o modelo (o `-p` terminou antes). Erro de processo: laço órfão disparou um C1 extra
+  em paralelo; repetido como C1b. **Proposta:** `aguardar_jobs` 100 s (máx. 110 s).
+- 2026-10-30 23:50 — **CONGELADO** por decisão do owner; nada de código/implantação; plano movido para `.workspace/plans/congelados/`.
+- 2026-11-04 16:56–17:51 — conversa com o owner (somente conversa, sem ação) sobre fila síncrona, timeout, webhook, WebSocket,
+  raciocínio, notificação no Claude Code, custo de tokens da espera, consulta por ID, tools MCP, lotes no dia seguinte, hook
+  `SessionStart`, armazenamento (`lotes.db`), estados de job, histórico com texto em `TEXT`, registro 100% e metadados de OCR.
+  **Deu certo:** consolidado num report de entendimento (`...-175900-fase11-reestruturacao-entendimento-para-revisao.report.md`, 508
+  linhas, varredura de segredos 0). **Não deu certo (erros meus, apontados pelo Codex):** (a) classifiquei o texto do OCR como
+  metadado; (b) afirmei que o raciocínio não era registrado — é (`journal.go:214-250`); (c) propus `lotes.db` sem fonte única de
+  estado; (d) propus "consulta de qualquer máquina" com dono por hash do token, que não separa usuários (todas as estações usam o
+  mesmo token); (e) propus trocar a D11-6 por `assincrono:true` sem marcar como decisão do owner. **Solução:** §2.2/§2.3.
+- 2026-11-04 18:11 — **avaliação independente do Codex** anexada ao report (§14): 10 achados, todos procedentes (conferidos no código
+  os de raciocínio e do cabeçalho declarado); recomendações: separar texto OCR, definir "100%" com limites, fonte única de estado,
+  idempotência e tentativas, dono por credencial real, fronteira do registro, map-reduce com retenção aprovada, desacoplar Fase 13,
+  lote sem preempção, HTTPS antes do WebSocket, provar a espera no Cursor.
+- 2026-11-04 18:24 — **decisões do owner:** D11-30 (guardar o texto OCR com o prazo do registro), D11-31 (90 dias + backup cifrado,
+  teto com alerta, exclusões expressas), D11-32 (token por usuário), D11-33 (HTTPS primeiro, WebSocket depois).
+- 2026-11-04 18:25 — **plano reescrito** neste arquivo (ordem do owner), título novo, decisões antigas com situação (§2.1), decisões
+  novas (§2.2), propostas D11-34…D11-40 (§2.3), arquitetura e endpoints HTTPS (§3), etapas 11.0–11.17 (§4), riscos (§5) e
+  pendências P11-1…P11-10 (§6). **Continua congelado**; próximo passo: 11.0 (aprovação) quando o owner mandar.

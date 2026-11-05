@@ -5,7 +5,8 @@
 > **Escopo (owner, 2026-11-02 15:30):** **base confiável + medição + melhora sem treino**. A fase precisa **reduzir erros já**, sem mexer
 > nos pesos do modelo (D12-15). O treino LoRA segue congelado (§10).
 > **Versões alvo:** mcpollama `0.10.0` (ID do job visível + tool `reportar_erro`) e gateway `0.13.0` (captura canônica, base de treino,
-> aba Erros, melhora sem treino).
+> aba Erros, melhora sem treino) — **implantadas em 2026-11-04**. **Ajustes da release (2026-11-05, não implantados):** gateway
+> `0.13.2` (falso alarme "fora da GPU", 12.12) e mcpollama `0.10.1` (modelo de produção `qwen3.8:27b` com o nome real, 12.13).
 > **Última atualização deste documento:** 2026-11-02 20:28 (sincronizado com o contrato 1.0.0, §16). Fatos de código levantados em 2026-11-02, com `arquivo:linha` relativos a `src/`.
 > **Origem (owner, 2026-11-01 21:31):** "preparar o MCP para se organizar e gerar as informações necessárias para que possamos evoluir
 > e treinar a IA para que determinados erros não ocorram", mais um md que instrua o Claude dos projetos a relatar os erros e o que foi
@@ -608,6 +609,8 @@ haiku, ver "Regras de uso"). Ao usar, indicar "nível local (Qwen)" no texto.
 | 12.9 | revisão adversarial: relato forjado, flood, corpo gigante, injeção no JSONL exportado, **vazamento entre clientes pelos exemplos (D12-15b)**, **resposta do teste vazando pelos exemplos (B1)**, apagamento incompleto (histórico, amostras compartilhadas), vazamento na aba, CSRF, rota `/api/feedback`; ainda: chave HMAC (`--doc-key-file`) ausente ou diferente entre gateways (503, `key_id`, C-4.3a), gateway `--role fallback` guardando amostra (C-1.21), `liberar-quarentena` e cota manipuláveis (C-4.9 a C-4.11a), teto 507 contornável (C-6.2), apagar que deixe conteúdo além da linha mínima (C-6.3), linha de `historico` com texto (C-7.4, C-7.6) | **opus** | achados corrigidos; testes de ataque guardados em `.workspace/reports/...testes/` | ✅ **concluída** (2026-11-04 04:15, sem commit ainda): revisão Opus (0 bloqueadores, 9 importantes, 19 menores), contrato 1.1.6, correções em Sonnet; 364/364 vetores OK |
 | 12.10 | gate completo + implantação (gateway 0.13.0, mcpollama 0.10.0) + aceite ao vivo com o owner | coordenador + owner | `--doc-key-file` gerado pelo instalador, 0600, fora do backup comum, e a **mesma chave** em todos os gateways que atendem as mesmas estações, com o `key_id` conferido (C-4.3, C-4.3a); gateway de fallback (se existir) com `--role fallback` (C-1.21); relato real pela tool e pelo monitor; confirmação (com `resposta_correta`, C-1.12a); exportação com o par certo, só da partição pedida (C-3.11); relatório da 12.7 antes e depois da 12.8 | ✅ **(a) preparação concluída** (`ebadc5f`, sem instalar); ✅ (b) instalação feita em 2026-11-04 13:07 (gateway 0.13.0-5372f4c, mcpollama 0.10.0-5372f4c); estresse A ok; falta o aceite ao vivo depois de reiniciar as sessões |
 | 12.11 | documentação + **`~\.claude\CLAUDE.md` global** (§9.1 e o apontador para `RELATAR-ERROS-IA.md`) | sonnet + coordenador | instruções em vigor; o Claude de outro projeto consegue relatar; `docs/RELATAR-ERROS-IA.md` reflete o `job_do_erro` obrigatório em `translate` e em listas sem `final`, o limite de 64 jobs e os limites de tamanho (C-1.3, C-1.17), e que só o confirmado pelo admin e elegível pela C-3 entra no treino | ✅ **aplicada** (2026-11-04 13:57) |
+| 12.12 | **ajuste: gateway 0.13.2** — falso alarme "degradado (fora da GPU)" quando o `/api/ps` conta em `size` um buffer `CUDA_Host` que não entra em `size_vram` (visto com o `gemma4:26b`, 31/31 camadas na GPU); regra: diferença ≤ 1 GiB **e** ≤ 25% do tamanho = "100% GPU" (`src/gateway/models/models.go` `Processor`) | coordenador (opus) + sonnet (ataques) | `TestProcessor` (26b, offload real de 60%, modelo pequeno 50% fora, 1 GiB + 1 byte) e `TestHostBufferIsNotOffTheGPU`; sem a correção os testes novos falham com "7%/93% CPU/GPU"; ataques 9/10.5/12: 138 PASS, 0 FAIL (`.workspace/reports/MCPOllam2026-11-04-1645-ataques-gateway-0.13.2.log`) | 🟡 **código pronto, não implantado** (2026-11-04 16:51); implantar junto com a 12.13 |
+| 12.13 | **ajuste: modelo de produção `qwen3.8:27b` com o nome real, sem alias** (owner 2026-11-05 10:51, opção "b"; 10:54: "vamos fazer os ajustes necessários na fase 12") — mcpollama **0.10.1** (`defaultModel` e lista padrão), unit do gateway (`--allowed-models "qwen3.8:27b;nomic-embed-text"`, raciocínio por `qwen3.8:27b-think`), `ollama-warm`, `stage2.sh`, contrato 1.1.7 (modelo identificado pelo nome; amostras com `modelo=qwen3-ia` são do `qwen3.5:9b`, digest `56671c2ab938`), bake-off (`-atual` padrão e opção `-think`), documentação | coordenador + sonnet (docs) | **aceite do `qwen3.8:27b` aprovado** (S1/S4/S5, `think` em tarefa grande, carga contínua com watts; relatório da Fase 13 §9b–§9d) + liberação do owner; no servidor: baixar o `qwen3.8:27b`, ajustar warm e gateway, conferir 100% GPU e só depois apagar o `qwen3-ia`; mcpollama 0.10.1 em `D:\MCP` e sessões reiniciadas; linha de base nova do modelo atual (C-5.14) | 🟡 **código e documentação em preparação** (2026-11-05); implantação depende do aceite |
 
 ## 13. Riscos
 
@@ -1415,3 +1418,58 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   - O `~\.claude\CLAUDE.md` global ganhou a seção "MCP `mcpOllama` ativo no projeto → PREFERÊNCIA" (texto da §9.1, com a `reportar_erro` exigindo mcpollama ≥ 0.10.0), logo depois do item "1) MCP mcpOllama" do nível local.
   - O `docs/RELATAR-ERROS-IA.md` agora diz "Em vigor desde 2026-11-04", sem o aviso de instrução futura, e o `docs/README.md` foi alinhado.
   - **Falta só o aceite ao vivo** da `reportar_erro`, numa sessão reiniciada (esta ainda usa a 0.9.2).
+- 2026-11-04 14:12: **validação pós-reinício solicitada pelo owner; sessão nova e suíte verificadas**.
+  - **Sessão MCP:** encontrado `mcpollama-mcp.exe` PID 34744, criado em 2026-11-04 14:07:33, após o reinício informado; o binário em `D:\MCP` respondeu `0.10.0-5372f4c`.
+  - **Protocolo real (stdio, binário instalado + configuração atual do Treinamento):** `initialize` e `tools/list` responderam com exit 0; 8 tools listadas (`chat`, `embed`, `extract`, `generate`, `list_models`, `reportar_erro`, `summarize_file`, `translate`). Chamada de `reportar_erro` com argumentos vazios retornou erro de validação esperado (`projeto is required`), sem inferência nem gravação; isso prova que a tool está registrada e valida a entrada, mas não substitui um relato real.
+  - **Gateway remoto (somente GET):** `/monitor/api/state` HTTP 200, versão `0.13.0-5372f4c`, uptime observado 3.976 s no primeiro snapshot, fila e uso de geração vazios, treinamento habilitado, `treino.total=0`, embeddings pendentes 0. `/api/tags` inicialmente retornou 401 porque o primeiro spike usou o esquema de autenticação incorreto; o manual confirmou `Authorization: Bearer <token>`, repetido com esse esquema e resultou em HTTP 200, modelos: `gemma4-ia:latest`, `gemma4:12b`, `qwen3-ia:latest`, `qwen3.5:9b`, `nomic-embed-text:latest`. Nenhum token foi exibido. Nenhuma geração/feedback real enviado.
+  - **Suíte limpa:** primeira execução de `go test -count=1 ./...` teve 1 falha em `gateway/pool/TestFailureOnASecondaryIsReportedNotMigrated` (status 502 inesperado); o teste isolado passou e o pacote `go test -count=1 ./gateway/pool` passou. Segunda execução integral `go test -count=1 ./...` passou em todos os pacotes, inclusive `gateway/pool` e `gateway/treino`. Registro da falha transitória mantido; não foi ocultada.
+  - **Resultado:** binários, sessão, descoberta MCP, versão e saúde do gateway validados; regressão geral passou na repetição. **Pendente para aceite completo de 12.10:** ocorrer um relato de erro real (não fabricar ocorrência) e então acompanhar confirmação e exportação pela partição correta. Estado de treino continuava vazio durante esta validação. Etapa B/Gemma4/Fase 13 fora do escopo.
+- 2026-11-04 14:21: **rodada de inferência ao vivo autorizada pelo owner; 3 jobs sequenciais validados no MCP e no gateway**.
+  - **Testes direcionados:** `go test -count=1 ./gateway/treino ./gateway/store ./tools ./mcpollama-mcp` passou nos quatro pacotes (`treino` 47.411 s, `store` 2.863 s, `tools` 6.155 s, `mcpollama-mcp` 5.180 s).
+  - **Jobs enviados um por vez por `tools/call`, modelo `qwen3-ia`:**
+    1. `generate`, job `3af080db33cdb919e5827a2521158a10`, solicitado marcador literal `FASE12-JOB-1-OK`; resposta exata, `total_ms=426`, `queue_ms=0`, `load_ms=0`.
+    2. `generate`, job `124a2a693ebb72c62fc5684f11001eac`, solicitado JSON `{"fase":12,"job":2,"status":"ok"}`; JSON retornado corretamente, `total_ms=457`, `queue_ms=0`, `load_ms=0`.
+    3. `chat`, job `e864c1162e3a38c612c14292c009902d`, solicitado marcador literal `RETORNO-CHAT-OK`; resposta exata, `total_ms=351`, `queue_ms=0`, `load_ms=0`.
+  - **Confirmação independente no gateway:** `GET /monitor/api/jobs?limite=100` HTTP 200; os 3 IDs constam com `status=ok`, `responded=true`, `model=qwen3-ia`, `backend=gpu-local` e tools `generate`, `generate`, `chat`. Não foi lido prompt/resposta do log.
+  - **Estado final (GET):** `/monitor/api/state` HTTP 200, gateway `0.13.0-5372f4c`, `started=72`, `finished=72`, `rejected=0`; sem jobs em execução/fila, treinamento habilitado, `treino.total=0`, embeddings pendentes 0. Os 3 jobs de validação não escreveram na base de treino.
+  - **Conclusão:** fluxo real de MCP → gateway → backend GPU → resposta e registro de metadados confirmado para `generate` e `chat`; os 3 jobs foram aceitos e concluídos sem erro. A tool `reportar_erro` está listada e sua validação de entrada foi exercitada sem escrita. Continua pendente somente o fluxo positivo de relato, confirmação administrativa e exportação, pois não existe erro real a registrar e nenhum foi fabricado. A instrução de uso da ferramenta foi explicada ao owner com base em `docs/RELATAR-ERROS-IA.md` e `TOOLS.md`.
+- 2026-11-04 14:25: **repetição autorizada pelo owner com 10 jobs; execução serial respeitando capacidade do Qwen de 1 job por vez**.
+  - Chamadas MCP `generate` com `model=qwen3-ia`, `think=false`, `temperature=0`, `num_predict=48`; cada uma pediu um marcador literal distinto (`TREINAMENTO-F12-10J-01` a `-10`). O coordenador aguardou cada resposta antes de enviar a próxima.
+  - **Retorno MCP:** 10/10 corretos, sem erro MCP; os marcadores foram reproduzidos exatamente e cada saída trouxe um ID distinto. `total_ms` variou de 435 a 473 ms; `queue_ms=0`, `load_ms=0` em todas as chamadas (modelo já residente, execução sequencial).
+  - **Verificação independente no gateway:** `GET /monitor/api/jobs?limite=100` HTTP 200; 10/10 IDs encontrados como `status=ok`, `responded=true`, `tool=generate`, `model=qwen3-ia`, `backend=gpu-local`.
+  - Estado final via `/monitor/api/state` HTTP 200: gateway `0.13.0-5372f4c`; `started=82`, `finished=82`, `rejected=0`; zero running/waiting/in-use; `treino.total=0`. Os testes não criaram relatos de erro nem registros de treino.
+  - **Resultado:** lote de 10 concluído com sucesso, enviado estritamente um por vez. Nenhuma falha ou job preso observado.
+- 2026-11-04 14:02–18:07: **etapa B (viabilidade da Fase 13) e bake-off de modelos, fora do escopo da Fase 12, registrados aqui pelo
+  impacto na produção.** Relatório completo: `.workspace/reports/MCPOllam2026-11-04-181000-fase13-viabilidade-etapa-b-bakeoff.report.md`.
+  - **Deu certo:** com `NUM_PARALLEL=1`, `qwen3-ia` + `gemma4:12b` (32k) + nomic cabem 100% na GPU (26,2/32 GB); bake-off com os dois
+    modelos trabalhando juntos; `gemma4:26b` sozinho 25/30 com 10 agentes; tabelas de tokens por job (pedido do owner).
+  - **Não deu certo:** rodada 1 (14:04, `NUM_PARALLEL=3`) jogou o `qwen3-ia` 61% na CPU e o owner reiniciou o servidor 2×; `48k` +
+    `NUM_PARALLEL=2` piorou VRAM e vazão (revertido); `gemma4:31b` só 6/30 com 10 agentes.
+  - **Produção:** o `qwen3-ia` ficou fora do disco de 16:30 a 18:07 por ordem do owner; restaurado com o mesmo digest `56671c2ab938`;
+    `OLLAMA_MAX_LOADED_MODELS` voltou de 3 para 2 (igual à cópia do repositório), backup `10-performance.conf.bak-20261104-180536`.
+- 2026-11-04 16:35–16:51: **12.12 — falso alarme "degradado (fora da GPU)"** visto pelo owner no monitor com o `gemma4:26b`
+  (31/31 camadas na GPU; o `/api/ps` conta em `size` o buffer `CUDA_Host`). Correção no `Processor` (≤ 1 GiB e ≤ 25%), testes novos
+  (falham sem a correção com "7%/93% CPU/GPU"), ataques 9/10.5/12 em Sonnet: 138 PASS, 0 FAIL. **Não implantado** (o reinício do gateway
+  derrubaria os testes em curso); gateway **0.13.2**.
+- 2026-11-04 18:12–18:40 e 2026-11-05 10:29–10:35: **`qwen3.8:27b`** (arquitetura `qwen35`, 27,3B denso, Q4_K_M): S2 100% **sem
+  inventar itens** (único; os itens `1.2.x` dos outros não existem no documento, o gabarito está certo), S3 100% sem cerca, 10 agentes
+  30/30 (p50 163 s), conta direta 0/15 sem `think` e **15/15 com `think`** (~2 s, ~70 tokens). Produção restaurada sozinha nos dois testes.
+- 2026-11-05 10:44: **aceite do `qwen3.8:27b` iniciado** (owner, 10:43: "faça os testes para fechar as lacunas"): A = S1 resumo, S4
+  tradução e S5 documento grande (8k, 32k e 40k tokens); B = S2/S3/S6/S1 com `-think`; C = carga 10×6 com `-think`, watts a 1 s; volta
+  automática da produção no fim. Para isso o bake-off ganhou a opção **`-think`** (`withThink` + `TestWithThink`; vet e testes do pacote ok).
+  **Lacuna 5 verificada:** o `treino.db` guarda o **nome** do modelo (`amostras.modelo`, C-1.7), não o digest; em 2026-11-05 10:50 o
+  `treino.db` tinha **0 ocorrências** (`/monitor/api/treino`: `total=0`).
+- 2026-11-05 10:51: **decisão do owner: opção (b), nome real `qwen3.8:27b` em produção, sem alias** (entre: (a) gravar o digest; (b)
+  nome real; (c) separar por data). 10:54: "como não está ainda finalizada a fase 12 ... vamos fazer os ajustes necessários na fase 12,
+  atualizando os planos e a documentação envolvida com a release" → **12.13**.
+  - **Feito (sem implantar):** `src/mcpollama-mcp/config.go` (`defaultModel = "qwen3.8:27b"`, ajuda), `config_test.go` (3 testes de
+    padrão ajustados), `src/cmd/bakeoff` (`-atual` padrão, mensagens), `deploy/gateway/mcpollama-gateway.service`
+    (`--allowed-models "qwen3.8:27b;nomic-embed-text"` + comentário), `deploy/gateway/stage2.sh`, `deploy/servidor-ia/ollama-warm.sh` e
+    `.service`, `ollama-10-performance.conf` (comentário), `deploy/servidor-ia/README.md`; `CHANGELOG.md` (mcpollama 0.10.1, gateway
+    0.13.2, seção "Não lançado" corrigida: a Fase 12 já estava implantada desde 2026-11-04). `go test ./mcpollama-mcp ./tools ./cmd/bakeoff`
+    ok. Documentação do repositório (README, CLAUDE.md, `docs/` e contrato 1.1.7) em Sonnet.
+  - **Fica para a implantação (descreve o estado de produção):** CLAUDE.md global (tabela do nível local), `D:\MCP\Documentation\Ollama`,
+    `csl-ollama.env` do `ia-local`, configuração do Codex, `.mcp.json` das estações (só se tiverem `--model` explícito).
+  - **Achado:** o `ollama-warm.sh` já registrava "2026-10-26: was qwen3.8:27b-64k (removed - only the models tuned for this hardware
+    remain)": o `qwen3.8:27b` foi usado antes e removido quando o owner fixou só modelos otimizados para o hardware; os testes de
+    2026-11-04/05 mostram que hoje ele cabe (64k, 100% GPU, ~24 GB com o nomic).
