@@ -57,7 +57,11 @@ func (f *fake) handle(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"version":"0.40.8"}`)
 	case "/api/ps":
 		size, vram := int64(8<<30), int64(8<<30)
-		if proc != "100% GPU" {
+		switch proc {
+		case "100% GPU":
+		case "host-buffer": // gemma4:26b, 2026-11-04: every layer on the GPU, a CUDA_Host buffer counted in size
+			size, vram = 6829175603, 6345979084
+		default:
 			vram = 2 << 30
 		}
 		fmt.Fprintf(w, `{"models":[{"name":%q,"model":%q,"size":%d,"size_vram":%d,"digest":%q,"context_length":65536}]}`, model, model, size, vram, digest)

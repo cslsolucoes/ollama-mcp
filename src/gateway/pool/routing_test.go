@@ -133,6 +133,24 @@ func TestS3PrimaryOffTheGPU(t *testing.T) {
 	a.Release(queue.Result{})
 }
 
+// A model all on the GPU whose /api/ps size counts a pinned host buffer
+// (gemma4:26b, 2026-11-04: "degradado (fora da GPU)" was a false alarm) keeps
+// the primary ok, and the work stays on it.
+func TestHostBufferIsNotOffTheGPU(t *testing.T) {
+	r := newRig(t, rigCfg{PrimarySlots: 1, Secs: twoSecs[:1]})
+	r.prim.set(func(f *fake) { f.processor = "host-buffer" })
+	r.pl.CheckOnce(context.Background(), r.pl.Primary())
+	st := r.q.PoolStatus()
+	if st[0].State != "ok" || st[0].LastError != "" {
+		t.Fatalf("state %q last error %q", st[0].State, st[0].LastError)
+	}
+	a := r.submit(queue.Request{}).started(t)
+	if a.Backend() != r.pl.Primary().ID {
+		t.Fatalf("ran on %q", a.Backend())
+	}
+	a.Release(queue.Result{})
+}
+
 // The breaker: three passive failures on the primary open it; requests wait
 // for the secondary; after the open time one probe goes to the primary.
 func TestBreakerOpenPrimaryRoutesToSecondaryThenProbes(t *testing.T) {

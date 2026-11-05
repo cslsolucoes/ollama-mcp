@@ -149,8 +149,18 @@ type tagsAnswer struct {
 	} `json:"models"`
 }
 
+// hostBufferMax is how much of size may sit outside the VRAM with the model
+// still all on the GPU. Some architectures keep a compute buffer in pinned host
+// memory (CUDA_Host) that /api/ps counts in size but not in size_vram: gemma4:26b
+// (2026-11-04) showed 6.36 GiB of size and 5.91 GiB of size_vram with every layer
+// on the GPU ("offloaded 31/31 layers"), and the pool marked the backend
+// "degradado" for it. A real offload is far larger (qwen3-ia in the etapa B
+// rodada 1: 3.3 of 8.4 GiB in VRAM), so the gap must stay under 1 GiB and under
+// a quarter of the size.
+const hostBufferMax = 1 << 30
+
 // Processor describes where a loaded model sits, from size_vram and size, as
-// "ollama ps" does.
+// "ollama ps" does, except that a gap within hostBufferMax counts as 100% GPU.
 func Processor(size, vram int64) string {
 	switch {
 	case size <= 0:
@@ -158,6 +168,8 @@ func Processor(size, vram int64) string {
 	case vram <= 0:
 		return "100% CPU"
 	case vram >= size:
+		return "100% GPU"
+	case size-vram <= hostBufferMax && (size-vram)*4 <= size:
 		return "100% GPU"
 	}
 	cpu := int((size - vram) * 100 / size)

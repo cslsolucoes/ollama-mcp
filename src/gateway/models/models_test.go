@@ -109,7 +109,15 @@ func TestProcessor(t *testing.T) {
 	for _, c := range []struct {
 		size, vram int64
 		want       string
-	}{{100, 100, "100% GPU"}, {100, 0, "100% CPU"}, {100, 25, "75%/25% CPU/GPU"}, {0, 0, "-"}, {100, 150, "100% GPU"}} {
+	}{{100, 100, "100% GPU"}, {100, 0, "100% CPU"}, {100, 25, "75%/25% CPU/GPU"}, {0, 0, "-"}, {100, 150, "100% GPU"},
+		// gemma4:26b, 2026-11-04: host buffer (CUDA_Host) with every layer on the GPU
+		{6829175603, 6345979084, "100% GPU"},
+		// qwen3-ia in the etapa B rodada 1: real offload (3.3 of 8.4 GiB in VRAM)
+		{9019431321, 3543348019, "60%/40% CPU/GPU"},
+		// a small model half out of the VRAM is under 1 GiB but over a quarter
+		{858993459, 429496729, "50%/50% CPU/GPU"},
+		// a big model 1 GiB + 1 byte out of the VRAM
+		{20 << 30, 20<<30 - 1<<30 - 1, "5%/95% CPU/GPU"}} {
 		if got := Processor(c.size, c.vram); got != c.want {
 			t.Errorf("Processor(%d,%d) = %q want %q", c.size, c.vram, got, c.want)
 		}
