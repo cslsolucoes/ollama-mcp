@@ -1,6 +1,6 @@
 # Contrato de dados da Fase 12 (erros do modelo local → base de treino)
 
-> **Versão:** 1.1.6 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21; 1.1.5 em 2026-11-04 00:57; 1.1.6 às 03:23) (etapa 12.1) · **Data:** 2026-11-02
+> **Versão:** 1.1.7 · **Estado:** ✅ APROVADO pelo owner (1.0.0 em 2026-11-02 20:05; 1.1.0 às 20:33; 1.1.1 às 20:40; 1.1.2 às 23:40; 1.1.3 em 2026-11-03 09:59; 1.1.4 às 10:21; 1.1.5 em 2026-11-04 00:57; 1.1.6 às 03:23; 1.1.7 em 2026-11-05) (etapa 12.1) · **Data:** 2026-11-02
 > **Fonte única:** `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md` (decisões D12-1 a D12-17, §5, §8, §10, §13, §14, §15).
 > Este documento só fixa regras; o raciocínio e o histórico estão no plano.
 
@@ -26,7 +26,7 @@
 | grupo | componente conectado de ocorrências ligadas por `doc_hash` ou por job em comum |
 | partição | `treino`, `teste` ou `quarentena` (coluna `particao`, não é estado) |
 | retrato | lista congelada de casos de teste usada numa avaliação |
-| linha de base | primeira avaliação do `qwen3-ia` atual, sem D12-15, num retrato |
+| linha de base | primeira avaliação do modelo atual (`qwen3.8:27b`), sem D12-15, num retrato |
 | admin | usuário `admin` do `/monitor`; única fronteira de confiança |
 
 ## 1. Unidade do erro
@@ -136,7 +136,7 @@
 - **C-5.11** Nenhuma outra categoria pode cair mais de 3 pontos percentuais.
 - **C-5.12** O S2 e o S3 da Fase 8 não podem cair mais de 2 pontos percentuais.
 - **C-5.13** O gate **falha** se a suíte não rodar, se avaliar 0 casos, se nenhuma categoria atingir o mínimo de **30** ou se o retrato estiver com `valido=0`; o relatório diz então "dados insuficientes" e nunca "sem regressão".
-- **C-5.14** A linha de base é a primeira rodada, com o `qwen3-ia` atual e sem a D12-15, registrada no relatório da etapa, e é a referência de tudo que vier depois.
+- **C-5.14** A linha de base é a primeira rodada, com o modelo atual (`qwen3.8:27b`) e sem a D12-15, registrada no relatório da etapa, e é a referência de tudo que vier depois.
 - **C-5.15** **Controle de variação:** cada caso automático roda em **3 rodadas pareadas**, com `options.seed` = 1, 2 e 3 e as demais opções iguais ao `prompt_json`. O modelo atual e o candidato rodam com as mesmas sementes, intercalados na mesma sessão. O caso conta como acerto com **2 de 3** rodadas certas, e o relatório traz quantos casos mudaram de resultado entre rodadas. A avaliação humana às cegas usa 1 rodada (`seed`=1).
 - **C-5.16** A cada comparação, o modelo atual é **medido de novo** no mesmo retrato e na mesma sessão (C-5.15). A linha de base da C-5.14 fica como registro histórico; se ela e a nova medição do modelo atual diferirem em mais de 3 pontos numa categoria, o relatório avisa (mudança no servidor).
 
@@ -270,3 +270,7 @@ Lacunas encontradas pela revisão adversarial da Fase 12 (12.9):
 - **C-4.8a:** um novo relato do mesmo job ou documento herda o lado anterior.
 - **C-4.11c:** é recusado liberar uma quarentena para o lado oposto ao de uma exportação.
 - **C-6.3a:** apagar remove o conteúdo também do disco (`secure_delete` e checkpoint do WAL).
+
+## Versão 1.1.7 (owner, 2026-11-05)
+
+Nenhuma regra alterada nem renumerada. O modelo de produção passa a ser identificado pelo nome real `qwen3.8:27b` (sem alias), para que as amostras e as comparações de cada modelo fiquem separadas pelo campo `modelo` (C-1.7). Amostras anteriores com `modelo`=`qwen3-ia` são do `qwen3.5:9b` (digest 56671c2ab938); em 2026-11-05 o `treino.db` tinha 0 ocorrências.

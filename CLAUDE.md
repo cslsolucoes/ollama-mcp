@@ -129,8 +129,8 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   `--ollama-url`/`OLLAMA_HOST`, `--api-key`/`OLLAMA_API_KEY` (nas configs dos clientes o token vai como argumento `--api-key`,
   decisão do owner de 2026-10-26; sem `--api-key-file`),
   `--tls-ca`/`OLLAMA_TLS_CA`, `--insecure`/`OLLAMA_INSECURE`, `--model`/`OLLAMA_MODEL`
-  (default `qwen3-ia`), `--embed-model`/`OLLAMA_EMBED_MODEL` (default `nomic-embed-text`),
-  `--allowed-models`/`MCPOLLAMA_ALLOWED_MODELS` (default fixo `qwen3-ia;nomic-embed-text`: **só
+  (default `qwen3.8:27b`), `--embed-model`/`OLLAMA_EMBED_MODEL` (default `nomic-embed-text`),
+  `--allowed-models`/`MCPOLLAMA_ALLOWED_MODELS` (default fixo `qwen3.8:27b;nomic-embed-text`: **só
   modelos otimizados para o hardware**, decisão do owner de 2026-10-26; modelo fora da lista é
   recusado na partida e por chamada, sem chegar ao Ollama),
   `--timeout`/`OLLAMA_TIMEOUT` (default 120 s, decisão P-7; o Claude Code aceita tools de ~87 s ou mais),
@@ -167,21 +167,27 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
 
 ## Servidor Ollama (alvo)
 
-- `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.13 (desde 2026-10-31 09:50; antes 0.40.8) · modelo **`qwen3-ia`** = **alias do
-  `qwen3.5:9b`** desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M,
-  100% GPU, 13 GB a 64k). Antes, era o MoE `qwen3-coder:30b-a3b`, removido do servidor.
+- `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.13 (desde 2026-10-31 09:50; antes 0.40.8) · modelo **`qwen3.8:27b`** (nome
+  real, **sem alias**; decisão do owner de 2026-11-05, release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12;
+  **implantação pendente do aceite de 2026-11-05**; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco,
+  64k de contexto com 66/66 camadas na GPU, ~19,6 GB + nomic ≈ 24 GB dos 32 GB). Nome virtual de raciocínio:
+  `qwen3.8:27b-think`. O nome `qwen3-ia` deixa de existir. Antes: `qwen3-ia` = alias do `qwen3.5:9b`
+  desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M, 100% GPU, 13 GB a 64k)
+  e, antes dele, o MoE `qwen3-coder:30b-a3b`, removido do servidor.
   - **Raciocina por padrão** (`thinking default true`; não dá para desligar no Modelfile). O
     mcpollama manda `think:false` (8.8); o `/v1` só desliga com `reasoning_effort: "none"`.
+    Regra de uso do `qwen3.8:27b`: contas e contagens, pedir passo a passo ou ligar `think` (bake-off
+    2026-11-04/05: conta direta 0/15 sem `think` e 15/15 com `think`, ~2 s).
   - **O Ollama roda essa arquitetura com 1 slot** ("does not support parallel requests"):
     agentes simultâneos entram na fila. Medido na 8.9 (4 GPUs a 100 W): 10 agentes × 32k com 0
     erros, ~700–790 tok/s somados (~2.000 com documentos grandes), S2 80–85% e S3 100%.
   - Report: `.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md`.
   - Embeddings: `nomic-embed-text` (768 dimensões), residente junto.
-- **Config atual: 4 GPUs a 100 W**, `num_ctx` 65536, `NUM_PARALLEL=3` e gateway `--gen-slots 3` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3-ia` segue com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
+- **Config atual: 4 GPUs a 100 W**, `num_ctx` 65536, `NUM_PARALLEL=1` e gateway `--gen-slots 1` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3.8:27b` também roda com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
   (2026-10-29). A causa dos reboots é a **fonte de 850 W, que não aguenta as 4 placas**
   (owner, 2026-10-28; não são os risers). Os 100 W valem até a troca da fonte; a VRAM de 32 GB
   é a prioridade. **Não fixar o contexto no código:** usar o teto configurável.
-- Carga a frio do `qwen3-ia`: ~16–22 s. Detalhes medidos antes da troca:
+- Carga a frio do `qwen3.8:27b`: ~33 s (era ~16–22 s com o `qwen3.5:9b`). Detalhes medidos antes da troca para o `qwen3.5:9b`:
   `referencias/Brief_Referencias/Servidor-Ollama-CSL/dados/validacao-empirica.md`.
 - Na LAN: `https://ia.cslsolucoes.com.br:8443` (porta explícita). Pela internet: o mesmo host
   sem porta (Cloudflare Tunnel); de dentro da LAN esse caminho dá timeout (DNS split-horizon).
@@ -193,10 +199,10 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   `D:\Users\claiton.linhares\.ssh\.workspace\Backup\ia\CONEXAO-IA.md`.
 - O nível `local` atual (`%USERPROFILE%\.claude\scripts\ia-local.ps1`, OpenClaude headless,
   config em `%USERPROFILE%\.openclaude\csl-ollama.env`) é o que este servidor substitui por uma
-  tool MCP. Desde 2026-10-26 ele usa o mesmo `qwen3-ia` (decisão do owner: **só modelos
-  otimizados para o hardware**: `qwen3-ia` para geração e `nomic-embed-text` para embeddings).
+  tool MCP. Desde 2026-10-26 ele usa o mesmo modelo do servidor (decisão do owner: **só modelos
+  otimizados para o hardware**: `qwen3.8:27b` para geração, antes `qwen3-ia`, e `nomic-embed-text` para embeddings).
   Desde a fila (2026-10-30), o `ia-local` (`/v1`) chega **sem raciocínio** por padrão; com
-  `OPENAI_MODEL=qwen3-ia-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
+  `OPENAI_MODEL=qwen3.8:27b-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
 - **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
   `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção:
   gateway `0.12.6-a155513`** (com o pool de backends; desde 2026-11-01; fila 64 por cliente/IP e 128 no total,
@@ -234,7 +240,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     owner: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; instruções para o Claude relatar erros em
     `docs/RELATAR-ERROS-IA.md`. Elas valem quando a tool `reportar_erro` existir;
   - clock das GPUs travado em 210–1400 MHz desde 2026-10-30, por causa da fonte.
-  - Plano (congelado, com as pendências ao descongelar): `.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`; relatório final: `.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md`. Políticas: raciocínio desligado por padrão (nome `qwen3-ia-think` ou `think` liga),
+  - Plano (congelado, com as pendências ao descongelar): `.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md`; relatório final: `.workspace/reports/MCPOllam2026-10-30-205000-fase10-final.report.md`. Políticas: raciocínio desligado por padrão (nome `qwen3.8:27b-think` ou `think` liga),
   e `keep_alive`/`num_ctx`/`num_gpu` do cliente são ignorados. Instalador, scripts e configs do nginx/unit:
   `deploy/gateway/` (`Instalar-Gateway.ps1`); manual de operação: `docs/MANUAL-GATEWAY.md`; guia de instalação do
   zero: `docs/INSTALACAO.md`. Plano da Fase 9:

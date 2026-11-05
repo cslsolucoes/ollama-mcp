@@ -24,7 +24,7 @@ func parse(t *testing.T, args []string, e map[string]string) Config {
 
 func TestDefaults(t *testing.T) {
 	c := parse(t, nil, nil)
-	if c.Model != "qwen3-ia" || c.EmbedModel != "nomic-embed-text" || c.MaxPromptChars != 128000 ||
+	if c.Model != "qwen3.8:27b" || c.EmbedModel != "nomic-embed-text" || c.MaxPromptChars != 128000 ||
 		c.ToolsVerbosity != "full" || c.Insecure || c.Debug || c.TraceFile != "" || c.AuditLogPath != "" ||
 		c.OllamaURL != "" || c.APIKey != "" || c.Timeout != 120*time.Second || c.AutoReport {
 		t.Fatalf("defaults: %+v", c)
@@ -219,11 +219,11 @@ func TestOllamaOptionsFromConfig(t *testing.T) {
 // check could never refuse a model that does not fit the GPUs.
 func TestAllowedModelsDefaultIsTheTunedSet(t *testing.T) {
 	c := parse(t, nil, nil)
-	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3-ia|nomic-embed-text" {
+	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3.8:27b|nomic-embed-text" {
 		t.Fatalf("default: %s", got)
 	}
-	c = parse(t, []string{"--model", "qwen3.8:27b-64k"}, nil)
-	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3-ia|nomic-embed-text" {
+	c = parse(t, []string{"--model", "gemma4:31b"}, nil)
+	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3.8:27b|nomic-embed-text" {
 		t.Fatalf("default must not follow --model: %s", got)
 	}
 	if err := c.validate(); err == nil || !strings.Contains(err.Error(), "--model") {
@@ -241,8 +241,8 @@ func TestAllowedModelsEnvFlagAndSeparators(t *testing.T) {
 	if got := strings.Join(c.allowedModelList(), "|"); got != "qwen3-ia|nomic-embed-text|x:latest" {
 		t.Fatalf("env: %s", got)
 	}
-	c = parse(t, []string{"--allowed-models", "qwen3-ia:latest;nomic-embed-text"}, map[string]string{"MCPOLLAMA_ALLOWED_MODELS": "zzz"})
-	if c.AllowedModels != "qwen3-ia:latest;nomic-embed-text" {
+	c = parse(t, []string{"--allowed-models", "qwen3.8:27b;nomic-embed-text:latest"}, map[string]string{"MCPOLLAMA_ALLOWED_MODELS": "zzz"})
+	if c.AllowedModels != "qwen3.8:27b;nomic-embed-text:latest" {
 		t.Fatalf("flag must win: %+v", c)
 	}
 	if err := c.validate(); err != nil { // :latest is implicit

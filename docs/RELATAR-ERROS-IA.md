@@ -1,4 +1,4 @@
-# Relatar os erros do modelo local (qwen3-ia): instruções para o Claude
+# Relatar os erros do modelo local (qwen3.8:27b): instruções para o Claude
 
 > ✅ **Em vigor desde 2026-11-04** (mcpollama 0.10.0 e gateway 0.13.0, Fase 12). Sessão com mcpollama antigo, sem a tool
 > `reportar_erro`, **não** relata por outro meio: avise o usuário e siga.

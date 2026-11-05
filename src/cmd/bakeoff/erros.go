@@ -205,7 +205,7 @@ func errosMain(eo errosOpts, logf func(string, ...any)) int {
 		eo.Timeout = 20 * time.Minute
 	}
 	if eo.Atual == "" {
-		eo.Atual = "qwen3-ia"
+		eo.Atual = "qwen3.8:27b"
 	}
 	if eo.S23MaxAge <= 0 {
 		eo.S23MaxAge = 48 * time.Hour

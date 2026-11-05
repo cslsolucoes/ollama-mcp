@@ -24,7 +24,7 @@ import (
 // Defaults. The prompt ceiling is a character budget decided by the owner
 // (P-6), not a model context size; nothing here assumes a num_ctx.
 const (
-	defaultModel          = "qwen3-ia"
+	defaultModel          = "qwen3.8:27b" // owner 2026-11-05: real name, no alias (was the alias qwen3-ia = qwen3.5:9b)
 	defaultEmbedModel     = "nomic-embed-text"
 	defaultTimeout        = 120 * time.Second // above the 32-36 s cold load
 	defaultMaxPromptChars = 128000
@@ -129,10 +129,10 @@ Every flag falls back to its environment variable; the flag wins.
   --fallback-api-key TOKEN   Bearer token of the fallback (never the primary's)
                                                                    (OLLAMA_FALLBACK_API_KEY)
   --fallback-tls-ca FILE  extra CA bundle (PEM) of the fallback    (OLLAMA_FALLBACK_TLS_CA)
-  --model NAME            generation model, default qwen3-ia       (OLLAMA_MODEL)
+  --model NAME            generation model, default qwen3.8:27b    (OLLAMA_MODEL)
   --embed-model NAME      embeddings model, default nomic-embed-text (OLLAMA_EMBED_MODEL)
   --allowed-models LIST   models the tools may use, separated by ; or ,; default is
-                          qwen3-ia;nomic-embed-text (tuned for the server GPUs);
+                          qwen3.8:27b;nomic-embed-text (tuned for the server GPUs);
                           --model and --embed-model must be in it (MCPOLLAMA_ALLOWED_MODELS)
   --timeout DURATION      per-call deadline, default 2m0s          (OLLAMA_TIMEOUT)
   --max-prompt-chars N    prompt ceiling in characters, default 128000 (MCPOLLAMA_MAX_PROMPT_CHARS)

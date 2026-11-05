@@ -33,7 +33,7 @@ e da revisão adversarial da Fase 9. Onde o plano e o código divergem, vale o c
 
 ## 1. O que é e por que existe
 
-O Ollama processa **1 pedido por vez** com o `qwen3-ia` (= `qwen3.5:9b`) e tem uma fila interna invisível
+O Ollama processa **1 pedido por vez** com o `qwen3.8:27b` (nome real, sem alias; até a Fase 12 era o `qwen3-ia` = `qwen3.5:9b`) e tem uma fila interna invisível
 (`OLLAMA_MAX_QUEUE`). Com vários agentes ao mesmo tempo, ninguém via quem esperava nem quanto. O gateway é uma **fila
 visível, justa e auditável** posta na frente do Ollama, com uma página (`/monitor`) para ver e mexer nela.
 
@@ -59,7 +59,7 @@ O que muda:
 | --- | --- |
 | **mcpollama** (MCP) | Manda `X-Mcpollama-Client` (rótulo, `--client-label`, padrão `<máquina>/<usuário>`, ou `<máquina>/<pid>` se não houver usuário) e `X-Mcpollama-Tool`. Lê `X-Queue-Ms` e mostra `queue_ms` na linha `[uso]`. Em **503 com `Retry-After`** repete **uma vez** (só se sobrar tempo no `--timeout`). Em **409** (administrador removeu/cancelou) não repete. Não manda prioridade nem `think` (usa o padrão do gateway). |
 | **mcpollama 0.9.2+** (MCP) | Também manda `X-Mcpollama-Station` (`computer=..;user=..;domain=..;mac=..`, **declarado pela estação, não autenticado**). O gateway valida, grava os quatro campos no log de jobs (7 dias) e mostra no **Detalhes** do job; a coluna Cliente segue sendo o rótulo. O cabeçalho não é repassado ao backend. Desligar: `--station-info=false`. |
-| **ia-local** (OpenClaude, `/v1`) | Sem rótulo: aparece como `anonimo` (a justiça por IP continua valendo). Por padrão o gateway **desliga o raciocínio** no `/v1`; para ligar, use o modelo `qwen3-ia-think` (seção 5). |
+| **ia-local** (OpenClaude, `/v1`) | Sem rótulo: aparece como `anonimo` (a justiça por IP continua valendo). Por padrão o gateway **desliga o raciocínio** no `/v1`; para ligar, use o modelo `qwen3.8:27b-think` (seção 5). |
 | **Qualquer um** | Respostas ganham `X-Request-Id`, `X-Queue-Ms` (quanto esperou) e `X-Queue-Position` (posição na entrada). O gateway remove `keep_alive`, `num_ctx` e opções de GPU do corpo e decide o raciocínio (seção 5). Pedido fora da lista de modelos dá 403. |
 
 ---
@@ -193,7 +193,7 @@ Pelo caminho real (nginx + Bearer; o token **não** vai na linha de comando, vai
 
 ```bash
 printf 'Authorization: Bearer %s\n' "$(sed -n 2p /root/API-Key)" | curl -sk https://127.0.0.1:8443/api/generate -H @- \
-  -H 'X-Mcpollama-Client: teste/manual' -D - -d '{"model":"qwen3-ia","prompt":"Responda apenas: pong","stream":false}'
+  -H 'X-Mcpollama-Client: teste/manual' -D - -d '{"model":"qwen3.8:27b","prompt":"Responda apenas: pong","stream":false}'
 ```
 
 Esperado: `HTTP/2 200`, os headers `x-request-id`, `x-queue-ms`, `x-queue-position`, e `"response":"pong"`.
@@ -253,7 +253,7 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--listen ADDR` | `MCPGW_LISTEN` | `127.0.0.1:11500` | Endereço de escuta. Fora do loopback a partida é recusada (confia no nginx para o IP real) | `127.0.0.1:11500` |
 | `--ollama HOST:PORT\|URL` | `MCPGW_OLLAMA` | `127.0.0.1:11434` | O Ollama de destino (só `http://`) | `127.0.0.1:11434` |
 | `--db FILE` | `MCPGW_DB` | `/var/lib/mcpollama-gateway/gateway.db` | Arquivo SQLite, criado `0600` | `/var/lib/mcpollama-gateway/gateway.db` |
-| `--gen-slots N` | `MCPGW_GEN_SLOTS` | `2` | Gerações simultâneas (`/api/generate`, `/api/chat`, `/v1/chat/completions`, `/v1/completions`) | **`1`** (o Ollama roda `qwen3.5:9b` com 1 slot) |
+| `--gen-slots N` | `MCPGW_GEN_SLOTS` | `2` | Gerações simultâneas (`/api/generate`, `/api/chat`, `/v1/chat/completions`, `/v1/completions`) | **`1`** (o Ollama roda o `qwen3.8:27b`, arquitetura `qwen35`, com 1 slot) |
 | `--embed-slots N` | `MCPGW_EMBED_SLOTS` | `2` | Embeddings simultâneos | `2` |
 | `--queue-max N` | `MCPGW_QUEUE_MAX` | `64` | Pedidos esperando, todos os clientes e as duas faixas juntas. Cheio: 503 | **`128`** (desde 2026-10-30; antes, o padrão 64) |
 | `--queue-per-client N` | `MCPGW_QUEUE_PER_CLIENT` | `16` | Esperando por IP + rótulo | **`64`** (antes 16) |
@@ -264,9 +264,9 @@ ambiente: vazio, `0`, `false`, `no` e `off` são falso; qualquer outro valor é 
 | `--age-after D` | `MCPGW_AGE_AFTER` | `5m` | Um pedido `baixa` que espera isso passa a competir como `normal` | padrão (5m) |
 | `--start-stagger D` | `MCPGW_START_STAGGER` | `300ms` | Intervalo mínimo entre o início de duas gerações (suaviza o pico de energia da fonte). `0` desliga. Só vale para a faixa de geração | `300ms` |
 | `--priority-ips LIST` | `MCPGW_PRIORITY_IPS` | vazio (ninguém) | IPs/CIDRs (separados por `,` ou `;`) que podem pedir prioridade `alta`. IPv4 mapeado em IPv6 é normalizado | `10.100.2.0/24` |
-| `--allowed-models LIST` | `MCPGW_ALLOWED_MODELS` | vazio (qualquer) | Modelos aceitos (`;` ou `,`). Confere o nome **base** (sem `-think`). `:latest` é ignorado na comparação | `"qwen3-ia;nomic-embed-text"` |
+| `--allowed-models LIST` | `MCPGW_ALLOWED_MODELS` | vazio (qualquer) | Modelos aceitos (`;` ou `,`). Confere o nome **base** (sem `-think`). `:latest` é ignorado na comparação | `"qwen3.8:27b;nomic-embed-text"` |
 | `--default-think BOOL` | `MCPGW_DEFAULT_THINK` | `false` | Raciocínio quando o cliente não diz: API nativa recebe `think:BOOL`; `/v1` recebe `reasoning_effort:"none"` se for `false` | padrão (`false`) |
-| `--think-suffix S` | `MCPGW_THINK_SUFFIX` | `-think` | O nome `<modelo>S` (ex.: `qwen3-ia-think`) é reescrito para `<modelo>` com raciocínio ligado. `none` desliga. Sem espaço nem aspas | padrão (`-think`) |
+| `--think-suffix S` | `MCPGW_THINK_SUFFIX` | `-think` | O nome `<modelo>S` (ex.: `qwen3.8:27b-think`) é reescrito para `<modelo>` com raciocínio ligado. `none` desliga. Sem espaço nem aspas | padrão (`-think`) |
 | `--allow-client-keepalive` | `MCPGW_ALLOW_CLIENT_KEEPALIVE` | `false` | Deixa passar o `keep_alive` do cliente (por padrão é removido: um `0` descarregaria o modelo para todos) | padrão (removido) |
 | `--allow-client-num-ctx` | `MCPGW_ALLOW_CLIENT_NUM_CTX` | `false` | Deixa passar `options.num_ctx` (por padrão é removido: outro valor recarrega o modelo) | padrão (removido) |
 | `--strip-options LIST` | `MCPGW_STRIP_OPTIONS` | `num_gpu,main_gpu,low_vram,use_mmap,use_mlock,numa` | Opções removidas de `options` (`,` ou `;`; `none` = nenhuma). O `num_ctx` sai pela flag acima, não por esta lista | padrão |
@@ -377,9 +377,9 @@ mesma chave** (`model` e `Model`) dão **400**. JSON inválido ou `model` que n�
 fixa (sem eco do corpo) e sem entrar na fila. Se nada muda, o corpo segue **byte a byte**.
 
 **2. Allowlist de modelos:** modelo fora de `--allowed-models` → **403** `modelo "X" não permitido neste servidor`.
-O nome conferido é o **base**: `qwen3-ia-think` passa porque `qwen3-ia` passa; `qwen3-ia-think-think` dá 403.
+O nome conferido é o **base**: `qwen3.8:27b-think` passa porque `qwen3.8:27b` passa; `qwen3.8:27b-think-think` dá 403.
 
-**3. Raciocínio.** O `qwen3-ia` raciocina por padrão (lento); o gateway **desliga** quando o cliente não diz.
+**3. Raciocínio.** O `qwen3.8:27b` raciocina por padrão (lento); o gateway **desliga** quando o cliente não diz.
 Precedência: **corpo explícito > header `X-Mcpollama-Think` > nome `<modelo>-think` > `--default-think`**.
 
 | Rota | Corpo explícito | Header `on` / nome `-think` | Header `off` ou nada (padrão) |
@@ -389,7 +389,7 @@ Precedência: **corpo explícito > header `X-Mcpollama-Think` > nome `<modelo>-t
 | Embeddings | não se aplica | — | — |
 
 O header só vale `on` ou `off` (qualquer caixa); outro valor é ignorado. O header é removido antes de ir ao Ollama.
-O nome `qwen3-ia-think` **não existe no Ollama** (não aparece em `/api/tags` nem em `/v1/models`); um cliente que valide o
+O nome `qwen3.8:27b-think` **não existe no Ollama** (não aparece em `/api/tags` nem em `/v1/models`); um cliente que valide o
 nome contra a lista não o acharia. O monitor mostra a coluna **Raciocínio**: `ligado`, `desligado`, `padrão do modelo` ou `-`.
 
 **Exemplos** (`<TOKEN>` é o Bearer; use `--cacert` com a CA da Cloudflare Origin, ver seção 6):
@@ -400,28 +400,28 @@ CA=~/.openclaude/certs/cloudflare-origin-ca.pem
 
 # Padrão: raciocínio desligado (rápido), prioridade normal
 curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -H 'X-Mcpollama-Client: meu-script' \
-  -d '{"model":"qwen3-ia","prompt":"Responda apenas: pong","stream":false}'
+  -d '{"model":"qwen3.8:27b","prompt":"Responda apenas: pong","stream":false}'
 
 # Ligar o raciocínio (3 jeitos equivalentes na API nativa)
-curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -d '{"model":"qwen3-ia","prompt":"...","stream":false,"think":true}'
-curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -H 'X-Mcpollama-Think: on' -d '{"model":"qwen3-ia","prompt":"...","stream":false}'
-curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -d '{"model":"qwen3-ia-think","prompt":"...","stream":false}'
+curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -d '{"model":"qwen3.8:27b","prompt":"...","stream":false,"think":true}'
+curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -H 'X-Mcpollama-Think: on' -d '{"model":"qwen3.8:27b","prompt":"...","stream":false}'
+curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" -d '{"model":"qwen3.8:27b-think","prompt":"...","stream":false}'
 
 # /v1 (dialeto OpenAI): sem nada, o gateway injeta reasoning_effort:"none". Para raciocinar:
 curl --cacert $CA $URL/v1/chat/completions -H "Authorization: Bearer <TOKEN>" -H 'Content-Type: application/json' \
-  -d '{"model":"qwen3-ia-think","messages":[{"role":"user","content":"..."}]}'
+  -d '{"model":"qwen3.8:27b-think","messages":[{"role":"user","content":"..."}]}'
 
 # Prioridade alta (só vale se o IP do cliente está em --priority-ips; senão vira normal, sem erro)
 curl --cacert $CA $URL/api/chat -H "Authorization: Bearer <TOKEN>" -H 'X-Mcpollama-Priority: alta' -H 'X-Mcpollama-Client: urgente' \
-  -d '{"model":"qwen3-ia","messages":[{"role":"user","content":"..."}],"stream":false}'
+  -d '{"model":"qwen3.8:27b","messages":[{"role":"user","content":"..."}],"stream":false}'
 
 # Estas opções são removidas em silêncio (não recarregam o modelo):
 curl --cacert $CA $URL/api/generate -H "Authorization: Bearer <TOKEN>" \
-  -d '{"model":"qwen3-ia","prompt":"oi","stream":false,"keep_alive":0,"options":{"num_ctx":131072,"num_gpu":1,"temperature":0}}'
+  -d '{"model":"qwen3.8:27b","prompt":"oi","stream":false,"keep_alive":0,"options":{"num_ctx":131072,"num_gpu":1,"temperature":0}}'
 ```
 
-**Como o `ia-local` liga o raciocínio:** o `%USERPROFILE%\.openclaude\csl-ollama.env` tem `OPENAI_MODEL=qwen3-ia`
-(raciocínio desligado pelo gateway). Para ligar, troque para `OPENAI_MODEL=qwen3-ia-think` (e volte para `qwen3-ia` depois:
+**Como o `ia-local` liga o raciocínio:** o `%USERPROFILE%\.openclaude\csl-ollama.env` tem `OPENAI_MODEL=qwen3.8:27b`
+(raciocínio desligado pelo gateway). Para ligar, troque para `OPENAI_MODEL=qwen3.8:27b-think` (e volte para `qwen3.8:27b` depois:
 raciocinar a cada chamada deixa o `ia-local` muito mais lento). Não coloque o token em nenhum comando de exemplo.
 
 ---
@@ -472,7 +472,7 @@ Windows; o Firefox tem loja própria (importe lá ou ative `security.enterprise_
 | **Backends** (10.4) | Uma linha por backend do pool (o primário `gpu-local` e os secundários): **id**, **tipo** (`gpu`, `cpu`, `remoto`), **estado** (`ok`, `sobrecarregado` (primário), `disjuntor aberto`, `fora`, `degradado` (modelo fora de 100% GPU), `drenado`), **disjuntor** (fechado, aberto, meio-aberto), **slots usados** e livres, **fila** (esperando que esse backend poderia pegar; no primário são todos), **p50** da duração das gerações, **modelo · digest · onde está**, **último erro** (passe o mouse) e, logado, o botão **Drenar / Retomar**. Sem `--backends` há uma linha só |
 | GPUs | Por GPU: potência em uso **e o limite aplicado** ("71 W / 100 W"; é o `enforced.power.limit`, o power cap que o `nvidia-powercap.service` aplica), uma barra fina com a fração do limite usada (cor de aviso acima de **90%** do limite; o teto da placa, `power.max_limit`, aparece ao passar o mouse na barra), memória (MiB), uso (%), temperatura; linha `AER 00:1b.4 (corrigíveis): N`; "registros descartados: N" se o buffer do banco encheu. Se o driver não informa o limite, mostra só os W |
 | CPU / RAM | Logo abaixo das GPUs, no mesmo visual de cartões. **CPU**: uso total (%, pelo delta de `/proc/stat` entre duas amostras; a primeira amostra após a partida mostra `-`), frequência média (GHz) e temperatura do pacote (°C, hwmon `coretemp` "Package id 0", ou a zona térmica `x86_pkg_temp`). **Carga** 1/5/15 min. **RAM**: usada/total em GB, % e "Ollama: X GB" (soma do `VmRSS` dos processos de nome `ollama`). **Swap**: usado/total. Abaixo, **uma barra por thread** (T0..T11), agrupadas por núcleo físico ("Núcleo 0: T0 T6 · 45 °C"; o núcleo vem de `topology/core_id`, a temperatura de `coretemp` "Core N"). Rodapé: "potência da CPU: indisponível (só root)" quando o RAPL não é legível (no servidor, `/sys/class/powercap/intel-rapl*/energy_uj` é `root 0400`; o gateway roda como `mcpgw` e **não** abre essa permissão). Qualquer leitura que falhe vira `-` e um texto curto de erro no rodapé; o gateway nunca para por isso |
-| Modelos | Duas tabelas. **Carregados (VRAM)**, do `/api/ps` do Ollama: nome, VRAM em GB, GPU/CPU (`100% GPU`, ou o split `70%/30% CPU/GPU` calculado de `size_vram`/`size`), contexto, quando expira e se é permitido. **Disponíveis (instalados)**, do `/api/tags`: nome, tamanho, parâmetros, quantização, família e "permitido" sim/não (o mesmo critério do `--allowed-models`; sem a lista, tudo é permitido). A legenda lista os permitidos e explica que os nomes com o sufixo de `--think-suffix` são **virtuais**: `qwen3-ia-think` liga o raciocínio de `qwen3-ia`, e o gateway tira o sufixo. O gateway consulta o próprio Ollama (`--ollama`, loopback, direto, fora da fila) **a cada 5 s**, uma consulta de cada vez; a página só lê o cache, então abrir 30 painéis não gera nenhuma consulta a mais. Se o Ollama não responde, a lista fica vazia e o rodapé mostra um erro curto (`ps: ...` / `tags: ...`). Cada carga ou descarga de modelo vira um evento `modelo_carregado` / `modelo_descarregado` (a primeira leitura depois da partida não gera evento, e um erro de consulta não conta como descarga) |
+| Modelos | Duas tabelas. **Carregados (VRAM)**, do `/api/ps` do Ollama: nome, VRAM em GB, GPU/CPU (`100% GPU`, ou o split `70%/30% CPU/GPU` calculado de `size_vram`/`size`), contexto, quando expira e se é permitido. **Disponíveis (instalados)**, do `/api/tags`: nome, tamanho, parâmetros, quantização, família e "permitido" sim/não (o mesmo critério do `--allowed-models`; sem a lista, tudo é permitido). A legenda lista os permitidos e explica que os nomes com o sufixo de `--think-suffix` são **virtuais**: `qwen3.8:27b-think` liga o raciocínio de `qwen3.8:27b`, e o gateway tira o sufixo. O gateway consulta o próprio Ollama (`--ollama`, loopback, direto, fora da fila) **a cada 5 s**, uma consulta de cada vez; a página só lê o cache, então abrir 30 painéis não gera nenhuma consulta a mais. Se o Ollama não responde, a lista fica vazia e o rodapé mostra um erro curto (`ps: ...` / `tags: ...`). Cada carga ou descarga de modelo vira um evento `modelo_carregado` / `modelo_descarregado` (a primeira leitura depois da partida não gera evento, e um erro de consulta não conta como descarga) |
 | Última hora | Três gráficos: pedidos na fila, vazão (pedidos/min), espera média (ms). **Ficam em memória**: reiniciar o gateway zera |
 | Concluídos recentes | Últimos 50 (qualquer status: `ok`, `erro`, `cancelado`, `rejeitado`, `expirado`...), com HTTP, espera, execução, tokens (prompt / gerados) e classe do erro |
 | Auditoria | Últimas 20 ações do administrador |
@@ -755,7 +755,7 @@ Se a partida falhar por flag inválida, o serviço entra em laço (`Restart=alwa
 | **401** `{"error":"unauthorized"}` em `/api/...` | Bearer ausente ou errado (barrado no nginx) | Conferir o token do cliente (`--api-key`, `OPENAI_API_KEY`). Nunca colar o token em chat ou log |
 | **401** em `/monitor/api/queue/...` | Sem sessão de administrador (ou sessão vencida, 8 h) | Entrar de novo na página |
 | **403** em `/api/pull`, `push`, `create`, `delete`, `copy`, `blobs` | Esperado: endpoint administrativo bloqueado no nginx e no gateway | Gerenciar modelos só no servidor, pelo `ollama` local |
-| **403** `modelo "X" não permitido neste servidor` | Modelo fora de `--allowed-models` | Usar `qwen3-ia` ou `nomic-embed-text` (ou `qwen3-ia-think`) |
+| **403** `modelo "X" não permitido neste servidor` | Modelo fora de `--allowed-models` | Usar `qwen3.8:27b` ou `nomic-embed-text` (ou `qwen3.8:27b-think`). O nome antigo `qwen3-ia` não existe mais |
 | **403** no `/monitor` | IP fora de `10.100.2.0/24` (inclusive via Cloudflare) | Acessar da LAN; ver `/monitor` por túnel só se o owner decidir |
 | **403** `origem não permitida` / `token CSRF ausente ou inválido` | Ação do monitor feita por outro site/ferramenta, ou sem o header | Usar a página, ou o `curl` da seção 7 |
 | **409** `removido da fila pelo administrador` / `cancelado pelo administrador` | O administrador agiu no `/monitor` | Ver a auditoria (motivo); o cliente pode repetir |
@@ -774,8 +774,8 @@ Se a partida falhar por flag inválida, o serviço entra em laço (`Restart=alwa
 | Página "sem conexão com o servidor" | Gateway parado, ou o nginx sem `location /monitor` | `systemctl status`; conferir `ollama.conf` |
 | "Sem conexão com o servidor" **e** 429 em **tudo** que sai da estação, com o gateway `active` | **Painel travado** (incidente de 2026-11-01, até a 0.12.5): o `/monitor/api/state` não responde, os pedidos se acumulam até o `limit_conn 80` do nginx (`ss -tn state established '( dport = :11500 )'` mostra ~80) | Confirmar: `curl -s -o /dev/null -w '%{http_code}' --max-time 8 -H 'X-Real-IP: <ip da estação>' http://127.0.0.1:11500/monitor/api/state` dá `000`. Com as GPUs ociosas: `systemctl restart mcpollama-gateway` (ou `kill -QUIT <pid>` para gravar o retrato das goroutines no journal; o systemd sobe de novo). Corrigido na **0.12.6** |
 | GPUs vazias ou erro `nvidia-smi:` / `aer:` no rodapé das GPUs | `nvidia-smi` sem acesso sob o sandbox da unit, ou AER ausente | Ver o texto do erro; não afeta a fila. Pendência 9.3 da revisão |
-| Modelo recarregando a cada pedido (`load_ms` alto, ~16–22 s) | Algo mudou o contexto/residência: reinício do Ollama, `ollama-warm` parado, cliente que ainda manda `num_ctx` (o gateway remove), ou o Ollama foi tocado direto | `ollama ps` antes e depois; consulta de `load_ms` (seção 8); `systemctl status ollama-warm` |
-| `ia-local` lento, raciocinando | Está usando `qwen3-ia-think` ou mandando `reasoning_effort` | Na coluna Raciocínio do `/monitor` deve estar `desligado`; ajustar `OPENAI_MODEL=qwen3-ia` no `csl-ollama.env` |
+| Modelo recarregando a cada pedido (`load_ms` alto, ~33 s com o `qwen3.8:27b`; era ~16–22 s com o `qwen3.5:9b`) | Algo mudou o contexto/residência: reinício do Ollama, `ollama-warm` parado, cliente que ainda manda `num_ctx` (o gateway remove), ou o Ollama foi tocado direto | `ollama ps` antes e depois; consulta de `load_ms` (seção 8); `systemctl status ollama-warm` |
+| `ia-local` lento, raciocinando | Está usando `qwen3.8:27b-think` ou mandando `reasoning_effort` | Na coluna Raciocínio do `/monitor` deve estar `desligado`; ajustar `OPENAI_MODEL=qwen3.8:27b` no `csl-ollama.env` |
 | Cliente aparece como `anonimo` | Não manda `X-Mcpollama-Client` (ex.: `ia-local`, `curl`) | Normal; a justiça por IP vale. Para o mcpollama, `--client-label` |
 | `prioridade alta` não surte efeito | IP fora de `--priority-ips` (o pedido vira `normal` em silêncio), ou a fila estava vazia | Conferir a coluna "Prioridade" no monitor; ajustar `--priority-ips` |
 | Pedido demora mesmo com fila vazia | Modelo carregando, prompt grande, ou raciocínio ligado | Ver `load_ms`, `prompt_eval_count`, coluna Raciocínio |
@@ -970,7 +970,7 @@ ou ação do monitor pode criar ou mudar um backend (nada de SSRF pelo cliente).
       "token_file": "/etc/mcpollama-gateway/sec-4x2060.token",
       "tls_ca": "/etc/mcpollama-gateway/cloudflare-origin-ca.pem",
       "slots": 2,
-      "modelos": ["qwen3-ia"],
+      "modelos": ["qwen3.8:27b"],
       "classes": ["alta", "normal", "baixa"],
       "max_prompt_tokens": 16000,
       "ordem": 1
@@ -995,7 +995,7 @@ ou ação do monitor pode criar ou mudar um backend (nada de SSRF pelo cliente).
 ### 16.2 Como acrescentar um secundário
 
 1. **No secundário:** instale o Ollama e traga **o mesmo modelo, com o mesmo digest** do primário
-   (`ollama pull`/cópia do mesmo blob). Compare: `curl -s http://127.0.0.1:11434/api/tags | python3 -m json.tool | grep -A3 qwen3-ia`
+   (`ollama pull`/cópia do mesmo blob). Compare: `curl -s http://127.0.0.1:11434/api/tags | python3 -m json.tool | grep -A3 qwen3.8`
    nos dois; o campo `digest` tem de ser **igual**. Digest diferente = o secundário **nunca** recebe o modelo (regra F4),
    mesmo que o nome seja igual.
 2. **Rede e TLS:** o secundário só na LAN da CSL, atrás de nginx com TLS e Bearer (como o primário). Pegue a CA (PEM) se o
@@ -1245,7 +1245,7 @@ runuser -u mcpgw -- /usr/local/bin/mcpollama-bakeoff -suites erros -erros-modo r
 | `-erros-modo` | Faz |
 | --- | --- |
 | `retrato` | congela o teste: lista (ocorrência, job, `prompt_hmac`, categoria) das amostras da partição teste; imprime o ID do retrato |
-| `base` | linha de base do `qwen3-ia` atual no retrato (`-retrato ID`), 3 rodadas pareadas (`options.seed` 1, 2 e 3); acerto com 2 de 3 (C-5.15) |
+| `base` | linha de base do modelo atual (`qwen3.8:27b`) no retrato (`-retrato ID`), 3 rodadas pareadas (`options.seed` 1, 2 e 3); acerto com 2 de 3 (C-5.15) |
 | `comparar` | candidato x atual no mesmo retrato (`-retrato ID -candidato M -alvo CAT`); o atual é medido de novo a cada comparação (C-5.16) |
 | `apurar` | aplica as respostas do owner à revisão às cegas (`-resultado resultado-*.json -blind-respostas arquivo`, linhas `rótulo<TAB>certa ou errada<TAB>certa ou errada`) |
 | `indice` | congela os exemplos públicos num índice (`-exemplos-k`, `-exemplos-limiar`; padrões provisórios 3 e 0,80) |

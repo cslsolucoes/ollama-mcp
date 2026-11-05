@@ -13,18 +13,34 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
 feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
-**Fase 12** (registro dos erros do modelo local → base de treino): **código pronto e revisado, a implantar** (aguarda a ordem
-do owner; nada foi instalado no servidor nem em `D:\MCP`). Entra como **gateway 0.13.0** e **mcpollama 0.10.0**, descritos
-abaixo. **Ordem obrigatória: gateway 0.13.0 ANTES do mcpollama 0.10.0** (ver as entradas). Plano:
-`.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; contrato de dados (1.1.6):
-`docs/CONTRATO-DADOS-TREINO.md`; instruções para o Claude em `docs/RELATAR-ERROS-IA.md` (valem só depois da implantação).
+**Fase 12** (registro dos erros do modelo local → base de treino): **implantada em 2026-11-04** (gateway 0.13.0 às 13:02, depois
+0.13.1; mcpollama 0.10.0 em `D:\MCP`); aceite ao vivo pendente. Plano:
+`.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; contrato de dados: `docs/CONTRATO-DADOS-TREINO.md`;
+instruções para o Claude em `docs/RELATAR-ERROS-IA.md` (em vigor desde 2026-11-04).
+
+**Release de ajuste da Fase 12, preparada e NÃO implantada (2026-11-05):** **gateway 0.13.2** (falso alarme "fora da GPU") e
+**mcpollama 0.10.1** (modelo de produção `qwen3.8:27b` com o nome real, sem alias). A troca do modelo depende do aceite do
+`qwen3.8:27b` em curso (S1/S4/S5, `think` em tarefa grande, carga contínua) e da liberação do owner. Ordem prevista: no servidor,
+baixar o `qwen3.8:27b`, ajustar o `ollama-warm` e o `--allowed-models` do gateway e só depois apagar o `qwen3-ia`; em seguida,
+mcpollama 0.10.1 em `D:\MCP` e reinício das sessões.
 
 
 ## mcpollama
 
-### [0.10.0] - a implantar (Fase 12; ainda sem tag)
+### [0.10.1] - preparada, não implantada (ajuste da Fase 12; ainda sem tag)
 
-Binário `0.10.0-<hash>` ainda **não** instalado em `D:\MCP`. **Só instale depois do gateway 0.13.0** (ver abaixo): o gateway
+#### Alterado
+- **Modelo de produção com o nome real** (decisão do owner, 2026-11-05, opção "b"): o padrão de `--model`/`OLLAMA_MODEL` e a lista
+  padrão de `--allowed-models`/`MCPOLLAMA_ALLOWED_MODELS` passam a ser `qwen3.8:27b` (antes `qwen3-ia`, alias do `qwen3.5:9b`).
+  O nome virtual de raciocínio passa a ser `qwen3.8:27b-think`. Motivo: o owner quer ver o modelo que roda, e as amostras de treino da
+  Fase 12 ficam separadas pelo campo `modelo` (o `treino.db` tinha 0 ocorrências na data da decisão). **Incompatível com o servidor
+  antigo:** só funciona depois que o servidor tiver o `qwen3.8:27b` e o gateway aceitar o nome (`deploy/gateway/mcpollama-gateway.service`).
+- **Bake-off** (`src/cmd/bakeoff`, ferramenta de teste): padrão de `-atual` = `qwen3.8:27b`; nova opção **`-think`**, que envia
+  `think:true` nas chamadas de `generate`, `chat`, `summarize_file`, `extract` e `translate` (teste `TestWithThink`).
+
+### [0.10.0] - 2026-11-04, em `D:\MCP` (Fase 12; ainda sem tag)
+
+Binário `0.10.0-5372f4c` instalado em `D:\MCP` em 2026-11-04 (backup da anterior em `mcpollama-mcp.exe.bak-0.9.2`). **Só instale depois do gateway 0.13.0** (ver abaixo): o gateway
 0.12.6, em produção, repassa o cabeçalho novo `X-Mcpollama-Doc` ao Ollama (que o ignora), mas a remoção dele e a partição por
 documento só passam a valer com o 0.13.0 (C-2.11). Commits da Fase 12 nesta parte: `1bb42fc` (12.2) e `9f67fee` (12.5), mais o contrato.
 
@@ -156,6 +172,21 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
+
+### [0.13.2] - preparada, não implantada (ajuste da Fase 12; ainda sem tag)
+
+#### Corrigido
+- **Falso alarme "degradado (fora da GPU)"** (2026-11-04, com o `gemma4:26b`): o `/api/ps` conta em `size` um buffer em memória do
+  host (`CUDA_Host`, ~0,45–0,6 GiB) que não entra em `size_vram`, com todas as camadas na GPU ("offloaded 31/31 layers"). Regra nova
+  em `src/gateway/models/models.go` (`Processor`): diferença de até **1 GiB e até 25% do tamanho** conta como "100% GPU"; acima disso
+  continua o alarme (ex.: o `qwen3-ia` com 60% fora da VRAM na etapa B). Testes: `TestProcessor` (casos do 26b, do offload real, de
+  modelo pequeno meio fora e de 1 GiB + 1 byte) e `TestHostBufferIsNotOffTheGPU` (pool: backend continua "ok" e o trabalho fica nele);
+  sem a correção, os testes novos falham com "7%/93% CPU/GPU". Testes de ataque das revisões 9, 10.5 e 12: 138 PASS, 0 FAIL
+  (`.workspace/reports/MCPOllam2026-11-04-1645-ataques-gateway-0.13.2.log`).
+
+#### Alterado
+- `deploy/gateway/mcpollama-gateway.service`: `--allowed-models "qwen3.8:27b;nomic-embed-text"` (modelo de produção com o nome real);
+  `deploy/gateway/stage2.sh` testa com `qwen3.8:27b`; `deploy/servidor-ia/ollama-warm.sh` carrega o `qwen3.8:27b` a 64k no boot.
 
 ### [0.13.1] - 2026-11-04 (ainda sem tag)
 

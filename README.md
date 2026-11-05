@@ -1,7 +1,7 @@
 # mcpollama
 
 > Servidor **MCP (Model Context Protocol)** em **Go** que expõe o Ollama self-hosted da CSL
-> (`qwen3-ia`) como ferramentas para o **Claude Code** e o **Cursor**, mais o **gateway**
+> (`qwen3.8:27b`) como ferramentas para o **Claude Code** e o **Cursor**, mais o **gateway**
 > (fila + `/monitor`) que protege e observa esse Ollama. O Claude é o **orquestrador**; o trabalho
 > mecânico em volume vai para o modelo local, que custa **zero** da cota Anthropic.
 >
@@ -42,7 +42,7 @@ Claude Code (CLI / VS Code)      Cursor
                       ▼
       mcpollama-gateway 127.0.0.1:11500   fila com prioridade e justiça, políticas, SQLite, /monitor
                       ▼
-      Ollama 127.0.0.1:11434   qwen3-ia (= qwen3.5:9b) · nomic-embed-text   (4× RTX 3070, 100% GPU)
+      Ollama 127.0.0.1:11434   qwen3.8:27b · nomic-embed-text   (4× RTX 3070, 100% GPU)
 ```
 
 **De onde vem a economia.** Uma tool que só recebe um prompt pronto economiza pouco, porque o Claude
@@ -198,9 +198,9 @@ diagnóstico, está no [CLAUDE.md](CLAUDE.md).
 | `--api-key` | `OLLAMA_API_KEY` | sem padrão (Bearer do nginx) |
 | `--tls-ca` | `OLLAMA_TLS_CA` | sem padrão (PEM da Cloudflare Origin CA) |
 | `--insecure` | `OLLAMA_INSECURE` | `false` (WARNING a cada partida) |
-| `--model` | `OLLAMA_MODEL` | `qwen3-ia` |
+| `--model` | `OLLAMA_MODEL` | `qwen3.8:27b` |
 | `--embed-model` | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
-| `--allowed-models` | `MCPOLLAMA_ALLOWED_MODELS` | `qwen3-ia;nomic-embed-text` (só modelos otimizados para o hardware) |
+| `--allowed-models` | `MCPOLLAMA_ALLOWED_MODELS` | `qwen3.8:27b;nomic-embed-text` (só modelos otimizados para o hardware) |
 | `--timeout` | `OLLAMA_TIMEOUT` | `120s` (limite efetivo de cada tool) |
 | `--allow-root` | `MCPOLLAMA_ALLOW_ROOT` | sem padrão (sem ele, as tools de arquivo não existem) |
 | `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` |
@@ -221,7 +221,7 @@ flag peça.
 
 ## 6. O gateway: fila e `/monitor`
 
-O Ollama processa **um pedido por vez** com o `qwen3-ia`, e a fila interna dele é invisível. O
+O Ollama processa **um pedido por vez** com o `qwen3.8:27b`, e a fila interna dele é invisível. O
 `mcpollama-gateway` (código em `src/gateway/` e `src/cmd/mcpollama-gateway/`) é uma **fila visível, justa e
 auditável** na frente do Ollama, com uma página para ver e mexer nela. Para os clientes nada muda: mesma URL,
 mesmo Bearer, mesmas rotas. O Ollama escuta só em `127.0.0.1`, então ninguém contorna a fila.
@@ -234,7 +234,7 @@ mesmo Bearer, mesmas rotas. O Ollama escuta só em `127.0.0.1`, então ninguém 
 | Prioridade | `alta`, `normal` (padrão) e `baixa`, pelo header `X-Mcpollama-Priority`. `alta` só vale para IPs de `--priority-ips` (hoje a LAN `10.100.2.0/24`); de outro IP vira `normal` sem erro. `baixa` que espera 5 min passa a `normal` |
 | Justiça | dentro da faixa: prioridade, fixados do admin, rodízio por **IP** (o IP vem do nginx e não se forja), depois por rótulo (`X-Mcpollama-Client`) |
 | Limites | fila total 128 e 64 por IP/rótulo (acima: **503** com `Retry-After`); espera máxima 10 min (**504**); execução máxima 10 min; no nginx, 600 pedidos/min (burst 100) e 80 simultâneos por IP (**429**) |
-| Raciocínio | desligado por padrão. Liga com `think:true`, header `X-Mcpollama-Think: on` ou o nome `qwen3-ia-think` (nome virtual, só do gateway). No `/v1`, injeta `reasoning_effort:"none"` |
+| Raciocínio | desligado por padrão. Liga com `think:true`, header `X-Mcpollama-Think: on` ou o nome `qwen3.8:27b-think` (nome virtual, só do gateway). No `/v1`, injeta `reasoning_effort:"none"` |
 | Opções | `keep_alive`, `num_ctx` e `num_gpu`/`main_gpu`/`low_vram`/`use_mmap`/`use_mlock`/`numa` do cliente são removidos em silêncio, para não recarregar o modelo (~20 s) |
 | Modelos | só os de `--allowed-models`; outro dá **403** |
 | Cliente mcpollama | manda `X-Mcpollama-Client` e `X-Mcpollama-Tool`, lê `X-Queue-Ms` e repete **uma vez** em 503 com `Retry-After` (não repete 409) |
@@ -284,11 +284,11 @@ Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico
 | Host | `ia.cslsolucoes.com.br` (`lx-ai01`, CentOS Stream 10), Ollama v0.40.13 (desde 2026-10-31; antes 0.40.8) |
 | Hardware | 4× RTX 3070 (8 GB cada, 32 GB de VRAM), **100 W por GPU**, clock travado em 210–1400 MHz desde 2026-10-30 |
 | Limite conhecido | a **fonte de 850 W** não aguenta as 4 placas (causa dos reboots); os 100 W e o clock travado valem até a troca. A segunda fonte está planejada |
-| Modelo | `qwen3-ia` = alias do **`qwen3.5:9b`** (Q4_K_M, 100% GPU, `num_ctx` 65536, 13 GB), desde 2026-10-29. Raciocina por padrão; o mcpollama manda `think:false` e o gateway também |
+| Modelo | **`qwen3.8:27b`** (nome real, sem alias; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco, `num_ctx` 65536 com 66/66 camadas na GPU: ~19,6 GB + nomic ≈ 24 GB dos 32 GB), desde a release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12 (2026-11-05; **implantação pendente do aceite de 2026-11-05**). Antes: `qwen3-ia` = alias do `qwen3.5:9b` (desde 2026-10-29). Raciocina por padrão; o mcpollama manda `think:false` e o gateway também. Contas e contagens: pedir passo a passo ou ligar `think` (nas medições do bake-off, conta direta 0/15 sem `think` e 15/15 com `think`) |
 | Embeddings | `nomic-embed-text` (768 dim), residente junto |
-| Concorrência | o Ollama roda essa arquitetura com **1 slot**; `NUM_PARALLEL=3` e gateway `--gen-slots 3` (`--run-timeout 10m`) desde 2026-11-04 (sem ganho com o `qwen3-ia`: o Ollama avisa "does not currently support parallel requests"), `MAX_QUEUE=32`; a fila de verdade é a do gateway |
-| Carga medida (Fase 8.9) | 10 agentes × 32k de contexto, 0 erros, **~700–790 tok/s somados** (~2.000 com documentos grandes) |
-| Carga a frio | ~16–22 s |
+| Concorrência | o Ollama roda essa arquitetura com **1 slot**; `NUM_PARALLEL=1` e gateway `--gen-slots 1` (`--run-timeout 10m`) desde 2026-11-04 (a arquitetura `qwen35` não paraleliza: o Ollama avisa "does not currently support parallel requests"), `MAX_QUEUE=32`; a fila de verdade é a do gateway |
+| Carga medida (Fase 8.9, com o `qwen3.5:9b`) | 10 agentes × 32k de contexto, 0 erros, **~700–790 tok/s somados** (~2.000 com documentos grandes) |
+| Carga a frio | ~33 s com o `qwen3.8:27b` (era ~16–22 s com o `qwen3.5:9b`) |
 
 **Acesso**
 

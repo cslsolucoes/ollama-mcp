@@ -39,6 +39,24 @@ type client struct {
 	deadErr  atomic.Value // string
 	badLines atomic.Int64 // stdout lines that are not JSON-RPC (protocol errors)
 	logf     func(format string, a ...any)
+	think    bool // -think: add think:true to the calls of the model tools
+}
+
+// thinkTools are the tools that accept the think argument (mcpollama >= 0.8.1).
+var thinkTools = map[string]bool{"generate": true, "chat": true, "summarize_file": true, "extract": true, "translate": true}
+
+// withThink returns args with think:true when on and the tool accepts it, as a
+// copy: the caller's map (shared by repetitions) stays as it was.
+func withThink(tool string, args map[string]any, on bool) map[string]any {
+	if !on || !thinkTools[tool] {
+		return args
+	}
+	a := make(map[string]any, len(args)+1)
+	for k, v := range args {
+		a[k] = v
+	}
+	a["think"] = true
+	return a
 }
 
 func startClient(exe string, args []string, logf func(string, ...any)) (*client, error) {
@@ -236,6 +254,7 @@ func (c *client) toolCall(timeout time.Duration, tool string, args map[string]an
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	args = withThink(tool, args, c.think)
 	raw, err := c.call(ctx, "tools/call", map[string]any{"name": tool, "arguments": args})
 	r := callRes{Tool: tool, Start: start.Format("15:04:05.000"), WallMS: time.Since(start).Milliseconds()}
 	if err != nil {

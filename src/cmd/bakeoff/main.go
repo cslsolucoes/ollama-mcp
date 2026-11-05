@@ -6,7 +6,7 @@
 // metrics. The API token is read from a file into memory and scrubbed from all
 // output.
 //
-//	bakeoff -exe X -model qwen3-ia -suites load,s5,s1,s2,s3,s4,s6
+//	bakeoff -exe X -model qwen3.8:27b -suites load,s5,s1,s2,s3,s4,s6
 //	bakeoff -suites ref                 # reference texts (doctext) of the corpus
 //	bakeoff -suites score -models a,b   # automatic scoring of S1-S4 outputs
 //	bakeoff -suites blind -models a,b   # anonymised S1 packets for the human review
@@ -39,6 +39,7 @@ type options struct {
 	reps, s3Reps, maxPrefill                                                      int
 	cpt                                                                           float64
 	s5Gen                                                                         bool
+	think                                                                         bool // -think: every model tool call carries think:true
 	timeout, srvTimeout                                                           time.Duration
 	// 8.9 multi-agent load and monitor reading
 	agents, tasks                                int
@@ -89,6 +90,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&o.maxPrefill, "max-prefill-tokens", 0, "skip (pulado-risco) any call whose estimated prefill exceeds this (0 = off)")
 	fs.Float64Var(&o.cpt, "chars-per-token", 3.0, "chars/token used by -max-prefill-tokens (low = conservative)")
 	fs.BoolVar(&o.s5Gen, "s5-gen", true, "S5: also run the 1000-token generation")
+	fs.BoolVar(&o.think, "think", false, "send think:true in every generate/chat/summarize_file/extract/translate call (reasoning on)")
 	fs.IntVar(&o.reps, "reps", 5, "repetitions for S1 and S2")
 	fs.IntVar(&o.s3Reps, "s3-reps", 2, "repetitions for S3")
 	fs.DurationVar(&o.timeout, "call-timeout", 20*time.Minute, "driver timeout per tool call")
@@ -108,7 +110,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&o.gwURL, "gateway-url", "http://127.0.0.1:11500", "erros: gateway do replay (loopback)")
 	fs.BoolVar(&o.gwRemote, "gateway-remoto", false, "erros: aceita um gateway que não é loopback (rede interna, decisão do owner)")
 	fs.StringVar(&o.retratoID, "retrato", "", "erros: id do retrato (modos base e comparar)")
-	fs.StringVar(&o.atual, "atual", "qwen3-ia", "erros: nome do modelo atual (rótulo; pasta do score.json do S2/S3)")
+	fs.StringVar(&o.atual, "atual", "qwen3.8:27b", "erros: nome do modelo atual (rótulo; pasta do score.json do S2/S3)")
 	fs.StringVar(&o.candidato, "candidato", "", "erros: modelo candidato (modo comparar)")
 	fs.StringVar(&o.candScore, "candidato-score", "", "erros/comparar: score.json do S2/S3 do candidato COM as instruções (vazio: <out>/<candidato>/score.json; igual ao do atual reprova o gate, C-5.12)")
 	fs.StringVar(&o.alvo, "alvo", "", "erros: categoria-alvo da mudança (C-5.10)")
@@ -201,6 +203,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		logf("FATAL start: %v", err)
 		return 2
 	}
+	c.think = o.think
 	defer c.close()
 	if err := c.initialize(); err != nil {
 		logf("FATAL initialize: %v", err)

@@ -285,6 +285,9 @@ func runMulti(o options, srvArgs []string, logf func(string, ...any)) int {
 		i := i
 		alog := func(f string, a ...any) { logf(fmt.Sprintf("A%02d ", i+1)+f, a...) }
 		c, err := startClient(o.exe, srvArgs, alog)
+		if err == nil {
+			c.think = o.think
+		}
 		if err != nil {
 			logf("FATAL start agente %d: %v", i+1, err)
 			closeAll()

@@ -121,7 +121,7 @@ func evaluate(in reportInput) outcome {
 	}
 	if in.Mode == "comparar" {
 		if in.CandSameScore { // I-9: the model name is the same, so the S2/S3 of the plain model must not stand for the one with instructions
-			o.GateFail = append(o.GateFail, "C-5.12: o S2 e o S3 do candidato apontam o MESMO score.json do atual (o gateway só aceita o nome qwen3-ia, então o candidato com instruções tem o nome do atual): meça o S2/S3 com as instruções, grave num score.json próprio e passe -candidato-score")
+			o.GateFail = append(o.GateFail, "C-5.12: o S2 e o S3 do candidato apontam o MESMO score.json do atual (o gateway só aceita o nome do modelo de produção, então o candidato com instruções tem o nome do atual): meça o S2/S3 com as instruções, grave num score.json próprio e passe -candidato-score")
 		}
 		if in.AtualS23 == nil || in.CandS23 == nil {
 			o.GateFail = append(o.GateFail, "o S2 e o S3 da Fase 8 não foram medidos para os dois modelos (C-5.12): rode as suítes s2 e s3 e depois -suites score")
@@ -385,7 +385,7 @@ func finish(eo errosOpts, outDir string, in reportInput, results []caseRes, blin
 			in.Baseline = bf
 		}
 		in.AtualS23, _ = readS23(filepath.Join(eo.Out, safeName(eo.Atual), "score.json"), eo.Atual, in.Now, eo.S23MaxAge)
-		// I-9: the candidate of an improvement has the NAME of the current model (the gateway accepts only qwen3-ia), so its S2/S3
+		// I-9: the candidate of an improvement has the NAME of the current model (the gateway accepts only the production model name), so its S2/S3
 		// come from a score.json of its own (-candidato-score); the same file as the current model's measures nothing.
 		atualScore := filepath.Join(eo.Out, safeName(eo.Atual), "score.json")
 		candScore := eo.CandScore
