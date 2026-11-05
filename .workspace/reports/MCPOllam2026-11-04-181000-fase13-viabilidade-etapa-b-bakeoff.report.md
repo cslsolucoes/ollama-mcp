@@ -166,6 +166,23 @@ Controle `think:false` (`num_predict` 50) na mesma rodada; `think:true` com `num
 - Produção restaurada às 10:34:47 (trap no fim do script): `qwen3.8:27b` apagado; `qwen3-ia` (já estava no disco) e nomic 100% GPU;
   `ollama-warm` success; gateway healthz 200. Durante o teste (10:29–10:34) o `qwen3-ia` ficou fora da memória.
 
+## 9d. Aceite do `qwen3.8:27b` — 2026-11-05 10:44–11:54 (pedido do owner 10:43: "faça os testes para fechar as lacunas")
+
+Troca por `tgon.sh` (qwen3.8:27b + nomic a 64k, 100% GPU; `qwen3-ia` mantido no disco); bake-off com a opção nova `-think`; watts a 1 s.
+Saídas: `.workspace/bakeoff/out-aceite-qwen38/` (A), `out-aceite-qwen38-think/` (B e C), `out-aceite-qwen38-think2/` (B2).
+
+| Lacuna | Parte | Resultado |
+| --- | --- | --- |
+| 1. Resumo e tradução | **A** (S1 4 docs × 5; S4 3 textos), sem think | 31/31 sem erro. Avaliação manual (Sonnet, `out-aceite-qwen38/avaliacao-s1-s4.md`): **S1 empate** (4,35 × 4,40 do qwen3.5:9b; nenhum dos dois inventou números/nomes), **S4 melhor** (4,75 × 4,42). Defeito: em 1 de 3 traduções o modelo **repetiu os marcadores** `=====ARQUIVO_INICIO <nonce>=====`/`ARQUIVO_FIM` da tool (o qwen3.5 nunca fez). S1 ~10,9 s por chamada (qwen3.5: 5,2 s) |
+| 2. Documento grande | **A** (S5) | prefill ~450–500 tok/s: **8k em 16 s, 32k em 68 s, 40k em 90 s**; geração de 1.000 tokens a ~25 tok/s (40 s). Um prompt perto de 64k passaria dos **120 s** do `--timeout` padrão das estações |
+| 3. `think` em tarefa grande | **B** (S2 ×3, S3 ×1) e **B2** (S6, S1 ×3) | S2/S3 com think ok. 1ª tentativa do S6 parou: o teste dava `num_predict` 50 e o raciocínio (~70 tokens) esgotou → resposta vazia, **avisada corretamente pela tool**; corrigido no bake-off (4096 com `-think`). **B2: conta direta 15/15, passo a passo 10/10, contagem direta 6/6 (3/6 sem think), lista 5/6**; S1 com think 0 erros, ~14–56 s por resumo (raciocínio de ~430–2.600 tokens). 49 chamadas, 0 erros |
+| 4. Energia sustentada | **C** (10 agentes × 6 tarefas, com think, ~30 min) + toda a janela | pico **238,2 W**, média **178,9 W**, VRAM máx. 25,4 GB em ~1 h; **sem reinício** (boot de 2026-11-04 16:34:37). Carga: **33/60 ok, 27 timeouts a 300 s (espera na fila)**; nas concluídas S2 264/264 (100%), S3 JSON 19/21 |
+| 5. Dados da Fase 12 | — | `treino.db` guarda o nome (`amostras.modelo`); 0 ocorrências; owner escolheu o nome real (opção b) |
+
+Conclusão: **qualidade aprovada** (igual ou melhor que o qwen3.5:9b em tudo; com think, perfeito nas contas e contagens). **Pontos operacionais
+antes de implantar:** (1) o `--timeout` de 120 s das estações corta documentos grandes e filas longas (o gateway já espera 30 min desde
+11:40); (2) o vazamento dos marcadores de arquivo em traduções pode ser removido na tool; (3) quem liga `think` precisa dar folga no `num_predict`.
+
 ## 10. Pendências
 
 1. Implantar o gateway **0.13.2** (correção do falso alarme "fora da GPU"; ataques 138 PASS / 0 FAIL) — aguardando o owner.

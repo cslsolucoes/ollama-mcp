@@ -1470,6 +1470,7 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
     ok. Documentação do repositório (README, CLAUDE.md, `docs/` e contrato 1.1.7) em Sonnet.
   - **Fica para a implantação (descreve o estado de produção):** CLAUDE.md global (tabela do nível local), `D:\MCP\Documentation\Ollama`,
     `csl-ollama.env` do `ia-local`, configuração do Codex, `.mcp.json` das estações (só se tiverem `--model` explícito).
-  - **Achado:** o `ollama-warm.sh` já registrava "2026-10-26: was qwen3.8:27b-64k (removed - only the models tuned for this hardware
-    remain)": o `qwen3.8:27b` foi usado antes e removido quando o owner fixou só modelos otimizados para o hardware; os testes de
-    2026-11-04/05 mostram que hoje ele cabe (64k, 100% GPU, ~24 GB com o nomic).
+  - ~~**Achado:** o `qwen3.8:27b` foi usado antes (comentário de 2026-10-26 no `ollama-warm.sh`).~~ **Retirado em 2026-11-05 11:51:**
+    a página do Ollama mostra o `qwen3.8` com 5 dias (≈ 2026-10-31), o que não fecha com o comentário de 2026-10-26 ("was
+    qwen3.8:27b-64k"); não dá para confirmar se o comentário anotou outro nome ou se os "5d" são da última atualização. O comentário
+    fica como registro antigo, sem conclusão.

@@ -5,7 +5,7 @@
 | Data/hora | 2026-11-04 17:59 (hora local, America/Sao_Paulo) |
 | Autor | Claude Opus 5.5 (Claude Code 2.1.296, extensão no Cursor), sessão de coordenação do projeto mcpollama |
 | Pedido do owner | "crie um report com todo esse bate-papo para pedir uma segunda avaliação de outra IA, com todos os detalhes ('até mesmo se é verde ou roxo'), detalhamento máximo do seu entendimento primeiro, antes de fazer o plano" |
-| Estado | **Somente entendimento e proposta.** Nenhum código, nenhuma mudança no servidor por causa deste assunto. A Fase 11 continua **congelada** (desde 2026-10-30 23:50). O plano será reescrito **depois** da revisão externa, no próprio arquivo congelado, com data/hora atualizadas (ordem do owner) |
+| Estado | **Entendimento, duas avaliações externas e o tratamento (atualizado em 2026-11-05 12:00).** Nenhum código nem mudança no servidor por causa deste assunto. A Fase 11 continua **congelada** (desde 2026-10-30 23:50). O plano **já foi reescrito** (2026-11-04 18:25, atualizado em 2026-11-05) no próprio arquivo congelado; o que vale hoje está na §0, na §15 e no plano. Pendentes: aprovação 11.0 e prova 11.1b |
 | Plano antigo (a ser reescrito) | `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` |
 | Spike já feito | `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md` (commit `f8c723e`) |
 
@@ -17,7 +17,7 @@
 > 3. **§1–§13 (entendimento original de 2026-11-04 17:59)** — histórico; as §7–§9 estão marcadas como **superadas em parte** e os trechos errados com ⛔.
 > A 2ª avaliação (GPT-6, 2026-11-05 10:25) e o tratamento dela estão na §15.7.
 
-1. A §1 a §4 descrevem **o sistema como ele é hoje**, com números medidos e caminhos de código. A §5 resume a Fase 11 original
+1. A §1 a §4 descrevem **o sistema como ele era em 2026-11-04 17:59** (fotografia daquele momento, não do estado atual), com números medidos e caminhos de código. A §5 resume a Fase 11 original
    (congelada). A §6 é a **cronologia literal da conversa** de 2026-11-04 (16:57–17:51) que originou a reestruturação. A §7 é o
    **desenho proposto**. A §8 compara o desenho novo com as decisões antigas (D11-x) e aponta **conflitos**. A §9 lista as
    **decisões em aberto**. A §10 traz riscos; a §11 o que **não foi verificado**; a §12 as **perguntas específicas** para você.
@@ -662,3 +662,13 @@ versão da instrução no job · D11-40 envelope e fechamento no mcpollama, sem 
 | 4 | "Resultado exatamente uma vez" precisava de contrato preciso | **procede.** D11-35 reescrita: **um único resultado autoritativo por job** (o primeiro gravado de forma durável; tentativas posteriores registradas e descartadas); anúncio só após gravação; `idempotency_key`: mesmo dono + mesmo corpo → **mesmo `job_id`**, corpo diferente → **409**, validade = prazo do registro; fechamento idempotente que prova **entrega ao cliente MCP**, não leitura pelo modelo |
 
 Conclusão do GPT-6 aceita: a Fase 11 **continua congelada**; pendentes a aprovação **11.0** e a prova **11.1b** (Claude Code dentro do Cursor).
+
+### 15.8 Terceira leitura externa (GPT-6, 2026-11-05 11:52) e tratamento — 2026-11-05 12:00
+
+| # | Ponto | Tratamento |
+| --- | --- | --- |
+| 1 | A linha "Estado" da capa ainda dizia "somente entendimento" e "o plano será reescrito depois"; a §0 item 1 dizia "o sistema como ele é hoje" | **procede.** Capa atualizada (plano já reescrito; vale a §0/§15/plano); §0 item 1 diz que §1–§4 são a fotografia de 2026-11-04 17:59 |
+| 2 | O limite de 10 GB só protege os jobs já aceitos se houver reserva calculável por job/lote | **procede.** D11-42 ganhou a **reserva**: cada job aceito reserva `bytes_in` + o teto de resposta (`num_predict` × 4 bytes, limitado ao teto de 16 MiB por parte) + 64 KiB de metadados; um lote reserva a soma dos seus jobs; o gateway só aceita se `espaço livre − reservas ativas − novo pedido ≥ limite`; a reserva é liberada quando o registro final é gravado |
+| 3 | O fechamento prova que o mcpollama escreveu a resposta no canal MCP, não que o cliente a consumiu | **procede.** D11-35 item 5: o estado `entregue` passa a significar "**resposta escrita com sucesso no stdout (canal MCP)**", com a limitação explícita: não prova que o cliente leu nem que o modelo usou |
+| 4 | O aceite do Qwen ainda não estava consolidado (`run-B2.log` em curso) | **procede**; o aceite é consolidado no relatório da Fase 13 antes de qualquer implantação |
+| 5 | Commit `33ac4f5` local e duas modificações fora dele (`deploy/gateway/mcpollama-gateway.service`, `src/cmd/bakeoff/suites.go`) | **correto e intencional:** são o `--max-wait 30m` (owner, 11:39) e a folga de tokens do S6 com `-think`; entram no commit da implantação, com o push |
