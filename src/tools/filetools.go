@@ -32,7 +32,7 @@ import (
 
 const (
 	defaultMaxChunks   = 40     // model calls per request when Deps.MaxChunks is 0
-	fallbackPromptChar = 128000 // same default as the config; the real value is Deps.MaxPromptChars
+	fallbackPromptChar = 270000 // same default as the config; the real value is Deps.MaxPromptChars
 	promptSlack        = 64     // runes kept free for the per-part counters in the task text
 	minPartRunes       = 200    // below this the ceiling cannot hold the instruction plus text
 	maxFocusRunes      = 2000

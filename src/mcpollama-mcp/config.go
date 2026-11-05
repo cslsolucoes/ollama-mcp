@@ -27,7 +27,7 @@ const (
 	defaultModel          = "qwen3.8:27b" // owner 2026-11-05: real name, no alias (was the alias qwen3-ia = qwen3.5:9b)
 	defaultEmbedModel     = "nomic-embed-text"
 	defaultTimeout        = 30 * time.Minute // owner 2026-11-05: same as the gateway --max-wait 30m; qwen3.8:27b reads a 40k prompt in ~90 s and long queues wait minutes (was 120 s)
-	defaultMaxPromptChars = 128000
+	defaultMaxPromptChars = 270000           // owner 2026-11-05: ~90k tokens, inside the 96k context of qwen3.8:27b (was 128000, ~40k tokens)
 	defaultMaxLineBytes   = 8 << 20
 	defaultMaxFileBytes   = 4 << 20
 	defaultMaxDocBytes    = 32 << 20 // .docx, .pptx and .pdf (D-3)
@@ -135,7 +135,7 @@ Every flag falls back to its environment variable; the flag wins.
                           qwen3.8:27b;nomic-embed-text (tuned for the server GPUs);
                           --model and --embed-model must be in it (MCPOLLAMA_ALLOWED_MODELS)
   --timeout DURATION      per-call deadline, default 30m0s         (OLLAMA_TIMEOUT)
-  --max-prompt-chars N    prompt ceiling in characters, default 128000 (MCPOLLAMA_MAX_PROMPT_CHARS)
+  --max-prompt-chars N    prompt ceiling in characters, default 270000 (MCPOLLAMA_MAX_PROMPT_CHARS)
   --max-file-bytes N      file ceiling in bytes, default 4194304   (MCPOLLAMA_MAX_FILE_BYTES)
   --max-doc-bytes N       .docx/.pptx/.pdf ceiling in bytes, default 33554432 (MCPOLLAMA_MAX_DOC_BYTES)
   --pdf-cache-dir DIR     absolute directory for the PDF engine compilation cache

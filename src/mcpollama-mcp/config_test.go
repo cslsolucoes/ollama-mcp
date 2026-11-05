@@ -24,7 +24,7 @@ func parse(t *testing.T, args []string, e map[string]string) Config {
 
 func TestDefaults(t *testing.T) {
 	c := parse(t, nil, nil)
-	if c.Model != "qwen3.8:27b" || c.EmbedModel != "nomic-embed-text" || c.MaxPromptChars != 128000 ||
+	if c.Model != "qwen3.8:27b" || c.EmbedModel != "nomic-embed-text" || c.MaxPromptChars != 270000 ||
 		c.ToolsVerbosity != "full" || c.Insecure || c.Debug || c.TraceFile != "" || c.AuditLogPath != "" ||
 		c.OllamaURL != "" || c.APIKey != "" || c.Timeout != 30*time.Minute || c.AutoReport {
 		t.Fatalf("defaults: %+v", c)
