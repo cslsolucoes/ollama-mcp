@@ -19,15 +19,31 @@ func TestIndexIsResponsiveAndStable(t *testing.T) {
 		`function safeRender`,
 		`dataset.k`, // stable keys: buttons survive a redraw
 		`Erro ao desenhar o painel`,
-		`RUN_PAGE_SIZE = 5`,                          // "Em execução": at most 5 rows, the rest is paged
-		`WAIT_PAGE_SIZE = 10`,                        // "Fila de espera": at most 10 rows, the rest is paged
+		`RUN_PAGE_SIZE = 5`,                          // "Em execução": always 5 rows, the rest is paged
+		`WAIT_PAGE_SIZE = 10`,                        // "Fila de espera": always 10 rows, the rest is paged
 		`pageOf("running", q.running, RUN_PAGE_SIZE`, // both boards really go through the pager
 		`pageOf("waiting", q.waiting, WAIT_PAGE_SIZE`,
+		`function padRows(`, // blank rows up to the fixed height (owner, 2026-11-05)
+		`padRows(runRows, RUN_PAGE_SIZE`,
+		`padRows(waitRows, WAIT_PAGE_SIZE`,
+		`function boardStatus(`, // the one-line status of each board is always there
+		`id="runst"`,
+		`id="waitst"`,
 		`function openJob(id) { showTab("joblog");`, // "Detalhes" outside the log tab must open that tab (the box lives there)
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("index.html lacks %s", want)
 		}
+	}
+	// The pager of the two boards is always drawn (owner, 2026-11-05: the 0.13.1 pager only appeared above the
+	// limit and the empty boards shrank to one line, which was not what he asked for).
+	if strings.Contains(page, "if (total <= size)") {
+		t.Error("the pager is hidden again when the board fits in one page")
+	}
+	// Both boards must pass blank rows to table(), never an empty list (an empty list hides the table).
+	if !regexp.MustCompile(`table\("running", runHeads, padRows\(runRows, RUN_PAGE_SIZE, runHeads\.length\)`).MatchString(page) ||
+		!regexp.MustCompile(`table\("waiting", waitHeads, padRows\(waitRows, WAIT_PAGE_SIZE, waitHeads\.length\)`).MatchString(page) {
+		t.Error("a paged board is not drawn through padRows")
 	}
 	// No empty catch around the render (the old "try { render(...) } catch (x) {}").
 	if regexp.MustCompile(`catch\s*\(\w+\)\s*\{\s*\}\s*stopPolling`).MatchString(page) {

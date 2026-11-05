@@ -92,8 +92,8 @@ main{padding:8px;gap:8px}
 <main>
   <div id="msg" role="status"></div>
   <div class="cards" id="cards"></div>
-  <section><h2>Em execução</h2><div class="wrap"><table id="running"></table></div><div id="runpg" class="pg"></div></section>
-  <section><h2>Fila de espera</h2><div class="wrap"><table id="waiting"></table></div><div id="waitpg" class="pg"></div></section>
+  <section><h2>Em execução</h2><div id="runst" class="empty"></div><div class="wrap"><table id="running"></table></div><div id="runpg" class="pg"></div></section>
+  <section><h2>Fila de espera</h2><div id="waitst" class="empty"></div><div class="wrap"><table id="waiting"></table></div><div id="waitpg" class="pg"></div></section>
   <section id="donesec"><h2 id="donehead">Concluídos recentes</h2><div class="wrap"><table id="donelist"></table></div></section>
   <section><h2>Backends</h2><div class="wrap"><table id="backends"></table></div><div id="bkmeta" class="empty"></div></section>
   <section><h2>GPUs</h2><div class="gpus" id="gpus"></div><div id="gpumeta" class="empty"></div></section>
@@ -230,9 +230,11 @@ function table(id, heads, rows, emptyText) {
   t.appendChild(tb);
   p.scrollLeft = sl;
 }
-// Paging for the "Em execução" (5 rows) and "Fila de espera" (10 rows) boards. The page is kept per board in
-// pageNo, so the 1 s redraw keeps it; if the list shrinks it is clamped to the last valid page. The pager is
-// drawn only when there are more items than the limit, and only rebuilt when page, page count or total change.
+// Paging for the "Em execução" (5 rows) and "Fila de espera" (10 rows) boards. Both boards always keep that many
+// rows (padRows fills the missing ones with blank rows) and always show the pager, even with a single page or
+// no item at all, so the screen does not jump when a job comes or goes (owner, 2026-11-05: "fixo 5 linhas" and
+// "10 linhas fixas", paging the rest). The page is kept per board in pageNo, so the 1 s redraw keeps it; if the
+// list shrinks it is clamped to the last valid page. The pager is only rebuilt when page, page count or total change.
 var RUN_PAGE_SIZE = 5, WAIT_PAGE_SIZE = 10;
 var pageNo = { running: 0, waiting: 0 };
 function pageOf(key, list, size, pgId) {
@@ -240,7 +242,6 @@ function pageOf(key, list, size, pgId) {
   if (pageNo[key] > pages - 1) pageNo[key] = pages - 1;
   if (pageNo[key] < 0) pageNo[key] = 0;
   var cur = pageNo[key];
-  if (total <= size) { if (box._sig !== null) { box.textContent = ""; box._sig = null; } return list; }
   if (!sameSig(box, [cur, pages, total])) {
     box.textContent = "";
     var prev = el("button", "‹ anterior"), next = el("button", "próxima ›");
@@ -249,11 +250,20 @@ function pageOf(key, list, size, pgId) {
     prev.addEventListener("click", function () { pageNo[key]--; if (lastState) safeRender(lastState); });
     next.addEventListener("click", function () { pageNo[key]++; if (lastState) safeRender(lastState); });
     box.appendChild(prev);
-    box.appendChild(el("span", "página " + (cur + 1) + " de " + pages + " · " + total + " itens"));
+    box.appendChild(el("span", "página " + (cur + 1) + " de " + pages + " · " + (total === 1 ? "1 item" : total + " itens")));
     box.appendChild(next);
   }
   return list.slice(cur * size, (cur + 1) * size);
 }
+// padRows fills a board up to size rows with blank ones (a no-break space keeps the row height), so the board
+// has a fixed height whatever the number of items.
+function padRows(rows, size, cols) {
+  var out = rows.slice();
+  while (out.length < size) { var r = []; for (var i = 0; i < cols; i++) r.push(" "); out.push(r); }
+  return out;
+}
+// boardStatus keeps the one-line status of a board (always present, so the board does not change height).
+function boardStatus(id, text) { var d = $(id); if (d.textContent !== text) d.textContent = text; }
 function thinkLabel(v) { return v === "on" ? "ligado" : v === "off" ? "desligado" : v === "modelo" ? "padrão do modelo" : "-"; }
 function who(it) { return { text: it.client_label || "", title: (it.client_ip || "") + " " + (it.client_label || "") }; }
 
@@ -350,8 +360,10 @@ function render(s) {
     cells.push(loggedIn ? btn("Cancelar", "Cancelar este pedido em execução", "cancel", it.id, "danger") : "");
     return cells;
   });
-  table("running", ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Prioridade", "Rodando há", "Esperou", ""], runRows,
-    "Nada em execução (slots: geração " + (inuse.geracao || 0) + "/" + (slots.geracao || 0) + ", embed " + (inuse.embed || 0) + "/" + (slots.embed || 0) + ").");
+  var runHeads = ["Faixa", "Id", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Prioridade", "Rodando há", "Esperou", ""];
+  var slotTxt = "(slots: geração " + (inuse.geracao || 0) + "/" + (slots.geracao || 0) + ", embed " + (inuse.embed || 0) + "/" + (slots.embed || 0) + ")";
+  boardStatus("runst", q.running.length ? q.running.length + " em execução " + slotTxt + "." : "Nada em execução " + slotTxt + ".");
+  table("running", runHeads, padRows(runRows, RUN_PAGE_SIZE, runHeads.length), "");
 
   var waitRows = pageOf("waiting", q.waiting, WAIT_PAGE_SIZE, "waitpg").map(function (it) {
     var box = el("div", null, "row"); box.dataset.k = "wbox:" + it.id + ":" + (loggedIn ? 1 : 0);
@@ -360,7 +372,9 @@ function render(s) {
     }
     return [it.position, it.lane, (it.id || "").slice(0, 8), who(it), it.tool, it.model, { text: "-", title: "o backend é escolhido quando o pedido começa", cls: "dim" }, thinkLabel(it.think), { text: it.priority, cls: it.priority }, fmtMs(it.waiting_ms), box];
   });
-  table("waiting", ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Prioridade", "Esperando há", ""], waitRows, "Ninguém esperando.");
+  var waitHeads = ["Pos.", "Faixa", "Id", "Cliente", "Tool", "Modelo", "Backend", "Raciocínio", "Prioridade", "Esperando há", ""];
+  boardStatus("waitst", q.waiting.length ? q.waiting.length + " esperando." : "Ninguém esperando.");
+  table("waiting", waitHeads, padRows(waitRows, WAIT_PAGE_SIZE, waitHeads.length), "");
 
   var recent = (s.recent || []).map(function (r) {
     return [fmtTime(r.finished_at), { text: r.status, cls: r.status }, r.http_status, who(r), r.tool, r.model, thinkLabel(r.think), fmtMs(r.wait_ms), fmtMs(r.run_ms), r.prompt_eval_count + " / " + r.eval_count, r.error_class];

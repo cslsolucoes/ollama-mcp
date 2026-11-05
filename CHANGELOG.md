@@ -192,6 +192,21 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
+### [0.13.3] - 2026-11-05 (ainda sem tag; monitor)
+
+#### Corrigido
+- **Monitor: "Em execução" e "Fila de espera" com altura fixa e paginador sempre visível** (owner, 2026-11-05: "não está aparecendo aqui ainda").
+  A 0.13.1 entendeu o pedido "fixo 5 linhas" e "10 linhas fixas" como "mostrar **até** 5 e 10 linhas": o paginador só aparecia quando a lista
+  passava do limite e, vazio, cada quadro encolhia para uma linha de texto. Agora cada quadro **sempre** ocupa 5 linhas (Execução) ou 10
+  (Fila), com linhas em branco quando há menos itens; o paginador aparece sempre ("página 1 de 1 · 0 itens", botões desabilitados); cada
+  quadro tem uma linha de status fixa ("Nada em execução (slots: …)" / "N em execução (slots: …)"; "Ninguém esperando." / "N esperando."),
+  para a tela não pular. Só muda `src/gateway/monitor/index.html` (elementos `#runst` e `#waitst`, `padRows`, `boardStatus`); o teste
+  `TestIndexIsResponsiveAndStable` passou a exigir as linhas em branco e o paginador sempre desenhado.
+  **Verificado em navegador real** (Playwright, gateway local com um Ollama de mentira): estado vazio (5 e 10 linhas, "página 1 de 1 · 0 itens");
+  carga de 13 pedidos (1 em execução + 4 linhas em branco; fila com 10 linhas, "página 1 de 2 · 12 itens"); página 2 pelo botão "próxima ›"
+  ("página 2 de 2 · 11 itens", 1 item + 9 linhas em branco; a página escolhida se mantém entre as atualizações); sem erro de console além do
+  `favicon.ico`. Testes de ataque das revisões 9, 10.5 e 12: `.workspace/reports/MCPOllam2026-11-05-ataques-gateway-0.13.3.log`.
+
 ### [0.13.2] - 2026-11-05 12:02, em produção (`0.13.2-bb51ed6`; ajuste da Fase 12; ainda sem tag)
 
 #### Corrigido
