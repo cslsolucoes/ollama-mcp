@@ -5,17 +5,18 @@
 | Data/hora | 2026-11-04 17:59 (hora local, America/Sao_Paulo) |
 | Autor | Claude Opus 5.5 (Claude Code 2.1.296, extensão no Cursor), sessão de coordenação do projeto mcpollama |
 | Pedido do owner | "crie um report com todo esse bate-papo para pedir uma segunda avaliação de outra IA, com todos os detalhes ('até mesmo se é verde ou roxo'), detalhamento máximo do seu entendimento primeiro, antes de fazer o plano" |
-| Estado | **Entendimento, duas avaliações externas e o tratamento (atualizado em 2026-11-05 12:00).** Nenhum código nem mudança no servidor por causa deste assunto. A Fase 11 continua **congelada** (desde 2026-10-30 23:50). O plano **já foi reescrito** (2026-11-04 18:25, atualizado em 2026-11-05) no próprio arquivo congelado; o que vale hoje está na §0, na §15 e no plano. Pendentes: aprovação 11.0 e prova 11.1b |
+| Estado | **Entendimento, avaliações externas, decisões e auditoria de coerência (atualizado em 2026-11-05 13:21).** Nenhum código nem mudança no servidor por causa deste assunto. A Fase 11 continua **congelada** (desde 2026-10-30 23:50). O plano **já foi reescrito** (2026-11-04 18:25, atualizado em 2026-11-05) no próprio arquivo congelado. A §16 é uma auditoria do desenho; seus achados não são decisões do owner nem alteram o plano. Pendentes: aprovação 11.0 e prova 11.1b; resolver os bloqueios da §16 antes de aprovar o contrato |
 | Plano antigo (a ser reescrito) | `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` |
 | Spike já feito | `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md` (commit `f8c723e`) |
 
 ## 0. Como usar este relatório (para a IA revisora)
 
-> **Situação em 2026-11-05 11:40 (leia primeiro).** Este documento tem três camadas, nesta ordem de validade:
-> 1. **§15 (resposta do coordenador, decisões do owner e correções) e o plano reescrito** (`.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) — **é o que vale hoje**;
-> 2. **§14 (1ª avaliação, Codex, 2026-11-04 18:11)** — as recomendações dela já foram decididas ou incorporadas na §15;
-> 3. **§1–§13 (entendimento original de 2026-11-04 17:59)** — histórico; as §7–§9 estão marcadas como **superadas em parte** e os trechos errados com ⛔.
-> A 2ª avaliação (GPT-6, 2026-11-05 10:25) e o tratamento dela estão na §15.7.
+> **Situação em 2026-11-05 13:21 (leia primeiro).** O documento tem quatro camadas; a §16 é a auditoria mais recente, mas não substitui decisões do owner:
+> 1. **Plano reescrito** (`.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) + decisões expressas do owner registradas na **§15** — fonte normativa atual;
+> 2. **§16 — auditoria de coerência de 2026-11-05 13:21** — achados e propostas para fechar o contrato antes da aprovação; não são decisões aprovadas e não descongelam a fase;
+> 3. **§14 — avaliação independente inicial do Codex (2026-11-04 18:11)**; suas recomendações foram tratadas na §15;
+> 4. **§1–§13** — entendimento e desenho original de 2026-11-04 17:59, histórico; §§7–§9 estão superadas em parte e trechos errados estão marcados com ⛔.
+> A 2ª avaliação (GPT-6, 2026-11-05 10:25) e a 3ª leitura (GPT-6, 11:52) estão tratadas na §15.7–§15.8.
 
 1. A §1 a §4 descrevem **o sistema como ele era em 2026-11-04 17:59** (fotografia daquele momento, não do estado atual), com números medidos e caminhos de código. A §5 resume a Fase 11 original
    (congelada). A §6 é a **cronologia literal da conversa** de 2026-11-04 (16:57–17:51) que originou a reestruturação. A §7 é o
@@ -672,3 +673,113 @@ Conclusão do GPT-6 aceita: a Fase 11 **continua congelada**; pendentes a aprova
 | 3 | O fechamento prova que o mcpollama escreveu a resposta no canal MCP, não que o cliente a consumiu | **procede.** D11-35 item 5: o estado `entregue` passa a significar "**resposta escrita com sucesso no stdout (canal MCP)**", com a limitação explícita: não prova que o cliente leu nem que o modelo usou |
 | 4 | O aceite do Qwen ainda não estava consolidado (`run-B2.log` em curso) | **procede**; o aceite é consolidado no relatório da Fase 13 antes de qualquer implantação |
 | 5 | Commit `33ac4f5` local e duas modificações fora dele (`deploy/gateway/mcpollama-gateway.service`, `src/cmd/bakeoff/suites.go`) | **correto e intencional:** são o `--max-wait 30m` (owner, 11:39) e a folga de tokens do S6 com `-think`; entram no commit da implantação, com o push |
+
+## 16. Auditoria de lacunas, brechas, lógica e semântica — Codex, 2026-11-05 13:21
+
+### 16.1 Escopo e método
+
+Revisão estática, sem alterar código, servidor ou plano, feita por comparação entre esta narrativa (§15, decisões e avaliações anteriores) e o plano congelado em vigor, em especial §§2.2–2.3 (decisões), §3 (endpoints), §4 (etapas), §5 (riscos) e §6 (pendências). A pergunta aplicada foi: **duas implementações independentes conseguiriam produzir o mesmo comportamento a partir do contrato atual, inclusive em falha, retry, acesso entre máquinas, retenção e falta de espaço?**
+
+**Resultado: FAIL para aprovação técnica integral na 11.0, até que os achados bloqueadores e altos abaixo sejam resolvidos no contrato.** Isso não significa que a Fase 11 esteja implementada ou que exista defeito em produção: ela está congelada e em redesenho. Os pontos marcados “já reconhecido” são pendências escritas no plano, mas ainda precisam de decisão/regra executável; os demais são lacunas de semântica encontradas nesta leitura. Esta auditoria não altera o plano e nenhuma recomendação abaixo passa a ser decisão do owner sem aprovação expressa.
+
+### 16.2 Achados
+
+#### A11-01 — Bloqueador: identidade do dono diverge entre a decisão e o contrato dos endpoints
+
+- **Evidência:** D11-32 (§2.2) define token por máquina associado a uma pessoa; a pessoa é dona dos jobs e pode acessá-los por outra máquina/token dela. Porém o desenho §3 ainda diz “todos exigem o token do usuário, dono = token”; a linha de arquitetura fala em “token do usuário”, a etapa 11.4 diz “dono por token” e P11-5/11.2 ainda descrevem distribuição de tokens “por usuário”.
+- **Risco:** se `owner_id` for o ID do token, a mesma pessoa não acessará o próprio job com outro token; se o backend tratar tokens como permissão intercambiável sem `person_id`, revogação e isolamento entre pessoas ficam ambíguos. `X-Mcpollama-Station` é expressamente declarado e não autenticado, portanto não pode preencher essa identidade.
+- **Correção proposta:** separar no contrato `person_id` (principal/dono), `credential_id` (token individual por máquina) e `station_id` (origem auditável). Autorizar leitura/listagem pelo `person_id`; autenticar e revogar por `credential_id`; revogar pessoa invalida todas as credenciais vinculadas. Atualizar diagrama, endpoint, etapas, pendência P11-5 e testes de aceite. Testar a mesma pessoa em duas máquinas, pessoa diferente, revogação de uma máquina e revogação total da pessoa.
+- **Estado:** contradição documental concreta; bloqueia D11-32 e a aprovação de 11.0.
+
+#### A11-02 — Alto: chave idempotente não tem ciclo de vida definido no cliente
+
+- **Evidência:** D11-35 (§2.3) define replay da mesma `idempotency_key` + mesmo dono + mesmo hash do corpo → mesmo `job_id`; mesma chave com corpo diferente → 409. O `POST /api/jobs` inclui a chave (§3), mas não diz quem a cria, quando a persiste na estação, como é reutilizada após timeout/reboot nem o que acontece com o mesmo corpo enviado com uma chave nova.
+- **Risco:** depois de uma resposta de aceite perdida, uma nova chave pode iniciar e cobrar uma segunda inferência; reutilizar hash do corpo como chave pode fundir duas solicitações idênticas que o usuário queria executar separadamente. Sem persistir a chave antes do primeiro envio, a recuperação não é idempotente.
+- **Correção proposta:** definir a chave como identidade de uma submissão lógica, criada e persistida localmente antes do POST; retry da mesma submissão reutiliza a chave; chave diferente cria novo job mesmo com corpo igual; a mesma chave só reproduz o mesmo aceite se principal e hash canônico coincidirem, caso contrário 409. Definir resposta de replay, canonicalização do corpo, tratamento quando a resposta HTTP se perde e limite temporal após retenção de 90 dias.
+- **Estado:** lacuna nova; requisito de 11.3/11.4 antes do aceite.
+
+#### A11-03 — Alto: reserva de disco não cobre claramente chamadas compostas, retries e crescimento real do SQLite
+
+- **Evidência:** D11-42 (§2.2) reserva `bytes_in` + `num_predict × 4`, limitado a 16 MiB “por parte”, + 64 KiB de metadados. D11-35 permite até N tentativas e diz que tentativas tardias ficam registradas; D11-37 executa map-reduce com várias chamadas/partes e redução; D11-40 retém corpos, respostas, raciocínio e fechamento. O texto não diz se a reserva inclui todas essas partes e tentativas, nem define teto obrigatório de bytes por resposta quando `num_predict` é omitido ou se o limite indicado é apenas uma estimativa.
+- **Risco:** o pedido pode ser aceito com reserva menor que o armazenamento exigido; o disco pode encher depois do aceite e quebrar a promessa “nenhum job roda sem registro/registro completo”. SQLite também pode precisar de espaço temporário para WAL, índices, páginas livres/compactação e projeções. `num_predict × 4` não é, por si só, um limite de bytes imposto ao stream.
+- **Correção proposta:** definir limites **enforced** de entrada e saída em bytes; resolver e gravar o `num_predict` efetivo/default antes da aceitação; reservar por chamada efetiva — todas as partes map, redução, retries máximos e fechamento — e contabilizar overhead/WAL/projeções com margem comprovada. Se exceder limite, especificar se recusa antes de aceitar ou trunca com marcador explícito e resultado ainda válido. O lote deve reservar a soma completa atomicamente. Incluir teste de falta de espaço durante execução e crash/recovery.
+- **Estado:** lacuna nova; bloqueia a garantia de registro integral e o gate 11.5/11.12.
+
+#### A11-04 — Alto: retenção de 90 dias não define o marco inicial; backup sem prazo não tem regra de exclusão/restauração
+
+- **Evidência:** D11-31 estabelece retenção configurável de 90 dias; D11-41 determina que backup cifrado permaneça sem prazo até exclusão manual e reconhece presença de dados de cliente por tempo indeterminado. Não se define se os 90 dias contam da aceitação, conclusão ou última atualização, nem como pedido legítimo de exclusão, descarte manual, restauração de snapshot e expiração do backup interagem.
+- **Risco:** job demorado pode perder o registro logo após concluir se o relógio começou na aceitação; restaurar backup pode ressuscitar dados que já venceram ou foram apagados; uma exclusão na base ativa não elimina cópias arquivadas. A regra “90 dias” pode ser entendida pelo usuário como retenção total, embora só valha para a base ativa.
+- **Correção proposta:** registrar que D11-31 é retenção da base ativa, decidir marco do relógio (recomendação técnica: a partir do estado terminal) e definir expiração de jobs ainda pendentes. Especificar processo de exclusão em backup (inclusive expurgo manual/criptográfico), tombstone e limpeza após restore; definir RPO/RTO, validação de chave e quem pode restaurar. Manter visível a decisão do owner de backup sem prazo; esta auditoria não a altera.
+- **Estado:** a duração indefinida foi escolhida pelo owner, não é contradição. O ciclo de vida e a semântica dos 90 dias continuam incompletos; completar P11-3/11.5.
+
+#### A11-05 — Alto: retry, lease e cancelamento não têm uma tabela de transições nem regra de corrida
+
+- **Evidência:** D11-26 é resumida como “cancelamento idempotente e tolerante a cruzamento”; D11-35 define lease, tentativas máximas, estados após reboot e primeiro resultado gravado como autoritativo. A API oferece `POST /api/jobs/{id}/cancelar` e consulta do resultado, mas não diz o resultado da corrida cancelar × início, cancelar × conclusão, lease expirado × worker antigo ainda ativo, nem se cancelamento interrompe o Ollama ou só impede novas tentativas.
+- **Risco:** cliente e gateway podem discordar se o job foi cancelado ou concluído; execução pode continuar consumindo GPU depois de “cancelado”; uma tentativa com lease vencido pode gravar resultado; clientes podem repetir uma ação já terminal.
+- **Correção proposta:** criar tabela de estados/transições e respostas HTTP para queued/running/completed/canceled/expired/error; especificar precedência atômica em cada corrida. Usar versão/fencing token de tentativa na gravação terminal; somente o worker que possui o lease vigente pode confirmar, salvo regra aprovada. Definir se cancelar execução ativa tenta interromper stream e o que ocorre se a interrupção não for possível. Cobrir cada corrida em testes determinísticos.
+- **Estado:** termos existem, sem semântica completa; fechar em 11.3/11.4 e provar em 11.11/11.12/11.14.
+
+#### A11-06 — Alto: lote pode ser aceito parcialmente sem contrato para itens, IDs e falhas
+
+- **Evidência:** D11-37 fala de map-reduce composto; D11-38 prevê limites por lote; D11-42 reserva a soma de jobs de um lote. `POST /api/lotes` cria o lote, mas o plano não especifica aceitação atômica ou parcial, formato de erro por item, tratamento de um item inválido/duplicado, ou se um lote pode conter jobs já aceitos antes de falhar por cota/espaço.
+- **Risco:** a estação pode repetir lote inteiro após timeout e duplicar itens que já foram aceitos; resultados parciais podem ser confundidos com falha total; reserva total pode falhar após algumas inferências já terem começado.
+- **Correção proposta:** escolher e documentar all-or-nothing (validar e reservar tudo antes de aceitar/enfileirar qualquer item) ou aceitação parcial explícita com ID/estado individual por item e replay idempotente do lote. Definir idempotência própria do lote, cancelamento do pai/filhos, agregação de erros e paginação/resultados parciais. Fazer o teste de espaço/cota provar que não há aceite parcial silencioso.
+- **Estado:** lacuna nova, bloqueia o contrato de lote e a etapa 11.7.
+
+#### A11-07 — Médio/alto: o teste de “30 jobs de uma vez” não separa submissão simultânea de execução simultânea
+
+- **Evidência:** a etapa 11.14 pede “30 jobs de uma vez”; D11-38 e o estado de referência de 1 slot indicam que lotes não preemptam a geração interativa. O critério não define se os 30 são POSTs concorrentes, 30 jobs aceitos em fila, ou 30 inferências simultâneas.
+- **Risco:** um aceite pode passar sem testar deduplicação/limites se cada chamada for serial; ou ser considerado FAIL incorretamente por não executar 30 inferências ao mesmo tempo, contradizendo o limite de 1 slot e o objetivo de proteger o Qwen.
+- **Correção proposta:** escrever o aceite em métricas distintas: N submissões concorrentes (se essa for a carga desejada), quantos aceites/429/507, exatamente um job de geração ativo, ordem/fairness da fila, duração total, nenhuma duplicação e busca de todos os resultados. Não exigir inferência paralela se `gen-slots=1` for mantido.
+- **Estado:** ambiguidade de critério já visível; esclarecer antes de 11.14.
+
+#### A11-08 — Médio: “fixar o digest” pode significar metadado ou obrigação de executar exatamente o modelo aceito
+
+- **Evidência:** D11-39 (§2.3) manda fixar modelo resolvido e digest no job, mas não diz se isso é apenas proveniência ou se o worker deve executar o mesmo blob quando o job sair da fila. Também não define o que fazer se o digest não existir mais após update/prune do modelo.
+- **Risco:** job aceito com um modelo e executado depois com outro conteúdo sob o mesmo nome; resultado não reproduzível apesar do campo digest sugerir pinagem.
+- **Correção proposta:** owner escolher entre pinagem executável (reter/garantir blob até a conclusão ou falhar explicitamente) e apenas registrar o digest esperado (validar antes de iniciar e marcar incompatibilidade sem trocar silenciosamente). Incluir teste de atualização do modelo com jobs pendentes.
+- **Estado:** lacuna nova para 11.8/11.14.
+
+#### A11-09 — Médio: os campos de “resumo mínimo” do hook não têm allowlist
+
+- **Evidência:** D11-36 permite que `--lotes-prontos` devolva “IDs/estado/resumo mínimo”, proibindo texto de documento; “resumo mínimo” não define campos permitidos nem se texto de resposta/modelo pode aparecer nele.
+- **Risco:** trecho sensível de prompt ou resposta pode ser injetado no contexto de uma sessão nova por um resumo livre, contornando a restrição explícita de não revelar conteúdo documental no `SessionStart`.
+- **Correção proposta:** definir allowlist não textual: ID do lote/job, rótulo fornecido pelo usuário sob limite, estado, quantidade concluída/total, horário e código de erro sanitizado. Proibir prompt, resposta, OCR, caminhos sensíveis e texto livre do modelo. O hook só anuncia que há resultados; a tool autenticada busca o conteúdo sob demanda.
+- **Estado:** lacuna nova; fechar em 11.9/11.10 e testar com texto-canário sensível.
+
+### 16.3 Pendências já registradas que continuam como gates explícitos
+
+1. **D11-6/P11-7:** escolha entre tornar todas as tools atuais assíncronas (quebra de contrato) e `assincrono:true`/tools novas. O plano já registra a decisão pendente; não implementar 11.8 antes da escolha escrita na 11.0.
+2. **P11-3:** caminho, chave, frequência e teste de restauração do backup; limite de espaço livre e alerta. Acrescentar as decisões de ciclo de vida do A11-04.
+3. **P11-4:** limites numéricos do lote e prioridade. Acrescentar a atomicidade do A11-06 e o critério de carga serial do A11-07.
+4. **P11-5/D11-32:** corrigir o mapeamento pessoa/token/máquina do A11-01; não deixar “dono por token” no endpoint.
+5. **P11-6:** registrar ausência de `session_id`/modelo chamador como “desconhecido” se o cliente não os fornecer; não inferir identidade a partir de `clientInfo` ou `X-Mcpollama-Station`.
+6. **P11-8:** estabelecer gate/version matrix para MCP Tasks/Claude Code; separar “feature disponível” de prova de background e consumo de tokens no 11.1b.
+7. **P11-10:** esclarecer BLOB/TEXT e bytes inválidos como parte dos limites reais de armazenamento e de leitura/exportação.
+
+### 16.4 Critério recomendado para encerrar a aprovação 11.0
+
+Antes de descongelar a fase, inserir no próprio plano/contrato, com aprovação do owner: (a) identidade e autorização por principal/credencial/estação; (b) chave idempotente e aceitação durável; (c) estado/transições de job, lease, retry e cancelamento; (d) atomicidade e limites do lote; (e) reserva de disco baseada em limites de bytes realmente impostos para todas as chamadas/tentativas; (f) retenção, backup, exclusão e restore; (g) semântica do digest; (h) campos exatos do hook; (i) métricas de aceite que preservem um único slot de inferência.
+
+**Conclusão desta leitura:** foram encontrados **9 achados**, dos quais **1 bloqueador**, **5 altos** e **3 médios** (o A11-07 é médio/alto pela carga). Há pendências que o plano já reconhece, mas a inconsistência de identidade e as lacunas de idempotência, espaço, transições, lotes, retenção e privacidade do hook ainda impedem que implementadores diferentes entreguem o mesmo contrato. A Fase 11 permanece congelada. A decisão e priorização das propostas pertencem ao owner na 11.0; nenhuma alteração foi feita no plano congelado.
+
+### 16.5 Tratamento dos 9 achados — coordenador (Claude), 2026-11-05 13:30
+
+Conferido no plano: **os 9 procedem.** O A11-01 é um **erro meu** (às 11:35 registrei a D11-32 sem atualizar a §3, a etapa 11.2 e a
+P11-5). Aplicado no plano congelado (changelog de 2026-11-05 13:30):
+
+| Achado | Tratamento | Onde no plano |
+| --- | --- | --- |
+| A11-01 | `person_id` (dono) · `credential_id` (token da máquina; autentica e revoga) · `station_id` (só auditoria); testes de 2 máquinas, outra pessoa, revogação de máquina e de pessoa | D11-4, D11-7, D11-32, §3, 11.2, 11.4, risco 5, P11-5 |
+| A11-02 | **owner: chave na memória e no disco local** (só chave/hash/job_id, sem conteúdo); submissão lógica; mesma chave+hash → mesmo aceite; hash diferente → 409 | D11-43 |
+| A11-03 | limites de bytes impostos; `num_predict` efetivo gravado antes do aceite; reserva por chamada efetiva (partes, reduções, fechamento, tentativas) + margem de WAL/projeções; teste de disco enchendo durante a execução | D11-42 |
+| A11-04 | 90 dias da **base ativa**, a partir do **estado terminal**; pendente não expira pela retenção. Exclusão/restore do backup sem prazo segue em P11-3 | D11-31, P11-3 |
+| A11-05 | tabela de estados e 5 regras de cruzamento; fencing por tentativa | §3.1, D11-35 |
+| A11-06 | **owner: tudo ou nada**, com reserva atômica e idempotência própria do lote | D11-44, 11.7 |
+| A11-07 | aceite com 30 envios simultâneos, 1 gerando por vez, sem duplicação | 11.14 |
+| A11-08 | **owner: conferir e falhar** (`modelo_mudou`, sem troca silenciosa) | D11-45, D11-39 |
+| A11-09 | lista fechada de campos do hook; proibido qualquer texto de documento/modelo; teste com canário | D11-36, 11.9 |
+
+Os gates da §16.3 continuam como pendências do plano (P11-3, P11-4, P11-5, P11-6, P11-7, P11-8, P11-10). Critério da §16.4: os itens
+(a), (b), (c), (d), (e), (g), (h) e (i) estão agora escritos no plano; (f) — exclusão e restauração do backup — segue em P11-3. A aprovação
+11.0 continua com o owner; a Fase 11 continua **congelada**.

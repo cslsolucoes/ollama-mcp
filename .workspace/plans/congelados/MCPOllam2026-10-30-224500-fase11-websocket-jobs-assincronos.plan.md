@@ -54,10 +54,10 @@ response; quando a IA finalizar o job, envia para a estação solicitante."
 | D11-1 | Tools enviar/resultado: a tool devolve o ID na hora; o Claude busca com outra tool | **mantida** |
 | D11-2 | Estação/sessão cai antes do fim → guardar e entregar ao voltar (não cancela) | **mantida**, reforçada por fila durável (D11-35) |
 | D11-3 | Só o mcpollama usa WebSocket | **mantida para quando houver WS**; WS adiado (D11-33) |
-| D11-4 | LAN (nginx :8443) e internet (túnel Cloudflare), mesmo Bearer | **ajustada**: mesmo caminho, com **token por usuário** (D11-32) |
+| D11-4 | LAN (nginx :8443) e internet (túnel Cloudflare), mesmo Bearer | **ajustada**: mesmo caminho, com **um token por máquina** (`credential_id`) ligado a uma **pessoa** (`person_id`) (D11-32) |
 | D11-5 | Resultado de job não terminado responde na hora com o estado; opcional esperar N s | **mantida** (espera longa por HTTPS, D11-33) |
 | D11-6 | **Todas** as tools assíncronas (`generate`, `chat`, `summarize_file`, `extract`, `translate`, `embed`) devolvem ID | **mantida até o owner decidir o contrário** (Codex §14.4-8); a alternativa compatível `assincrono:true` é a pendência P11-7 |
-| D11-7 | Quem busca = mesma máquina/usuário + ID | **substituída** por D11-32 (dono = token do usuário; mesma pessoa busca de qualquer máquina) |
+| D11-7 | Quem busca = mesma máquina/usuário + ID | **substituída** por D11-32 (dono = **pessoa** `person_id`; a mesma pessoa busca de qualquer máquina dela, cada uma com o seu token) |
 | D11-8 | `list_models` síncrona | mantida |
 | D11-9 | `embed` também assíncrona | mantida (segue D11-6) |
 | D11-10 | Biblioteca `github.com/coder/websocket` | **adiada** com o WS (D11-33); se entrar, registrar no NOTICE |
@@ -86,35 +86,38 @@ response; quando a IA finalizar o job, envia para a estação solicitante."
 | # | Decisão | Escolha do owner |
 | --- | --- | --- |
 | D11-30 | **Texto extraído pelo OCR** é conteúdo (não metadado) | **guardar**, com o prazo do registro (D11-31), mesmo acesso (admin e dono); junto os metadados (hash do arquivo e por página, páginas totais/lidas, dimensões/DPI/megapixels, motor/versão/idioma/tessdata, confiança e tempo por página, se a imagem foi direto ao modelo). **Bytes da imagem não são guardados** (decisão de 17:49) |
-| D11-31 | **"100% registrado" = cobertura de toda chamada aceita, dentro de limites explícitos** | **90 dias** (configurável), compactação mensal, **backup cifrado no TrueNAS** (**sem prazo no backup**: as cópias ficam até o owner apagar, D11-41), **teto de disco com alerta** (ao atingir avisa e não apaga sozinho; pedidos novos são recusados antes de aceitos, D11-42), todo corte por tamanho **marcado**; **exclusões expressas**: bytes de imagem e vetores de embedding |
-| D11-32 | **Dono do job** | **token por máquina, agrupado por pessoa** (owner, 2026-11-05 11:35; refina a escolha "token por usuário" de 18:24): cada máquina tem o seu token, ligado a **uma pessoa**; o **dono do job é a pessoa**, então ela lista e busca os jobs enviados de **qualquer** máquina dela, com o token daquela máquina; revogar um token corta **só aquela máquina** (ex.: notebook perdido), e revogar a pessoa corta todas. O job guarda também a máquina que enviou (auditoria). Cabeçalho `X-Mcpollama-Station` segue como informação declarada, **não** credencial |
+| D11-31 | **"100% registrado" = cobertura de toda chamada aceita, dentro de limites explícitos** | **90 dias** (configurável) **da base ativa, contados a partir do estado terminal do job** (concluído, erro, cancelado ou expirado; A11-04); job ainda pendente não expira pela retenção, só por `--max-wait`/tentativas, compactação mensal, **backup cifrado no TrueNAS** (**sem prazo no backup**: as cópias ficam até o owner apagar, D11-41), **teto de disco com alerta** (ao atingir avisa e não apaga sozinho; pedidos novos são recusados antes de aceitos, D11-42), todo corte por tamanho **marcado**; **exclusões expressas**: bytes de imagem e vetores de embedding |
+| D11-32 | **Dono do job** | **token por máquina, agrupado por pessoa** (owner, 2026-11-05 11:35; refina a escolha "token por usuário" de 18:24). **Contrato de identidade (A11-01, 2026-11-05 13:30):** três campos distintos — **`person_id`** (o principal e **dono** do job), **`credential_id`** (o token de uma máquina; serve para **autenticar e revogar**) e **`station_id`** (a origem declarada, só **auditoria**, nunca autorização). Leitura, listagem e cancelamento autorizados por `person_id`; autenticação e revogação por `credential_id` (revogar um token corta só aquela máquina); revogar a pessoa invalida todas as credenciais dela. O job guarda os três. `X-Mcpollama-Station` segue declarado, **não** credencial. Testes obrigatórios: mesma pessoa em duas máquinas lê o job; outra pessoa recebe 404; token revogado recebe 401; pessoa revogada perde todas as máquinas |
 | D11-41 | **Prazo do backup** | **sem prazo** (owner, 2026-11-05 11:35): o servidor apaga o registro aos 90 dias (D11-31), mas as cópias cifradas no TrueNAS ficam até o owner apagar manualmente. Consequência registrada: dados de cliente podem existir no backup por tempo indeterminado; acesso ao backup e à chave de cifra só do owner (P11-3) |
-| D11-42 | **Sem espaço para o registro completo** | **recusar antes de aceitar** (owner, 2026-11-05 11:35): abaixo de um limite de espaço livre (proposta: 10 GB, configurável), o gateway recusa **jobs novos** com HTTP 507 ("sem espaço para o registro") **antes** de enfileirar e avisa no monitor; nenhum job roda sem registro; a IA recebe o erro na hora e decide usar a IA paga. **Reserva calculável** (3ª leitura externa): cada job aceito reserva `bytes_in` + teto de resposta (`num_predict` × 4 bytes, limitado ao teto de 16 MiB por parte) + 64 KiB de metadados; um lote reserva a soma dos seus jobs; o gateway só aceita se `espaço livre − reservas ativas − novo pedido ≥ limite`; a reserva é liberada quando o registro final é gravado — assim os jobs já aceitos sempre têm espaço |
+| D11-42 | **Sem espaço para o registro completo** | **recusar antes de aceitar** (owner, 2026-11-05 11:35): abaixo de um limite de espaço livre (proposta: 10 GB, configurável), o gateway recusa **jobs novos** com HTTP 507 ("sem espaço para o registro") **antes** de enfileirar e avisa no monitor; nenhum job roda sem registro; a IA recebe o erro na hora e decide usar a IA paga. **Reserva calculável** (3ª leitura externa), **com limites impostos** (A11-03, 2026-11-05 13:30): antes de aceitar, o gateway **resolve e grava** o `num_predict` efetivo (padrão do servidor quando omitido) e impõe **teto de bytes** na entrada e na saída (o stream é cortado no teto, com marcador `truncado` e resultado ainda válido); a reserva é por **chamada efetiva** — todas as partes do map, as reduções, o fechamento e **o máximo de tentativas** (D11-35) — somando entrada + teto de saída + raciocínio + 64 KiB de metadados, **mais uma margem para WAL, índices e projeções** medida em teste; um lote reserva a soma completa **de forma atômica** (D11-44); o gateway só aceita se `espaço livre − reservas ativas − novo pedido ≥ limite`; a reserva é liberada quando o registro final é gravado. Teste obrigatório: disco enchendo **durante** a execução e queda/recuperação |
 | D11-33 | **Transporte** | **HTTPS primeiro** (envio, consulta com espera longa, cancelamento, listagem); **WebSocket depois**, só se um aceite provar que o aviso imediato agrega valor. Substitui por enquanto D11-16 e adia D11-10/D11-3 |
+| D11-43 | **Chave de idempotência** (A11-02) | **owner, 2026-11-05 13:28: na memória e no disco local.** A chave identifica **uma submissão lógica**: o mcpollama a gera **antes** do primeiro envio e a grava num arquivo pequeno no perfil do usuário (só chave, hash canônico do pedido e `job_id` quando houver; **nenhum conteúdo**; ACL só do usuário; exceção registrada à regra "o mcpollama não grava em disco"); toda nova tentativa da mesma submissão reusa a chave (resposta perdida, queda do processo, reboot); chave nova = job novo, mesmo com corpo igual; a mesma chave com o mesmo `person_id` e o mesmo hash devolve o **mesmo aceite**; com hash diferente, **409**; a entrada local sai quando o aceite é confirmado; a chave vale no servidor pelo prazo da D11-31 |
+| D11-44 | **Lote** (A11-06) | **owner, 2026-11-05 13:28: tudo ou nada.** O gateway valida todos os itens e reserva o espaço de todos (D11-42) **antes** de aceitar qualquer um; se um falhar, o lote inteiro é recusado com a lista dos itens e motivos, e nada roda; o lote tem a sua própria chave de idempotência (D11-43), então reenviar é seguro; cancelar o lote cancela os itens pendentes; os resultados vêm por item, paginados |
+| D11-45 | **Digest do modelo** (A11-08) | **owner, 2026-11-05 13:28: conferir e falhar explicitamente.** Antes de rodar, o gateway confere se o digest do modelo é o gravado no aceite; se mudou (troca ou atualização), o job **não roda com outro modelo**: vai para o estado terminal `modelo_mudou`, com os dois digests, e a IA ou o owner decide reenviar; nada é trocado em silêncio; o servidor não precisa guardar o modelo antigo. Teste: atualizar o modelo com jobs pendentes |
 
 ### 2.3 Decisões técnicas propostas (a confirmar na 11.0)
 
 | # | Proposta | Motivo (Codex §14.3) |
 | --- | --- | --- |
 | D11-34 | **Uma fonte única de estado durável**: um banco novo do gateway (nome provisório `jobs.db`, 0600, `mcpgw`) é a **autoridade** de estado do job assíncrono/lote, dono, idempotência, tentativas, resultado e texto integral (90 dias). `gateway.db` (métricas) e `content.db` (log síncrono de 7 dias) passam a ser **projeções**; falha de projeção não altera o estado; reconciliação documentada | SQLite não faz transação entre arquivos; evitar máquina de estados duplicada (achado 4) |
-| D11-35 | **Execução pelo menos uma vez, um único resultado autoritativo por job** (revisado em 2026-11-05 após a 2ª avaliação externa). Contrato: (1) **cálculo e entrega podem se repetir; o resultado não**: o job tem **um** resultado autoritativo, o **primeiro** gravado de forma durável; uma tentativa que termine depois (ex.: reexecução após reboot) é registrada como tentativa e **descartada**, nunca substitui nem se mistura; (2) a conclusão só é anunciada (consulta, `--esperar`, WS) **depois** da gravação durável; (3) **idempotência do envio**: a mesma `idempotency_key` do mesmo dono com o **mesmo corpo** (hash) devolve o **mesmo `job_id`** e não cria job novo, em qualquer estado; com **corpo diferente** responde 409 sem criar; a chave vale pelo prazo do registro (D11-31); (4) *lease* do job em execução e contador de tentativas (máx. N, configurável); `interrompido_reboot`/`interrompido_gateway` volta à fila enquanto houver tentativas, depois vira `erro` com o motivo; (5) **fechamento** (`POST /api/jobs/{id}/fechamento`, D11-40): o mcpollama envia `job_id`, hash do texto entregue e estado (`entregue` = **resposta escrita com sucesso no stdout, o canal MCP**; `falhou` com o motivo), é idempotente (repetir não muda nada). **Limitação explícita:** não há confirmação do cliente; o fechamento não prova que o Claude Code consumiu a resposta nem que o modelo a usou | achados 5 e 2ª avaliação (ponto 4) |
-| D11-36 | **Espera da IA**: padrão = `mcpollama-mcp.exe --esperar <job|lote>` em `Bash run_in_background` (zero tokens na espera; o Claude Code reativa o modelo ao terminar, com a sessão ativa); reserva = `job_resultado(aguardar_s ≤ 100)` (volta antes do auto-background de 120 s); dia seguinte = hook `SessionStart` com `--lotes-prontos` devolvendo **só IDs/estado/resumo mínimo**, nunca texto de documento | achados 14.2; spike 11.1 |
+| D11-35 | **Execução pelo menos uma vez, um único resultado autoritativo por job** (revisado em 2026-11-05 após a 2ª avaliação externa). Contrato: (1) **cálculo e entrega podem se repetir; o resultado não**: o job tem **um** resultado autoritativo, o **primeiro** gravado de forma durável; uma tentativa que termine depois (ex.: reexecução após reboot) é registrada como tentativa e **descartada**, nunca substitui nem se mistura; (2) a conclusão só é anunciada (consulta, `--esperar`, WS) **depois** da gravação durável; (3) **idempotência do envio**: a mesma `idempotency_key` do mesmo dono com o **mesmo corpo** (hash) devolve o **mesmo `job_id`** e não cria job novo, em qualquer estado; com **corpo diferente** responde 409 sem criar; a chave vale pelo prazo do registro (D11-31); (4) *lease* do job em execução com **número de tentativa (fencing)**: só a tentativa dona do *lease* vigente pode gravar o estado terminal; uma tentativa com *lease* vencido é registrada e descartada (A11-05); contador de tentativas (máx. N, configurável); `interrompido_reboot`/`interrompido_gateway` volta à fila enquanto houver tentativas, depois vira `erro` com o motivo; (5) **fechamento** (`POST /api/jobs/{id}/fechamento`, D11-40): o mcpollama envia `job_id`, hash do texto entregue e estado (`entregue` = **resposta escrita com sucesso no stdout, o canal MCP**; `falhou` com o motivo), é idempotente (repetir não muda nada). **Limitação explícita:** não há confirmação do cliente; o fechamento não prova que o Claude Code consumiu a resposta nem que o modelo a usou | achados 5 e 2ª avaliação (ponto 4) |
+| D11-36 | **Espera da IA**: padrão = `mcpollama-mcp.exe --esperar <job|lote>` em `Bash run_in_background` (zero tokens na espera; o Claude Code reativa o modelo ao terminar, com a sessão ativa); reserva = `job_resultado(aguardar_s ≤ 100)` (volta antes do auto-background de 120 s); dia seguinte = hook `SessionStart` com `--lotes-prontos` devolvendo **só campos de uma lista fechada** (A11-09): ID do lote/job, rótulo dado pelo usuário (até 64 caracteres), estado, concluídos/total, horário e código de erro saneado; **proibidos** prompt, resposta, texto de OCR, caminho de arquivo e qualquer texto livre do modelo; o hook só avisa, e o conteúdo é buscado pela tool autenticada. Teste com texto-canário | achados 14.2; spike 11.1 |
 | D11-37 | **Extração e OCR continuam na estação.** Map-reduce: o mcpollama envia as partes de texto já extraídas e o gateway orquestra as partes e a junção (sobrevive ao fim da sessão), com vínculo a hash do arquivo, versão das instruções, IDs/ordem das partes e resultado da redução. O texto das partes é retido pelo prazo da D11-31 (aprovado em 18:24) | achado 8 |
 | D11-38 | **Lotes**: prioridade baixa por padrão, **limite de lote admitido e ativo** (jobs por lote, lotes por dono, bytes), envelhecimento existente; sem preempção (um job de lote já iniciado não é interrompido): **medir a espera interativa no aceite** | achado 10 |
-| D11-39 | **Fixar no job**: modelo resolvido + **digest**, `think`, contexto/parâmetros efetivos e versão da instrução da tool | achado 9 |
+| D11-39 | **Fixar no job**: modelo resolvido + **digest**, `think`, contexto/parâmetros efetivos e versão da instrução da tool; a semântica do digest é a D11-45 | achado 9; A11-08 |
 | D11-40 | **Fronteira do registro integral**: o gateway registra o corpo enviado ao Ollama e a resposta (incluindo `[raciocínio]`, que **já é gravado** por `respTee`, `src/gateway/proxy/journal.go:214-250`); o mcpollama envia **envelope** (tool, argumentos sem segredos, caminho e hash do arquivo, versão da tool, cliente/versão do `initialize`, projeto/diretório) e **fechamento** (texto final entregue ao Claude, estado de entrega, marcadores de truncamento). Sem tokens/segredos em nenhum registro | achados 2 e 7 |
 
 ## 3. Arquitetura alvo (rascunho)
 
 ```
-Claude Code ──stdio──▶ mcpollama 0.11.0 ──HTTPS (token do usuário)──▶ nginx ──▶ gateway 0.14.0 ──▶ Ollama
+Claude Code ──stdio──▶ mcpollama 0.11.0 ──HTTPS (token da máquina = credential_id → person_id)──▶ nginx ──▶ gateway 0.14.0 ──▶ Ollama
      ▲                     │  --esperar <id> (processo local, long-poll)        │ jobs.db (autoridade: estado, dono, lote,
      │ notificação de      │  --lotes-prontos (hook SessionStart)               │   idempotência, tentativas, resultado, texto 90 d)
      └─ tarefa concluída ◀─┘                                                    │ gateway.db (métricas, projeção)
                                                                                 │ content.db (log síncrono 7 d, projeção)
 ```
 
-Endpoints HTTPS (rascunho, viram `docs/PROTOCOLO-JOBS.md`; todos exigem o token do usuário, dono = token):
+Endpoints HTTPS (rascunho, viram `docs/PROTOCOLO-JOBS.md`; todos exigem o token da máquina, que identifica a `credential_id`; **o dono é a `person_id` ligada a ela**, D11-32):
 
 | Método e caminho | Função |
 | --- | --- |
@@ -130,6 +133,21 @@ Tools do mcpollama (D11-6 mantida): as tools atuais devolvem `{job_id, estado, p
 `--esperar <id>` e `--lotes-prontos`. Descrições das tools ensinam: enviar → seguir → esperar em segundo plano → ler. `TOOLS.md`
 regenerado por `src/cmd/dumptools`.
 
+### 3.1 Estados do job e cruzamentos (A11-05; a detalhar em `docs/PROTOCOLO-JOBS.md` na 11.3)
+
+| Estado | Terminal? | Entra por | Sai para |
+| --- | --- | --- | --- |
+| `na_fila` | não | aceite (com reserva, D11-42) | `em_execucao`, `cancelado`, `expirado` (`--max-wait`), `modelo_mudou` (D11-45) |
+| `em_execucao` | não | o worker pega o *lease* (tentativa n) | `concluido`, `erro`, `cancelado`, `na_fila` (lease vencido / reboot, se ainda houver tentativas) |
+| `concluido` · `erro` · `cancelado` · `expirado` · `modelo_mudou` | **sim** | — | nenhum (imutável; repetir a ação devolve o mesmo estado) |
+
+Regras de cruzamento (cada uma com teste determinístico na 11.11/11.12):
+1. **Cancelar × início:** quem gravar primeiro ganha (transação única); se o cancelamento ganhar, o worker não começa.
+2. **Cancelar × conclusão:** se a conclusão já estiver gravada, o cancelamento responde `ja_concluido` (D11-26) e o resultado vale.
+3. **Cancelar durante a execução:** o gateway interrompe o pedido ao Ollama; se não conseguir, o job fica `cancelado` e a resposta tardia é descartada (registrada como tentativa).
+4. **Lease vencido × worker antigo:** só a tentativa dona do *lease* vigente grava o estado terminal (fencing, D11-35); a antiga é descartada.
+5. **Reboot/queda:** `em_execucao` sem dono volta a `na_fila` enquanto houver tentativas; acabou, vira `erro` com o motivo.
+
 ## 4. Etapas
 
 | # | Etapa | Modelo | Estado |
@@ -137,19 +155,19 @@ regenerado por `src/cmd/dumptools`.
 | 11.0 | Aprovação deste plano: confirmar D11-34…D11-40 e as pendências P11-x; contrato `docs/PROTOCOLO-JOBS.md` + contrato de registro (completude, limites, exclusões, truncamento, retenção, backup, disco cheio) | owner + opus | **pendente** |
 | 11.1 | Spike de espera (2026-10-30, `claude -p`): **feito** (300 s sem background devolvem o resultado; background aos 120 s com `CLAUDE_AUTO_BACKGROUND_TASKS=1`; notificação final não provada em `-p`) | sonnet | **concluído (parcial)** |
 | 11.1b | **Prova no Claude Code dentro do Cursor** (Codex §14.4-6): comando local de espera em segundo plano concluindo com o turno ativo; sessão fechada e reaberta com job pronto antes do `SessionStart`; medir o uso do Claude na conclusão; registrar versões | sonnet + owner | pendente |
-| 11.2 | Tokens por usuário no gateway (emissão, revogação, rotação, nginx, `.mcp.json` das estações; compatibilidade com o token único atual durante a transição) | sonnet | pendente |
+| 11.2 | Identidade (D11-32): cadastro de **pessoas** e de **um token por máquina** ligado a cada pessoa (emissão, revogação por máquina e por pessoa, rotação), nginx, `.mcp.json` das estações; convivência com o token único atual durante a transição | sonnet | pendente |
 | 11.3 | `jobs.db` (D11-34): esquema, máquina de estados, idempotência, *lease*, tentativas (D11-35), projeções e reconciliação | sonnet | pendente |
-| 11.4 | Endpoints HTTPS (§3) com espera longa, listagem e cancelamento; dono por token | sonnet | pendente |
+| 11.4 | Endpoints HTTPS (§3) com espera longa, listagem e cancelamento; **autorização por `person_id`, autenticação por `credential_id`** (D11-32); idempotência D11-43; estados e cruzamentos da §3.1 | sonnet | pendente |
 | 11.5 | Registro integral (D11-30/31/40): envelope e fechamento, metadados e texto OCR, campos `TEXT` (tratar bytes inválidos), 90 dias, compactação mensal, teto com alerta, marcação de cortes, backup cifrado no TrueNAS | sonnet | pendente |
 | 11.6 | Map-reduce orquestrado no gateway com partes extraídas na estação (D11-37) | sonnet | pendente |
-| 11.7 | Lotes (D11-38): faixa, limites, rótulo, `enviar_lote`/`resultado_lote` | sonnet | pendente |
+| 11.7 | Lotes (D11-38, **tudo ou nada** D11-44): faixa, limites, rótulo, reserva atômica, `enviar_lote`/`resultado_lote` | sonnet | pendente |
 | 11.8 | mcpollama: tools assíncronas (D11-6), `--esperar`, `--lotes-prontos`, aviso D11-17, toast D11-18 opcional; fixar modelo/digest (D11-39) | sonnet | pendente |
-| 11.9 | Hook `SessionStart` (modelo de configuração para as estações; só IDs/estado) | haiku | pendente |
+| 11.9 | Hook `SessionStart` (modelo de configuração para as estações; **só os campos da lista fechada** da D11-36; teste com texto-canário) | haiku | pendente |
 | 11.10 | `/monitor`: jobs assíncronos, lotes, "pronto não buscado", tokens por usuário (sem expor segredo) | sonnet | pendente |
 | 11.11 | Revisão adversarial (dono/IDOR, token revogado, idempotência, flood de lotes, lote gigante, disco cheio, envelope/fechamento mentiroso, reconciliação de projeções, reboot no meio) + testes de ataque guardados em `.workspace/reports/...testes/` | **opus** | pendente |
 | 11.12 | Gate: build/vet/gofmt, `go test -count=1 ./...`, `-race`, build Linux, ataques 9/10.5/12/11 | sonnet | pendente |
 | 11.13 | Implantação com rollback (instalador `-Modo Atualizar`), mcpollama em `D:\MCP`, reiniciar sessões | coordenador | pendente |
-| 11.14 | Aceite ao vivo com o modelo escolhido na Fase 13: 30 jobs de uma vez; lote de madrugada e busca no dia seguinte; reboot do servidor no meio (job volta e conclui uma vez); outra pessoa não lê; espera interativa medida com lote ativo; via internet | coordenador + owner | pendente |
+| 11.14 | Aceite ao vivo com o modelo escolhido na Fase 13: **30 envios simultâneos** (A11-07) medindo aceites/429/507, **exatamente 1 job gerando por vez** (`--gen-slots 1`; não se exige inferência paralela), ordem e justiça da fila, duração total, **nenhuma duplicação** e busca de todos os 30 resultados; lote de madrugada e busca no dia seguinte; reboot do servidor no meio (job volta e conclui uma vez); outra pessoa não lê; espera interativa medida com lote ativo; via internet | coordenador + owner | pendente |
 | 11.15 | Documentação: README, CLAUDE.md (projeto e global: novo fluxo do nível `local`), MANUAL-GATEWAY, `TOOLS.md`, `D:\MCP\Documentation\Ollama`, CHANGELOG; relatório final | sonnet | pendente |
 | 11.16 | (Depois, condicional) WebSocket como otimização de aviso (D11-33), mantendo D11-23 | sonnet | condicional |
 | 11.17 | (Independente) opção `-think` no bake-off e medição com raciocínio (útil a lotes) | sonnet | pendente |
@@ -161,7 +179,7 @@ regenerado por `src/cmd/dumptools`.
 2. **1 slot sem preempção:** um job de lote iniciado segura o interativo (D11-38); medir.
 3. **Disco:** 90 dias de texto integral + compactação; teto com alerta (D11-31).
 4. **Dados de cliente acumulados** 90 dias + backup cifrado: LGPD, acesso só admin/dono.
-5. **Transição de token único para token por usuário:** quebra de estações não atualizadas; período de convivência.
+5. **Transição do token único para um token por máquina (agrupado por pessoa):** quebra de estações não atualizadas; período de convivência.
 6. **Execução repetida** em reboot (custo de GPU), aceito por D11-35.
 7. **Comportamento do cliente:** depende do Claude Code (auto-background, notificação de tarefas, hooks); mudanças de versão.
 8. **Mudança incompatível das tools (D11-6):** sessões antigas seguem no síncrono; servidor aceita os dois.
@@ -172,7 +190,7 @@ regenerado por `src/cmd/dumptools`.
 2. P11-2 — Executar a prova 11.1b no Cursor + Claude Code.
 3. P11-3 — Backup cifrado no TrueNAS: caminho, chave de cifra (quem guarda; só o owner), frequência; **prazo decidido: sem prazo** (D11-41). Disco: **comportamento decidido** (D11-42: recusar antes de aceitar); falta confirmar o limite de espaço livre (proposta 10 GB) e o alerta no monitor; a reserva por job/lote está definida na D11-42.
 4. P11-4 — Definir limites de lote (D11-38) e prioridade padrão.
-5. P11-5 — Esquema de emissão/distribuição dos tokens por usuário (quem emite, como revoga, como a estação guarda — sem colocar em git).
+5. P11-5 — Esquema de emissão/distribuição dos **tokens por máquina ligados a pessoas** (quem emite, como revoga uma máquina ou a pessoa, como a estação guarda — sem colocar em git) (D11-32, A11-01).
 6. P11-6 — Verificar se o Claude Code expõe ID de sessão e modelo da IA chamadora ao servidor MCP (para o envelope D11-40); hoje só o
    `clientInfo` do `initialize` é garantido.
 7. P11-7 — Owner decidir se mantém D11-6 (tudo assíncrono, incompatível) ou adota `assincrono:true` + tools novas (compatível).
@@ -228,3 +246,12 @@ regenerado por `src/cmd/dumptools`.
   pelo modelo). P11-3 atualizada. Continua **congelado**; 11.0 e 11.1b pendentes.
 - 2026-11-05 12:00 — **3ª leitura externa (GPT-6, 11:52):** capa do report corrigida; **D11-42 com reserva calculável por job/lote**;
   **D11-35 item 5**: `entregue` = resposta escrita no stdout (canal MCP), sem confirmação do cliente (limitação explícita). Continua congelado.
+- 2026-11-05 13:30 — **auditoria de lacunas do Codex (report §16, 13:21): 9 achados (1 bloqueador, 5 altos, 3 médios), todos procedentes.**
+  **Erro meu (A11-01, bloqueador):** ao registrar a D11-32 (token por máquina, agrupado por pessoa) às 11:35, não atualizei a §3, a
+  etapa 11.2 nem a P11-5, que continuavam com "dono = token". **Correções técnicas aplicadas:** A11-01 (`person_id`/`credential_id`/
+  `station_id` na D11-32, §3, 11.2, 11.4, risco 5, P11-5), A11-03 (D11-42 com limites de bytes impostos e reserva por chamada efetiva,
+  partes, tentativas e margem de WAL), A11-04 (D11-31: 90 dias da base ativa a partir do estado terminal), A11-05 (§3.1 estados e
+  cruzamentos; fencing na D11-35), A11-07 (11.14 com métricas de 30 envios simultâneos e 1 por vez), A11-09 (D11-36 com lista
+  fechada de campos do hook). **Decisões do owner (13:28):** D11-43 chave de idempotência na memória e no disco local (A11-02);
+  D11-44 lote tudo ou nada (A11-06); D11-45 digest conferido e falha explícita `modelo_mudou` (A11-08). Continua **congelado**;
+  pendentes: 11.0 (aprovação de D11-34…D11-40 e destas correções), 11.1b (prova no Cursor + Claude Code) e P11-x.
