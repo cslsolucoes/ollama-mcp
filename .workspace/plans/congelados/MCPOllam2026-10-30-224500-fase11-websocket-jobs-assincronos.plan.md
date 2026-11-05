@@ -1,6 +1,6 @@
 # Plano — Fase 11: jobs assíncronos, lotes e registro integral (HTTPS primeiro; WebSocket depois)
 
-> **Reescrito em 2026-11-04 18:25** (ordem do owner: "reescreve o antigo atualizando data e hora"), a partir da conversa de 2026-11-04
+> **Reescrito em 2026-11-04 18:25; atualizado em 2026-11-05 11:40** (2ª avaliação externa, D11-32/35/41/42) (ordem do owner: "reescreve o antigo atualizando data e hora"), a partir da conversa de 2026-11-04
 > 16:56–17:51, do report de entendimento e da **avaliação independente do Codex (18:11)**:
 > `.workspace/reports/MCPOllam2026-11-04-175900-fase11-reestruturacao-entendimento-para-revisao.report.md` (§1–§13 entendimento;
 > §14 avaliação). Criado em 2026-10-30 22:45 com o título "túnel WebSocket entre o MCP da estação e o servidor da IA, com jobs
@@ -86,8 +86,10 @@ response; quando a IA finalizar o job, envia para a estação solicitante."
 | # | Decisão | Escolha do owner |
 | --- | --- | --- |
 | D11-30 | **Texto extraído pelo OCR** é conteúdo (não metadado) | **guardar**, com o prazo do registro (D11-31), mesmo acesso (admin e dono); junto os metadados (hash do arquivo e por página, páginas totais/lidas, dimensões/DPI/megapixels, motor/versão/idioma/tessdata, confiança e tempo por página, se a imagem foi direto ao modelo). **Bytes da imagem não são guardados** (decisão de 17:49) |
-| D11-31 | **"100% registrado" = cobertura de toda chamada aceita, dentro de limites explícitos** | **90 dias** (configurável), compactação mensal, **backup cifrado no TrueNAS**, **teto de disco com alerta** (ao atingir avisa e não apaga sozinho), todo corte por tamanho **marcado**; **exclusões expressas**: bytes de imagem e vetores de embedding |
-| D11-32 | **Dono do job** | **token por usuário** (ou por estação) no gateway, revogável e rotacionável; o dono é o token; a mesma pessoa busca de qualquer máquina com o seu token. Cabeçalho `X-Mcpollama-Station` segue como informação declarada, **não** credencial |
+| D11-31 | **"100% registrado" = cobertura de toda chamada aceita, dentro de limites explícitos** | **90 dias** (configurável), compactação mensal, **backup cifrado no TrueNAS** (**sem prazo no backup**: as cópias ficam até o owner apagar, D11-41), **teto de disco com alerta** (ao atingir avisa e não apaga sozinho; pedidos novos são recusados antes de aceitos, D11-42), todo corte por tamanho **marcado**; **exclusões expressas**: bytes de imagem e vetores de embedding |
+| D11-32 | **Dono do job** | **token por máquina, agrupado por pessoa** (owner, 2026-11-05 11:35; refina a escolha "token por usuário" de 18:24): cada máquina tem o seu token, ligado a **uma pessoa**; o **dono do job é a pessoa**, então ela lista e busca os jobs enviados de **qualquer** máquina dela, com o token daquela máquina; revogar um token corta **só aquela máquina** (ex.: notebook perdido), e revogar a pessoa corta todas. O job guarda também a máquina que enviou (auditoria). Cabeçalho `X-Mcpollama-Station` segue como informação declarada, **não** credencial |
+| D11-41 | **Prazo do backup** | **sem prazo** (owner, 2026-11-05 11:35): o servidor apaga o registro aos 90 dias (D11-31), mas as cópias cifradas no TrueNAS ficam até o owner apagar manualmente. Consequência registrada: dados de cliente podem existir no backup por tempo indeterminado; acesso ao backup e à chave de cifra só do owner (P11-3) |
+| D11-42 | **Sem espaço para o registro completo** | **recusar antes de aceitar** (owner, 2026-11-05 11:35): abaixo de um limite de espaço livre (proposta: 10 GB, configurável), o gateway recusa **jobs novos** com HTTP 507 ("sem espaço para o registro") **antes** de enfileirar e avisa no monitor; nenhum job roda sem registro; jobs já aceitos terminam e são registrados (o limite reserva espaço para eles); a IA recebe o erro na hora e decide usar a IA paga |
 | D11-33 | **Transporte** | **HTTPS primeiro** (envio, consulta com espera longa, cancelamento, listagem); **WebSocket depois**, só se um aceite provar que o aviso imediato agrega valor. Substitui por enquanto D11-16 e adia D11-10/D11-3 |
 
 ### 2.3 Decisões técnicas propostas (a confirmar na 11.0)
@@ -95,7 +97,7 @@ response; quando a IA finalizar o job, envia para a estação solicitante."
 | # | Proposta | Motivo (Codex §14.3) |
 | --- | --- | --- |
 | D11-34 | **Uma fonte única de estado durável**: um banco novo do gateway (nome provisório `jobs.db`, 0600, `mcpgw`) é a **autoridade** de estado do job assíncrono/lote, dono, idempotência, tentativas, resultado e texto integral (90 dias). `gateway.db` (métricas) e `content.db` (log síncrono de 7 dias) passam a ser **projeções**; falha de projeção não altera o estado; reconciliação documentada | SQLite não faz transação entre arquivos; evitar máquina de estados duplicada (achado 4) |
-| D11-35 | **Execução pelo menos uma vez, resultado exatamente uma vez**: chave de idempotência por envio, contador de tentativas, *lease* do job em execução, **resultado gravado de forma durável antes de anunciar conclusão**; job `interrompido_reboot`/`interrompido_gateway` volta à fila até N tentativas; duplicação de cálculo permitida, duplicação/mistura de resultado não | achado 5 |
+| D11-35 | **Execução pelo menos uma vez, um único resultado autoritativo por job** (revisado em 2026-11-05 após a 2ª avaliação externa). Contrato: (1) **cálculo e entrega podem se repetir; o resultado não**: o job tem **um** resultado autoritativo, o **primeiro** gravado de forma durável; uma tentativa que termine depois (ex.: reexecução após reboot) é registrada como tentativa e **descartada**, nunca substitui nem se mistura; (2) a conclusão só é anunciada (consulta, `--esperar`, WS) **depois** da gravação durável; (3) **idempotência do envio**: a mesma `idempotency_key` do mesmo dono com o **mesmo corpo** (hash) devolve o **mesmo `job_id`** e não cria job novo, em qualquer estado; com **corpo diferente** responde 409 sem criar; a chave vale pelo prazo do registro (D11-31); (4) *lease* do job em execução e contador de tentativas (máx. N, configurável); `interrompido_reboot`/`interrompido_gateway` volta à fila enquanto houver tentativas, depois vira `erro` com o motivo; (5) **fechamento** (`POST /api/jobs/{id}/fechamento`, D11-40): o mcpollama envia `job_id`, hash do texto entregue e estado (`entregue` quando a tool devolveu o resultado ao Claude Code; `falhou` com o motivo), é idempotente (repetir não muda nada) e **não** prova que o modelo leu o texto, só que o cliente MCP recebeu | achados 5 e 2ª avaliação (ponto 4) |
 | D11-36 | **Espera da IA**: padrão = `mcpollama-mcp.exe --esperar <job|lote>` em `Bash run_in_background` (zero tokens na espera; o Claude Code reativa o modelo ao terminar, com a sessão ativa); reserva = `job_resultado(aguardar_s ≤ 100)` (volta antes do auto-background de 120 s); dia seguinte = hook `SessionStart` com `--lotes-prontos` devolvendo **só IDs/estado/resumo mínimo**, nunca texto de documento | achados 14.2; spike 11.1 |
 | D11-37 | **Extração e OCR continuam na estação.** Map-reduce: o mcpollama envia as partes de texto já extraídas e o gateway orquestra as partes e a junção (sobrevive ao fim da sessão), com vínculo a hash do arquivo, versão das instruções, IDs/ordem das partes e resultado da redução. O texto das partes é retido pelo prazo da D11-31 (aprovado em 18:24) | achado 8 |
 | D11-38 | **Lotes**: prioridade baixa por padrão, **limite de lote admitido e ativo** (jobs por lote, lotes por dono, bytes), envelhecimento existente; sem preempção (um job de lote já iniciado não é interrompido): **medir a espera interativa no aceite** | achado 10 |
@@ -168,7 +170,7 @@ regenerado por `src/cmd/dumptools`.
 
 1. P11-1 — Confirmar D11-34…D11-40 (11.0).
 2. P11-2 — Executar a prova 11.1b no Cursor + Claude Code.
-3. P11-3 — Definir o limite de disco/alerta e o destino exato do backup cifrado no TrueNAS (caminho, chave, rotação).
+3. P11-3 — Backup cifrado no TrueNAS: caminho, chave de cifra (quem guarda; só o owner), frequência; **prazo decidido: sem prazo** (D11-41). Disco: **comportamento decidido** (D11-42: recusar antes de aceitar); falta confirmar o limite de espaço livre (proposta 10 GB) e o alerta no monitor.
 4. P11-4 — Definir limites de lote (D11-38) e prioridade padrão.
 5. P11-5 — Esquema de emissão/distribuição dos tokens por usuário (quem emite, como revoga, como a estação guarda — sem colocar em git).
 6. P11-6 — Verificar se o Claude Code expõe ID de sessão e modelo da IA chamadora ao servidor MCP (para o envelope D11-40); hoje só o
@@ -217,3 +219,10 @@ regenerado por `src/cmd/dumptools`.
 - 2026-11-04 18:25 — **plano reescrito** neste arquivo (ordem do owner), título novo, decisões antigas com situação (§2.1), decisões
   novas (§2.2), propostas D11-34…D11-40 (§2.3), arquitetura e endpoints HTTPS (§3), etapas 11.0–11.17 (§4), riscos (§5) e
   pendências P11-1…P11-10 (§6). **Continua congelado**; próximo passo: 11.0 (aprovação) quando o owner mandar.
+- 2026-11-05 11:35 — **2ª avaliação externa (GPT-6, 10:25)**, 4 pontos, todos procedentes: (1) o report mantinha como atuais trechos
+  superados (§7–§9 e as recomendações da §14) → report consolidado com avisos de "superado" e a §0 explicando a relação com a §14/§15;
+  (2) D11-32 ambígua ("por usuário (ou por estação)") → **owner: token por máquina, agrupado por pessoa**; (3) faltavam o prazo do
+  backup e o comportamento sem espaço → **owner: backup sem prazo (D11-41)** e **recusar antes de aceitar (D11-42)**; (4) "resultado
+  exatamente uma vez" impreciso → D11-35 reescrita como **um único resultado autoritativo por job**, com a semântica da
+  `idempotency_key` (mesmo corpo → mesmo `job_id`; corpo diferente → 409) e do fechamento (prova entrega ao cliente MCP, não leitura
+  pelo modelo). P11-3 atualizada. Continua **congelado**; 11.0 e 11.1b pendentes.

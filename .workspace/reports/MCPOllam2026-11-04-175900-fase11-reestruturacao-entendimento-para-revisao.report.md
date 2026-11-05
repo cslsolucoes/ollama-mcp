@@ -11,6 +11,12 @@
 
 ## 0. Como usar este relatório (para a IA revisora)
 
+> **Situação em 2026-11-05 11:40 (leia primeiro).** Este documento tem três camadas, nesta ordem de validade:
+> 1. **§15 (resposta do coordenador, decisões do owner e correções) e o plano reescrito** (`.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) — **é o que vale hoje**;
+> 2. **§14 (1ª avaliação, Codex, 2026-11-04 18:11)** — as recomendações dela já foram decididas ou incorporadas na §15;
+> 3. **§1–§13 (entendimento original de 2026-11-04 17:59)** — histórico; as §7–§9 estão marcadas como **superadas em parte** e os trechos errados com ⛔.
+> A 2ª avaliação (GPT-6, 2026-11-05 10:25) e o tratamento dela estão na §15.7.
+
 1. A §1 a §4 descrevem **o sistema como ele é hoje**, com números medidos e caminhos de código. A §5 resume a Fase 11 original
    (congelada). A §6 é a **cronologia literal da conversa** de 2026-11-04 (16:57–17:51) que originou a reestruturação. A §7 é o
    **desenho proposto**. A §8 compara o desenho novo com as decisões antigas (D11-x) e aponta **conflitos**. A §9 lista as
@@ -267,6 +273,8 @@ Bake-off de qualidade, `think:false`, contexto 64k (qwen) / 32k (gemma4 em dupla
 
 ## 7. Desenho proposto (meu entendimento completo)
 
+> ⚠️ **SUPERADO EM PARTE (2026-11-05).** Esta seção é o **entendimento original de 2026-11-04 17:59, mantido como histórico**. Onde ela diverge das §15.2–§15.7 e do plano reescrito, **valem a §15 e o plano**. Trechos sabidamente superados estão marcados com ⛔.
+
 ### 7.1 Objetivo da Fase 11 reestruturada
 
 **"Jobs assíncronos, lotes e registro integral"**: a IA paga (Claude Code) envia trabalho ao modelo local **sem ficar bloqueada e
@@ -311,7 +319,7 @@ sai** fica registrado com metadados completos, sem perda. O WebSocket é o **tra
 | `gateway.db` | sim | metadados de todos os jobs (já tem `status`, estação, tokens, tempos) + colunas novas (ver §7.6) |
 | `content.db` | sim | log integral (10.L) — passa a ser o **registro 100%** (ver §7.6) ou fica como está, com o 100% em outro lugar (§9, decisão 6) |
 | `treino.db` | sim | sem mudança |
-| **`lotes.db`** | **novo** | lotes, jobs assíncronos pendentes (fila persistente), resultados ainda não buscados, situação `pronto_nao_buscado`/`buscado`, dono |
+| ⛔ **`lotes.db`** (superado: fonte única de estado `jobs.db`, D11-34) | **novo** | lotes, jobs assíncronos pendentes (fila persistente), resultados ainda não buscados, situação `pronto_nao_buscado`/`buscado`, dono |
 
 - Campos de **lote**: `lote_id`, `rotulo`, `dono` (hash do token + estação + usuário; **nunca o token**), `criado_em`, `prazo_guarda`,
   contadores (na_fila/rodando/pronto/erro/buscado).
@@ -345,7 +353,7 @@ Lacunas atuais e o que fecha cada uma:
 | 3 | gateway só vê o prompt montado | mcpollama envia o **envelope da chamada**: tool, argumentos (sem segredos), caminho e SHA-256 do arquivo, instrução, formato |
 | 4 | partes do map-reduce soltas | **ID de chamada** liga partes e junção |
 | 5 | resultado final entregue à IA não chega ao gateway | mcpollama envia o **fechamento** com o texto final entregue |
-| 6 | texto do raciocínio não registrado | campo próprio `raciocinio` |
+| 6 | ⛔ texto do raciocínio não registrado (**errado**: já é registrado, `journal.go:214-250`; §15.3 item 1) | campo próprio `raciocinio` |
 | 7 | recusados (cheia/expirado/removido) sem texto garantido | gravar o texto **antes** da decisão de fila |
 | 8 | imagens só com marcador | **somente metadados** (decisão do owner 17:49; §7.7) |
 | 9 | sem cópia fora do servidor | backup para fora (ex.: TrueNAS da CSL), cifrado ou não (decisão) |
@@ -360,6 +368,8 @@ ligados por ID (preserva a separação decidida em 30/10). Campos `TEXT` em vez 
 bytes inválidos, provável motivo do `BLOB`). Prova de não adulteração opcional (encadeamento de hashes).
 
 ### 7.7 Imagens / OCR — decisão do owner: só metadados no servidor
+
+> ⛔ **Superado:** o texto extraído pelo OCR é **conteúdo**, não metadado; o owner decidiu **guardá-lo** com o prazo do registro (D11-30, §15.2). A imagem em si continua fora.
 
 - O OCR roda **na estação** (mcpollama, `src/ocr/`, Tesseract 5.3.3 em processos filhos isolados, opt-in por `--ocr-lib` +
   `--ocr-lib-sha256`; limites `--ocr-max-pages` 30, `--ocr-dpi` 300, `--ocr-max-megapixels` 40). Logo, os metadados saem do mcpollama no
@@ -414,6 +424,8 @@ compactável.
 
 ## 8. Desenho novo × decisões antigas (onde há conflito)
 
+> ⚠️ **SUPERADO EM PARTE (2026-11-05).** Esta seção é o **entendimento original de 2026-11-04 17:59, mantido como histórico**. Onde ela diverge das §15.2–§15.7 e do plano reescrito, **valem a §15 e o plano**. Trechos sabidamente superados estão marcados com ⛔.
+
 | Decisão antiga | Situação no desenho novo |
 | --- | --- |
 | D11-1 tools enviar/resultado | **mantém** |
@@ -440,6 +452,8 @@ compactável.
 | Versões 0.13.0/0.10.0 | **obsoletas** (usadas pela Fase 12); novas a definir |
 
 ## 9. Decisões em aberto (para o owner, após a revisão)
+
+> ⚠️ **SUPERADO EM PARTE (2026-11-05).** Itens 2, 3, 4, 6 e o transporte foram decididos pelo owner (D11-30 a D11-33, D11-41, D11-42; §15.2 e §15.7); o item 1 continua com a D11-6 até decisão do owner (P11-7). A lista vigente é a §6 do plano.
 
 1. **Forma do assíncrono**: tudo assíncrono (D11-6, incompatível) **ou** `assincrono:true` + tools novas (compatível).
 2. **Dono do job**: segredo por job no perfil (D11-11) **ou** dono = hash do token + estação/usuário (forjável pelo cabeçalho
@@ -510,6 +524,8 @@ compactável.
 - Operação: `docs/MANUAL-GATEWAY.md`, `docs/INSTALACAO.md`, `deploy/gateway/`, `deploy/servidor-ia/`
 
 ## 14. Avaliação independente do Codex — 2026-11-04 18:11
+
+> ℹ️ **Histórico:** as recomendações desta seção foram tratadas na §15 (decisões do owner e correções) e no plano reescrito. Onde esta seção diz "decidir", "definir" ou "escolher", a decisão está na §15.2 ou na §15.7.
 
 ### 14.1 Escopo e parecer
 
@@ -635,3 +651,14 @@ versão da instrução no job · D11-40 envelope e fechamento no mcpollama, sem 
 2. D11-35: desenho de *lease* e tentativas com 1 slot e reboot do host (boot_id).
 3. D11-32: emissão e transição do token único para tokens por usuário sem derrubar estações.
 4. D11-37: limites de tamanho para partes retidas e vínculo com o hash do arquivo.
+
+### 15.7 Segunda avaliação externa (GPT-6, 2026-11-05 10:25) e tratamento — 2026-11-05 11:40
+
+| # | Ponto do GPT-6 | Tratamento |
+| --- | --- | --- |
+| 1 | O report seguia contraditório: §7–§9 com afirmações antigas (raciocínio não registrado, OCR como metadado, `lotes.db`, decisões em aberto); a §14 com recomendações já decididas; a §0 sem explicar a relação | **procede.** §0 com a ordem de validade (§15 e plano > §14 > §1–§13); avisos "superado em parte" nas §7, §8 e §9; marcas ⛔ nos trechos errados (§7.4 `lotes.db`, §7.6 item 6, §7.7); aviso de histórico na §14. O texto original foi **mantido** (histórico), não apagado |
+| 2 | "Token por usuário" × "(ou por estação)" deixava incerto o acesso de uma pessoa em máquinas diferentes | **procede.** Owner (11:35): **token por máquina, agrupado por pessoa** — o dono do job é a pessoa; ela busca de qualquer máquina dela; revogar um token corta só aquela máquina. D11-32 reescrita no plano |
+| 3 | Faltavam o prazo do backup e o comportamento sem espaço | **procede.** Owner (11:35): **backup sem prazo** (D11-41; as cópias ficam até o owner apagar) e **recusar antes de aceitar** (D11-42; HTTP 507 abaixo de um limite de espaço livre, proposta 10 GB; nenhum job roda sem registro). P11-3 atualizada (falta caminho/chave do backup e confirmar o limite) |
+| 4 | "Resultado exatamente uma vez" precisava de contrato preciso | **procede.** D11-35 reescrita: **um único resultado autoritativo por job** (o primeiro gravado de forma durável; tentativas posteriores registradas e descartadas); anúncio só após gravação; `idempotency_key`: mesmo dono + mesmo corpo → **mesmo `job_id`**, corpo diferente → **409**, validade = prazo do registro; fechamento idempotente que prova **entrega ao cliente MCP**, não leitura pelo modelo |
+
+Conclusão do GPT-6 aceita: a Fase 11 **continua congelada**; pendentes a aprovação **11.0** e a prova **11.1b** (Claude Code dentro do Cursor).
