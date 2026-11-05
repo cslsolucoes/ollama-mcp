@@ -783,3 +783,20 @@ P11-5). Aplicado no plano congelado (changelog de 2026-11-05 13:30):
 Os gates da §16.3 continuam como pendências do plano (P11-3, P11-4, P11-5, P11-6, P11-7, P11-8, P11-10). Critério da §16.4: os itens
 (a), (b), (c), (d), (e), (g), (h) e (i) estão agora escritos no plano; (f) — exclusão e restauração do backup — segue em P11-3. A aprovação
 11.0 continua com o owner; a Fase 11 continua **congelada**.
+
+### 16.6 Plano da Fase 11 REFEITO a partir deste relatório — coordenador (Claude), 2026-11-05 20:09
+
+Por ordem do owner ("agora com o report, gere refaça o plano da fase 11"), o plano `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` foi **refeito por inteiro** a partir das §1–§16 deste relatório (o texto anterior, de 257 linhas, está no git, commit `73e4496`). A Fase 11 continua **congelada**.
+
+| Item | Resultado |
+| --- | --- |
+| Método | 2 Workflows, 161 agentes, 0 erros: inventários (Sonnet) → 8 seções (Sonnet) → verificação adversarial em 3 rodadas por seção (Opus) → mapa de consolidação (Fable) → aplicação → nova verificação → prova de 2 implementadores (Opus) → leitura final (Fable) |
+| Tamanho | 1.634 linhas, §0–§14: fatos verificados no código, decisões D11-1…D11-51, desenho em 15 subseções, contrato HTTPS, tools e CLI, 20 etapas com aceite, riscos, pendências, 51 questões, rastreabilidade das revisões, metodologia, changelog |
+| Questões para o owner | **Q11-1…Q11-51** (numeração nova, única, definida na §11 do plano); as mais sensíveis: Q11-9, 13, 29, 33, 35, 42 e 26 |
+| Propostas novas | **D11-46…D11-51**, todas "a confirmar na 11.0", nenhuma decidida pelo owner |
+| Achados do código incorporados | semáforo local de 1 vaga no mcpollama; `--age-after` de 5 min contra a faixa de lote; `interrompido_*` não re-enfileirado e fila só em memória; `content.db` fail-open; nginx com 1 token e o gateway apaga o `Authorization`; `requests` sem digest; `clientInfo` não lido; defaults de `src/ollama/client.go` |
+| Prova dos implementadores | **"não"** nos dois (gateway: 24 ambiguidades, 3 altas; mcpollama: 19, 5 altas). Esperado com 51 decisões em aberto; **o critério da §16.1 não está atendido** até o owner responder as Q11 e o contrato absorver os pontos |
+| Verificação adversarial | **não convergiu para zero**: 3 a 27 achados médios/altos por arquivo depois da 3ª rodada (§4 e §5 os mais carregados); leitura final do Fable: "sim, com ressalvas" |
+| Não feito | nova revisão externa depois desta refeitura (a auditoria FAIL de 2026-11-05 13:21 não foi reavaliada) |
+
+Nota de histórico: as §7–§9 e as recomendações da §14 deste relatório seguem como histórico; quem precisar do estado vigente lê o plano refeito.
