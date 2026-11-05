@@ -1494,3 +1494,24 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   **Pendentes:** reiniciar as sessões do Claude Code/Codex/Cursor (sessões 0.10.0 recebem 403 ao pedir `qwen3-ia`); conferir o
   `.mcp.json` e o `.codex/config.toml` das estações caso tenham `--model qwen3-ia` explícito (não abertos por conterem o token);
   aceite ao vivo da `reportar_erro` (12.10); linha de base do modelo atual (C-5.14) quando houver dados.
+- 2026-11-05 12:06–12:58: **contexto do servidor 64k → 96k e mcpollama 0.10.2** (owner: "contexto 128k é possível?", "e 256k?",
+  "teste 256k", "vai reduzindo até caber", "ok, implemente").
+  - **256k** (12:09, só capacidade): 27,85 GB, **41/66 camadas na GPU**, 4,8 tok/s → não cabe; produção voltou a 64k sozinha.
+  - **Busca** (12:14–12:22, `ctxbusca.sh`): 192k 50/66 (6,7 tok/s); 160k 56/66 (8,7); 128k 61/66 (15,0); 112k 63/66 (16,7);
+    104k 65/66 (22,2); **96k 66/66, 21,26 GB, 26,1 tok/s** → maior que cabe. O limite é a divisão por placa (reserva de ~1 GB em cada),
+    não o total (a 128k ainda sobravam ~8 GB somados). Produção voltou a 64k sozinha no fim.
+  - **Implantado** (12:25): `OLLAMA_CONTEXT_LENGTH=98304` e `ollama-warm` com `num_ctx 98304` (backups `*.bak-20261105-122557`);
+    conferido 66/66, 21,26 GB, 100% GPU com o nomic; gateway healthz 200.
+  - **mcpollama 0.10.2-09e2936** (commit `09e2936`): `--max-prompt-chars` 128000 → 270000; gate limpo; backup `mcpollama-mcp.exe.bak-0.10.1`.
+    Medido pelo caminho real (test exe com o teto novo): prompt de 87.051 tokens em 227 s (~382 tok/s, 2/2 ok); `summarize_file`
+    b04.pdf 110k tokens em 2 partes, 349 s; b07.pdf 268k tokens em 5 partes, 925 s (dentro do `--timeout` 30 min).
+  - **Cuidado:** com partes de até ~90k tokens, cada uma ocupa a fila por até ~4 min (antes ~1,5 min com partes de ~40k).
+  - **Pendente:** reiniciar as sessões para carregar o 0.10.2; documentação (`CLAUDE.md`, README, `docs/`, `D:\MCP\Documentation`) em Sonnet.
+- 2026-11-05 13:03–13:10: **fechamento da documentação** (owner: "atualizar toda documentação com o que já foi feito nesta sessão e
+  fazer o commit push"). Repositório: CLAUDE.md, README, INSTALACAO, MANUAL-GATEWAY com 96k/270000/0.10.2 (conferidos). `D:\MCP\Documentation`
+  (fora do git): `Ollama\` atualizado para 96k, 270000 caracteres e 0.10.2 (medidas a 96k em `04-tools`, dicas em `06`); **criados na raiz**
+  `README.md` (os 3 MCPs, `.mcp.json` combinado, formatos por cliente, segurança) e `LEIA-ME-IA.md` (roteiro de 6 passos para uma IA);
+  varredura da pasta inteira: **0 dados reais** (só cabeçalhos PEM explicativos, loopback, e-mail padrão do vSphere, exemplo `maria`).
+  `D:\MCP\mcpollama-mcp.exe~` (0.10.0) apagado. Memória atualizada (gateway 0.13.2; Fase 13 em espera).
+  **Achado sem correção:** o plano geral `MCPOllam2026-10-23-150845-mcpollama-implementacao.plan.md` tem trecho final em codificação
+  errada ("implanta��o") e 1 byte nulo, anteriores a hoje; não alterado.

@@ -134,7 +134,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   modelos otimizados para o hardware**, decisão do owner de 2026-10-26; modelo fora da lista é
   recusado na partida e por chamada, sem chegar ao Ollama),
   `--timeout`/`OLLAMA_TIMEOUT` (default **30 min** desde o mcpollama 0.10.1, igual ao `--max-wait 30m` do gateway; antes 120 s, decisão P-7; o Claude Code aceita tools longas e, no interativo, passa a chamada para segundo plano após 2 min),
-  `--max-prompt-chars`/`MCPOLLAMA_MAX_PROMPT_CHARS` (default 128000),
+  `--max-prompt-chars`/`MCPOLLAMA_MAX_PROMPT_CHARS` (default **270000** desde o mcpollama 0.10.2, ~90k tokens; até 2026-11-05: 128000),
   `--max-file-bytes`/`MCPOLLAMA_MAX_FILE_BYTES`,
   `--max-doc-bytes`/`MCPOLLAMA_MAX_DOC_BYTES` (default 32 MiB, só `.docx/.pptx/.pdf`),
   `--pdf-cache-dir`/`MCPOLLAMA_PDF_CACHE_DIR` (absoluto; cache de compilação do motor de PDF, sem ele nada é gravado em disco),
@@ -170,7 +170,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
 - `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.13 (desde 2026-10-31 09:50; antes 0.40.8) · modelo **`qwen3.8:27b`** (nome
   real, **sem alias**; decisão do owner de 2026-11-05, release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12;
   **implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1)**; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco,
-  64k de contexto com 66/66 camadas na GPU, ~19,6 GB + nomic ≈ 24 GB dos 32 GB). Nome virtual de raciocínio:
+  **96k de contexto desde 2026-11-05 12:25** (antes 64k, ~19,6 GB + nomic ≈ 24 GB) com 66/66 camadas na GPU, ~21,3 GB junto do nomic; 96k é o maior contexto 100% na GPU: 104k deixa 1 camada na CPU, 128k cai para 15 tok/s, 256k não cabe, 41/66 camadas e 4,8 tok/s; a 96k a geração fica ~26 tok/s, igual à de 64k). Nome virtual de raciocínio:
   `qwen3.8:27b-think`. O nome `qwen3-ia` deixa de existir. Antes: `qwen3-ia` = alias do `qwen3.5:9b`
   desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M, 100% GPU, 13 GB a 64k)
   e, antes dele, o MoE `qwen3-coder:30b-a3b`, removido do servidor.
@@ -183,7 +183,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     erros, ~700–790 tok/s somados (~2.000 com documentos grandes), S2 80–85% e S3 100%.
   - Report: `.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md`.
   - Embeddings: `nomic-embed-text` (768 dimensões), residente junto.
-- **Config atual: 4 GPUs a 100 W**, `num_ctx` 65536, `NUM_PARALLEL=1` e gateway `--gen-slots 1` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3.8:27b` também roda com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
+- **Config atual: 4 GPUs a 100 W**, `num_ctx` **98304 (96k) desde 2026-11-05 12:25** (`OLLAMA_CONTEXT_LENGTH` e `ollama-warm`; até 2026-11-05: 65536/64k), `NUM_PARALLEL=1` e gateway `--gen-slots 1` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3.8:27b` também roda com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
   (2026-10-29). A causa dos reboots é a **fonte de 850 W, que não aguenta as 4 placas**
   (owner, 2026-10-28; não são os risers). Os 100 W valem até a troca da fonte; a VRAM de 32 GB
   é a prioridade. **Não fixar o contexto no código:** usar o teto configurável.
@@ -204,7 +204,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
   Desde a fila (2026-10-30), o `ia-local` (`/v1`) chega **sem raciocínio** por padrão; com
   `OPENAI_MODEL=qwen3.8:27b-think`, raciocina. Em teste ao vivo, **uma chamada de cada vez**, salvo nos testes de carga autorizados.
 - **Fase 9 (fila + `/monitor`), CONCLUÍDA em 2026-10-30:** código em `src/gateway/` (`queue`, `proxy`,
-  `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção desde 2026-11-05: gateway `0.13.2-bb51ed6` (`--max-wait 30m`) e mcpollama `0.10.1-bb51ed6`.** Antes (2026-11-01 a 2026-11-04):
+  `store`, `monitor`, `gpu`, `cpu`, `models`, `pool`) e `src/cmd/mcpollama-gateway/`. **Versão em produção desde 2026-11-05: gateway `0.13.2-bb51ed6` (`--max-wait 30m`) e mcpollama `0.10.1-bb51ed6`; o mcpollama passou a `0.10.2-09e2936` em 2026-11-05 (`--max-prompt-chars` 270000; sessões reiniciam para carregar).** Antes (2026-11-01 a 2026-11-04):
   gateway `0.12.6-a155513` (com o pool de backends; desde 2026-11-01; fila 64 por cliente/IP e 128 no total,
   nginx 80 conexões por IP e burst 100). **Incidente 2026-11-01 (0.12.5):** o `/monitor/api/state` travou por um impasse no
   `database/sql`, porque o `store.Stats` usava o ctx da aba sob o mutex do monitor; os pedidos se acumularam até o `limit_conn 80` e a
@@ -231,7 +231,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     foi removido (merge `736c205`; o commit `d38fb61` está só na tag local `archive/wip-fase10-4-pool`). O
     secundário planejado é um PC com 4× RTX 2060, sem data (10.S);
   - **fallback do mcpollama** (`--ollama-url-fallback`, `--fallback-api-key`, `--fallback-tls-ca`): vai no binário
-    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`), **desligado por padrão**; binário em `D:\MCP` até 2026-11-05 (hoje `0.10.1-bb51ed6`):
+    **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`), **desligado por padrão**; binário em `D:\MCP` até 2026-11-05 (hoje `0.10.2-09e2936`; antes `0.10.1-bb51ed6`):
     **`0.9.2-f367b35`** (tag `mcpollama-v0.9.2`, sessões reiniciadas 2026-11-01 00:11; rótulo padrão `<máquina>/<usuário>`
     + `X-Mcpollama-Station`);
   - **Fase 11 (túnel WebSocket + jobs assíncronos): congelada em 2026-10-30 23:50** por decisão do owner; só o spike 11.1

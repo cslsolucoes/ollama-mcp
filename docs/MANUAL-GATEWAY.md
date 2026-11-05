@@ -370,7 +370,7 @@ Rodam **antes de enfileirar**, em `/api/generate`, `/api/chat`, `/api/embed`, `/
 `/v1/chat/completions`, `/v1/completions` e `/v1/embeddings`.
 
 **1. Opções removidas** (em silêncio): `keep_alive` de topo, `options.num_ctx` e `options.num_gpu`, `main_gpu`, `low_vram`,
-`use_mmap`, `use_mlock`, `numa`. Motivo: o Ollama mantém o modelo residente com o contexto dele (`num_ctx` 65536); qualquer
+`use_mmap`, `use_mlock`, `numa`. Motivo: o Ollama mantém o modelo residente com o contexto dele (`num_ctx` 98304 desde 2026-11-05; antes 65536); qualquer
 outro valor recarrega o modelo (~20 s) ou o descarrega para todos. Religar com `--allow-client-keepalive`,
 `--allow-client-num-ctx` ou editando `--strip-options`. As chaves são casadas sem diferenciar maiúsculas; **duas grafias da
 mesma chave** (`model` e `Model`) dão **400**. JSON inválido ou `model` que não é texto também dá **400**, com mensagem
@@ -1131,7 +1131,7 @@ Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primári
 
 ## 17. Erros do modelo e base de treino (Fase 12)
 
-> **Estado:** implantado (gateway **0.13.0** e mcpollama **0.10.0** em 2026-11-04; release de ajuste em 2026-11-05: gateway **0.13.2-bb51ed6**, mcpollama **0.10.1-bb51ed6**).
+> **Estado:** implantado (gateway **0.13.0** e mcpollama **0.10.0** em 2026-11-04; release de ajuste em 2026-11-05: gateway **0.13.2-bb51ed6**, mcpollama **0.10.1-bb51ed6**; mcpollama **0.10.2-09e2936** e contexto 96k também em 2026-11-05).
 > Contrato de dados (regras `C-x.y`, testáveis): [`CONTRATO-DADOS-TREINO.md`](CONTRATO-DADOS-TREINO.md) (1.1.6). Instruções para o Claude
 > relatar erros: [`RELATAR-ERROS-IA.md`](RELATAR-ERROS-IA.md). Plano: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`.
 

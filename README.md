@@ -72,7 +72,7 @@ Em produção (2026-10-30):
 | `mcpollama-mcp` | **0.9.2** (`mcpollama-v0.9.2`, `0.9.2-f367b35`; sessões reiniciadas em 2026-11-01 00:11). Rótulo padrão `<máquina>/<usuário>` + cabeçalho `X-Mcpollama-Station` (máquina, usuário, domínio, MAC via WMI) | `D:\MCP\mcpollama-mcp.exe` (estações) |
 | `mcpollama-gateway` | **0.13.2** (`0.13.2-bb51ed6`, implantado em 2026-11-05; antes, `0.12.6-a155513` desde 2026-11-01), com o pool de backends; `--max-wait 30m`; fila 64 por cliente/IP e 128 no total; o painel não trava mais quando uma leitura do banco empaca | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
 
-Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `mcpollama-v0.9.2`, `gateway-v0.11.1`, `gateway-v0.12.0` … `gateway-v0.12.6` (a release 0.13.2 e o mcpollama 0.10.1 foram implantados em 2026-11-05). O histórico de versões está no
+Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `mcpollama-v0.9.2`, `gateway-v0.11.1`, `gateway-v0.12.0` … `gateway-v0.12.6` (a release 0.13.2 e o mcpollama 0.10.1 foram implantados em 2026-11-05; o mcpollama 0.10.2-09e2936 também, em 2026-11-05). O histórico de versões está no
 [CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5, desde o `0.9.0`) segue no binário atual, **desligado por padrão**.
 
 | Fase | Assunto | Estado |
@@ -203,7 +203,7 @@ diagnóstico, está no [CLAUDE.md](CLAUDE.md).
 | `--allowed-models` | `MCPOLLAMA_ALLOWED_MODELS` | `qwen3.8:27b;nomic-embed-text` (só modelos otimizados para o hardware) |
 | `--timeout` | `OLLAMA_TIMEOUT` | `30m` desde a 0.10.1 (antes `120s`; limite efetivo de cada tool, fila + execução; o gateway espera na fila até `--max-wait 30m`) |
 | `--allow-root` | `MCPOLLAMA_ALLOW_ROOT` | sem padrão (sem ele, as tools de arquivo não existem) |
-| `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `128000` |
+| `--max-prompt-chars` | `MCPOLLAMA_MAX_PROMPT_CHARS` | `270000` desde a 0.10.2 (~90k tokens; até 2026-11-05: `128000`) |
 | `--max-file-bytes` | `MCPOLLAMA_MAX_FILE_BYTES` | `4194304` |
 | `--max-doc-bytes` | `MCPOLLAMA_MAX_DOC_BYTES` | `33554432` (32 MiB; `.docx/.pptx/.pdf`) |
 | `--max-chunks` | `MCPOLLAMA_MAX_CHUNKS` | `40` (teto de chamadas do map-reduce por arquivo) |
@@ -284,7 +284,7 @@ Detalhes (instalação, as flags `MCPGW_*`, API do monitor, SQLite, diagnóstico
 | Host | `ia.cslsolucoes.com.br` (`lx-ai01`, CentOS Stream 10), Ollama v0.40.13 (desde 2026-10-31; antes 0.40.8) |
 | Hardware | 4× RTX 3070 (8 GB cada, 32 GB de VRAM), **100 W por GPU**, clock travado em 210–1400 MHz desde 2026-10-30 |
 | Limite conhecido | a **fonte de 850 W** não aguenta as 4 placas (causa dos reboots); os 100 W e o clock travado valem até a troca. A segunda fonte está planejada |
-| Modelo | **`qwen3.8:27b`** (nome real, sem alias; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco, `num_ctx` 65536 com 66/66 camadas na GPU: ~19,6 GB + nomic ≈ 24 GB dos 32 GB), desde a release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12 (2026-11-05; **implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1)**). Antes: `qwen3-ia` = alias do `qwen3.5:9b` (desde 2026-10-29). Raciocina por padrão; o mcpollama manda `think:false` e o gateway também. Contas e contagens: pedir passo a passo ou ligar `think` (nas medições do bake-off, conta direta 0/15 sem `think` e 15/15 com `think`) |
+| Modelo | **`qwen3.8:27b`** (nome real, sem alias; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco, `num_ctx` **98304 (96k) desde 2026-11-05 12:25**, antes 65536/64k, com 66/66 camadas na GPU: ~21,3 GB junto do nomic; a 64k eram ~19,6 GB + nomic ≈ 24 GB dos 32 GB), desde a release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12 (2026-11-05; **implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1)**). Antes: `qwen3-ia` = alias do `qwen3.5:9b` (desde 2026-10-29). Raciocina por padrão; o mcpollama manda `think:false` e o gateway também. Contas e contagens: pedir passo a passo ou ligar `think` (nas medições do bake-off, conta direta 0/15 sem `think` e 15/15 com `think`) |
 | Embeddings | `nomic-embed-text` (768 dim), residente junto |
 | Concorrência | o Ollama roda essa arquitetura com **1 slot**; `NUM_PARALLEL=1` e gateway `--gen-slots 1` (`--run-timeout 10m`) desde 2026-11-04 (a arquitetura `qwen35` não paraleliza: o Ollama avisa "does not currently support parallel requests"), `MAX_QUEUE=32`; a fila de verdade é a do gateway |
 | Carga medida (Fase 8.9, com o `qwen3.5:9b`) | 10 agentes × 32k de contexto, 0 erros, **~700–790 tok/s somados** (~2.000 com documentos grandes) |

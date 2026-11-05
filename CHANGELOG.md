@@ -27,6 +27,15 @@ mcpollama 0.10.1 em `D:\MCP` e reinício das sessões.
 
 ## mcpollama
 
+### [0.10.2] - 2026-11-05 12:58, em `D:\MCP` (`0.10.2-09e2936`; ajuste da Fase 12; ainda sem tag)
+
+#### Alterado
+- **`--max-prompt-chars` padrão de 128000 para 270000** (~90k tokens; owner, 2026-11-05 12:23: "ok, implemente"), junto com o
+  contexto do servidor de 64k para **96k** (`OLLAMA_CONTEXT_LENGTH=98304` e `ollama-warm` com `num_ctx 98304`, aplicados às 12:25).
+  96k é o maior contexto com o `qwen3.8:27b` 100% na GPU (66/66 camadas, ~21,3 GB) junto do nomic: 104k já deixa 1 camada na CPU,
+  128k cai para 15 tok/s e 256k não cabe (41/66, 4,8 tok/s). Medido pelo caminho real: prompt de 87k tokens em ~227 s; PDF de 110k
+  tokens em 2 partes (~6 min) e de 268k tokens em 5 partes (~15 min). Cada parte grande ocupa a fila (1 por vez) por até ~4 min.
+
 ### [0.10.1] - 2026-11-05 12:06, em `D:\MCP` (`0.10.1-bb51ed6`; ajuste da Fase 12; ainda sem tag)
 
 #### Alterado
