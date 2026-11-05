@@ -10,8 +10,9 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 
 ## Não lançado
 
-A Fase 11 (túnel WebSocket e jobs assíncronos) está **congelada** desde 2026-10-30 23:50 (só o spike 11.1 foi
-feito; nenhum código): `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
+A Fase 11 (jobs assíncronos, lotes e registro integral) foi **descongelada em 2026-11-05 20:22** por ordem do owner (estava congelada
+desde 2026-10-30 23:50); o plano foi refeito e a aprovação 11.0 está pendente (só o spike 11.1 foi feito; nenhum código):
+`.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`.
 
 **Fase 12** (registro dos erros do modelo local → base de treino): **implantada em 2026-11-04** (gateway 0.13.0 às 13:02, depois
 0.13.1; mcpollama 0.10.0 em `D:\MCP`); aceite ao vivo pendente. Plano:

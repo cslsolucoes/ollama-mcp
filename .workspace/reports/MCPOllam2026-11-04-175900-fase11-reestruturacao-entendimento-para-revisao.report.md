@@ -6,13 +6,13 @@
 | Autor | Claude Opus 5.5 (Claude Code 2.1.296, extensão no Cursor), sessão de coordenação do projeto mcpollama |
 | Pedido do owner | "crie um report com todo esse bate-papo para pedir uma segunda avaliação de outra IA, com todos os detalhes ('até mesmo se é verde ou roxo'), detalhamento máximo do seu entendimento primeiro, antes de fazer o plano" |
 | Estado | **Entendimento, avaliações externas, decisões e auditoria de coerência (atualizado em 2026-11-05 13:21).** Nenhum código nem mudança no servidor por causa deste assunto. A Fase 11 continua **congelada** (desde 2026-10-30 23:50). O plano **já foi reescrito** (2026-11-04 18:25, atualizado em 2026-11-05) no próprio arquivo congelado. A §16 é uma auditoria do desenho; seus achados não são decisões do owner nem alteram o plano. Pendentes: aprovação 11.0 e prova 11.1b; resolver os bloqueios da §16 antes de aprovar o contrato |
-| Plano antigo (a ser reescrito) | `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` |
+| Plano antigo (a ser reescrito) | `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` |
 | Spike já feito | `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md` (commit `f8c723e`) |
 
 ## 0. Como usar este relatório (para a IA revisora)
 
 > **Situação em 2026-11-05 13:21 (leia primeiro).** O documento tem quatro camadas; a §16 é a auditoria mais recente, mas não substitui decisões do owner:
-> 1. **Plano reescrito** (`.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) + decisões expressas do owner registradas na **§15** — fonte normativa atual;
+> 1. **Plano reescrito** (`.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) + decisões expressas do owner registradas na **§15** — fonte normativa atual;
 > 2. **§16 — auditoria de coerência de 2026-11-05 13:21** — achados e propostas para fechar o contrato antes da aprovação; não são decisões aprovadas e não descongelam a fase;
 > 3. **§14 — avaliação independente inicial do Codex (2026-11-04 18:11)**; suas recomendações foram tratadas na §15;
 > 4. **§1–§13** — entendimento e desenho original de 2026-11-04 17:59, histórico; §§7–§9 estão superadas em parte e trechos errados estão marcados com ⛔.
@@ -514,7 +514,7 @@ compactável.
 
 ## 13. Referências (arquivos e caminhos)
 
-- Plano congelado: `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`
+- Plano congelado: `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`
 - Spike 11.1: `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md`
 - Fase 12 (contrato de dados de treino): `docs/CONTRATO-DADOS-TREINO.md`, plano `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`
 - Fase 13 (rota automática de modelo, **não executar**): `.workspace/plans/MCPOllam2026-11-04-033446-fase13-rota-auto.plan.md`
@@ -637,7 +637,7 @@ versão da instrução no job · D11-40 envelope e fechamento no mcpollama, sem 
 ### 15.5 Plano reescrito
 
 - Arquivo (reescrito no lugar, com data/hora atualizadas, ordem do owner):
-  `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`
+  `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`
   — título novo "Fase 11: jobs assíncronos, lotes e registro integral (HTTPS primeiro; WebSocket depois)".
 - Conteúdo: §1 objetivo e fronteiras; §2.1 as 29 decisões antigas com a situação de cada uma (mantida/ajustada/substituída/adiada/
   reaberta/obsoleta); §2.2 D11-30…33 do owner; §2.3 D11-34…40 propostas; §3 arquitetura e endpoints HTTPS; §4 etapas 11.0–11.17
@@ -786,7 +786,7 @@ Os gates da §16.3 continuam como pendências do plano (P11-3, P11-4, P11-5, P11
 
 ### 16.6 Plano da Fase 11 REFEITO a partir deste relatório — coordenador (Claude), 2026-11-05 20:09
 
-Por ordem do owner ("agora com o report, gere refaça o plano da fase 11"), o plano `.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` foi **refeito por inteiro** a partir das §1–§16 deste relatório (o texto anterior, de 257 linhas, está no git, commit `73e4496`). A Fase 11 continua **congelada**.
+Por ordem do owner ("agora com o report, gere refaça o plano da fase 11"), o plano `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` foi **refeito por inteiro** a partir das §1–§16 deste relatório (o texto anterior, de 257 linhas, está no git, commit `73e4496`). A Fase 11 continua **congelada**.
 
 | Item | Resultado |
 | --- | --- |
@@ -800,3 +800,7 @@ Por ordem do owner ("agora com o report, gere refaça o plano da fase 11"), o pl
 | Não feito | nova revisão externa depois desta refeitura (a auditoria FAIL de 2026-11-05 13:21 não foi reavaliada) |
 
 Nota de histórico: as §7–§9 e as recomendações da §14 deste relatório seguem como histórico; quem precisar do estado vigente lê o plano refeito.
+
+### 16.7 Fase 11 descongelada — coordenador (Claude), 2026-11-05 20:22
+
+Por ordem do owner ("descongele o plano"), a Fase 11 saiu de 🧊 congelada. O plano voltou de `.workspace/plans/congelados/` para `.workspace/plans/` (mesmo nome de arquivo; as 5 referências a este caminho neste relatório foram atualizadas) e o estado passou a "descongelado, com a aprovação 11.0 pendente". **Descongelar não aprova a 11.0 nem inicia etapa alguma**: nenhum código, deploy ou mudança no servidor foi feito; os próximos passos são do owner (responder as Q11-1…Q11-51, aprovar o roteiro 11.0a e mandar a prova 11.1b). As falas históricas deste relatório que dizem "congelada" ficam como estavam: valiam na data em que foram escritas.

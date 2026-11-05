@@ -87,7 +87,7 @@ Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`
 | 8 | Bake-off de modelos: `qwen3-ia` = `qwen3.5:9b`; argumento `think` por chamada | concluída |
 | 9 | Gateway: fila, políticas, `/monitor`, SQLite, instalador | concluída (2026-10-30) |
 | 10 | Log de jobs, pool de backends e fallback (faixa CPU descartada) | **10.1 a 10.8 concluídas; plano congelado em 2026-10-30**; 10.S (secundário) pendente, sem data |
-| 11 | Túnel WebSocket e jobs assíncronos ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md)) | **congelada em 2026-10-30 23:50** (decisão do owner); só o spike 11.1 foi feito ([relatório](.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md)); nenhum código |
+| 11 | Jobs assíncronos, lotes e registro integral ([plano](.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md)) | **descongelada em 2026-11-05 20:22** (ordem do owner; estava congelada desde 2026-10-30 23:50), com a aprovação 11.0 pendente; só o spike 11.1 foi feito ([relatório](.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md)); nenhum código |
 | 12 | Erros do modelo local, base de treino, melhora sem treino ([plano](.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md), [contrato](docs/CONTRATO-DADOS-TREINO.md)) | **implantada** (gateway 0.13.0 e mcpollama 0.10.0 em 2026-11-04; release de ajuste implantada em 2026-11-05: gateway 0.13.2, mcpollama 0.10.1; ver [MANUAL, seção 17](docs/MANUAL-GATEWAY.md#17-erros-do-modelo-e-base-de-treino-fase-12)) |
 
 **Fase 10** ([plano](.workspace/plans/congelados/MCPOllam2026-10-30-144800-fase10-faixa-cpu-pool.plan.md), congelado):

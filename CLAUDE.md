@@ -234,8 +234,9 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     **`0.9.0-c4031f7`** (tag `mcpollama-v0.9.0`), **desligado por padrão**; binário em `D:\MCP` até 2026-11-05 (hoje `0.10.2-09e2936`; antes `0.10.1-bb51ed6`):
     **`0.9.2-f367b35`** (tag `mcpollama-v0.9.2`, sessões reiniciadas 2026-11-01 00:11; rótulo padrão `<máquina>/<usuário>`
     + `X-Mcpollama-Station`);
-  - **Fase 11 (túnel WebSocket + jobs assíncronos): congelada em 2026-10-30 23:50** por decisão do owner; só o spike 11.1
-    foi feito, nenhum código (`.workspace/plans/congelados/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`);
+  - **Fase 11 (jobs assíncronos, lotes e registro integral): descongelada em 2026-11-05 20:22** por ordem do owner (estava congelada desde
+    2026-10-30 23:50); plano refeito, com 51 questões para o owner e a aprovação 11.0 pendente; só o spike 11.1 foi feito, nenhum
+    código (`.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`);
   - **Fase 12 (registro dos erros do modelo → base de treino), em planejamento** desde 2026-11-01, aguardando os ajustes do
     owner: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`; instruções para o Claude relatar erros em
     `docs/RELATAR-ERROS-IA.md`. Elas valem quando a tool `reportar_erro` existir;
