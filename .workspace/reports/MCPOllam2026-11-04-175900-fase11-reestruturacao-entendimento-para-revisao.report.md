@@ -2,18 +2,18 @@
 
 | Campo | Valor |
 | --- | --- |
-| Data/hora | 2026-11-04 17:59 (hora local, America/Sao_Paulo) |
+| Data/hora | 2026-11-04 17:59 (hora local, America/Sao_Paulo); cabeçalho atualizado em 2026-11-05 21:20 |
 | Autor | Claude Opus 5.5 (Claude Code 2.1.296, extensão no Cursor), sessão de coordenação do projeto mcpollama |
 | Pedido do owner | "crie um report com todo esse bate-papo para pedir uma segunda avaliação de outra IA, com todos os detalhes ('até mesmo se é verde ou roxo'), detalhamento máximo do seu entendimento primeiro, antes de fazer o plano" |
-| Estado | **Entendimento, avaliações externas, decisões e auditoria de coerência (atualizado em 2026-11-05 13:21).** Nenhum código nem mudança no servidor por causa deste assunto. A Fase 11 continua **congelada** (desde 2026-10-30 23:50). O plano **já foi reescrito** (2026-11-04 18:25, atualizado em 2026-11-05) no próprio arquivo congelado. A §16 é uma auditoria do desenho; seus achados não são decisões do owner nem alteram o plano. Pendentes: aprovação 11.0 e prova 11.1b; resolver os bloqueios da §16 antes de aprovar o contrato |
-| Plano antigo (a ser reescrito) | `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md` |
+| Estado | **Entendimento, avaliações externas, decisões, auditoria de coerência e tratamento (atualizado em 2026-11-05 21:20).** Nenhum código nem mudança no servidor por causa deste assunto. **A Fase 11 foi descongelada em 2026-11-05 20:22**, por ordem do owner (estava congelada desde 2026-10-30 23:50), **com a aprovação 11.0 pendente** (§16.7); descongelar não aprova a 11.0 nem inicia etapa. O plano foi **refeito por inteiro** em 2026-11-05 20:09 (§16.6). A §16 é a auditoria do Codex; seus achados não são decisões do owner. Pendentes: as 51 questões Q11-1…Q11-51 para o owner, a aprovação do roteiro 11.0a, a prova 11.1b e a aprovação 11.0; a prova dos dois implementadores deu "não" (§16.6) |
+| Plano da Fase 11 (vigente) | `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`: refeito em 2026-11-05 20:09 e descongelado às 20:22; o plano anterior (257 linhas, de 2026-11-05 13:30) está no git, commit `73e4496` |
 | Spike já feito | `.workspace/reports/MCPOllam2026-10-30-234600-fase11-1-spike-espera-longa.report.md` (commit `f8c723e`) |
 
 ## 0. Como usar este relatório (para a IA revisora)
 
-> **Situação em 2026-11-05 13:21 (leia primeiro).** O documento tem quatro camadas; a §16 é a auditoria mais recente, mas não substitui decisões do owner:
-> 1. **Plano reescrito** (`.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) + decisões expressas do owner registradas na **§15** — fonte normativa atual;
-> 2. **§16 — auditoria de coerência de 2026-11-05 13:21** — achados e propostas para fechar o contrato antes da aprovação; não são decisões aprovadas e não descongelam a fase;
+> **Situação em 2026-11-05 21:20 (leia primeiro).** O documento tem quatro camadas; a §16 reúne a auditoria mais recente (13:21) e o tratamento dela (§16.5 a §16.8), mas não substitui decisões do owner:
+> 1. **Plano refeito** (2026-11-05 20:09; descongelado em 20:22; `.workspace/plans/MCPOllam2026-10-30-224500-fase11-websocket-jobs-assincronos.plan.md`) + decisões expressas do owner registradas na **§15** — fonte normativa atual;
+> 2. **§16 — auditoria de coerência de 2026-11-05 13:21** e o tratamento dela — achados e propostas para fechar o contrato antes da aprovação; não são decisões aprovadas (o descongelamento das 20:22, §16.7, foi ordem do owner e não aprova a 11.0);
 > 3. **§14 — avaliação independente inicial do Codex (2026-11-04 18:11)**; suas recomendações foram tratadas na §15;
 > 4. **§1–§13** — entendimento e desenho original de 2026-11-04 17:59, histórico; §§7–§9 estão superadas em parte e trechos errados estão marcados com ⛔.
 > A 2ª avaliação (GPT-6, 2026-11-05 10:25) e a 3ª leitura (GPT-6, 11:52) estão tratadas na §15.7–§15.8.
@@ -804,3 +804,13 @@ Nota de histórico: as §7–§9 e as recomendações da §14 deste relatório s
 ### 16.7 Fase 11 descongelada — coordenador (Claude), 2026-11-05 20:22
 
 Por ordem do owner ("descongele o plano"), a Fase 11 saiu de 🧊 congelada. O plano voltou de `.workspace/plans/congelados/` para `.workspace/plans/` (mesmo nome de arquivo; as 5 referências a este caminho neste relatório foram atualizadas) e o estado passou a "descongelado, com a aprovação 11.0 pendente". **Descongelar não aprova a 11.0 nem inicia etapa alguma**: nenhum código, deploy ou mudança no servidor foi feito; os próximos passos são do owner (responder as Q11-1…Q11-51, aprovar o roteiro 11.0a e mandar a prova 11.1b). As falas históricas deste relatório que dizem "congelada" ficam como estavam: valiam na data em que foram escritas.
+
+### 16.8 Avaliação do GPT-6 sobre o plano refeito e o descongelamento — coordenador (Claude), 2026-11-05 21:20
+
+Leitura externa (GPT-6, 2026-11-05 20:47), sem alterar arquivos: o plano e este relatório **concordam** sobre o estado (descongelado em 20:22, aprovação 11.0 pendente, nenhuma etapa iniciada); o histórico ("congelada" nas §16.5 e §16.6) é coerente com a data de cada registro; as 51 questões e o "não" dos dois implementadores mostram que o desenho ainda não está pronto nem autorizado para execução; as alternativas técnicas abertas (Q11, P11) não são conflitos.
+
+| # | Achado | Tratamento |
+| --- | --- | --- |
+| 1 | **Cabeçalho do relatório desatualizado:** a tabela inicial dizia que a fase "continua congelada" e chamava o plano de "antigo (a ser reescrito)"; o §0 datava a situação em 13:21 | **procede — erro meu:** o cabeçalho foi editado pela auditoria das 13:21 e nem a refeitura (20:09) nem o descongelamento (20:22) o atualizaram. Corrigidos às 21:20: linha "Estado", linha "Plano da Fase 11 (vigente)", data do cabeçalho e o §0 (situação em 21:20 e referência ao §16.5–§16.8) |
+
+As demais conclusões da avaliação conferem com o plano: nada mais a alterar.
