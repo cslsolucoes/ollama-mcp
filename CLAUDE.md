@@ -16,7 +16,7 @@ Princípio de design que guia as tools: a economia vem de o **servidor ler os ar
 dele** e devolver só o resultado compacto. Uma tool que exige o Claude já ter o conteúdo no
 contexto economiza pouco.
 
-Estado em 2026-10-30: **Fases 1 a 9 concluídas** e **Fase 10 congelada** (10.1 a 10.8 concluídas; 10.S, o secundário, pendente sem data) (8: modelo `qwen3-ia` = `qwen3.5:9b` e `think` por
+Estado em 2026-11-06 (detalhe das Fases 9 a 13 em "Servidor Ollama"): **Fases 1 a 9 concluídas** e **Fase 10 congelada** (10.1 a 10.8 concluídas; 10.S, o secundário, pendente sem data) (8: modelo `qwen3-ia` = `qwen3.5:9b` e `think` por
 chamada; 9: fila + `/monitor` em produção; ver "Servidor Ollama"). Base, em 2026-10-28: **Fases 1 a 4 e 7 concluídas** (tools base `list_models`, `generate`,
 `chat` e `embed`; tools de arquivo `summarize_file`, `extract` e `translate`, que só existem
 com `--allow-root` e passam pelo guard de `src/files/`; catálogo em `TOOLS.md`, gerado por
