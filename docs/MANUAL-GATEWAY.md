@@ -467,8 +467,8 @@ Windows; o Firefox tem loja própria (importe lá ou ative `security.enterprise_
 | --- | --- |
 | Cabeçalho | `versão · boot (8 primeiros caracteres) · ativo há · atualizado`; à direita, login |
 | Cartões | Em execução; Na fila; Concluídos hoje (status `ok` desde 00:00 do servidor); Erros hoje (status `erro`); Espera p50 e p95 (15 min); **Tokens/s** (tokens gerados nos últimos 15 min ÷ 900 s, é média e não instantâneo); Pedidos/min (15 min) |
-| Em execução | Faixa, id (8 caracteres), cliente (passe o mouse: IP + rótulo), tool, modelo, raciocínio, prioridade concedida, rodando há, esperou; botão **Cancelar** (logado) |
-| Fila de espera | Posição (a ordem em que vão começar, simulada), faixa, id, cliente, tool, modelo, raciocínio, prioridade atual (já com envelhecimento), esperando há; botões **▲ ▼ ✕** (logado) |
+| Em execução (**sempre 5 linhas**, paginador sempre visível; ver abaixo da tabela) | Faixa, id (8 caracteres), cliente (passe o mouse: IP + rótulo), tool, modelo, raciocínio, prioridade concedida, rodando há, esperou; botão **Cancelar** (logado) |
+| Fila de espera (**sempre 10 linhas**, paginador sempre visível; ver abaixo da tabela) | Posição (a ordem em que vão começar, simulada), faixa, id, cliente, tool, modelo, raciocínio, prioridade atual (já com envelhecimento), esperando há; botões **▲ ▼ ✕** (logado) |
 | **Backends** (10.4) | Uma linha por backend do pool (o primário `gpu-local` e os secundários): **id**, **tipo** (`gpu`, `cpu`, `remoto`), **estado** (`ok`, `sobrecarregado` (primário), `disjuntor aberto`, `fora`, `degradado` (modelo fora de 100% GPU), `drenado`), **disjuntor** (fechado, aberto, meio-aberto), **slots usados** e livres, **fila** (esperando que esse backend poderia pegar; no primário são todos), **p50** da duração das gerações, **modelo · digest · onde está**, **último erro** (passe o mouse) e, logado, o botão **Drenar / Retomar**. Sem `--backends` há uma linha só |
 | GPUs | Por GPU: potência em uso **e o limite aplicado** ("71 W / 100 W"; é o `enforced.power.limit`, o power cap que o `nvidia-powercap.service` aplica), uma barra fina com a fração do limite usada (cor de aviso acima de **90%** do limite; o teto da placa, `power.max_limit`, aparece ao passar o mouse na barra), memória (MiB), uso (%), temperatura; linha `AER 00:1b.4 (corrigíveis): N`; "registros descartados: N" se o buffer do banco encheu. Se o driver não informa o limite, mostra só os W |
 | CPU / RAM | Logo abaixo das GPUs, no mesmo visual de cartões. **CPU**: uso total (%, pelo delta de `/proc/stat` entre duas amostras; a primeira amostra após a partida mostra `-`), frequência média (GHz) e temperatura do pacote (°C, hwmon `coretemp` "Package id 0", ou a zona térmica `x86_pkg_temp`). **Carga** 1/5/15 min. **RAM**: usada/total em GB, % e "Ollama: X GB" (soma do `VmRSS` dos processos de nome `ollama`). **Swap**: usado/total. Abaixo, **uma barra por thread** (T0..T11), agrupadas por núcleo físico ("Núcleo 0: T0 T6 · 45 °C"; o núcleo vem de `topology/core_id`, a temperatura de `coretemp` "Core N"). Rodapé: "potência da CPU: indisponível (só root)" quando o RAPL não é legível (no servidor, `/sys/class/powercap/intel-rapl*/energy_uj` é `root 0400`; o gateway roda como `mcpgw` e **não** abre essa permissão). Qualquer leitura que falhe vira `-` e um texto curto de erro no rodapé; o gateway nunca para por isso |
@@ -477,6 +477,8 @@ Windows; o Firefox tem loja própria (importe lá ou ative `security.enterprise_
 | Concluídos recentes | Últimos 50 (qualquer status: `ok`, `erro`, `cancelado`, `rejeitado`, `expirado`...), com HTTP, espera, execução, tokens (prompt / gerados) e classe do erro |
 | Auditoria | Últimas 20 ações do administrador |
 | Eventos | Últimos 10: `gateway_inicio`, `gateway_config`, `gateway_parada`, `boot_novo`, `registros_descartados`, `teto_pedidos`, `modelo_carregado`, `modelo_descarregado`, `teto_conteudo`, `teto_conteudo_falhou`, `jobs_interrompidos`, `conteudo_indisponivel` |
+
+**Quadros "Em execução" e "Fila de espera" (0.13.3; a 0.13.1 trouxe a paginação):** cada quadro tem **altura fixa**: sempre **5 linhas** na Execução e **10** na Fila, com linhas em branco quando há menos itens; o resto vai para as páginas seguintes, e o **paginador aparece sempre** ("‹ anterior · página X de N · T itens · próxima ›", botões desabilitados quando não há outra página; "página 1 de 1 · 0 itens" quando vazio). Cada quadro tem uma linha de status fixa ("Nada em execução (slots: geração a/b, embed c/d)" ou "N em execução (…)"; "Ninguém esperando." ou "N esperando."), para a tela não pular quando um job entra ou sai. A página escolhida se mantém entre as atualizações de 1 s. Se a sua aba ficou aberta antes da atualização do gateway, use **Ctrl+F5**.
 
 **Login do administrador:** usuário `admin` (um só) e a senha definida na instalação (seção 2.1, modo `Senha`).
 Sessão: cookie `HttpOnly; Secure; SameSite=Strict` de **8 horas**, no máximo 8 sessões ao mesmo tempo (a mais antiga cai).
@@ -876,7 +878,7 @@ O token do cliente nunca é gravado.
 
 ## 13. Limites e futuro
 
-**O gateway de hoje (`0.13.2-bb51ed6`, em produção desde 2026-11-05; o `0.12.6` ficou de 2026-11-01 a 2026-11-04)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
+**O gateway de hoje (`0.13.3-7db4ffa`, em produção desde 2026-11-05 21:00; a `0.13.2-bb51ed6` ficou de 12:02 a 21:00; o `0.12.6` ficou de 2026-11-01 a 2026-11-04)** tem 2 faixas (geração e embedding), ambas na **GPU**, e um
 **pool de backends** (seção 16). Em produção o pool tem **um único backend, o `gpu-local`** (o Ollama do próprio servidor,
 `127.0.0.1:11434`): sem `--backends` tudo se comporta como antes da 10.4. Com `--backends`, o gateway repassa o trabalho que
 **ainda não começou** a Ollamas **secundários** quando o primário está sobrecarregado ou sem saúde (`--overload-wait` e
@@ -1131,7 +1133,7 @@ Sem essas flags nada muda. Se o fallback também falhar, vale o erro do primári
 
 ## 17. Erros do modelo e base de treino (Fase 12)
 
-> **Estado:** implantado (gateway **0.13.0** e mcpollama **0.10.0** em 2026-11-04; release de ajuste em 2026-11-05: gateway **0.13.2-bb51ed6**, mcpollama **0.10.1-bb51ed6**; mcpollama **0.10.2-09e2936** e contexto 96k também em 2026-11-05).
+> **Estado:** implantado (gateway **0.13.0** e mcpollama **0.10.0** em 2026-11-04; release de ajuste em 2026-11-05: gateway **0.13.2-bb51ed6** (12:02) e **0.13.3-7db4ffa** (21:00, monitor), mcpollama **0.10.1-bb51ed6**; mcpollama **0.10.2-09e2936** e contexto 96k também em 2026-11-05).
 > Contrato de dados (regras `C-x.y`, testáveis): [`CONTRATO-DADOS-TREINO.md`](CONTRATO-DADOS-TREINO.md) (1.1.6). Instruções para o Claude
 > relatar erros: [`RELATAR-ERROS-IA.md`](RELATAR-ERROS-IA.md). Plano: `.workspace/plans/MCPOllam2026-11-01-213500-fase12-erros-treino.plan.md`.
 

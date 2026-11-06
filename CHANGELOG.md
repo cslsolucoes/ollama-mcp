@@ -20,10 +20,10 @@ desde 2026-10-30 23:50); o plano foi refeito e a aprovação 11.0 está pendente
 instruções para o Claude em `docs/RELATAR-ERROS-IA.md` (em vigor desde 2026-11-04).
 
 **Release de ajuste da Fase 12, IMPLANTADA em 2026-11-05 12:02–12:06:** **gateway 0.13.2** (falso alarme "fora da GPU") e
-**mcpollama 0.10.1** (modelo de produção `qwen3.8:27b` com o nome real, sem alias). A troca do modelo depende do aceite do
-`qwen3.8:27b` em curso (S1/S4/S5, `think` em tarefa grande, carga contínua) e da liberação do owner. Ordem prevista: no servidor,
-baixar o `qwen3.8:27b`, ajustar o `ollama-warm` e o `--allowed-models` do gateway e só depois apagar o `qwen3-ia`; em seguida,
-mcpollama 0.10.1 em `D:\MCP` e reinício das sessões.
+**mcpollama 0.10.1** (modelo de produção `qwen3.8:27b` com o nome real, sem alias). O aceite do `qwen3.8:27b` (S1/S4/S5, `think` em
+tarefa grande, carga contínua) passou e a troca foi feita na ordem prevista (baixar o modelo, ajustar o `ollama-warm` e o `--allowed-models`,
+só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). Depois, no mesmo dia: contexto do servidor de 64k para 96k e
+**mcpollama 0.10.2** (12:25–12:58), e **gateway 0.13.3** (21:00, monitor com quadros de altura fixa).
 
 
 ## mcpollama

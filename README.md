@@ -70,9 +70,9 @@ Em produção (2026-10-30):
 | Componente | Versão (tag) | Onde |
 | --- | --- | --- |
 | `mcpollama-mcp` | **0.9.2** (`mcpollama-v0.9.2`, `0.9.2-f367b35`; sessões reiniciadas em 2026-11-01 00:11). Rótulo padrão `<máquina>/<usuário>` + cabeçalho `X-Mcpollama-Station` (máquina, usuário, domínio, MAC via WMI) | `D:\MCP\mcpollama-mcp.exe` (estações) |
-| `mcpollama-gateway` | **0.13.2** (`0.13.2-bb51ed6`, implantado em 2026-11-05; antes, `0.12.6-a155513` desde 2026-11-01), com o pool de backends; `--max-wait 30m`; fila 64 por cliente/IP e 128 no total; o painel não trava mais quando uma leitura do banco empaca | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
+| `mcpollama-gateway` | **0.13.3** (`0.13.3-7db4ffa`, implantado em 2026-11-05 21:00: monitor com quadros de altura fixa e paginador sempre visível; a 0.13.2 ficou de 12:02 a 21:00; antes, `0.12.6-a155513` desde 2026-11-01), com o pool de backends; `--max-wait 30m`; fila 64 por cliente/IP e 128 no total; o painel não trava mais quando uma leitura do banco empaca | `10.100.2.2`, `/usr/local/bin/mcpollama-gateway` |
 
-Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `mcpollama-v0.9.2`, `gateway-v0.11.1`, `gateway-v0.12.0` … `gateway-v0.12.6` (a release 0.13.2 e o mcpollama 0.10.1 foram implantados em 2026-11-05; o mcpollama 0.10.2-09e2936 também, em 2026-11-05). O histórico de versões está no
+Tags no repositório: `mcpollama-v0.8.1`, `mcpollama-v0.9.0`, `mcpollama-v0.9.1`, `mcpollama-v0.9.2`, `gateway-v0.11.1`, `gateway-v0.12.0` … `gateway-v0.12.6` (a release 0.13.2, a 0.13.3 e o mcpollama 0.10.1 foram implantados em 2026-11-05; o mcpollama 0.10.2-09e2936 também, em 2026-11-05). O histórico de versões está no
 [CHANGELOG.md](CHANGELOG.md). O **fallback do mcpollama** (seção 5, desde o `0.9.0`) segue no binário atual, **desligado por padrão**.
 
 | Fase | Assunto | Estado |

@@ -1,6 +1,6 @@
 # Relatar os erros do modelo local (qwen3.8:27b): instruções para o Claude
 
-> ✅ **Em vigor desde 2026-11-04** (mcpollama 0.10.0 e gateway 0.13.0, Fase 12; release de ajuste implantada em 2026-11-05: gateway 0.13.2, mcpollama 0.10.1, modelo `qwen3.8:27b`). Sessão com mcpollama antigo, sem a tool
+> ✅ **Em vigor desde 2026-11-04** (mcpollama 0.10.0 e gateway 0.13.0, Fase 12; release de ajuste implantada em 2026-11-05: gateway 0.13.3, mcpollama 0.10.2, modelo `qwen3.8:27b`). Sessão com mcpollama antigo, sem a tool
 > `reportar_erro`, **não** relata por outro meio: avise o usuário e siga.
 >
 > Fonte única destas instruções. Vale para **todo projeto que usa o servidor MCP `mcpOllama`** (tools `generate`, `chat`,
