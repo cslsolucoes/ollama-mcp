@@ -28,7 +28,7 @@ só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). 
 
 ## mcpollama
 
-### [0.10.2] - 2026-11-05 12:58, em `D:\MCP` (`0.10.2-09e2936`; ajuste da Fase 12; ainda sem tag)
+### [0.10.2] - 2026-11-05 12:58, em `D:\MCP` (`0.10.2-09e2936`; ajuste da Fase 12; tag `mcpollama-v0.10.2`)
 
 #### Alterado
 - **`--max-prompt-chars` padrão de 128000 para 270000** (~90k tokens; owner, 2026-11-05 12:23: "ok, implemente"), junto com o
@@ -37,7 +37,7 @@ só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). 
   128k cai para 15 tok/s e 256k não cabe (41/66, 4,8 tok/s). Medido pelo caminho real: prompt de 87k tokens em ~227 s; PDF de 110k
   tokens em 2 partes (~6 min) e de 268k tokens em 5 partes (~15 min). Cada parte grande ocupa a fila (1 por vez) por até ~4 min.
 
-### [0.10.1] - 2026-11-05 12:06, em `D:\MCP` (`0.10.1-bb51ed6`; ajuste da Fase 12; ainda sem tag)
+### [0.10.1] - 2026-11-05 12:06, em `D:\MCP` (`0.10.1-bb51ed6`; ajuste da Fase 12; tag `mcpollama-v0.10.1`)
 
 #### Alterado
 - **Modelo de produção com o nome real** (decisão do owner, 2026-11-05, opção "b"): o padrão de `--model`/`OLLAMA_MODEL` e a lista
@@ -57,7 +57,7 @@ só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). 
   **daquele pedido** (o id é aleatório por pedido e ausente do documento); qualquer outro texto fica. Testes `TestStripEchoedMarkers` e
   `TestTranslateDropsEchoedMarkers` (este falha sem a correção).
 
-### [0.10.0] - 2026-11-04, em `D:\MCP` (Fase 12; ainda sem tag)
+### [0.10.0] - 2026-11-04, em `D:\MCP` (Fase 12; tag `mcpollama-v0.10.0`)
 
 Binário `0.10.0-5372f4c` instalado em `D:\MCP` em 2026-11-04 (backup da anterior em `mcpollama-mcp.exe.bak-0.9.2`). **Só instale depois do gateway 0.13.0** (ver abaixo): o gateway
 0.12.6, em produção, repassa o cabeçalho novo `X-Mcpollama-Doc` ao Ollama (que o ignora), mas a remoção dele e a partição por
@@ -192,7 +192,7 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
-### [0.13.3] - 2026-11-05 21:00, em produção (`0.13.3-7db4ffa`; ainda sem tag; monitor)
+### [0.13.3] - 2026-11-05 21:00, em produção (`0.13.3-7db4ffa`; tag `gateway-v0.13.3`; monitor)
 
 #### Corrigido
 - **Monitor: "Em execução" e "Fila de espera" com altura fixa e paginador sempre visível** (owner, 2026-11-05: "não está aparecendo aqui ainda").
@@ -207,7 +207,7 @@ em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo sã
   ("página 2 de 2 · 11 itens", 1 item + 9 linhas em branco; a página escolhida se mantém entre as atualizações); sem erro de console além do
   `favicon.ico`. Testes de ataque das revisões 9, 10.5 e 12: `.workspace/reports/MCPOllam2026-11-05-ataques-gateway-0.13.3.log`.
 
-### [0.13.2] - 2026-11-05 12:02, em produção (`0.13.2-bb51ed6`; ajuste da Fase 12; ainda sem tag)
+### [0.13.2] - 2026-11-05 12:02, em produção (`0.13.2-bb51ed6`; ajuste da Fase 12; tag `gateway-v0.13.2`)
 
 #### Corrigido
 - **Falso alarme "degradado (fora da GPU)"** (2026-11-04, com o `gemma4:26b`): o `/api/ps` conta em `size` um buffer em memória do
@@ -224,13 +224,13 @@ em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo sã
 - **`--max-wait 30m`** na unit (owner, 2026-11-05 11:39: "aumente o timeout na fila para 30 minutos"; antes o padrão de 10 min); já
   aplicado no servidor às 11:40 (backup `mcpollama-gateway.service.bak-20261105-114002`). O `--run-timeout` (execução) continua 10 min.
 
-### [0.13.1] - 2026-11-04 (ainda sem tag)
+### [0.13.1] - 2026-11-04 (tag `gateway-v0.13.1`)
 
 - **Monitor:** o quadro "Em execução" mostra até 5 linhas e o "Fila de espera" até 10, com paginação do restante
   ("‹ anterior · página X de N · T itens · próxima ›"). A página é guardada por quadro e não reinicia com a atualização de 1 s.
   Os demais quadros não mudaram (pedido do owner).
 
-### [0.13.0] - 2026-11-04 13:02, em produção (Fase 12; ainda sem tag)
+### [0.13.0] - 2026-11-04 13:02, em produção (Fase 12; tag `gateway-v0.13.0`)
 
 Binário `0.13.0-<hash>` (Linux amd64) ainda **não** instalado no servidor. Commits da Fase 12: `8fc5558` (contrato 1.0.0), `1fd5b27`,
 `3531beb` (12.3), `a1a4f9f`, `a820b70` (12.4), `37706bb`, `d27a4ca`, `0493f7f` (12.6), `3fc8fa9` (12.7), `9e3c111` (12.8) e `481aee0`
