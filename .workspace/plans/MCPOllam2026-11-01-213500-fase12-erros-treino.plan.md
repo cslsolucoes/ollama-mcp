@@ -1515,3 +1515,12 @@ bloqueadores foram **erros do coordenador** na edição de 15:54.
   `D:\MCP\mcpollama-mcp.exe~` (0.10.0) apagado. Memória atualizada (gateway 0.13.2; Fase 13 em espera).
   **Achado sem correção:** o plano geral `MCPOllam2026-10-23-150845-mcpollama-implementacao.plan.md` tem trecho final em codificação
   errada ("implanta��o") e 1 byte nulo, anteriores a hoje; não alterado.
+- 2026-11-05 20:36–21:02: **monitor: gateway 0.13.3** (owner: "os ajustes do dashboard do monitor já foram executados?" e, com a imagem, "não está aparecendo aqui ainda").
+  **Não deu certo:** a 0.13.1 (2026-11-04 14:43) entendeu "fixo 5 linhas" e "10 linhas fixas" como "até 5 e 10 linhas": o paginador só aparecia acima
+  do limite e, vazio, cada quadro encolhia para uma linha; respondi às 20:38 que estava executado, sem ter visto a tela. **Erro meu de interpretação**
+  (devia ter perguntado em 2026-11-04). **Solução:** o owner escolheu "altura fixa + paginador sempre visível"; `index.html` com `padRows`,
+  `boardStatus` e as linhas de status `#runst`/`#waitst`; teste `TestIndexIsResponsiveAndStable` exige o comportamento. **Verificado em navegador
+  real** (Playwright, gateway local com Ollama de mentira): vazio, 13 pedidos (fila "página 1 de 2 · 12 itens") e página 2. Ataques 9/10.5/12:
+  138 PASS, 0 FAIL, 1 SKIP (Linux). Commit `7db4ffa`; **implantado às 21:00** (`Instalar-Gateway.ps1 -Modo Atualizar`, fila vazia, ETAPA1_OK,
+  ATUALIZAR_OK); conferido em produção: versão `0.13.3-7db4ffa`, página com os 6 marcadores novos e sem o retorno antecipado antigo, backend
+  `gpu-local` "ok", `--gen-slots 1 --max-wait 30m`, generate pelo gateway respondeu "pong". Backups: `/root/srv-backup-20261028/fase96-20261105-210020`.
