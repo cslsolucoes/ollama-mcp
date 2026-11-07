@@ -28,6 +28,16 @@ só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). 
 
 ## mcpollama
 
+### [0.10.3] - 2026-11-07 16:04, em `D:\MCP` (`0.10.3-b1faec3`; Fase 14; **sem tag** e **sem push** até o owner decidir)
+
+#### Adicionado
+- **Argumento opcional `seed` em `generate` e `chat`** (inteiro de 1 a 2147483647; omitido = nada é enviado e vale o padrão do servidor):
+  vai em `options.seed` do Ollama, para rodadas pareadas (contrato C-5.15). `0`, negativos, decimais e texto são recusados pela tool.
+  Fora de `summarize_file`, `extract` e `translate` (temperatura fixa de 0,2). Código no ramo `feat/seed-generate-chat`, testes provados por
+  mutação e revisão adversarial feitos em 2026-11-07 01:27; implantado só no Windows por ordem do owner (versão **0.10.3**, não a 0.11.0 que
+  o plano previa). Observação ao vivo: `seed=1` duas vezes deu o mesmo texto e `seed=2` deu texto diferente (um par; a S5 completa está no
+  report do Treinamento `seed-s5`). **Não garante texto idêntico.** O binário Linux segue em 0.10.2.
+
 ### [0.10.2] - 2026-11-05 12:58, em `D:\MCP` (`0.10.2-09e2936`; ajuste da Fase 12; tag `mcpollama-v0.10.2`)
 
 #### Alterado
