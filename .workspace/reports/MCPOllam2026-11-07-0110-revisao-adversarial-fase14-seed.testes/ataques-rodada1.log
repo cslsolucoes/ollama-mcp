@@ -1,0 +1,35 @@
+=== RUN   TestAtkSeedA01RawWire
+    zz_seed_attack_test.go:60: VEC|A01|OK|generate: seed literal inteiro no corpo cru; seed sozinho => options={"seed":N}
+    zz_seed_attack_test.go:60: VEC|A01|OK|chat: seed literal inteiro no corpo cru; seed sozinho => options={"seed":N}
+--- PASS: TestAtkSeedA01RawWire (0.01s)
+=== RUN   TestAtkSeedA02Literals
+    zz_seed_attack_test.go:132: VEC|A02|OK|generate: 31 literais de seed com o resultado esperado (inclui 2 aceitos por arredondamento de float64)
+    zz_seed_attack_test.go:132: VEC|A02|OK|chat: 31 literais de seed com o resultado esperado (inclui 2 aceitos por arredondamento de float64)
+--- PASS: TestAtkSeedA02Literals (0.02s)
+=== RUN   TestAtkSeedA03DuplicateKeys
+    zz_seed_attack_test.go:156: VEC|A03|OK|generate: chave repetida => vale a ÚLTIMA (0,5 aceito como 5; 5,0 recusado; 5,null = omitido)
+    zz_seed_attack_test.go:156: VEC|A03|OK|chat: chave repetida => vale a ÚLTIMA (0,5 aceito como 5; 5,0 recusado; 5,null = omitido)
+--- PASS: TestAtkSeedA03DuplicateKeys (0.00s)
+=== RUN   TestAtkSeedA04KeyCase
+    zz_seed_attack_test.go:180: VEC|A04|OK|generate: Seed/SEED/"seed "/homóglifo cirílico recusados como desconhecidos; \u0065 escapado decodifica para seed e é aceito
+    zz_seed_attack_test.go:180: VEC|A04|OK|chat: Seed/SEED/"seed "/homóglifo cirílico recusados como desconhecidos; \u0065 escapado decodifica para seed e é aceito
+--- PASS: TestAtkSeedA04KeyCase (0.00s)
+=== RUN   TestAtkSeedA05ArgumentsShape
+    zz_seed_attack_test.go:202: VEC|A05|OK|BOM, array, string e número como argumentos => mensagem genérica; null => prompt obrigatório; seed antes de prompt funciona
+--- PASS: TestAtkSeedA05ArgumentsShape (0.00s)
+=== RUN   TestAtkSeedA06OrderAndMessages
+    zz_seed_attack_test.go:228: VEC|A06|OK|ordem: temperature, num_predict, seed, think; mensagem igual à dos irmãos: "`seed` deve estar entre 1 e 2147483647"
+--- PASS: TestAtkSeedA06OrderAndMessages (0.00s)
+=== RUN   TestAtkSeedA07Fallback
+    zz_seed_attack_test.go:251: VEC|A07|OK|generate: o fallback recebe o mesmo options.seed
+    zz_seed_attack_test.go:251: VEC|A07|OK|chat: o fallback recebe o mesmo options.seed
+--- PASS: TestAtkSeedA07Fallback (0.00s)
+=== RUN   TestAtkSeedA08ThinkFalseAndModel
+    zz_seed_attack_test.go:278: VEC|A08|OK|generate: seed + think:false + modelo por chamada; modelo proibido com seed válido não chega ao Ollama
+    zz_seed_attack_test.go:278: VEC|A08|OK|chat: seed + think:false + modelo por chamada; modelo proibido com seed válido não chega ao Ollama
+--- PASS: TestAtkSeedA08ThinkFalseAndModel (0.00s)
+=== RUN   TestAtkSeedA09SamplingCombos
+    zz_seed_attack_test.go:314: VEC|A09|OK|samplingOptions: 8 combinações de presença; nil só quando os três faltam; top_p nunca preenchido; numPredictOf inalterado
+--- PASS: TestAtkSeedA09SamplingCombos (0.00s)
+PASS
+ok  	github.com/cslsoftwares/mcpollama/tools	0.061s
