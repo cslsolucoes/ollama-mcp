@@ -36,7 +36,7 @@ só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). 
   Fora de `summarize_file`, `extract` e `translate` (temperatura fixa de 0,2). Código no ramo `feat/seed-generate-chat`, testes provados por
   mutação e revisão adversarial feitos em 2026-11-07 01:27; implantado só no Windows por ordem do owner (versão **0.10.3**, não a 0.11.0 que
   o plano previa). Observação ao vivo: `seed=1` duas vezes deu o mesmo texto e `seed=2` deu texto diferente (um par; a S5 completa está no
-  report do Treinamento `seed-s5`). **Não garante texto idêntico.** O binário Linux segue em 0.10.2.
+  report do Treinamento `seed-s5`). **Não garante texto idêntico.** O binário Linux (`D:\MCP\mcpollama-mcp`) foi atualizado para 0.10.3-b1faec3 em 2026-11-07 20:07 (compilado com `GOOS=linux`, `CGO_ENABLED=0`; backup `.bak-0.10.2`; não executado em Linux).
 
 ### [0.10.2] - 2026-11-05 12:58, em `D:\MCP` (`0.10.2-09e2936`; ajuste da Fase 12; tag `mcpollama-v0.10.2`)
 
