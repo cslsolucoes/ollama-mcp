@@ -27,6 +27,7 @@ func (d Deps) generateTool() mcp.ToolEntry {
 				"temperature": numberProp("Sampling temperature, 0 to 2.", 0, 2),
 				"num_predict": intProp("Maximum tokens to generate.", 1, maxGeneratePredict),
 				"think":       thinkProp(),
+				"seed":        seedProp(),
 			}),
 			Annotations: readOnlyClosed("Generate text with the local model", false),
 		},
@@ -34,7 +35,14 @@ func (d Deps) generateTool() mcp.ToolEntry {
 	}
 }
 
-// samplingOptions reads the optional temperature and num_predict.
+// minSeed and maxSeed bound the accepted `seed` (max = int32 max); the minimum
+// is 1 because 0 is ambiguous in the Ollama runner (Fase 14, D14-12).
+const (
+	minSeed = 1
+	maxSeed = 2147483647
+)
+
+// samplingOptions reads the optional temperature, num_predict and seed.
 func samplingOptions(a args) (*ollama.ModelOptions, error) {
 	temp, err := a.optFloat("temperature", 0, 2)
 	if err != nil {
@@ -44,14 +52,18 @@ func samplingOptions(a args) (*ollama.ModelOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	if temp == nil && n == nil {
+	seed, err := a.optInt("seed", minSeed, maxSeed)
+	if err != nil {
+		return nil, err
+	}
+	if temp == nil && n == nil && seed == nil {
 		return nil, nil
 	}
-	return &ollama.ModelOptions{Temperature: temp, NumPredict: n}, nil
+	return &ollama.ModelOptions{Temperature: temp, NumPredict: n, Seed: seed}, nil
 }
 
 func (d Deps) generate(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "prompt", "system", "model", "temperature", "num_predict", "think")
+	a, err := parseArgs(raw, "prompt", "system", "model", "temperature", "num_predict", "think", "seed")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}

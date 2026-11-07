@@ -31,6 +31,7 @@ func (d Deps) chatTool() mcp.ToolEntry {
 				"temperature": numberProp("Sampling temperature, 0 to 2.", 0, 2),
 				"num_predict": intProp("Maximum tokens to generate.", 1, maxGeneratePredict),
 				"think":       thinkProp(),
+				"seed":        seedProp(),
 			}),
 			Annotations: readOnlyClosed("Chat with the local model", false),
 		},
@@ -84,7 +85,7 @@ func mustJSON(v any) json.RawMessage {
 }
 
 func (d Deps) chat(ctx context.Context, raw json.RawMessage) (mcp.ToolCallResult, error) {
-	a, err := parseArgs(raw, "messages", "system", "model", "temperature", "num_predict", "think")
+	a, err := parseArgs(raw, "messages", "system", "model", "temperature", "num_predict", "think", "seed")
 	if err != nil {
 		return mcp.ToolCallResult{}, err
 	}

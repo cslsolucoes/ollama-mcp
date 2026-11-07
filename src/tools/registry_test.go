@@ -16,8 +16,8 @@ import (
 // toolsListBudget is the byte budget of the full tools/list payload (TOK-006).
 // Measured at 4 tools: see TestToolsListBudget for the figure it protects.
 const (
-	toolsListBudget     = 5640 // 12.5: + reportar_erro trimmed to the minimum (4588 -> 5604 measured: +1016, half of the first +2032; 36 bytes of slack; the compact list +885 is the floor of enums, names and annotations); the five base tools, no --allow-root; owner 2026-10-29: think por chamada (generate and chat get `think`): 4390 -> 4588 measured, 32 bytes of slack (was 4400; unchanged by phase 7, owner D-13 revised 2026-10-28)
-	toolsListBudgetFull = 9345 // 12.5: + reportar_erro trimmed (8295 -> 9311 measured, 34 bytes of slack); with the three file tools (--allow-root); owner 2026-10-29: think por chamada (5 tools get `think`): 7800 -> 8295 measured, 35 bytes of slack (7800 before: .png/.jpg 7.9b 7728 -> 7800, no slack; 7600 before the document extensions)
+	toolsListBudget     = 5974 // owner 2026-11-07, Fase 14 D14-11: seed no generate e no chat: 5624 -> 5958 medido, 16 bytes de folga (era 5640, folga de 16). 12.5: + reportar_erro trimmed to the minimum (4588 -> 5604 measured: +1016, half of the first +2032; 36 bytes of slack then, 16 before the seed; the compact list +885 is the floor of enums, names and annotations); the five base tools, no --allow-root; owner 2026-10-29: think por chamada (generate and chat get `think`): 4390 -> 4588 measured, 32 bytes of slack (was 4400; unchanged by phase 7, owner D-13 revised 2026-10-28)
+	toolsListBudgetFull = 9679 // owner 2026-11-07, Fase 14 D14-11: seed no generate e no chat: 9331 -> 9665 medido, 14 bytes de folga (era 9345, folga de 14). 12.5: + reportar_erro trimmed (8295 -> 9311 measured, 34 bytes of slack then, 14 before the seed); with the three file tools (--allow-root); owner 2026-10-29: think por chamada (5 tools get `think`): 7800 -> 8295 measured, 35 bytes of slack (7800 before: .png/.jpg 7.9b 7728 -> 7800, no slack; 7600 before the document extensions)
 )
 
 // TEST-008 / TOOL-001 / SEC-012: the exact set, not a "contains".

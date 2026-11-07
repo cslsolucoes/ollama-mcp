@@ -57,6 +57,12 @@ Input schema:
       "minimum": 1,
       "type": "integer"
     },
+    "seed": {
+      "description": "Sampling seed for paired, reproducible runs (1 to 2147483647). Omit for the server default.",
+      "maximum": 2147483647,
+      "minimum": 1,
+      "type": "integer"
+    },
     "system": {
       "description": "Optional system instruction, placed before messages.",
       "type": "string"
@@ -203,6 +209,12 @@ Input schema:
       "description": "The prompt text.",
       "minLength": 1,
       "type": "string"
+    },
+    "seed": {
+      "description": "Sampling seed for paired, reproducible runs (1 to 2147483647). Omit for the server default.",
+      "maximum": 2147483647,
+      "minimum": 1,
+      "type": "integer"
     },
     "system": {
       "description": "Optional system instruction.",

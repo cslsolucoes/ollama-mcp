@@ -43,6 +43,11 @@ func thinkProp() schemaMap {
 	return boolProp("Reason first: slower; for hard analysis. Default false.")
 }
 
+// seedProp is the optional sampling seed for paired, reproducible runs (Fase 14).
+func seedProp() schemaMap {
+	return intProp("Sampling seed for paired, reproducible runs (1 to 2147483647). Omit for the server default.", minSeed, maxSeed)
+}
+
 func arrayProp(desc string, items schemaMap) schemaMap {
 	return schemaMap{"type": "array", "items": items, "description": desc}
 }
