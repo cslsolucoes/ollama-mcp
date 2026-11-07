@@ -28,7 +28,7 @@ só depois apagar o `qwen3-ia`; mcpollama em `D:\MCP`; reinício das sessões). 
 
 ## mcpollama
 
-### [0.10.3] - 2026-11-07 16:04, em `D:\MCP` (`0.10.3-b1faec3`; Fase 14; **sem tag** e **sem push** até o owner decidir)
+### [0.10.3] - 2026-11-07 16:04, em `D:\MCP` (`0.10.3-b1faec3`; Fase 14; tag `mcpollama-v0.10.3` em `b1faec3`, `master` em `385373e` enviados ao remoto em 2026-11-07, por ordem do owner)
 
 #### Adicionado
 - **Argumento opcional `seed` em `generate` e `chat`** (inteiro de 1 a 2147483647; omitido = nada é enviado e vale o padrão do servidor):
