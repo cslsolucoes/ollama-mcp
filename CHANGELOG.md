@@ -244,7 +244,7 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
-### [0.13.4] - 2026-11-08 (monitor; ainda sem tag, nao implantado)
+### [0.13.4] - 2026-11-08 18:53, em produção (`0.13.4-0973774`; tag `gateway-v0.13.4`; monitor)
 
 #### Alterado (pedido do owner, 2026-11-08 18:24; so `src/gateway/monitor/index.html` e o teste `responsive_test.go`)
 - **"Em execução" com 2 linhas fixas** (era 5), **"Fila de espera" com 5** (era 10) e **"Concluídos nos últimos N min" com 5 linhas fixas** (novo; mesmo padrão: linhas em branco,
