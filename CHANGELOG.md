@@ -244,6 +244,18 @@ Binário `0.9.0-c4031f7` gerado em `D:\MCP\mcpollama-mcp.exe` em 2026-10-30; val
 Código em `src/gateway/` e `src/cmd/mcpollama-gateway/`; instalação em [`deploy/gateway/`](deploy/gateway/README.md) e operação
 em [`docs/MANUAL-GATEWAY.md`](docs/MANUAL-GATEWAY.md). Todas as datas abaixo são de 2026-10-30, hora local.
 
+### [0.13.4] - 2026-11-08 (monitor; ainda sem tag, nao implantado)
+
+#### Alterado (pedido do owner, 2026-11-08 18:24; so `src/gateway/monitor/index.html` e o teste `responsive_test.go`)
+- **"Em execução" com 2 linhas fixas** (era 5), **"Fila de espera" com 5** (era 10) e **"Concluídos nos últimos N min" com 5 linhas fixas** (novo; mesmo padrão: linhas em branco,
+  paginador sempre visível, linha de status `#donest`, página própria que não reinicia a cada atualização de 1 s). A aba "Concluídos recentes" do histórico não mudou.
+- **Coluna "Rótulo"** nas três tabelas, logo depois do Id: mostra o `client_label` (máquina/usuário enviado pelo mcpollama); a coluna **"Cliente"** passa a mostrar o `client_ip`
+  (cada uma com o outro dado no tooltip), para não duplicar informação.
+- **GPUs e CPU / RAM no topo**, logo depois dos cartões de resumo e antes de "Em execução".
+- Teste `TestIndexIsResponsiveAndStable` exige os três tamanhos, `padRows` nas três tabelas, as colunas e a ordem das seções. Gate: build, vet, gofmt e `go test ./gateway/...` sem falhas.
+  **Verificado em navegador real** (Playwright, gateway local com Ollama de mentira, 8 pedidos): ordem GPUs, CPU/RAM, Em execução, Fila, Concluídos; 2, 5 e 5 linhas; paginador
+  "página 1 de 2 · 7 itens" na fila; colunas Rótulo e Cliente; a 570 px sem rolagem horizontal da página; único erro de console é o `favicon.ico`.
+
 ### [0.13.3] - 2026-11-05 21:00, em produção (`0.13.3-7db4ffa`; tag `gateway-v0.13.3`; monitor)
 
 #### Corrigido
