@@ -170,7 +170,7 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
 - `ia.cslsolucoes.com.br` = 10.100.2.2 · Ollama v0.40.13 (desde 2026-10-31 09:50; antes 0.40.8) · modelo **`qwen3.8:27b`** (nome
   real, **sem alias**; decisão do owner de 2026-11-05, release mcpollama 0.10.1 / gateway 0.13.2 da Fase 12;
   **implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1)**; arquitetura `qwen35`, 27,3B denso, Q4_K_M, 17 GB em disco,
-  **96k de contexto desde 2026-11-05 12:25** (antes 64k, ~19,6 GB + nomic ≈ 24 GB) com 66/66 camadas na GPU, ~21,3 GB junto do nomic; 96k é o maior contexto 100% na GPU: 104k deixa 1 camada na CPU, 128k cai para 15 tok/s, 256k não cabe, 41/66 camadas e 4,8 tok/s; a 96k a geração fica ~26 tok/s, igual à de 64k). Nome virtual de raciocínio:
+  **128k de contexto (`num_ctx 131072`) e `num_gpu 66` embutidos no próprio modelo desde 2026-11-08 ~17:05** (modelo recriado com `ollama create`, Modelfile em `deploy/servidor-ia/Modelfile.qwen3.8-27b-128k`; digest `aaee06c39dcf` → `40e90b71222a`; o original ficou como tag local `qwen3.8:27b-orig`): 66/66 camadas na GPU e ~52 tok/s com prompt curto (sem `num_gpu` o Ollama punha 61/66 camadas e 23 tok/s; 112k automático: 63/66 a 28,8 tok/s); VRAM por GPU ~7183/5519/5787/7717 MiB de 8192 (folga ~470 MiB na GPU 3); com contexto cheio a geração cai (~22 tok/s com 65k de prompt, é atenção, independe das camadas). Histórico: 96k de 2026-11-05 12:25 a 2026-11-08 (66/66 camadas, ~21,3 GB junto do nomic; a 96k a geração ficava ~26 tok/s) e 64k antes (~19,6 GB + nomic ≈ 24 GB); medido em 2026-11-05 sem `num_gpu` fixo: 104k deixava 1 camada na CPU, 128k caía para 15 tok/s, 256k não cabe (41/66 camadas e 4,8 tok/s). Nome virtual de raciocínio:
   `qwen3.8:27b-think`. O nome `qwen3-ia` deixa de existir. Antes: `qwen3-ia` = alias do `qwen3.5:9b`
   desde 2026-10-29 14:00 (decisão do owner na Fase 8, D8-3: multiagente; 9B, Q4_K_M, 100% GPU, 13 GB a 64k)
   e, antes dele, o MoE `qwen3-coder:30b-a3b`, removido do servidor.
@@ -183,10 +183,28 @@ TOOLS.md                    catálogo das tools, gerado por src/cmd/dumptools (n
     erros, ~700–790 tok/s somados (~2.000 com documentos grandes), S2 80–85% e S3 100%.
   - Report: `.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md`.
   - Embeddings: `nomic-embed-text` (768 dimensões), residente junto.
-- **Config atual: 4 GPUs a 100 W**, `num_ctx` **98304 (96k) desde 2026-11-05 12:25** (`OLLAMA_CONTEXT_LENGTH` e `ollama-warm`; até 2026-11-05: 65536/64k), `NUM_PARALLEL=1` e gateway `--gen-slots 1` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3.8:27b` também roda com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
-  (2026-10-29). A causa dos reboots é a **fonte de 850 W, que não aguenta as 4 placas**
-  (owner, 2026-10-28; não são os risers). Os 100 W valem até a troca da fonte; a VRAM de 32 GB
-  é a prioridade. **Não fixar o contexto no código:** usar o teto configurável.
+- **Config atual (desde 2026-11-08): 4 GPUs a 240 W, clock liberado, memória +1500 MHz e núcleo +150 MHz, em 2 fontes** (o dono
+  instalou uma 2ª fonte de 500 W: placa-mãe + 1 GPU nela, 3 GPUs na de 850 W; reinícios às 14:59 e 16:02:26). `nvidia-powercap.service`:
+  `-pl 240` (máximo das placas; o `nvidia-smi` recusa 250), `-rgc` e os offsets aplicados por `/usr/local/bin/oc` (C com NVML, fonte em
+  `deploy/servidor-ia/ferramentas-gpu/oc.c`); ventoinhas em automático. Até 2026-11-08 eram 100 W e clock travado em 210–1400 MHz
+  (a causa dos reboots era a **fonte de 850 W, que não aguentava as 4 placas**; owner, 2026-10-28; não eram os risers).
+  Contexto: `num_ctx 131072` e `num_gpu 66` **vêm do próprio modelo** (o gateway tira `num_ctx`/`num_gpu` do pedido do cliente);
+  `OLLAMA_CONTEXT_LENGTH=98304` segue no `10-performance.conf` e só vale para modelo sem o parâmetro; `ollama-warm` não manda `num_ctx`
+  (antes 98304 desde 2026-11-05 12:25; 65536/64k até então). `NUM_PARALLEL=1` e gateway `--gen-slots 1` com `--run-timeout 10m` (owner, 2026-11-04; o `qwen3.8:27b` também roda com 1 slot, a arquitetura `qwen35` não aceita pedidos paralelos), `MAX_QUEUE=32`
+  (2026-10-29). Medido (RTX 3070 ×4, driver 610.57.04): clock liberado + 220/240 W deram +30% na leitura de prompt (451→587 tok/s) e
+  +14 a 24% na geração (20,9→23,8..25,9 tok/s); estresse de 12 min a 240 W sem erro; burn nas 4 GPUs 130..240 W, pico somado 946 W,
+  temperatura máx. 87 °C (GPU 0 chega a 90–91 °C). Memória limpa de +0 a +2100 MHz; +2400 derrubou o GSP de uma placa (GSP-CrashCat,
+  precisou reiniciar), fixado +1500 (ganho real só ~+5% na geração). Núcleo limpo até +150 (~+4% na leitura); +200 falhou 2× (Xid 13/31),
+  fixado +150. **Rollback:** ver "Reverter" em `deploy/servidor-ia/README.md`. **Não fixar o contexto no código:** usar o teto configurável.
+- **Comparativo controlado (2026-11-08; detalhe no `CHANGELOG.md`):** antes (100 W e clock travado) contra final (240 W, clock liberado, memória +1500, núcleo +150):
+  leitura de prompt **476,9 → 674,6 tok/s (+41,5%)**, geração com prompt curto **43,9 → 51,9 (+18,2%)** e com 83,5 mil tokens de contexto **19,2 → 22,4 (+16,7%)**;
+  só liberar o clock e subir a 240 W já dá +34,3%, +13,4% e +9,9%; os dois overclocks somam +5% a +6%.
+- **Prompt maior que o contexto é cortado pelo Ollama SEM erro (medido em 2026-11-08; corrige uma leitura errada feita no mesmo dia):** só quando o prompt
+  **não cabe** no contexto (`num_ctx`) o Ollama o reduz para ~metade do contexto + 2 (log `truncating input prompt limit=49154 ... keep=4` a 96k,
+  `limit=65538` a 128k, `limit=32770` a 64k), ficando só com os 4 primeiros tokens e o final. Prompt que cabe **não é cortado**: a 128k, prompts de
+  83,5 mil tokens passaram inteiros (0 truncamentos, `n_ctx_slot = 131072`). O limite de 270.000 caracteres do mcpollama (`src/mcpollama-mcp/config.go:30`,
+  ~82–90 mil tokens de português) cabe em 128k; a 96k ficava justo, pois o prompt mais a resposta precisam caber no contexto. Medições de 2026-11-08
+  com "49 mil tokens" usavam prompts de >100 mil tokens (o gerador de teste dava ~4 tokens por palavra) truncados a 49.154; a comparação relativa valia.
 - Carga a frio do `qwen3.8:27b`: ~33 s (era ~16–22 s com o `qwen3.5:9b`). Detalhes medidos antes da troca para o `qwen3.5:9b`:
   `referencias/Brief_Referencias/Servidor-Ollama-CSL/dados/validacao-empirica.md`.
 - Na LAN: `https://ia.cslsolucoes.com.br:8443` (porta explícita). Pela internet: o mesmo host

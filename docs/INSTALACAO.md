@@ -62,10 +62,10 @@ Caminho de uma chamada: cliente MCP -> `https://ia.cslsolucoes.com.br:8443` -> n
 O servidor atual: **4x NVIDIA GeForce RTX 3070 (8 GB cada, 32 GB de VRAM)**, **94 GB de RAM**, NVMe de ~238 GB, fonte **Cougar 850 W**.
 Para reproduzir a configuração:
 
-- GPUs NVIDIA com VRAM somada suficiente para o modelo a 96k de contexto (desde 2026-11-05; antes 64k): **cerca de 21,3 GB** com o `nomic-embed-text` junto (a 64k eram ~19,6 GB só do `qwen3.8:27b`; 27,3B denso, Q4_K_M,
+- GPUs NVIDIA com VRAM somada suficiente para o modelo a **128k de contexto (desde 2026-11-08 ~17:05, `num_ctx 131072` e `num_gpu 66` embutidos no modelo; VRAM por GPU ~7183/5519/5787/7717 MiB de 8192)**. Antes, 96k (de 2026-11-05 12:25 a 2026-11-08; antes 64k): **cerca de 21,3 GB** com o `nomic-embed-text` junto (a 64k eram ~19,6 GB só do `qwen3.8:27b`; 27,3B denso, Q4_K_M,
   17 GB em disco, `OLLAMA_KV_CACHE_TYPE=q4_0`) mais o `nomic-embed-text` residente junto (≈ 24 GB no total dos 32 GB; com o
   `qwen3.5:9b`, usado até a Fase 12, eram ~13 GB). Na medição do bake-off (2026-11-04/05), o `qwen3.8:27b` ficou a 64k com 66/66
-  camadas na GPU, na VRAM somada das 4 placas (`OLLAMA_SCHED_SPREAD=1` espalha as camadas). Implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1; contexto 96k e mcpollama 0.10.2 no mesmo dia, 12:25 a 12:58). Medido a 96k: 66/66 camadas na GPU; 104k deixa 1 camada na CPU, 128k cai para 15 tok/s e 256k não cabe.
+  camadas na GPU, na VRAM somada das 4 placas (`OLLAMA_SCHED_SPREAD=1` espalha as camadas). Implantado em 2026-11-05 (gateway 0.13.2, mcpollama 0.10.1; contexto 96k e mcpollama 0.10.2 no mesmo dia, 12:25 a 12:58). Medido a 96k (sem `num_gpu` fixo): 66/66 camadas na GPU; 104k deixa 1 camada na CPU, 128k cai para 15 tok/s e 256k não cabe. Em 2026-11-08, com `num_gpu 66` fixado no modelo, 128k ficou 66/66 na GPU a ~52 tok/s com prompt curto (automático eram 61/66 e 23 tok/s). **Atenção:** o Ollama trunca o prompt sem erro em ~metade do contexto (65.538 tokens a 128k); ver "Limitação conhecida" no `CLAUDE.md`.
 - **A fonte precisa aguentar as placas.** Com 4 placas, a 850 W houve reboots secos (ver [B.3](#b3-limite-de-potência-e-clock-nvidia-powercapservice)
   e [H.1](#h1-reboots-do-servidor)). Se montar com fonte maior ou menos placas, os limites da B.3 podem ser revistos.
 - Rede: IP fixo na LAN (`10.100.2.2` hoje) e DNS interno resolvendo `ia.cslsolucoes.com.br` para ele (split-horizon).
@@ -141,8 +141,13 @@ O que a unit faz, para cada GPU (`for i in $(nvidia-smi --query-gpu=index ...)`)
 | Comando | Efeito |
 | --- | --- |
 | `nvidia-smi -i $i -pm 1` | persistence mode ligado |
-| `nvidia-smi -i $i -pl 100` | limite de potência de **100 W** (o mínimo aceito pela placa; faixa válida 100 a 240 W; padrão de fábrica 220 W) |
-| `nvidia-smi -i $i -lgc 210,1400` | clock **travado** entre 210 e 1400 MHz |
+| `nvidia-smi -i $i -pl 100` | limite de potência de **100 W** (o mínimo aceito pela placa; faixa válida 100 a 240 W; padrão de fábrica 220 W). **Até 2026-11-08**; hoje `-pl 240` |
+| `nvidia-smi -i $i -lgc 210,1400` | clock **travado** entre 210 e 1400 MHz. **Até 2026-11-08**; hoje `-rgc` (liberado) |
+
+**Config atual (desde 2026-11-08, depois da 2ª fonte de 500 W):** `-pl 240` (máximo das placas; o `nvidia-smi` recusa 250), `-rgc` e, por
+`/usr/local/bin/oc` (programa C com NVML, fonte em [`ferramentas-gpu/oc.c`](../deploy/servidor-ia/ferramentas-gpu/oc.c)), offset de memória
+**+1500 MHz** e de núcleo **+150 MHz**. Limites medidos: memória limpa até +2100 MHz e +2400 derrubou o GSP de uma placa; núcleo limpo até
++150 e +200 falhou 2× (Xid 13/31). O texto abaixo descreve a config de 100 W, válida enquanto havia só a fonte de 850 W.
 
 `Type=oneshot` + `RemainAfterExit=yes` (fica "active" depois de rodar); `After=nvidia-persistenced.service`. A unit **não** depende de
 `multi-user.target` de propósito: isso fechava um ciclo com o `ollama-warm` e o aquecimento do boot era descartado.
@@ -206,7 +211,7 @@ O nome virtual de raciocínio é `qwen3.8:27b-think`. Contas e contagens: pedir 
 | `OLLAMA_HOST` | `127.0.0.1:11434` | só o loopback: todo acesso passa por nginx e gateway (D9-2) |
 | `OLLAMA_MAX_QUEUE` | `32` | fila do Ollama (era 8 e recusava com 503 o 10º pedido simultâneo) |
 | `OLLAMA_NUM_PARALLEL` | `1` | essa arquitetura roda com 1 slot; a fila de verdade é a do gateway |
-| `OLLAMA_CONTEXT_LENGTH` | `98304` | 96k desde 2026-11-05 (até então `65536`, 64k); 4 GPUs com 131072 derrubaram a máquina |
+| `OLLAMA_CONTEXT_LENGTH` | `98304` | 96k desde 2026-11-05 (até então `65536`, 64k). Desde 2026-11-08 o `qwen3.8:27b` usa `num_ctx 131072` e `num_gpu 66` do próprio modelo (Modelfile em `deploy/servidor-ia/`), então esta variável só vale para modelo sem o parâmetro. (Antes da 2ª fonte, 4 GPUs com 131072 derrubaram a máquina) |
 | `OLLAMA_KEEP_ALIVE` | `-1` | modelo residente (carga a frio do `qwen3.8:27b` custa ~33 s; com o `qwen3.5:9b` era ~16 a 22 s) |
 | `OLLAMA_MAX_LOADED_MODELS` | `2` | `qwen3.8:27b` + `nomic-embed-text` juntos; um `embed` não descarrega o modelo de geração |
 
@@ -240,12 +245,12 @@ systemctl enable --now ollama-warm.service
 ```
 
 O script espera o Ollama responder em `/api/version` (até 60 tentativas de 2 s) e então faz um `/api/generate` mínimo
-(`think:false`, `num_ctx:98304`, `num_predict:1`; até 2026-11-05: 65536) para carregar o `qwen3.8:27b` a 96k na VRAM, de modo que o primeiro cliente não espere a carga a frio.
+(`think:false`, `num_predict:1`; **sem `num_ctx` desde 2026-11-08**, o contexto vem do modelo: 131072; antes `num_ctx:98304`, e 65536 até 2026-11-05) para carregar o `qwen3.8:27b` a 128k na VRAM, de modo que o primeiro cliente não espere a carga a frio.
 
 **Ordem no boot:** `nvidia-powercap` primeiro, depois `ollama`, depois `ollama-warm` (a unit declara `After=ollama.service nvidia-powercap.service` e
 `Requires=ollama.service`). Carregar o modelo antes do power cap aplicado já coincidiu com um reboot (2026-10-30 16:41).
 
-Como conferir: `systemctl is-active ollama-warm` (`active`, é oneshot) e `ollama ps`, com `qwen3.8:27b` em `100% GPU` e `CONTEXT 98304` (até 2026-11-05: 65536).
+Como conferir: `systemctl is-active ollama-warm` (`active`, é oneshot) e `ollama ps`, com `qwen3.8:27b` em `100% GPU` e `CONTEXT 131072` (98304 de 2026-11-05 a 2026-11-08; 65536 antes).
 O `nomic-embed-text` entra no primeiro `embed` (a etapa 2 do gateway também o aquece).
 
 ### B.6 journald
@@ -827,7 +832,7 @@ No servidor:
 
 ```bash
 systemctl is-active ollama ollama-warm nvidia-powercap nginx cloudflared mcpollama-gateway   # 6 linhas "active"
-ollama ps                                      # qwen3.8:27b (CONTEXT 98304) e nomic-embed-text, PROCESSOR 100% GPU
+ollama ps                                      # qwen3.8:27b (CONTEXT 131072; 98304 até 2026-11-08) e nomic-embed-text, PROCESSOR 100% GPU
 nvidia-smi --query-gpu=index,power.limit --format=csv,noheader     # 4 GPUs, 100.00 W
 ss -tlnH | grep -E '11434|11500|8443'          # 11434 e 11500 em 127.0.0.1; 8443 pública
 firewall-cmd --zone=public --list-ports        # 8443/tcp
@@ -887,7 +892,7 @@ systemctl restart ollama && systemctl restart ollama-warm
 ollama ps
 ```
 
-**Confira os pré-requisitos do novo modelo:** se ele raciocina por padrão (`think:false`), se roda em 1 slot, e a VRAM a 96k (até 2026-11-05: 64k). Faça um teste de carga antes de adotar (as medidas da Fase 8, com o `qwen3.5:9b`, estão no
+**Confira os pré-requisitos do novo modelo:** se ele raciocina por padrão (`think:false`), se roda em 1 slot, e a VRAM a 128k (desde 2026-11-08; 96k até então e 64k até 2026-11-05). Faça um teste de carga antes de adotar (as medidas da Fase 8, com o `qwen3.5:9b`, estão no
 [report de carga multiagente](../.workspace/reports/MCPOllam2026-10-28-235002-fase8-9-carga-multiagente.report.md)). Para voltar ao modelo anterior, mantenha-o instalado (`ollama list`) até o aceite e só então remova (`ollama rm`).
 
 ### G.4 Rotacionar o token
@@ -932,7 +937,7 @@ mv /usr/local/lib/ollama $B/lib-ollama
 tar --zstd -xf ollama-linux-amd64.tar.zst -C /usr/local                   # traz bin/ollama e lib/ollama/
 restorecon -RF /usr/local/bin/ollama /usr/local/lib/ollama
 systemctl start ollama && systemctl restart ollama-warm
-curl -s http://127.0.0.1:11434/api/version; ollama ps                     # versão nova; qwen3.8:27b 100% GPU, 96k
+curl -s http://127.0.0.1:11434/api/version; ollama ps                     # versão nova; qwen3.8:27b 100% GPU, 128k (96k até 2026-11-08)
 # rollback: systemctl stop ollama; rm -rf /usr/local/lib/ollama; mv $B/lib-ollama /usr/local/lib/ollama;
 #           cp -a $B/ollama /usr/local/bin/; systemctl start ollama && systemctl restart ollama-warm
 ```
@@ -962,7 +967,7 @@ O que guardar (fora do git; cofre e backup cifrados):
 ### H.1 Reboots do servidor
 
 **Causa: a fonte de 850 W não aguenta as 4 placas** (decisão do owner; não são os risers). Os reboots são desligamentos secos, sem Xid e sem log, na subida de ocioso para carga
-(inclusive durante a carga do modelo no boot e em extrações grandes). Mitigações aplicadas: 100 W por GPU e clock travado em 210 a 1400 MHz (B.3), `ollama-warm` depois do powercap, journald com sync de 10 s.
+(inclusive durante a carga do modelo no boot e em extrações grandes). Mitigações aplicadas (até 2026-11-08, quando entrou a 2ª fonte e os limites foram liberados, ver B.3): 100 W por GPU e clock travado em 210 a 1400 MHz (B.3), `ollama-warm` depois do powercap, journald com sync de 10 s.
 Diagnóstico: `uptime -s`, `journalctl -b -1 -n 50`, `journalctl -k | grep -iE 'xid|aer'` (vazio = sem erro de GPU) e, no gateway, o evento de reinício e os jobs `interrompido_reboot` (MANUAL, seção 8).
 Solução definitiva: fonte maior; depois reveja potência e clock (B.3).
 

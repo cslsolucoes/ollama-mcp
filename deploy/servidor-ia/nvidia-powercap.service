@@ -1,5 +1,5 @@
 [Unit]
-Description=NVIDIA GPU power cap for stable 4-GPU inference (240W MAX post-riser-fix)
+Description=NVIDIA GPU power cap 240W, clock liberado e offset de memoria +1500 e nucleo +150 (segunda fonte de 500W, owner 2026-11-08)
 # 2026-10-28: sem multi-user.target aqui (fechava ciclo com ollama-warm e o warm era descartado no boot).
 After=nvidia-persistenced.service
 Wants=nvidia-persistenced.service
@@ -10,7 +10,11 @@ RemainAfterExit=yes
 # Conservador (owner 2026-10-23): pos Xid 79 'GPU fell off the bus' na placa PCI 01:00 sob carga a 240W.
 # Clock travado 210-1400 MHz (owner 2026-10-30 16:49: corta os picos de ms que desarmam a fonte de 850 W; 2 reboots as 16:40/16:41, um deles na carga do modelo no boot).
 # Power limit 100W nas 4 GPUs (owner 2026-10-28 21:48: fonte Cougar 850 W insuficiente para 4 placas - causa dos reboots, nao os risers; 100W preserva os 32 GB de VRAM ate a troca da fonte; antes 130W/150W); SEM locked clocks.
-ExecStart=/bin/bash -c 'for i in $(nvidia-smi --query-gpu=index --format=csv,noheader); do nvidia-smi -i "$i" -pm 1; nvidia-smi -i "$i" -pl 100; nvidia-smi -i "$i" -lgc 210,1400; done'
+# 2026-11-08 16:18 (owner): 2a fonte de 500 W instalada; testes de estresse (burn nas 4 GPUs a 240 W: pico somado 946 W, sem Xid) e de memoria
+# (offset 0..+2100 limpo; +2400 derrubou o GSP de uma placa). Agora: 240 W (max das placas; owner 2026-11-08 16:22), SEM travar o clock (-rgc) e memoria +1500 MHz (margem sob o +2100).
+# 16:33 (owner): nucleo +150 MHz fixado (limite estavel; +200 derrubou o llama-server 2x com Xid 13/31).
+# Antes: -pl 100 e -lgc 210,1400 (fonte de 850 W com 4 placas). Backup: /root/nvidia-powercap.service.bak-20261108-1618
+ExecStart=/bin/bash -c 'for i in $(nvidia-smi --query-gpu=index --format=csv,noheader); do nvidia-smi -i "$i" -pm 1; nvidia-smi -i "$i" -pl 240; nvidia-smi -i "$i" -rgc; /usr/local/bin/oc set "$i" mem 1500 || true; /usr/local/bin/oc set "$i" graphics 150 || true; done'
 Restart=on-failure
 RestartSec=15
 

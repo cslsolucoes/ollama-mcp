@@ -1,5 +1,5 @@
 [Unit]
-Description=Warm qwen3.8:27b (96K context) into VRAM at boot
+Description=Warm qwen3.8:27b (128K context) into VRAM at boot
 After=ollama.service nvidia-powercap.service
 Requires=ollama.service
 

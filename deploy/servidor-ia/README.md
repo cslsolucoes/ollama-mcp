@@ -16,9 +16,11 @@ Regras:
 | --- | --- | --- | --- |
 | `ollama.service` | `/etc/systemd/system/ollama.service` | root, 0644 | unit base do Ollama (usuário `ollama`, `Restart=always`). O `Environment PATH` herda caminhos de `/root/.opencode` que não são necessários (conferir) |
 | `ollama-10-performance.conf` | `/etc/systemd/system/ollama.service.d/10-performance.conf` | root, 0644 | drop-in de desempenho: `OLLAMA_HOST=127.0.0.1:11434`, contexto 98304 (96k; 65536 até 2026-11-05 12:23), KV `q4_0`, `NUM_PARALLEL=1` (o `qwen3-ia` segue com 1 slot: a arquitetura `qwen35` não aceita pedidos paralelos; owner, 2026-11-04), `MAX_QUEUE=32`, `MAX_LOADED_MODELS=2`, `KEEP_ALIVE=-1`, `CUDA_VISIBLE_DEVICES` por UUID. **Os UUIDs são das GPUs deste servidor: troque pelos de `nvidia-smi -L`** |
-| `ollama-warm.service` | `/etc/systemd/system/ollama-warm.service` | root, 0644 | oneshot que carrega o `qwen3.8:27b` a 96k no boot (64k até 2026-11-05 12:23) (até 2026-11-05: `qwen3-ia`); `After=ollama.service nvidia-powercap.service` |
-| `ollama-warm.sh` | `/usr/local/bin/ollama-warm` | root, 0755 | espera o Ollama e faz um `/api/generate` mínimo (`think:false`, `num_ctx:98304`) |
-| `nvidia-powercap.service` | `/etc/systemd/system/nvidia-powercap.service` | root, 0644 | por GPU: persistence mode, `-pl 100` (100 W) e `-lgc 210,1400` (clock travado). Motivo: fonte de 850 W |
+| `ollama-warm.service` | `/etc/systemd/system/ollama-warm.service` | root, 0644 | oneshot que carrega o `qwen3.8:27b` a 128k no boot (96k de 2026-11-05 a 2026-11-08; 64k antes) (até 2026-11-05: `qwen3-ia`); `After=ollama.service nvidia-powercap.service` |
+| `ollama-warm.sh` | `/usr/local/bin/ollama-warm` | root, 0755 | espera o Ollama e faz um `/api/generate` mínimo (`think:false`, `num_predict:1`). **Desde 2026-11-08 não manda `num_ctx`**: o contexto vem do modelo (antes `num_ctx:98304`) |
+| `nvidia-powercap.service` | `/etc/systemd/system/nvidia-powercap.service` | root, 0644 | por GPU, desde 2026-11-08: persistence mode, `-pl 240` (máximo das placas), `-rgc` (clock liberado) e offsets de memória +1500 MHz e núcleo +150 MHz por `/usr/local/bin/oc`. Até 2026-11-08: `-pl 100` e `-lgc 210,1400` (motivo: fonte de 850 W com 4 placas; resolvido com a 2ª fonte de 500 W) |
+| `Modelfile.qwen3.8-27b-128k` | (usado no `ollama create`, não é instalado) | | recria o `qwen3.8:27b` com `PARAMETER num_ctx 131072` e `PARAMETER num_gpu 66` embutidos (o gateway tira `num_ctx`/`num_gpu` do pedido do cliente, então o parâmetro tem de estar no modelo). Digest `aaee06c39dcf` → `40e90b71222a` |
+| `ferramentas-gpu/` | `/root/pl-test/` (testes; `oc` em `/usr/local/bin/oc`) | | ferramentas de teste e ajuste das GPUs: `oc.c` (offsets NVML, vira `/usr/local/bin/oc`), `memtest.cu`, `cb.cu`, `fan.c`, `burn.cu` e os scripts `ramp.sh`, `osc4.sh`, `core3.sh`, `ctx2.sh`, `ctx3.sh`, `load.sh`, `genpf.py` |
 | `nginx-cloudflare-allow.conf` | `/etc/nginx/ollama/cloudflare-allow.conf` | root, 0644 | faixas de IP da borda do Cloudflare (`allow ...;`); incluída pelo `ollama.conf` |
 | `nginx-auth.conf.modelo` | `/etc/nginx/ollama/auth.conf` | root, **0600** | modelo do mapa de autenticação. Veja a nota abaixo |
 | `cloudflared.service` | `/etc/systemd/system/cloudflared.service` | root, 0644 | túnel do Cloudflare: `cloudflared ... tunnel run --token-file /etc/cloudflared/token` |
@@ -38,6 +40,25 @@ map $http_authorization $ollama_authorized {
 
 Gere o token com `openssl rand -hex 32`, grave o arquivo como root com modo 0600 e **nunca** o versione. O script `ollama-key-rotate` (em `nginx/`) reescreve o arquivo com a variante
 por expressão regular `"~*^Bearer[[:space:]]+<TOKEN>$"`, equivalente para o cliente.
+
+## Reverter (mudanças de 2026-11-08)
+
+Contexto 128k (volta ao modelo original a 96k):
+
+```bash
+ollama stop qwen3.8:27b
+ollama cp qwen3.8:27b-orig qwen3.8:27b      # a tag local qwen3.8:27b-orig guarda o modelo original (digest aaee06c39dcf)
+cp /root/ollama-warm.bak-20261108-1705 /usr/local/bin/ollama-warm   # volta a mandar num_ctx 98304
+```
+
+Power cap e overclock (volta ao estado anterior; backups feitos no servidor antes de cada edição):
+
+```bash
+cp /root/nvidia-powercap.service.bak-20261108-1618 /etc/systemd/system/nvidia-powercap.service   # ou o -1633, mais recente
+systemctl daemon-reload; systemctl restart nvidia-powercap
+```
+
+A unit antiga voltava a `-pl 100` e `-lgc 210,1400`. Só faça isso com a 2ª fonte desligada ou se houver reboots secos sob carga.
 
 ## Subpasta `nginx/`
 

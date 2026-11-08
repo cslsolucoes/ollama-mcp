@@ -370,7 +370,7 @@ Rodam **antes de enfileirar**, em `/api/generate`, `/api/chat`, `/api/embed`, `/
 `/v1/chat/completions`, `/v1/completions` e `/v1/embeddings`.
 
 **1. Opções removidas** (em silêncio): `keep_alive` de topo, `options.num_ctx` e `options.num_gpu`, `main_gpu`, `low_vram`,
-`use_mmap`, `use_mlock`, `numa`. Motivo: o Ollama mantém o modelo residente com o contexto dele (`num_ctx` 98304 desde 2026-11-05; antes 65536); qualquer
+`use_mmap`, `use_mlock`, `numa`. Motivo: o Ollama mantém o modelo residente com o contexto dele (`num_ctx` 131072 e `num_gpu` 66 embutidos no modelo desde 2026-11-08; 98304 de 2026-11-05 a 2026-11-08; antes 65536); qualquer
 outro valor recarrega o modelo (~20 s) ou o descarrega para todos. Religar com `--allow-client-keepalive`,
 `--allow-client-num-ctx` ou editando `--strip-options`. As chaves são casadas sem diferenciar maiúsculas; **duas grafias da
 mesma chave** (`model` e `Model`) dão **400**. JSON inválido ou `model` que não é texto também dá **400**, com mensagem

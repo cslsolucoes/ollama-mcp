@@ -8,6 +8,48 @@ Fontes: commits, tags, e os planos e reports de `.workspace/`. As versões vêm 
 (`<versão>-<hash curto do commit>`, definido na compilação por `-X main.Version`). O que não deu para confirmar está marcado
 **(data/versão a conferir)**.
 
+## Servidor de IA (infraestrutura), 2026-11-08
+
+Mudanças só no servidor `ia.cslsolucoes.com.br` e nos arquivos de referência em `deploy/servidor-ia/`; **sem mudança de código e sem
+número de versão** (gateway e mcpollama seguem como estavam).
+
+- **Hardware:** o dono instalou uma 2ª fonte de 500 W (placa-mãe + 1 GPU nela; 3 GPUs ficaram na de 850 W). Servidor reiniciado às 14:59 e
+  de novo às 16:02:26.
+- **`nvidia-powercap.service`:** de `-pl 100` e `-lgc 210,1400` para `-pl 240` (máximo das placas; o `nvidia-smi` recusa 250), `-rgc`
+  (clock liberado) e offsets de memória **+1500 MHz** e núcleo **+150 MHz** por `/usr/local/bin/oc` (C com NVML, `deploy/servidor-ia/ferramentas-gpu/oc.c`).
+  Backups no servidor: `/root/nvidia-powercap.service.bak-20261108-1618` e `-1633`. Ventoinhas em automático.
+- **Comparativo controlado A/B/C (números exatos, 2026-11-08 17:16–17:51, `deploy/servidor-ia/ferramentas-gpu/abtest.sh` e `abtest2.sh`):** A = 100 W e clock travado
+  (como estava), B = 240 W e clock liberado, C = final (B + memória +1500 e núcleo +150); ordem espelhada A B C C B A, 6 execuções por configuração,
+  mesmo modelo (128k, 66/66 camadas), Ollama direto. **Leitura de prompt** (33,4 mil tokens, prompt novo a cada execução para não usar o cache): A **476,9 ±1,6**
+  tok/s, B **640,4 ±1,3** (**+34,3%**), C **674,6 ±0,7** (**+41,5% sobre A**, +5,3% sobre B). **Geração com prompt curto:** A **43,9**, B **49,8** (+13,4%), C **51,9**
+  (**+18,2%**) tok/s (±0,3). **Geração com contexto de 83,5 mil tokens:** A **19,2**, B **21,1** (+9,9%), C **22,4** (**+16,7%**) tok/s (±0,8 a 1,0). Pico por placa sob
+  carga: A 1395 MHz e ~72 W; B 1950–1965 MHz e ~135 W; C 2100 MHz e ~139 W (51–55 °C). As respostas (`md5`) saíram idênticas nas três configurações.
+  Ressalvas: a geração com contexto de ~33 mil tokens variou ±2,7 tok/s entre prompts diferentes (24,4 / 26,9 / 30,7 em A/B/C) e não entra na conclusão;
+  uma primeira rodada com prompts repetidos foi descartada na leitura por efeito do cache do Ollama. Os percentuais anteriores deste dia (+30% e +14 a 24%)
+  eram preliminares, de testes não pareados.
+- **Medições (RTX 3070 ×4, driver 610.57.04):** só liberar o clock e 220/240 W deu +30% na leitura de prompt (451→587 tok/s) e +14 a 24% na
+  geração (20,9→23,8..25,9 tok/s, contexto longo); estresse de 12 min a 240 W sem erro; rampa com burn SGEMM nas 4 GPUs ao mesmo tempo
+  130..240 W sem falha, pico somado 946 W a 240 W, temperatura máx. 87 °C (GPU 0, a mais quente, chega a 90–91 °C). Memória limpa de +0 a
+  +2100 MHz (banda 191→221 GB/s); **+2400 derrubou o firmware GSP de uma placa** (GSP-CrashCat, precisou reiniciar), por isso fixado +1500
+  (ganho real na geração só ~+5%: 49,8→52,2 tok/s, resposta idêntica). Núcleo limpo até +150 (~+4% na leitura: 615→639 tok/s); **+200 falhou
+  2×** (Xid 13/31, `llama-server` caiu) em placas diferentes, fixado +150.
+- **Contexto 128k:** o `qwen3.8:27b` foi **recriado** (`ollama create`) com `num_ctx 131072` e `num_gpu 66` embutidos
+  (`deploy/servidor-ia/Modelfile.qwen3.8-27b-128k`; digest `aaee06c39dcf` → `40e90b71222a`; original guardado como `qwen3.8:27b-orig`).
+  O gateway tira `num_ctx`/`num_gpu` do pedido, por isso os parâmetros ficam no modelo (testado: 1 carga só, pedidos pelo gateway com carga 0,0 s).
+  `ollama-warm.sh` não manda mais `num_ctx`; `OLLAMA_CONTEXT_LENGTH=98304` fica no drop-in (só vale para modelo sem o parâmetro). Medido:
+  66/66 camadas na GPU a **52 tok/s** com prompt curto (automático, sem `num_gpu`: 61/66 e 23 tok/s; 112k automático 63/66 a 28,8 tok/s);
+  VRAM por GPU ~7183/5519/5787/7717 MiB de 8192 (folga ~470 MiB na GPU 3); com contexto cheio a geração cai (~22 tok/s com 65k de prompt).
+- **Prompt maior que o contexto é cortado pelo Ollama SEM erro (medido; corrige uma leitura errada feita no mesmo dia).** Só quando o prompt **não cabe**
+  no contexto o Ollama o reduz para ~metade do contexto + 2 (`truncating input prompt limit=49154 ... keep=4` a 96k; `limit=65538` a 128k;
+  `limit=32770` a 64k; ficam os 4 primeiros tokens e o final). Prompt que cabe **não é cortado**: a 128k, prompts de 83,5 mil tokens passaram
+  inteiros (0 truncamentos). O `--max-prompt-chars 270000` do mcpollama (~82–90 mil tokens) cabe em 128k; a 96k ficava justo. Os testes do dia
+  rotulados "49 mil tokens" eram prompts de >100 mil tokens truncados a 49.154 (a comparação relativa valia). Sem pendência de código.
+- **Achado fora do pedido (não corrigido):** erros PCIe corrigíveis de camada física na porta `00:1b.4` (GPU 1, `03:00.0`), pré-existentes e
+  frequentes (93 em 1 min no boot atual), sugerem contato ruim no slot/riser; não afetaram os resultados. Não há VBIOS oficial novo da
+  RTX 3070 nem GSP separado do driver (610.57.04 é o mais recente encontrado); BIOS da placa-mãe PRIME Z490-P 1806 é beta de 15/01/2026.
+- **Ferramentas de teste:** `deploy/servidor-ia/ferramentas-gpu/` (`oc.c`, `memtest.cu`, `cb.cu`, `fan.c`, `burn.cu`, `ramp.sh`, `osc4.sh`,
+  `core3.sh`, `ctx2.sh`, `ctx3.sh`, `load.sh`, `genpf.py`); no servidor ficam em `/root/pl-test/`.
+
 ## Não lançado
 
 A Fase 11 (jobs assíncronos, lotes e registro integral) foi **descongelada em 2026-11-05 20:22** por ordem do owner (estava congelada
